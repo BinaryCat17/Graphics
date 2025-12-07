@@ -318,6 +318,12 @@ static void create_swapchain_and_views(void) {
             break;
         }
     }
+    /* Some platforms advertise VK_FORMAT_UNDEFINED to indicate flexibility. Choose a
+       concrete format so swapchain creation succeeds on implementations that reject
+       VK_FORMAT_UNDEFINED. */
+    if (chosen_fmt.format == VK_FORMAT_UNDEFINED) {
+        chosen_fmt.format = VK_FORMAT_B8G8R8A8_UNORM;
+    }
     swapchain_format = chosen_fmt.format;
     free(fmts);
 
