@@ -1,0 +1,9 @@
+{
+  "dependencies": [
+    "cglm",
+    "glfw3",
+    "vulkan-headers",
+    "vulkan-loader",
+    "stb"
+  ]
+}
