@@ -673,6 +673,10 @@ static void cleanup_swapchain(bool keep_swapchain_handle) {
         free(swapchain_imgviews);
         swapchain_imgviews = NULL;
     }
+    if (swapchain_imgs) {
+        free(swapchain_imgs);
+        swapchain_imgs = NULL;
+    }
     if (!keep_swapchain_handle && swapchain) {
         vkDestroySwapchainKHR(device, swapchain, NULL);
         swapchain = VK_NULL_HANDLE;
@@ -707,13 +711,25 @@ static void destroy_device_resources(void) {
     if (sem_render_done) { vkDestroySemaphore(device, sem_render_done, NULL); sem_render_done = VK_NULL_HANDLE; }
 }
 
+static void recreate_instance_and_surface(void) {
+    if (surface) { vkDestroySurfaceKHR(instance, surface, NULL); surface = VK_NULL_HANDLE; }
+    if (instance) { vkDestroyInstance(instance, NULL); instance = VK_NULL_HANDLE; }
+
+    create_instance();
+    res = glfwCreateWindowSurface(instance, window, NULL, &surface);
+    if (res != VK_SUCCESS) fatal_vk("glfwCreateWindowSurface", res);
+}
+
 static bool recover_device_loss(void) {
     fprintf(stderr, "Device lost detected; tearing down and recreating logical device and swapchain resources...\n");
+    if (device) vkDeviceWaitIdle(device);
     destroy_device_resources();
     if (device) {
         vkDestroyDevice(device, NULL);
         device = VK_NULL_HANDLE;
     }
+
+    recreate_instance_and_surface();
 
     pick_physical_and_create_device();
     create_swapchain_and_views(VK_NULL_HANDLE);
