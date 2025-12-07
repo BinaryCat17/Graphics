@@ -60,6 +60,8 @@ if (NOT VULKAN_STUB)
 
     set(APP_SOURCES
             "app/main.c"
+            "app/vulkan_renderer.c" "app/vulkan_renderer.h"
+            "app/ui_json.c" "app/ui_json.h"
             "src/Graphics.c" "src/Graphics.h"
     )
 else()
@@ -71,7 +73,7 @@ add_executable (Graphics ${APP_SOURCES})
 
 if (NOT VULKAN_STUB)
     add_dependencies(Graphics Shaders)
-    set_source_files_properties(src/main.c PROPERTIES LANGUAGE C)
+    set_source_files_properties(app/main.c PROPERTIES LANGUAGE C)
     target_include_directories(${PROJECT_NAME} PRIVATE
         ${Vulkan_INCLUDE_DIRS}
     )
