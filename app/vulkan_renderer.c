@@ -527,30 +527,6 @@ static void recreate_instance_and_surface(void) {
     if (res != VK_SUCCESS) fatal_vk("glfwCreateWindowSurface", res);
 }
 
-static bool recover_device_loss(void) {
-    fprintf(stderr, "Device lost detected; tearing down and recreating logical device and swapchain resources...\n");
-    if (device) vkDeviceWaitIdle(device);
-    destroy_device_resources();
-    if (device) {
-        vkDestroyDevice(device, NULL);
-        device = VK_NULL_HANDLE;
-    }
-
-    recreate_instance_and_surface();
-
-    pick_physical_and_create_device();
-    create_swapchain_and_views(VK_NULL_HANDLE);
-    if (!swapchain) return false;
-    create_render_pass();
-    create_descriptor_layout();
-    create_pipeline(g_vert_spv, g_frag_spv);
-    create_cmds_and_sync();
-    create_font_texture();
-    create_descriptor_pool_and_set();
-    build_vertices_from_widgets();
-    return true;
-}
-
 static void recreate_swapchain(void) {
     vkDeviceWaitIdle(device);
 
@@ -664,59 +640,6 @@ static void upload_vertices(void) {
 }
 
 /* record commands per framebuffer (we will re-record each frame in this simple example) */
-static void record_cmdbuffer(uint32_t idx) {
-    VkCommandBuffer cb = cmdbuffers[idx];
-    vkResetCommandBuffer(cb, 0);
-    VkCommandBufferBeginInfo binfo = { .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO };
-    vkBeginCommandBuffer(cb, &binfo);
-
-    VkClearValue clr = { .color = {{0.9f,0.9f,0.9f,1.0f}} };
-    VkRenderPassBeginInfo rpbi = { .sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO, .renderPass = render_pass, .framebuffer = framebuffers[idx], .renderArea = {.offset = {0,0}, .extent = swapchain_extent }, .clearValueCount = 1, .pClearValues = &clr };
-    vkCmdBeginRenderPass(cb, &rpbi, VK_SUBPASS_CONTENTS_INLINE);
-
-    vkCmdBindPipeline(cb, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline);
-    ViewConstants pc = { .viewport = { (float)swapchain_extent.width, (float)swapchain_extent.height } };
-    vkCmdPushConstants(cb, pipeline_layout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(ViewConstants), &pc);
-    vkCmdBindDescriptorSets(cb, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_layout, 0, 1, &descriptor_set, 0, NULL);
-    if (vertex_buffer != VK_NULL_HANDLE && vtx_count > 0) {
-        VkDeviceSize offset = 0;
-        vkCmdBindVertexBuffers(cb, 0, 1, &vertex_buffer, &offset);
-        /* simple draw: vertices are triangles (every 3 vertices) */
-        vkCmdDraw(cb, (uint32_t)vtx_count, 1, 0, 0);
-    }
-
-    vkCmdEndRenderPass(cb);
-    vkEndCommandBuffer(cb);
-}
-
-/* present frame */
-static void draw_frame(void) {
-    if (swapchain == VK_NULL_HANDLE) return;
-    uint32_t img_idx;
-    VkResult acq = vkAcquireNextImageKHR(device, swapchain, UINT64_MAX, sem_img_avail, VK_NULL_HANDLE, &img_idx);
-    if (acq == VK_ERROR_OUT_OF_DATE_KHR || acq == VK_SUBOPTIMAL_KHR) { recreate_swapchain(); return; }
-    if (acq != VK_SUCCESS) fatal_vk("vkAcquireNextImageKHR", acq);
-    vkWaitForFences(device, 1, &fences[img_idx], VK_TRUE, UINT64_MAX);
-    vkResetFences(device, 1, &fences[img_idx]);
-
-    /* re-upload vertices & record */
-    upload_vertices();
-    record_cmdbuffer(img_idx);
-
-    VkPipelineStageFlags waitStage = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
-    VkSubmitInfo si = { .sType = VK_STRUCTURE_TYPE_SUBMIT_INFO, .waitSemaphoreCount = 1, .pWaitSemaphores = &sem_img_avail, .pWaitDstStageMask = &waitStage, .commandBufferCount = 1, .pCommandBuffers = &cmdbuffers[img_idx], .signalSemaphoreCount = 1, .pSignalSemaphores = &sem_render_done };
-    VkResult submit = vkQueueSubmit(queue, 1, &si, fences[img_idx]);
-    if (submit == VK_ERROR_DEVICE_LOST) {
-        if (!recover_device_loss()) fatal_vk("vkQueueSubmit", submit);
-        return;
-    }
-    if (submit != VK_SUCCESS) fatal_vk("vkQueueSubmit", submit);
-    VkPresentInfoKHR pi = { .sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR, .waitSemaphoreCount = 1, .pWaitSemaphores = &sem_render_done, .swapchainCount = 1, .pSwapchains = &swapchain, .pImageIndices = &img_idx };
-    VkResult present = vkQueuePresentKHR(queue, &pi);
-    if (present == VK_ERROR_OUT_OF_DATE_KHR || present == VK_SUBOPTIMAL_KHR) { recreate_swapchain(); return; }
-    if (present != VK_SUCCESS) fatal_vk("vkQueuePresentKHR", present);
-}
-
 /* ---------- GUI building: convert g_widgets -> vertex list (rects + textured glyphs) ---------- */
 static unsigned char* ttf_buffer = NULL;
 static stbtt_fontinfo fontinfo;
@@ -858,6 +781,83 @@ static void build_vertices_from_widgets(void) {
             append_text(w->text, w->rect.x + 6.0f, w->rect.y + 6.0f, cc);
         }
     }
+}
+
+static bool recover_device_loss(void) {
+    fprintf(stderr, "Device lost detected; tearing down and recreating logical device and swapchain resources...\n");
+    if (device) vkDeviceWaitIdle(device);
+    destroy_device_resources();
+    if (device) {
+        vkDestroyDevice(device, NULL);
+        device = VK_NULL_HANDLE;
+    }
+
+    recreate_instance_and_surface();
+
+    pick_physical_and_create_device();
+    create_swapchain_and_views(VK_NULL_HANDLE);
+    if (!swapchain) return false;
+    create_render_pass();
+    create_descriptor_layout();
+    create_pipeline(g_vert_spv, g_frag_spv);
+    create_cmds_and_sync();
+    create_font_texture();
+    create_descriptor_pool_and_set();
+    build_vertices_from_widgets();
+    return true;
+}
+
+static void record_cmdbuffer(uint32_t idx) {
+    VkCommandBuffer cb = cmdbuffers[idx];
+    vkResetCommandBuffer(cb, 0);
+    VkCommandBufferBeginInfo binfo = { .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO };
+    vkBeginCommandBuffer(cb, &binfo);
+
+    VkClearValue clr = { .color = {{0.9f,0.9f,0.9f,1.0f}} };
+    VkRenderPassBeginInfo rpbi = { .sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO, .renderPass = render_pass, .framebuffer = framebuffers[idx], .renderArea = {.offset = {0,0}, .extent = swapchain_extent }, .clearValueCount = 1, .pClearValues = &clr };
+    vkCmdBeginRenderPass(cb, &rpbi, VK_SUBPASS_CONTENTS_INLINE);
+
+    vkCmdBindPipeline(cb, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline);
+    ViewConstants pc = { .viewport = { (float)swapchain_extent.width, (float)swapchain_extent.height } };
+    vkCmdPushConstants(cb, pipeline_layout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(ViewConstants), &pc);
+    vkCmdBindDescriptorSets(cb, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_layout, 0, 1, &descriptor_set, 0, NULL);
+    if (vertex_buffer != VK_NULL_HANDLE && vtx_count > 0) {
+        VkDeviceSize offset = 0;
+        vkCmdBindVertexBuffers(cb, 0, 1, &vertex_buffer, &offset);
+        /* simple draw: vertices are triangles (every 3 vertices) */
+        vkCmdDraw(cb, (uint32_t)vtx_count, 1, 0, 0);
+    }
+
+    vkCmdEndRenderPass(cb);
+    vkEndCommandBuffer(cb);
+}
+
+/* present frame */
+static void draw_frame(void) {
+    if (swapchain == VK_NULL_HANDLE) return;
+    uint32_t img_idx;
+    VkResult acq = vkAcquireNextImageKHR(device, swapchain, UINT64_MAX, sem_img_avail, VK_NULL_HANDLE, &img_idx);
+    if (acq == VK_ERROR_OUT_OF_DATE_KHR || acq == VK_SUBOPTIMAL_KHR) { recreate_swapchain(); return; }
+    if (acq != VK_SUCCESS) fatal_vk("vkAcquireNextImageKHR", acq);
+    vkWaitForFences(device, 1, &fences[img_idx], VK_TRUE, UINT64_MAX);
+    vkResetFences(device, 1, &fences[img_idx]);
+
+    /* re-upload vertices & record */
+    upload_vertices();
+    record_cmdbuffer(img_idx);
+
+    VkPipelineStageFlags waitStage = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+    VkSubmitInfo si = { .sType = VK_STRUCTURE_TYPE_SUBMIT_INFO, .waitSemaphoreCount = 1, .pWaitSemaphores = &sem_img_avail, .pWaitDstStageMask = &waitStage, .commandBufferCount = 1, .pCommandBuffers = &cmdbuffers[img_idx], .signalSemaphoreCount = 1, .pSignalSemaphores = &sem_render_done };
+    VkResult submit = vkQueueSubmit(queue, 1, &si, fences[img_idx]);
+    if (submit == VK_ERROR_DEVICE_LOST) {
+        if (!recover_device_loss()) fatal_vk("vkQueueSubmit", submit);
+        return;
+    }
+    if (submit != VK_SUCCESS) fatal_vk("vkQueueSubmit", submit);
+    VkPresentInfoKHR pi = { .sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR, .waitSemaphoreCount = 1, .pWaitSemaphores = &sem_render_done, .swapchainCount = 1, .pSwapchains = &swapchain, .pImageIndices = &img_idx };
+    VkResult present = vkQueuePresentKHR(queue, &pi);
+    if (present == VK_ERROR_OUT_OF_DATE_KHR || present == VK_SUBOPTIMAL_KHR) { recreate_swapchain(); return; }
+    if (present != VK_SUCCESS) fatal_vk("vkQueuePresentKHR", present);
 }
 
 bool vk_renderer_init(GLFWwindow* window, const char* vert_spv, const char* frag_spv, const Widget* widgets) {
