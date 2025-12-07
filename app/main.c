@@ -361,6 +361,31 @@ static void fatal_vk(const char* msg, VkResult r) {
     exit(1);
 }
 
+static void log_gpu_info(VkPhysicalDevice dev) {
+    VkPhysicalDeviceProperties props;
+    vkGetPhysicalDeviceProperties(dev, &props);
+
+    const char* type = "Unknown";
+    switch (props.deviceType) {
+    case VK_PHYSICAL_DEVICE_TYPE_OTHER: type = "Other"; break;
+    case VK_PHYSICAL_DEVICE_TYPE_INTEGRATED_GPU: type = "Integrated"; break;
+    case VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU: type = "Discrete"; break;
+    case VK_PHYSICAL_DEVICE_TYPE_VIRTUAL_GPU: type = "Virtual"; break;
+    case VK_PHYSICAL_DEVICE_TYPE_CPU: type = "CPU"; break;
+    default: break;
+    }
+
+    printf("Using GPU: %s (%s) vendor=0x%04x device=0x%04x driver=0x%x api=%u.%u.%u\n",
+           props.deviceName,
+           type,
+           props.vendorID,
+           props.deviceID,
+           props.driverVersion,
+           VK_VERSION_MAJOR(props.apiVersion),
+           VK_VERSION_MINOR(props.apiVersion),
+           VK_VERSION_PATCH(props.apiVersion));
+}
+
 /* ---------- Vulkan setup (minimal, not exhaustive checks) ---------- */
 static void create_instance(void) {
     VkApplicationInfo ai = { .sType = VK_STRUCTURE_TYPE_APPLICATION_INFO, .pApplicationName = "vk_gui", .apiVersion = VK_API_VERSION_1_0 };
@@ -376,6 +401,8 @@ static void pick_physical_and_create_device(void) {
     uint32_t pc = 0; vkEnumeratePhysicalDevices(instance, &pc, NULL); if (pc == 0) fatal("No physical dev");
     VkPhysicalDevice* list = malloc(sizeof(VkPhysicalDevice) * pc); vkEnumeratePhysicalDevices(instance, &pc, list);
     physical = list[0]; free(list);
+
+    log_gpu_info(physical);
 
     /* find queue family with graphics + present */
     uint32_t qcount = 0; vkGetPhysicalDeviceQueueFamilyProperties(physical, &qcount, NULL);
@@ -577,7 +604,9 @@ static void create_pipeline(const char* vert_spv, const char* frag_spv) {
     VkPipelineVertexInputStateCreateInfo vxi = { .sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO, .vertexBindingDescriptionCount = 1, .pVertexBindingDescriptions = &bind, .vertexAttributeDescriptionCount = 4, .pVertexAttributeDescriptions = attr };
 
     VkPipelineInputAssemblyStateCreateInfo ia = { .sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO, .topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST };
-    VkViewport vp = { .x = 0, .y = 0, .width = (float)swapchain_extent.width, .height = (float)swapchain_extent.height, .minDepth = 0.0f, .maxDepth = 1.0f };
+    float viewport_w = (swapchain_extent.width == 0) ? 1.0f : (float)swapchain_extent.width;
+    float viewport_h = (swapchain_extent.height == 0) ? 1.0f : (float)swapchain_extent.height;
+    VkViewport vp = { .x = 0, .y = 0, .width = viewport_w, .height = viewport_h, .minDepth = 0.0f, .maxDepth = 1.0f };
     VkRect2D sc = { .offset = {0,0}, .extent = swapchain_extent };
     VkPipelineViewportStateCreateInfo vpci = { .sType = VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO, .viewportCount = 1, .pViewports = &vp, .scissorCount = 1, .pScissors = &sc };
     VkPipelineRasterizationStateCreateInfo rs = { .sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO, .polygonMode = VK_POLYGON_MODE_FILL, .cullMode = VK_CULL_MODE_NONE, .frontFace = VK_FRONT_FACE_CLOCKWISE, .lineWidth = 1.0f };
@@ -591,6 +620,11 @@ static void create_pipeline(const char* vert_spv, const char* frag_spv) {
     if (res != VK_SUCCESS) fatal_vk("vkCreatePipelineLayout", res);
     VkGraphicsPipelineCreateInfo gpci = { .sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO, .stageCount = 2, .pStages = stages, .pVertexInputState = &vxi, .pInputAssemblyState = &ia, .pViewportState = &vpci, .pRasterizationState = &rs, .pMultisampleState = &ms, .pDepthStencilState = &ds, .pColorBlendState = &cb, .layout = pipeline_layout, .renderPass = render_pass, .subpass = 0 };
     res = vkCreateGraphicsPipelines(device, VK_NULL_HANDLE, 1, &gpci, NULL, &pipeline);
+    if (res == VK_ERROR_DEVICE_LOST) {
+        fprintf(stderr, "vkCreateGraphicsPipelines returned device lost, waiting for device idle and retrying...\n");
+        vkDeviceWaitIdle(device);
+        res = vkCreateGraphicsPipelines(device, VK_NULL_HANDLE, 1, &gpci, NULL, &pipeline);
+    }
     if (res != VK_SUCCESS) fatal_vk("vkCreateGraphicsPipelines", res);
     vkDestroyShaderModule(device, vs, NULL); vkDestroyShaderModule(device, fs, NULL);
 }
