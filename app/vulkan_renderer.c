@@ -1,6 +1,7 @@
 #define _POSIX_C_SOURCE 200809L
 #include "vulkan_renderer.h"
 
+#include "vulkan/vulkan.h"
 #include <math.h>
 #include <stdbool.h>
 #include <stdint.h>
