@@ -434,6 +434,8 @@ static void create_pipeline(const char* vert_spv, const char* frag_spv) {
 
 /* command pool/buffers/framebuffers/semaphores */
 static void create_cmds_and_sync(void) {
+    if (sem_img_avail) { vkDestroySemaphore(device, sem_img_avail, NULL); sem_img_avail = VK_NULL_HANDLE; }
+    if (sem_render_done) { vkDestroySemaphore(device, sem_render_done, NULL); sem_render_done = VK_NULL_HANDLE; }
     VkCommandPoolCreateInfo cpci = { .sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO, .queueFamilyIndex = graphics_family, .flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT };
     res = vkCreateCommandPool(device, &cpci, NULL, &cmdpool);
     if (res != VK_SUCCESS) fatal_vk("vkCreateCommandPool", res);
@@ -721,7 +723,9 @@ static void append_text(const char* text, float x, float y, Color col) {
         float y0 = base_y + g->yoff;
         float x1 = x0 + g->w;
         float y1 = y0 + g->h;
-        append_quad(x0, y0, x1, y1, g->u0, g->v0, g->u1, g->v1, col, 1.0f);
+        float fv0 = 1.0f - g->v0;
+        float fv1 = 1.0f - g->v1;
+        append_quad(x0, y0, x1, y1, g->u0, fv1, g->u1, fv0, col, 1.0f);
         pen_x += g->advance;
     }
 }
