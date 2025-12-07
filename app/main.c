@@ -307,7 +307,7 @@ static void pick_physical_and_create_device(void) {
 }
 
 /* create swapchain and imageviews */
-static void create_swapchain_and_views(void) {
+static void create_swapchain_and_views(VkSwapchainKHR old_swapchain) {
     /* choose format */
     uint32_t fc = 0; vkGetPhysicalDeviceSurfaceFormatsKHR(physical, surface, &fc, NULL); if (fc == 0) fatal("no surface formats");
     VkSurfaceFormatKHR* fmts = malloc(sizeof(VkSurfaceFormatKHR) * fc); vkGetPhysicalDeviceSurfaceFormatsKHR(physical, surface, &fc, fmts);
@@ -363,7 +363,7 @@ static void create_swapchain_and_views(void) {
     VkImageUsageFlags usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
     if (!(caps.supportedUsageFlags & usage)) fatal("swapchain color usage unsupported");
 
-    VkSwapchainCreateInfoKHR sci = { .sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR, .surface = surface, .minImageCount = img_count, .imageFormat = swapchain_format, .imageColorSpace = chosen_fmt.colorSpace, .imageExtent = swapchain_extent, .imageArrayLayers = 1, .imageUsage = usage, .imageSharingMode = VK_SHARING_MODE_EXCLUSIVE, .preTransform = caps.currentTransform, .compositeAlpha = comp_alpha, .presentMode = VK_PRESENT_MODE_FIFO_KHR, .clipped = VK_TRUE };
+    VkSwapchainCreateInfoKHR sci = { .sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR, .surface = surface, .minImageCount = img_count, .imageFormat = swapchain_format, .imageColorSpace = chosen_fmt.colorSpace, .imageExtent = swapchain_extent, .imageArrayLayers = 1, .imageUsage = usage, .imageSharingMode = VK_SHARING_MODE_EXCLUSIVE, .preTransform = caps.currentTransform, .compositeAlpha = comp_alpha, .presentMode = VK_PRESENT_MODE_FIFO_KHR, .clipped = VK_TRUE, .oldSwapchain = old_swapchain };
     if (vkCreateSwapchainKHR(device, &sci, NULL, &swapchain) != VK_SUCCESS) fatal("vkCreateSwapchainKHR");
     vkGetSwapchainImagesKHR(device, swapchain, &swapchain_img_count, NULL);
     swapchain_imgs = malloc(sizeof(VkImage) * swapchain_img_count);
@@ -453,7 +453,7 @@ static void create_cmds_and_sync(void) {
     }
 }
 
-static void cleanup_swapchain(void) {
+static void cleanup_swapchain(bool keep_swapchain_handle) {
     if (cmdbuffers) {
         vkFreeCommandBuffers(device, cmdpool, swapchain_img_count, cmdbuffers);
         free(cmdbuffers);
@@ -478,7 +478,7 @@ static void cleanup_swapchain(void) {
         free(swapchain_imgviews);
         swapchain_imgviews = NULL;
     }
-    if (swapchain) {
+    if (!keep_swapchain_handle && swapchain) {
         vkDestroySwapchainKHR(device, swapchain, NULL);
         swapchain = VK_NULL_HANDLE;
     }
@@ -499,12 +499,21 @@ static void cleanup_swapchain(void) {
 
 static void recreate_swapchain(void) {
     vkDeviceWaitIdle(device);
-    cleanup_swapchain();
-    create_swapchain_and_views();
-    if (!swapchain) return;
+
+    VkSwapchainKHR old_swapchain = swapchain;
+    cleanup_swapchain(true);
+
+    create_swapchain_and_views(old_swapchain);
+    if (!swapchain) {
+        if (old_swapchain) vkDestroySwapchainKHR(device, old_swapchain, NULL);
+        return;
+    }
+
     create_render_pass();
     create_pipeline(g_vert_spv, g_frag_spv);
     create_cmds_and_sync();
+
+    if (old_swapchain) vkDestroySwapchainKHR(device, old_swapchain, NULL);
 }
 
 /* create a simple host-visible vertex buffer */
@@ -808,7 +817,7 @@ int main(int argc, char** argv) {
     if (glfwCreateWindowSurface(instance, window, NULL, &surface) != VK_SUCCESS) fatal("glfwCreateWindowSurface");
 
     pick_physical_and_create_device();
-    create_swapchain_and_views();
+    create_swapchain_and_views(VK_NULL_HANDLE);
     create_render_pass();
     create_descriptor_layout();
     create_pipeline(g_vert_spv, g_frag_spv);
@@ -832,7 +841,7 @@ int main(int argc, char** argv) {
     free(atlas);
     free(ttf_buffer);
     free(vtx_buf);
-    cleanup_swapchain();
+    cleanup_swapchain(false);
     if (descriptor_pool) vkDestroyDescriptorPool(device, descriptor_pool, NULL);
     if (descriptor_layout) vkDestroyDescriptorSetLayout(device, descriptor_layout, NULL);
     if (font_sampler) vkDestroySampler(device, font_sampler, NULL);
