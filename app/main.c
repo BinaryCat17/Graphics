@@ -620,11 +620,6 @@ static void create_pipeline(const char* vert_spv, const char* frag_spv) {
     if (res != VK_SUCCESS) fatal_vk("vkCreatePipelineLayout", res);
     VkGraphicsPipelineCreateInfo gpci = { .sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO, .stageCount = 2, .pStages = stages, .pVertexInputState = &vxi, .pInputAssemblyState = &ia, .pViewportState = &vpci, .pRasterizationState = &rs, .pMultisampleState = &ms, .pDepthStencilState = &ds, .pColorBlendState = &cb, .layout = pipeline_layout, .renderPass = render_pass, .subpass = 0 };
     res = vkCreateGraphicsPipelines(device, VK_NULL_HANDLE, 1, &gpci, NULL, &pipeline);
-    if (res == VK_ERROR_DEVICE_LOST) {
-        fprintf(stderr, "vkCreateGraphicsPipelines returned device lost, waiting for device idle and retrying...\n");
-        vkDeviceWaitIdle(device);
-        res = vkCreateGraphicsPipelines(device, VK_NULL_HANDLE, 1, &gpci, NULL, &pipeline);
-    }
     if (res != VK_SUCCESS) fatal_vk("vkCreateGraphicsPipelines", res);
     vkDestroyShaderModule(device, vs, NULL); vkDestroyShaderModule(device, fs, NULL);
 }
@@ -695,6 +690,42 @@ static void cleanup_swapchain(bool keep_swapchain_handle) {
         render_pass = VK_NULL_HANDLE;
     }
     swapchain_img_count = 0;
+}
+
+static void destroy_device_resources(void) {
+    cleanup_swapchain(false);
+
+    if (descriptor_pool) { vkDestroyDescriptorPool(device, descriptor_pool, NULL); descriptor_pool = VK_NULL_HANDLE; }
+    if (descriptor_layout) { vkDestroyDescriptorSetLayout(device, descriptor_layout, NULL); descriptor_layout = VK_NULL_HANDLE; }
+    if (font_sampler) { vkDestroySampler(device, font_sampler, NULL); font_sampler = VK_NULL_HANDLE; }
+    if (font_image_view) { vkDestroyImageView(device, font_image_view, NULL); font_image_view = VK_NULL_HANDLE; }
+    if (font_image) { vkDestroyImage(device, font_image, NULL); font_image = VK_NULL_HANDLE; }
+    if (font_image_mem) { vkFreeMemory(device, font_image_mem, NULL); font_image_mem = VK_NULL_HANDLE; }
+    if (vertex_buffer) { vkDestroyBuffer(device, vertex_buffer, NULL); vertex_buffer = VK_NULL_HANDLE; }
+    if (vertex_memory) { vkFreeMemory(device, vertex_memory, NULL); vertex_memory = VK_NULL_HANDLE; }
+    if (sem_img_avail) { vkDestroySemaphore(device, sem_img_avail, NULL); sem_img_avail = VK_NULL_HANDLE; }
+    if (sem_render_done) { vkDestroySemaphore(device, sem_render_done, NULL); sem_render_done = VK_NULL_HANDLE; }
+}
+
+static bool recover_device_loss(void) {
+    fprintf(stderr, "Device lost detected; tearing down and recreating logical device and swapchain resources...\n");
+    destroy_device_resources();
+    if (device) {
+        vkDestroyDevice(device, NULL);
+        device = VK_NULL_HANDLE;
+    }
+
+    pick_physical_and_create_device();
+    create_swapchain_and_views(VK_NULL_HANDLE);
+    if (!swapchain) return false;
+    create_render_pass();
+    create_descriptor_layout();
+    create_pipeline(g_vert_spv, g_frag_spv);
+    create_cmds_and_sync();
+    create_font_texture();
+    create_descriptor_pool_and_set();
+    build_vertices_from_widgets();
+    return true;
 }
 
 static void recreate_swapchain(void) {
@@ -852,7 +883,10 @@ static void draw_frame(void) {
     VkPipelineStageFlags waitStage = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
     VkSubmitInfo si = { .sType = VK_STRUCTURE_TYPE_SUBMIT_INFO, .waitSemaphoreCount = 1, .pWaitSemaphores = &sem_img_avail, .pWaitDstStageMask = &waitStage, .commandBufferCount = 1, .pCommandBuffers = &cmdbuffers[img_idx], .signalSemaphoreCount = 1, .pSignalSemaphores = &sem_render_done };
     VkResult submit = vkQueueSubmit(queue, 1, &si, fences[img_idx]);
-    if (submit == VK_ERROR_DEVICE_LOST) { recreate_swapchain(); return; }
+    if (submit == VK_ERROR_DEVICE_LOST) {
+        if (!recover_device_loss()) fatal_vk("vkQueueSubmit", submit);
+        return;
+    }
     if (submit != VK_SUCCESS) fatal_vk("vkQueueSubmit", submit);
     VkPresentInfoKHR pi = { .sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR, .waitSemaphoreCount = 1, .pWaitSemaphores = &sem_render_done, .swapchainCount = 1, .pSwapchains = &swapchain, .pImageIndices = &img_idx };
     VkResult present = vkQueuePresentKHR(queue, &pi);
@@ -1050,17 +1084,7 @@ int main(int argc, char** argv) {
     free(atlas);
     free(ttf_buffer);
     free(vtx_buf);
-    cleanup_swapchain(false);
-    if (descriptor_pool) vkDestroyDescriptorPool(device, descriptor_pool, NULL);
-    if (descriptor_layout) vkDestroyDescriptorSetLayout(device, descriptor_layout, NULL);
-    if (font_sampler) vkDestroySampler(device, font_sampler, NULL);
-    if (font_image_view) vkDestroyImageView(device, font_image_view, NULL);
-    if (font_image) vkDestroyImage(device, font_image, NULL);
-    if (font_image_mem) vkFreeMemory(device, font_image_mem, NULL);
-    if (vertex_buffer) vkDestroyBuffer(device, vertex_buffer, NULL);
-    if (vertex_memory) vkFreeMemory(device, vertex_memory, NULL);
-    if (sem_img_avail) vkDestroySemaphore(device, sem_img_avail, NULL);
-    if (sem_render_done) vkDestroySemaphore(device, sem_render_done, NULL);
+    destroy_device_resources();
     vkDestroyDevice(device, NULL);
     vkDestroySurfaceKHR(instance, surface, NULL);
     vkDestroyInstance(instance, NULL);
