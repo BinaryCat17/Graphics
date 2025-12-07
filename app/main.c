@@ -232,6 +232,7 @@ static VkPipeline pipeline = VK_NULL_HANDLE;
 static VkCommandPool cmdpool = VK_NULL_HANDLE;
 static VkCommandBuffer* cmdbuffers = NULL;
 static VkFramebuffer* framebuffers = NULL;
+static VkResult res = VK_SUCCESS;
 
 static VkSemaphore sem_img_avail = VK_NULL_HANDLE;
 static VkSemaphore sem_render_done = VK_NULL_HANDLE;
@@ -271,7 +272,94 @@ static uint32_t* read_file_bin_u32(const char* path, size_t * out_words) {
 }
 
 /* Minimal error helper */
-static void fatal(const char* msg) { fprintf(stderr, "Fatal: %s\n", msg); exit(1); }
+static const char* vk_result_name(VkResult r) {
+    switch (r) {
+    case VK_SUCCESS: return "VK_SUCCESS";
+    case VK_NOT_READY: return "VK_NOT_READY";
+    case VK_TIMEOUT: return "VK_TIMEOUT";
+    case VK_EVENT_SET: return "VK_EVENT_SET";
+    case VK_EVENT_RESET: return "VK_EVENT_RESET";
+    case VK_INCOMPLETE: return "VK_INCOMPLETE";
+    case VK_ERROR_OUT_OF_HOST_MEMORY: return "VK_ERROR_OUT_OF_HOST_MEMORY";
+    case VK_ERROR_OUT_OF_DEVICE_MEMORY: return "VK_ERROR_OUT_OF_DEVICE_MEMORY";
+    case VK_ERROR_INITIALIZATION_FAILED: return "VK_ERROR_INITIALIZATION_FAILED";
+    case VK_ERROR_DEVICE_LOST: return "VK_ERROR_DEVICE_LOST";
+    case VK_ERROR_MEMORY_MAP_FAILED: return "VK_ERROR_MEMORY_MAP_FAILED";
+    case VK_ERROR_LAYER_NOT_PRESENT: return "VK_ERROR_LAYER_NOT_PRESENT";
+    case VK_ERROR_EXTENSION_NOT_PRESENT: return "VK_ERROR_EXTENSION_NOT_PRESENT";
+    case VK_ERROR_FEATURE_NOT_PRESENT: return "VK_ERROR_FEATURE_NOT_PRESENT";
+    case VK_ERROR_INCOMPATIBLE_DRIVER: return "VK_ERROR_INCOMPATIBLE_DRIVER";
+    case VK_ERROR_TOO_MANY_OBJECTS: return "VK_ERROR_TOO_MANY_OBJECTS";
+    case VK_ERROR_FORMAT_NOT_SUPPORTED: return "VK_ERROR_FORMAT_NOT_SUPPORTED";
+    case VK_ERROR_FRAGMENTED_POOL: return "VK_ERROR_FRAGMENTED_POOL";
+    case VK_ERROR_UNKNOWN: return "VK_ERROR_UNKNOWN";
+    case VK_ERROR_OUT_OF_POOL_MEMORY: return "VK_ERROR_OUT_OF_POOL_MEMORY";
+    case VK_ERROR_INVALID_EXTERNAL_HANDLE: return "VK_ERROR_INVALID_EXTERNAL_HANDLE";
+    case VK_ERROR_FRAGMENTATION: return "VK_ERROR_FRAGMENTATION";
+    case VK_ERROR_INVALID_OPAQUE_CAPTURE_ADDRESS: return "VK_ERROR_INVALID_OPAQUE_CAPTURE_ADDRESS";
+    case VK_ERROR_SURFACE_LOST_KHR: return "VK_ERROR_SURFACE_LOST_KHR";
+    case VK_ERROR_NATIVE_WINDOW_IN_USE_KHR: return "VK_ERROR_NATIVE_WINDOW_IN_USE_KHR";
+    case VK_SUBOPTIMAL_KHR: return "VK_SUBOPTIMAL_KHR";
+    case VK_ERROR_OUT_OF_DATE_KHR: return "VK_ERROR_OUT_OF_DATE_KHR";
+    case VK_ERROR_INCOMPATIBLE_DISPLAY_KHR: return "VK_ERROR_INCOMPATIBLE_DISPLAY_KHR";
+    case VK_ERROR_VALIDATION_FAILED_EXT: return "VK_ERROR_VALIDATION_FAILED_EXT";
+    case VK_ERROR_INVALID_SHADER_NV: return "VK_ERROR_INVALID_SHADER_NV";
+    case VK_ERROR_IMAGE_USAGE_NOT_SUPPORTED_KHR: return "VK_ERROR_IMAGE_USAGE_NOT_SUPPORTED_KHR";
+    case VK_ERROR_VIDEO_PICTURE_LAYOUT_NOT_SUPPORTED_KHR: return "VK_ERROR_VIDEO_PICTURE_LAYOUT_NOT_SUPPORTED_KHR";
+    case VK_ERROR_VIDEO_PROFILE_OPERATION_NOT_SUPPORTED_KHR: return "VK_ERROR_VIDEO_PROFILE_OPERATION_NOT_SUPPORTED_KHR";
+    case VK_ERROR_VIDEO_PROFILE_FORMAT_NOT_SUPPORTED_KHR: return "VK_ERROR_VIDEO_PROFILE_FORMAT_NOT_SUPPORTED_KHR";
+    case VK_ERROR_VIDEO_PROFILE_CODEC_NOT_SUPPORTED_KHR: return "VK_ERROR_VIDEO_PROFILE_CODEC_NOT_SUPPORTED_KHR";
+    case VK_ERROR_VIDEO_STD_VERSION_NOT_SUPPORTED_KHR: return "VK_ERROR_VIDEO_STD_VERSION_NOT_SUPPORTED_KHR";
+    default: return "UNKNOWN_VK_RESULT";
+    }
+}
+
+static const char* vk_result_description(VkResult r) {
+    switch (r) {
+    case VK_ERROR_OUT_OF_HOST_MEMORY: return "Host system ran out of memory while fulfilling the request.";
+    case VK_ERROR_OUT_OF_DEVICE_MEMORY: return "GPU memory was insufficient for the requested allocation or object.";
+    case VK_ERROR_INITIALIZATION_FAILED: return "Driver rejected initialization, often due to invalid parameters or missing prerequisites.";
+    case VK_ERROR_DEVICE_LOST: return "The GPU stopped responding or was reset; usually caused by device removal or timeout.";
+    case VK_ERROR_MEMORY_MAP_FAILED: return "Mapping the requested memory range failed (invalid offset/size or unsupported).";
+    case VK_ERROR_LAYER_NOT_PRESENT: return "Requested validation layer is not available on this system.";
+    case VK_ERROR_EXTENSION_NOT_PRESENT: return "Requested Vulkan extension is not supported by the implementation.";
+    case VK_ERROR_FEATURE_NOT_PRESENT: return "A required device feature is unavailable on the selected GPU.";
+    case VK_ERROR_INCOMPATIBLE_DRIVER: return "The installed driver does not support the requested Vulkan version.";
+    case VK_ERROR_TOO_MANY_OBJECTS: return "Implementation-specific object limit exceeded (try freeing unused resources).";
+    case VK_ERROR_FORMAT_NOT_SUPPORTED: return "Chosen image/format combination is unsupported for the requested usage.";
+    case VK_ERROR_FRAGMENTED_POOL: return "Pool allocation failed because the pool became internally fragmented.";
+    case VK_ERROR_OUT_OF_POOL_MEMORY: return "Descriptor or command pool cannot satisfy the allocation request.";
+    case VK_ERROR_INVALID_EXTERNAL_HANDLE: return "External handle provided is not valid for this driver or platform.";
+    case VK_ERROR_FRAGMENTATION: return "Allocation failed due to excessive fragmentation of the available memory.";
+    case VK_ERROR_INVALID_OPAQUE_CAPTURE_ADDRESS: return "Opaque capture address is invalid or already in use.";
+    case VK_ERROR_SURFACE_LOST_KHR: return "The presentation surface became invalid (resized, moved, or destroyed).";
+    case VK_ERROR_NATIVE_WINDOW_IN_USE_KHR: return "Surface creation failed because the window is already bound to another surface.";
+    case VK_ERROR_OUT_OF_DATE_KHR: return "Swapchain no longer matches the surface; recreate swapchain to continue.";
+    case VK_SUBOPTIMAL_KHR: return "Swapchain is still usable but no longer matches the surface optimally (consider recreating).";
+    case VK_ERROR_INCOMPATIBLE_DISPLAY_KHR: return "Requested display configuration is incompatible with the selected display.";
+    case VK_ERROR_VALIDATION_FAILED_EXT: return "Validation layers found an error; check validation output for details.";
+    case VK_ERROR_INVALID_SHADER_NV: return "Shader failed to compile or link for the driver; inspect SPIR-V or compile options.";
+    case VK_ERROR_IMAGE_USAGE_NOT_SUPPORTED_KHR: return "Requested image usage flags are unsupported for this surface format.";
+    case VK_ERROR_VIDEO_PICTURE_LAYOUT_NOT_SUPPORTED_KHR: return "Video profile does not support the requested picture layout.";
+    case VK_ERROR_VIDEO_PROFILE_OPERATION_NOT_SUPPORTED_KHR: return "Video profile does not support the requested operation.";
+    case VK_ERROR_VIDEO_PROFILE_FORMAT_NOT_SUPPORTED_KHR: return "Video profile does not support the requested pixel format.";
+    case VK_ERROR_VIDEO_PROFILE_CODEC_NOT_SUPPORTED_KHR: return "Video profile does not support the requested codec.";
+    case VK_ERROR_VIDEO_STD_VERSION_NOT_SUPPORTED_KHR: return "Requested video standard version is not supported.";
+    default: return "Consult validation output or driver logs for more details.";
+    }
+}
+
+static void fatal(const char* msg) {
+    fprintf(stderr, "Fatal: %s\n", msg);
+    exit(1);
+}
+
+static void fatal_vk(const char* msg, VkResult r) {
+    const char* name = vk_result_name(r);
+    const char* desc = vk_result_description(r);
+    fprintf(stderr, "Fatal: %s failed with %s. %s\n", msg, name, desc);
+    exit(1);
+}
 
 /* ---------- Vulkan setup (minimal, not exhaustive checks) ---------- */
 static void create_instance(void) {
@@ -280,7 +368,8 @@ static void create_instance(void) {
     /* request glfw extensions */
     uint32_t extc = 0; const char** exts = glfwGetRequiredInstanceExtensions(&extc);
     ici.enabledExtensionCount = extc; ici.ppEnabledExtensionNames = exts;
-    if (vkCreateInstance(&ici, NULL, &instance) != VK_SUCCESS) fatal("vkCreateInstance");
+    VkResult res = vkCreateInstance(&ici, NULL, &instance);
+    if (res != VK_SUCCESS) fatal_vk("vkCreateInstance", res);
 }
 
 static void pick_physical_and_create_device(void) {
@@ -303,7 +392,8 @@ static void pick_physical_and_create_device(void) {
     VkDeviceQueueCreateInfo qci = { .sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO, .queueFamilyIndex = graphics_family, .queueCount = 1, .pQueuePriorities = &prio };
     const char* dev_ext[] = { VK_KHR_SWAPCHAIN_EXTENSION_NAME };
     VkDeviceCreateInfo dci = { .sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO, .queueCreateInfoCount = 1, .pQueueCreateInfos = &qci, .enabledExtensionCount = 1, .ppEnabledExtensionNames = dev_ext };
-    if (vkCreateDevice(physical, &dci, NULL, &device) != VK_SUCCESS) fatal("vkCreateDevice");
+    res = vkCreateDevice(physical, &dci, NULL, &device);
+    if (res != VK_SUCCESS) fatal_vk("vkCreateDevice", res);
     vkGetDeviceQueue(device, graphics_family, 0, &queue);
 }
 
@@ -429,14 +519,16 @@ static void create_swapchain_and_views(VkSwapchainKHR old_swapchain) {
     if (!(caps.supportedUsageFlags & usage)) fatal("swapchain color usage unsupported");
 
     VkSwapchainCreateInfoKHR sci = { .sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR, .surface = surface, .minImageCount = img_count, .imageFormat = swapchain_format, .imageColorSpace = chosen_fmt.colorSpace, .imageExtent = swapchain_extent, .imageArrayLayers = 1, .imageUsage = usage, .imageSharingMode = VK_SHARING_MODE_EXCLUSIVE, .preTransform = caps.currentTransform, .compositeAlpha = comp_alpha, .presentMode = VK_PRESENT_MODE_FIFO_KHR, .clipped = VK_TRUE, .oldSwapchain = old_swapchain };
-    if (vkCreateSwapchainKHR(device, &sci, NULL, &swapchain) != VK_SUCCESS) fatal("vkCreateSwapchainKHR");
+    res = vkCreateSwapchainKHR(device, &sci, NULL, &swapchain);
+    if (res != VK_SUCCESS) fatal_vk("vkCreateSwapchainKHR", res);
     vkGetSwapchainImagesKHR(device, swapchain, &swapchain_img_count, NULL);
     swapchain_imgs = malloc(sizeof(VkImage) * swapchain_img_count);
     vkGetSwapchainImagesKHR(device, swapchain, &swapchain_img_count, swapchain_imgs);
     swapchain_imgviews = malloc(sizeof(VkImageView) * swapchain_img_count);
     for (uint32_t i = 0; i < swapchain_img_count; i++) {
         VkImageViewCreateInfo ivci = { .sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO, .image = swapchain_imgs[i], .viewType = VK_IMAGE_VIEW_TYPE_2D, .format = swapchain_format, .subresourceRange = { VK_IMAGE_ASPECT_COLOR_BIT, 0,1,0,1 } };
-        if (vkCreateImageView(device, &ivci, NULL, &swapchain_imgviews[i]) != VK_SUCCESS) fatal("vkCreateImageView");
+        res = vkCreateImageView(device, &ivci, NULL, &swapchain_imgviews[i]);
+        if (res != VK_SUCCESS) fatal_vk("vkCreateImageView", res);
     }
 }
 
@@ -446,13 +538,15 @@ static void create_render_pass(void) {
     VkAttachmentReference aref = { .attachment = 0, .layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL };
     VkSubpassDescription sub = { .pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS, .colorAttachmentCount = 1, .pColorAttachments = &aref };
     VkRenderPassCreateInfo rpci = { .sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO, .attachmentCount = 1, .pAttachments = &att, .subpassCount = 1, .pSubpasses = &sub };
-    if (vkCreateRenderPass(device, &rpci, NULL, &render_pass) != VK_SUCCESS) fatal("vkCreateRenderPass");
+    res = vkCreateRenderPass(device, &rpci, NULL, &render_pass);
+    if (res != VK_SUCCESS) fatal_vk("vkCreateRenderPass", res);
 }
 
 static void create_descriptor_layout(void) {
     VkDescriptorSetLayoutBinding binding = { .binding = 0, .descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, .descriptorCount = 1, .stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT };
     VkDescriptorSetLayoutCreateInfo lci = { .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO, .bindingCount = 1, .pBindings = &binding };
-    if (vkCreateDescriptorSetLayout(device, &lci, NULL, &descriptor_layout) != VK_SUCCESS) fatal("descriptor layout");
+    res = vkCreateDescriptorSetLayout(device, &lci, NULL, &descriptor_layout);
+    if (res != VK_SUCCESS) fatal_vk("vkCreateDescriptorSetLayout", res);
 }
 
 /* create simple pipeline from provided SPIR-V files (vertex/fragment) */
@@ -460,7 +554,8 @@ static VkShaderModule create_shader_module_from_spv(const char* path) {
     size_t words = 0; uint32_t* code = read_file_bin_u32(path, &words);
     if (!code) fatal("read spv");
     VkShaderModuleCreateInfo smci = { .sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO, .codeSize = words * 4, .pCode = code };
-    VkShaderModule mod; if (vkCreateShaderModule(device, &smci, NULL, &mod) != VK_SUCCESS) fatal("vkCreateShaderModule");
+    VkShaderModule mod; res = vkCreateShaderModule(device, &smci, NULL, &mod);
+    if (res != VK_SUCCESS) fatal_vk("vkCreateShaderModule", res);
     free(code); return mod;
 }
 
@@ -492,24 +587,29 @@ static void create_pipeline(const char* vert_spv, const char* frag_spv) {
     VkPipelineColorBlendStateCreateInfo cb = { .sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO, .attachmentCount = 1, .pAttachments = &cbatt };
     VkPushConstantRange pcr = { .stageFlags = VK_SHADER_STAGE_VERTEX_BIT, .offset = 0, .size = sizeof(float) * 2 };
     VkPipelineLayoutCreateInfo plci = { .sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO, .setLayoutCount = 1, .pSetLayouts = &descriptor_layout, .pushConstantRangeCount = 1, .pPushConstantRanges = &pcr };
-    if (vkCreatePipelineLayout(device, &plci, NULL, &pipeline_layout) != VK_SUCCESS) fatal("vkCreatePipelineLayout");
+    res = vkCreatePipelineLayout(device, &plci, NULL, &pipeline_layout);
+    if (res != VK_SUCCESS) fatal_vk("vkCreatePipelineLayout", res);
     VkGraphicsPipelineCreateInfo gpci = { .sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO, .stageCount = 2, .pStages = stages, .pVertexInputState = &vxi, .pInputAssemblyState = &ia, .pViewportState = &vpci, .pRasterizationState = &rs, .pMultisampleState = &ms, .pDepthStencilState = &ds, .pColorBlendState = &cb, .layout = pipeline_layout, .renderPass = render_pass, .subpass = 0 };
-    if (vkCreateGraphicsPipelines(device, VK_NULL_HANDLE, 1, &gpci, NULL, &pipeline) != VK_SUCCESS) fatal("vkCreateGraphicsPipelines");
+    res = vkCreateGraphicsPipelines(device, VK_NULL_HANDLE, 1, &gpci, NULL, &pipeline);
+    if (res != VK_SUCCESS) fatal_vk("vkCreateGraphicsPipelines", res);
     vkDestroyShaderModule(device, vs, NULL); vkDestroyShaderModule(device, fs, NULL);
 }
 
 /* command pool/buffers/framebuffers/semaphores */
 static void create_cmds_and_sync(void) {
     VkCommandPoolCreateInfo cpci = { .sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO, .queueFamilyIndex = graphics_family, .flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT };
-    if (vkCreateCommandPool(device, &cpci, NULL, &cmdpool) != VK_SUCCESS) fatal("vkCreateCommandPool");
+    res = vkCreateCommandPool(device, &cpci, NULL, &cmdpool);
+    if (res != VK_SUCCESS) fatal_vk("vkCreateCommandPool", res);
     cmdbuffers = malloc(sizeof(VkCommandBuffer) * swapchain_img_count);
     VkCommandBufferAllocateInfo cbai = { .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO, .commandPool = cmdpool, .level = VK_COMMAND_BUFFER_LEVEL_PRIMARY, .commandBufferCount = swapchain_img_count };
-    if (vkAllocateCommandBuffers(device, &cbai, cmdbuffers) != VK_SUCCESS) fatal("alloc cmdbuffers");
+    res = vkAllocateCommandBuffers(device, &cbai, cmdbuffers);
+    if (res != VK_SUCCESS) fatal_vk("vkAllocateCommandBuffers", res);
 
     framebuffers = malloc(sizeof(VkFramebuffer) * swapchain_img_count);
     for (uint32_t i = 0; i < swapchain_img_count; i++) {
         VkFramebufferCreateInfo fci = { .sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO, .renderPass = render_pass, .attachmentCount = 1, .pAttachments = &swapchain_imgviews[i], .width = swapchain_extent.width, .height = swapchain_extent.height, .layers = 1 };
-        if (vkCreateFramebuffer(device, &fci, NULL, &framebuffers[i]) != VK_SUCCESS) fatal("fb");
+        res = vkCreateFramebuffer(device, &fci, NULL, &framebuffers[i]);
+        if (res != VK_SUCCESS) fatal_vk("vkCreateFramebuffer", res);
     }
     VkSemaphoreCreateInfo sci = { .sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO }; vkCreateSemaphore(device, &sci, NULL, &sem_img_avail); vkCreateSemaphore(device, &sci, NULL, &sem_render_done);
     fences = malloc(sizeof(VkFence) * swapchain_img_count);
@@ -593,10 +693,12 @@ static uint32_t find_mem_type(uint32_t typeFilter, VkMemoryPropertyFlags props) 
 }
 static void create_buffer(VkDeviceSize size, VkBufferUsageFlags usage, VkMemoryPropertyFlags props, VkBuffer* out_buf, VkDeviceMemory* out_mem) {
     VkBufferCreateInfo bci = { .sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO, .size = size, .usage = usage, .sharingMode = VK_SHARING_MODE_EXCLUSIVE };
-    if (vkCreateBuffer(device, &bci, NULL, out_buf) != VK_SUCCESS) fatal("create buffer");
+    res = vkCreateBuffer(device, &bci, NULL, out_buf);
+    if (res != VK_SUCCESS) fatal_vk("vkCreateBuffer", res);
     VkMemoryRequirements mr; vkGetBufferMemoryRequirements(device, *out_buf, &mr);
     VkMemoryAllocateInfo mai = { .sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO, .allocationSize = mr.size, .memoryTypeIndex = find_mem_type(mr.memoryTypeBits, props) };
-    if (vkAllocateMemory(device, &mai, NULL, out_mem) != VK_SUCCESS) fatal("alloc mem");
+    res = vkAllocateMemory(device, &mai, NULL, out_mem);
+    if (res != VK_SUCCESS) fatal_vk("vkAllocateMemory", res);
     vkBindBufferMemory(device, *out_buf, *out_mem, 0);
 }
 static VkCommandBuffer begin_single_time_commands(void) {
@@ -705,7 +807,7 @@ static void draw_frame(void) {
     uint32_t img_idx;
     VkResult acq = vkAcquireNextImageKHR(device, swapchain, UINT64_MAX, sem_img_avail, VK_NULL_HANDLE, &img_idx);
     if (acq == VK_ERROR_OUT_OF_DATE_KHR || acq == VK_SUBOPTIMAL_KHR) { recreate_swapchain(); return; }
-    if (acq != VK_SUCCESS) fatal("acquire image");
+    if (acq != VK_SUCCESS) fatal_vk("vkAcquireNextImageKHR", acq);
     vkWaitForFences(device, 1, &fences[img_idx], VK_TRUE, UINT64_MAX);
     vkResetFences(device, 1, &fences[img_idx]);
 
@@ -717,11 +819,11 @@ static void draw_frame(void) {
     VkSubmitInfo si = { .sType = VK_STRUCTURE_TYPE_SUBMIT_INFO, .waitSemaphoreCount = 1, .pWaitSemaphores = &sem_img_avail, .pWaitDstStageMask = &waitStage, .commandBufferCount = 1, .pCommandBuffers = &cmdbuffers[img_idx], .signalSemaphoreCount = 1, .pSignalSemaphores = &sem_render_done };
     VkResult submit = vkQueueSubmit(queue, 1, &si, fences[img_idx]);
     if (submit == VK_ERROR_DEVICE_LOST) { recreate_swapchain(); return; }
-    if (submit != VK_SUCCESS) fatal("queue submit");
+    if (submit != VK_SUCCESS) fatal_vk("vkQueueSubmit", submit);
     VkPresentInfoKHR pi = { .sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR, .waitSemaphoreCount = 1, .pWaitSemaphores = &sem_render_done, .swapchainCount = 1, .pSwapchains = &swapchain, .pImageIndices = &img_idx };
     VkResult present = vkQueuePresentKHR(queue, &pi);
     if (present == VK_ERROR_OUT_OF_DATE_KHR || present == VK_SUBOPTIMAL_KHR) { recreate_swapchain(); return; }
-    if (present != VK_SUCCESS) fatal("present");
+    if (present != VK_SUCCESS) fatal_vk("vkQueuePresentKHR", present);
 }
 
 /* ---------- GUI building: convert widgets -> vertex list (rects + textured glyphs) ---------- */
@@ -812,10 +914,12 @@ static void append_text(const char* text, float x, float y, Color col) {
 static void create_font_texture(void) {
     if (!atlas) fatal("font atlas not built");
     VkImageCreateInfo ici = { .sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO, .imageType = VK_IMAGE_TYPE_2D, .format = VK_FORMAT_R8_UNORM, .extent = { (uint32_t)atlas_w, (uint32_t)atlas_h, 1 }, .mipLevels = 1, .arrayLayers = 1, .samples = VK_SAMPLE_COUNT_1_BIT, .tiling = VK_IMAGE_TILING_OPTIMAL, .usage = VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, .sharingMode = VK_SHARING_MODE_EXCLUSIVE, .initialLayout = VK_IMAGE_LAYOUT_UNDEFINED }; 
-    if (vkCreateImage(device, &ici, NULL, &font_image) != VK_SUCCESS) fatal("font image");
+    res = vkCreateImage(device, &ici, NULL, &font_image);
+    if (res != VK_SUCCESS) fatal_vk("vkCreateImage", res);
     VkMemoryRequirements mr; vkGetImageMemoryRequirements(device, font_image, &mr);
     VkMemoryAllocateInfo mai = { .sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO, .allocationSize = mr.size, .memoryTypeIndex = find_mem_type(mr.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT) };
-    if (vkAllocateMemory(device, &mai, NULL, &font_image_mem) != VK_SUCCESS) fatal("font image mem");
+    res = vkAllocateMemory(device, &mai, NULL, &font_image_mem);
+    if (res != VK_SUCCESS) fatal_vk("vkAllocateMemory", res);
     vkBindImageMemory(device, font_image, font_image_mem, 0);
 
     VkBuffer staging = VK_NULL_HANDLE; VkDeviceMemory staging_mem = VK_NULL_HANDLE;
@@ -830,19 +934,23 @@ static void create_font_texture(void) {
     vkFreeMemory(device, staging_mem, NULL);
 
     VkImageViewCreateInfo ivci = { .sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO, .image = font_image, .viewType = VK_IMAGE_VIEW_TYPE_2D, .format = VK_FORMAT_R8_UNORM, .subresourceRange = { .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT, .baseMipLevel = 0, .levelCount = 1, .baseArrayLayer = 0, .layerCount = 1 } };
-    if (vkCreateImageView(device, &ivci, NULL, &font_image_view) != VK_SUCCESS) fatal("font image view");
+    res = vkCreateImageView(device, &ivci, NULL, &font_image_view);
+    if (res != VK_SUCCESS) fatal_vk("vkCreateImageView", res);
 
     VkSamplerCreateInfo sci = { .sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO, .magFilter = VK_FILTER_LINEAR, .minFilter = VK_FILTER_LINEAR, .addressModeU = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE, .addressModeV = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE, .addressModeW = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE, .borderColor = VK_BORDER_COLOR_INT_OPAQUE_BLACK, .unnormalizedCoordinates = VK_FALSE, .mipmapMode = VK_SAMPLER_MIPMAP_MODE_NEAREST };
-    if (vkCreateSampler(device, &sci, NULL, &font_sampler) != VK_SUCCESS) fatal("font sampler");
+    res = vkCreateSampler(device, &sci, NULL, &font_sampler);
+    if (res != VK_SUCCESS) fatal_vk("vkCreateSampler", res);
 }
 
 static void create_descriptor_pool_and_set(void) {
     VkDescriptorPoolSize pool = { .type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, .descriptorCount = 1 };
     VkDescriptorPoolCreateInfo dpci = { .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO, .maxSets = 1, .poolSizeCount = 1, .pPoolSizes = &pool };
-    if (vkCreateDescriptorPool(device, &dpci, NULL, &descriptor_pool) != VK_SUCCESS) fatal("descriptor pool");
+    res = vkCreateDescriptorPool(device, &dpci, NULL, &descriptor_pool);
+    if (res != VK_SUCCESS) fatal_vk("vkCreateDescriptorPool", res);
 
     VkDescriptorSetAllocateInfo dsai = { .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO, .descriptorPool = descriptor_pool, .descriptorSetCount = 1, .pSetLayouts = &descriptor_layout };
-    if (vkAllocateDescriptorSets(device, &dsai, &descriptor_set) != VK_SUCCESS) fatal("alloc descriptor set");
+    res = vkAllocateDescriptorSets(device, &dsai, &descriptor_set);
+    if (res != VK_SUCCESS) fatal_vk("vkAllocateDescriptorSets", res);
 
     VkDescriptorImageInfo dii = { .sampler = font_sampler, .imageView = font_image_view, .imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL };
     VkWriteDescriptorSet w = { .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET, .dstSet = descriptor_set, .dstBinding = 0, .descriptorCount = 1, .descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, .pImageInfo = &dii };
@@ -880,7 +988,8 @@ int main(int argc, char** argv) {
     if (!window) fatal("glfwCreateWindow");
 
     create_instance();
-    if (glfwCreateWindowSurface(instance, window, NULL, &surface) != VK_SUCCESS) fatal("glfwCreateWindowSurface");
+    res = glfwCreateWindowSurface(instance, window, NULL, &surface);
+    if (res != VK_SUCCESS) fatal_vk("glfwCreateWindowSurface", res);
 
     pick_physical_and_create_device();
     create_swapchain_and_views(VK_NULL_HANDLE);
