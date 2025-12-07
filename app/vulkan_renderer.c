@@ -693,7 +693,7 @@ static void build_font_atlas(void) {
         int advance, lsb;
         stbtt_GetCodepointHMetrics(&fontinfo, c, &advance, &lsb);
         int box_x0, box_y0, box_x1, box_y1;
-        stbtt_GetCodepointBitmapBox(&fontinfo, c, 0, font_scale, &box_x0, &box_y0, &box_x1, &box_y1);
+        stbtt_GetCodepointBitmapBox(&fontinfo, c, font_scale, font_scale, &box_x0, &box_y0, &box_x1, &box_y1);
         glyphs[c].advance = advance * font_scale;
         glyphs[c].xoff = (float)box_x0;
         glyphs[c].yoff = (float)box_y0;
