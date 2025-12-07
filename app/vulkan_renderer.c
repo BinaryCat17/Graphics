@@ -674,8 +674,9 @@ static void build_font_atlas(void) {
         if (x + aw >= atlas_w) { x = 0; y += rowh; rowh = 0; }
         if (y + ah >= atlas_h) { fprintf(stderr, "atlas too small\n"); break; }
         for (int yy = 0; yy < ah; yy++) {
+            int flipped_y = ah - 1 - yy;
             for (int xx = 0; xx < aw; xx++) {
-                atlas[(y + yy) * atlas_w + (x + xx)] = bitmap[yy * aw + xx];
+                atlas[(y + yy) * atlas_w + (x + xx)] = bitmap[flipped_y * aw + xx];
             }
         }
         stbtt_FreeBitmap(bitmap, NULL);
@@ -723,9 +724,7 @@ static void append_text(const char* text, float x, float y, Color col) {
         float y0 = base_y + g->yoff;
         float x1 = x0 + g->w;
         float y1 = y0 + g->h;
-        float fv0 = 1.0f - g->v0;
-        float fv1 = 1.0f - g->v1;
-        append_quad(x0, y0, x1, y1, g->u0, fv1, g->u1, fv0, col, 1.0f);
+        append_quad(x0, y0, x1, y1, g->u0, g->v0, g->u1, g->v1, col, 1.0f);
         pen_x += g->advance;
     }
 }
@@ -842,6 +841,7 @@ static void draw_frame(void) {
     if (swapchain == VK_NULL_HANDLE) return;
     uint32_t img_idx;
     VkResult acq = vkAcquireNextImageKHR(device, swapchain, UINT64_MAX, sem_img_avail, VK_NULL_HANDLE, &img_idx);
+    if (acq == VK_ERROR_DEVICE_LOST) { if (!recover_device_loss()) fatal_vk("vkAcquireNextImageKHR", acq); return; }
     if (acq == VK_ERROR_OUT_OF_DATE_KHR || acq == VK_SUBOPTIMAL_KHR) { recreate_swapchain(); return; }
     if (acq != VK_SUCCESS) fatal_vk("vkAcquireNextImageKHR", acq);
     vkWaitForFences(device, 1, &fences[img_idx], VK_TRUE, UINT64_MAX);
@@ -861,6 +861,7 @@ static void draw_frame(void) {
     if (submit != VK_SUCCESS) fatal_vk("vkQueueSubmit", submit);
     VkPresentInfoKHR pi = { .sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR, .waitSemaphoreCount = 1, .pWaitSemaphores = &sem_render_done, .swapchainCount = 1, .pSwapchains = &swapchain, .pImageIndices = &img_idx };
     VkResult present = vkQueuePresentKHR(queue, &pi);
+    if (present == VK_ERROR_DEVICE_LOST) { if (!recover_device_loss()) fatal_vk("vkQueuePresentKHR", present); return; }
     if (present == VK_ERROR_OUT_OF_DATE_KHR || present == VK_SUBOPTIMAL_KHR) { recreate_swapchain(); return; }
     if (present != VK_SUCCESS) fatal_vk("vkQueuePresentKHR", present);
 }
