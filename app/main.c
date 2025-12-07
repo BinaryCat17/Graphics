@@ -225,6 +225,7 @@ static VkImage* swapchain_imgs = NULL;
 static VkImageView* swapchain_imgviews = NULL;
 static VkFormat swapchain_format;
 static VkExtent2D swapchain_extent;
+static VkBool32 swapchain_supports_blend = VK_FALSE;
 static VkRenderPass render_pass = VK_NULL_HANDLE;
 static VkPipelineLayout pipeline_layout = VK_NULL_HANDLE;
 static VkPipeline pipeline = VK_NULL_HANDLE;
@@ -306,24 +307,88 @@ static void pick_physical_and_create_device(void) {
     vkGetDeviceQueue(device, graphics_family, 0, &queue);
 }
 
+typedef struct {
+    VkBool32 color_attachment;
+    VkBool32 blend;
+} FormatSupport;
+
+static FormatSupport get_format_support(VkFormat fmt) {
+    VkFormatProperties props;
+    vkGetPhysicalDeviceFormatProperties(physical, fmt, &props);
+    FormatSupport support = {
+        .color_attachment = (props.optimalTilingFeatures & VK_FORMAT_FEATURE_COLOR_ATTACHMENT_BIT) != 0,
+        .blend = (props.optimalTilingFeatures & VK_FORMAT_FEATURE_COLOR_ATTACHMENT_BLEND_BIT) != 0
+    };
+    return support;
+}
+
 /* create swapchain and imageviews */
-static void create_swapchain_and_views(void) {
+static void create_swapchain_and_views(VkSwapchainKHR old_swapchain) {
     /* choose format */
     uint32_t fc = 0; vkGetPhysicalDeviceSurfaceFormatsKHR(physical, surface, &fc, NULL); if (fc == 0) fatal("no surface formats");
     VkSurfaceFormatKHR* fmts = malloc(sizeof(VkSurfaceFormatKHR) * fc); vkGetPhysicalDeviceSurfaceFormatsKHR(physical, surface, &fc, fmts);
-    VkSurfaceFormatKHR chosen_fmt = fmts[0];
+    VkSurfaceFormatKHR chosen_fmt = { 0 };
+    FormatSupport chosen_support = { 0 };
+    VkSurfaceFormatKHR srgb_choice = { 0 };
+    FormatSupport srgb_support = { 0 };
+    VkBool32 have_srgb = VK_FALSE;
+    VkBool32 have_srgb_blend = VK_FALSE;
+    VkSurfaceFormatKHR blend_choice = { 0 };
+    FormatSupport blend_support = { 0 };
+    VkBool32 have_blend_only = VK_FALSE;
+
     for (uint32_t i = 0; i < fc; i++) {
-        if (fmts[i].format == VK_FORMAT_B8G8R8A8_SRGB && fmts[i].colorSpace == VK_COLOR_SPACE_SRGB_NONLINEAR_KHR) {
+        FormatSupport support = get_format_support(fmts[i].format);
+        if (!support.color_attachment) continue;
+
+        if (chosen_support.color_attachment == VK_FALSE) {
             chosen_fmt = fmts[i];
-            break;
+            chosen_support = support;
+        }
+
+        if (support.blend && !have_blend_only) {
+            blend_choice = fmts[i];
+            blend_support = support;
+            have_blend_only = VK_TRUE;
+        }
+
+        if (fmts[i].format == VK_FORMAT_B8G8R8A8_SRGB && fmts[i].colorSpace == VK_COLOR_SPACE_SRGB_NONLINEAR_KHR) {
+            srgb_choice = fmts[i];
+            srgb_support = support;
+            have_srgb = VK_TRUE;
+            if (support.blend) {
+                have_srgb_blend = VK_TRUE;
+                chosen_fmt = srgb_choice;
+                chosen_support = srgb_support;
+                break;
+            }
         }
     }
+
+    if (have_srgb_blend) {
+        chosen_fmt = srgb_choice;
+        chosen_support = srgb_support;
+    }
+    else if (!chosen_support.color_attachment && have_srgb) {
+        chosen_fmt = srgb_choice;
+        chosen_support = srgb_support;
+    }
+    else if (!chosen_support.color_attachment && have_blend_only) {
+        chosen_fmt = blend_choice;
+        chosen_support = blend_support;
+    }
+
+    if (!chosen_support.color_attachment) fatal("no color attachment format for swapchain");
+
     /* Some platforms advertise VK_FORMAT_UNDEFINED to indicate flexibility. Choose a
        concrete format so swapchain creation succeeds on implementations that reject
        VK_FORMAT_UNDEFINED. */
     if (chosen_fmt.format == VK_FORMAT_UNDEFINED) {
         chosen_fmt.format = VK_FORMAT_B8G8R8A8_UNORM;
     }
+    chosen_support = get_format_support(chosen_fmt.format);
+    if (!chosen_support.color_attachment) fatal("swapchain format lacks color attachment support");
+    swapchain_supports_blend = chosen_support.blend;
     swapchain_format = chosen_fmt.format;
     free(fmts);
 
@@ -363,7 +428,7 @@ static void create_swapchain_and_views(void) {
     VkImageUsageFlags usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
     if (!(caps.supportedUsageFlags & usage)) fatal("swapchain color usage unsupported");
 
-    VkSwapchainCreateInfoKHR sci = { .sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR, .surface = surface, .minImageCount = img_count, .imageFormat = swapchain_format, .imageColorSpace = chosen_fmt.colorSpace, .imageExtent = swapchain_extent, .imageArrayLayers = 1, .imageUsage = usage, .imageSharingMode = VK_SHARING_MODE_EXCLUSIVE, .preTransform = caps.currentTransform, .compositeAlpha = comp_alpha, .presentMode = VK_PRESENT_MODE_FIFO_KHR, .clipped = VK_TRUE };
+    VkSwapchainCreateInfoKHR sci = { .sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR, .surface = surface, .minImageCount = img_count, .imageFormat = swapchain_format, .imageColorSpace = chosen_fmt.colorSpace, .imageExtent = swapchain_extent, .imageArrayLayers = 1, .imageUsage = usage, .imageSharingMode = VK_SHARING_MODE_EXCLUSIVE, .preTransform = caps.currentTransform, .compositeAlpha = comp_alpha, .presentMode = VK_PRESENT_MODE_FIFO_KHR, .clipped = VK_TRUE, .oldSwapchain = old_swapchain };
     if (vkCreateSwapchainKHR(device, &sci, NULL, &swapchain) != VK_SUCCESS) fatal("vkCreateSwapchainKHR");
     vkGetSwapchainImagesKHR(device, swapchain, &swapchain_img_count, NULL);
     swapchain_imgs = malloc(sizeof(VkImage) * swapchain_img_count);
@@ -422,7 +487,7 @@ static void create_pipeline(const char* vert_spv, const char* frag_spv) {
     VkPipelineViewportStateCreateInfo vpci = { .sType = VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO, .viewportCount = 1, .pViewports = &vp, .scissorCount = 1, .pScissors = &sc };
     VkPipelineRasterizationStateCreateInfo rs = { .sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO, .polygonMode = VK_POLYGON_MODE_FILL, .cullMode = VK_CULL_MODE_NONE, .frontFace = VK_FRONT_FACE_CLOCKWISE, .lineWidth = 1.0f };
     VkPipelineMultisampleStateCreateInfo ms = { .sType = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO, .rasterizationSamples = VK_SAMPLE_COUNT_1_BIT };
-    VkPipelineColorBlendAttachmentState cbatt = { .blendEnable = VK_TRUE, .srcColorBlendFactor = VK_BLEND_FACTOR_SRC_ALPHA, .dstColorBlendFactor = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA, .colorBlendOp = VK_BLEND_OP_ADD, .srcAlphaBlendFactor = VK_BLEND_FACTOR_ONE, .dstAlphaBlendFactor = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA, .alphaBlendOp = VK_BLEND_OP_ADD, .colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT };
+    VkPipelineColorBlendAttachmentState cbatt = { .blendEnable = swapchain_supports_blend, .srcColorBlendFactor = VK_BLEND_FACTOR_SRC_ALPHA, .dstColorBlendFactor = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA, .colorBlendOp = VK_BLEND_OP_ADD, .srcAlphaBlendFactor = VK_BLEND_FACTOR_ONE, .dstAlphaBlendFactor = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA, .alphaBlendOp = VK_BLEND_OP_ADD, .colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT };
     VkPipelineColorBlendStateCreateInfo cb = { .sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO, .attachmentCount = 1, .pAttachments = &cbatt };
     VkPushConstantRange pcr = { .stageFlags = VK_SHADER_STAGE_VERTEX_BIT, .offset = 0, .size = sizeof(float) * 2 };
     VkPipelineLayoutCreateInfo plci = { .sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO, .setLayoutCount = 1, .pSetLayouts = &descriptor_layout, .pushConstantRangeCount = 1, .pPushConstantRanges = &pcr };
@@ -453,7 +518,7 @@ static void create_cmds_and_sync(void) {
     }
 }
 
-static void cleanup_swapchain(void) {
+static void cleanup_swapchain(bool keep_swapchain_handle) {
     if (cmdbuffers) {
         vkFreeCommandBuffers(device, cmdpool, swapchain_img_count, cmdbuffers);
         free(cmdbuffers);
@@ -478,7 +543,7 @@ static void cleanup_swapchain(void) {
         free(swapchain_imgviews);
         swapchain_imgviews = NULL;
     }
-    if (swapchain) {
+    if (!keep_swapchain_handle && swapchain) {
         vkDestroySwapchainKHR(device, swapchain, NULL);
         swapchain = VK_NULL_HANDLE;
     }
@@ -499,12 +564,21 @@ static void cleanup_swapchain(void) {
 
 static void recreate_swapchain(void) {
     vkDeviceWaitIdle(device);
-    cleanup_swapchain();
-    create_swapchain_and_views();
-    if (!swapchain) return;
+
+    VkSwapchainKHR old_swapchain = swapchain;
+    cleanup_swapchain(true);
+
+    create_swapchain_and_views(old_swapchain);
+    if (!swapchain) {
+        if (old_swapchain) vkDestroySwapchainKHR(device, old_swapchain, NULL);
+        return;
+    }
+
     create_render_pass();
     create_pipeline(g_vert_spv, g_frag_spv);
     create_cmds_and_sync();
+
+    if (old_swapchain) vkDestroySwapchainKHR(device, old_swapchain, NULL);
 }
 
 /* create a simple host-visible vertex buffer */
@@ -808,7 +882,7 @@ int main(int argc, char** argv) {
     if (glfwCreateWindowSurface(instance, window, NULL, &surface) != VK_SUCCESS) fatal("glfwCreateWindowSurface");
 
     pick_physical_and_create_device();
-    create_swapchain_and_views();
+    create_swapchain_and_views(VK_NULL_HANDLE);
     create_render_pass();
     create_descriptor_layout();
     create_pipeline(g_vert_spv, g_frag_spv);
@@ -832,7 +906,7 @@ int main(int argc, char** argv) {
     free(atlas);
     free(ttf_buffer);
     free(vtx_buf);
-    cleanup_swapchain();
+    cleanup_swapchain(false);
     if (descriptor_pool) vkDestroyDescriptorPool(device, descriptor_pool, NULL);
     if (descriptor_layout) vkDestroyDescriptorSetLayout(device, descriptor_layout, NULL);
     if (font_sampler) vkDestroySampler(device, font_sampler, NULL);

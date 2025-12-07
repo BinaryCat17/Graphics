@@ -8,8 +8,11 @@ set(CMAKE_C_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_COMPILER "")
 set(CMAKE_CXX_FOUND FALSE)
 
-find_package(Stb REQUIRED)
-find_package(cglm CONFIG REQUIRED)
+find_package(Stb QUIET)
+if (NOT Stb_FOUND)
+    message(STATUS "Stb package not found; using bundled stub header")
+    set(Stb_INCLUDE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/third_party/stb")
+endif()
 find_package(glfw3 CONFIG REQUIRED)
 find_package(Vulkan REQUIRED)
 
@@ -58,6 +61,5 @@ target_include_directories(${PROJECT_NAME} PRIVATE
 )
 
 target_link_libraries(Graphics PRIVATE glfw)
-target_link_libraries(Graphics PRIVATE cglm::cglm)
 target_link_libraries(Graphics PRIVATE Vulkan::Vulkan)
 target_include_directories(Graphics PRIVATE ${Stb_INCLUDE_DIR})
