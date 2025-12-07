@@ -681,7 +681,7 @@ static void build_font_atlas(void) {
     for (int c = 32; c < 128; c++) {
         int aw, ah, bx, by;
         unsigned char* bitmap = stbtt_GetCodepointBitmap(&fontinfo, 0, font_scale, c, &aw, &ah, &bx, &by);
-        if (x + aw >= atlas_w) { x = 0; y += rowh; rowh = 0; }
+        if (x + aw >= atlas_w) { x = 0; y += rowh;  }
         if (y + ah >= atlas_h) { fprintf(stderr, "atlas too small\n"); break; }
         for (int yy = 0; yy < ah; yy++) {
             int flipped_y = ah - 1 - yy;
@@ -696,7 +696,7 @@ static void build_font_atlas(void) {
         stbtt_GetCodepointBitmapBox(&fontinfo, c, font_scale, font_scale, &box_x0, &box_y0, &box_x1, &box_y1);
         glyphs[c].advance = advance * font_scale;
         glyphs[c].xoff = (float)box_x0;
-        glyphs[c].yoff = (float)box_y0;
+        glyphs[c].yoff = -rowh;
         glyphs[c].w = (float)(box_x1 - box_x0);
         glyphs[c].h = (float)(box_y1 - box_y0);
         glyphs[c].u0 = (float)x / (float)atlas_w;
