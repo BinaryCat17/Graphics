@@ -56,6 +56,7 @@ static size_t vtx_count = 0;
 /* GPU-side buffers (vertex) simple staging omitted: we'll create host-visible vertex buffer */
 static VkBuffer vertex_buffer = VK_NULL_HANDLE;
 static VkDeviceMemory vertex_memory = VK_NULL_HANDLE;
+static VkDeviceSize vertex_capacity = 0;
 
 /* Texture atlas for font */
 static VkImage font_image = VK_NULL_HANDLE;
@@ -517,6 +518,7 @@ static void destroy_device_resources(void) {
     if (font_image_mem) { vkFreeMemory(device, font_image_mem, NULL); font_image_mem = VK_NULL_HANDLE; }
     if (vertex_buffer) { vkDestroyBuffer(device, vertex_buffer, NULL); vertex_buffer = VK_NULL_HANDLE; }
     if (vertex_memory) { vkFreeMemory(device, vertex_memory, NULL); vertex_memory = VK_NULL_HANDLE; }
+    vertex_capacity = 0;
     if (sem_img_avail) { vkDestroySemaphore(device, sem_img_avail, NULL); sem_img_avail = VK_NULL_HANDLE; }
     if (sem_render_done) { vkDestroySemaphore(device, sem_render_done, NULL); sem_render_done = VK_NULL_HANDLE; }
 }
@@ -584,6 +586,10 @@ static void end_single_time_commands(VkCommandBuffer cb) {
     vkFreeCommandBuffers(device, cmdpool, 1, &cb);
 }
 static void create_vertex_buffer(size_t bytes) {
+    if (vertex_buffer != VK_NULL_HANDLE && vertex_capacity >= bytes) {
+        return;
+    }
+
     if (vertex_buffer) {
         vkDestroyBuffer(device, vertex_buffer, NULL);
         vertex_buffer = VK_NULL_HANDLE;
@@ -591,8 +597,11 @@ static void create_vertex_buffer(size_t bytes) {
     if (vertex_memory) {
         vkFreeMemory(device, vertex_memory, NULL);
         vertex_memory = VK_NULL_HANDLE;
+        vertex_capacity = 0;
     }
+
     create_buffer(bytes, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, &vertex_buffer, &vertex_memory);
+    vertex_capacity = bytes;
 }
 
 static void transition_image_layout(VkImage image, VkImageLayout oldLayout, VkImageLayout newLayout) {
@@ -633,6 +642,7 @@ static void upload_vertices(void) {
             vkFreeMemory(device, vertex_memory, NULL);
             vertex_memory = VK_NULL_HANDLE;
         }
+        vertex_capacity = 0;
         return;
     }
     size_t bytes = vtx_count * sizeof(Vtx);
