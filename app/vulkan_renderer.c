@@ -692,11 +692,13 @@ static void build_font_atlas(void) {
         stbtt_FreeBitmap(bitmap, NULL);
         int advance, lsb;
         stbtt_GetCodepointHMetrics(&fontinfo, c, &advance, &lsb);
+        int box_x0, box_y0, box_x1, box_y1;
+        stbtt_GetCodepointBitmapBox(&fontinfo, c, 0, font_scale, &box_x0, &box_y0, &box_x1, &box_y1);
         glyphs[c].advance = advance * font_scale;
-        glyphs[c].xoff = (float)bx;
-        glyphs[c].yoff = (float)by;
-        glyphs[c].w = (float)aw;
-        glyphs[c].h = (float)ah;
+        glyphs[c].xoff = (float)box_x0;
+        glyphs[c].yoff = (float)box_y0;
+        glyphs[c].w = (float)(box_x1 - box_x0);
+        glyphs[c].h = (float)(box_y1 - box_y0);
         glyphs[c].u0 = (float)x / (float)atlas_w;
         glyphs[c].v0 = (float)y / (float)atlas_h;
         glyphs[c].u1 = (float)(x + aw) / (float)atlas_w;
