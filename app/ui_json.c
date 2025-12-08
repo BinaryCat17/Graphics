@@ -324,6 +324,16 @@ void update_widget_bindings(Widget* widgets, const Model* model) {
 
 static void parse_widget_object(Widget** list, const char* json, jsmntok_t* toks, unsigned int tokc, unsigned int start_idx, const Model* model, const Style* styles, float base_x, float base_y);
 
+static unsigned int skip_container(const jsmntok_t* toks, unsigned int tokc, unsigned int idx) {
+    if (idx >= tokc) return tokc;
+    unsigned int i = idx + 1;
+    while (i < tokc && toks[i].start >= toks[idx].start && toks[i].end <= toks[idx].end) {
+        if (toks[i].type == JSMN_OBJECT || toks[i].type == JSMN_ARRAY) i = skip_container(toks, tokc, i);
+        else i++;
+    }
+    return i;
+}
+
 static void place_child_widgets(Widget** list, const char* json, jsmntok_t* toks, unsigned int tokc, unsigned int start_idx, const Model* model, const Style* styles, float base_x, float base_y, const char* direction, float spacing, int columns) {
     jsmntok_t* obj = &toks[start_idx];
     float cursor_x = base_x;
@@ -332,7 +342,7 @@ static void place_child_widgets(Widget** list, const char* json, jsmntok_t* toks
     for (unsigned int k = start_idx + 1; k < tokc && toks[k].start >= obj->start && toks[k].end <= obj->end; k++) {
         if (tok_is_key(json, &toks[k], "children") && k + 1 < tokc && toks[k + 1].type == JSMN_ARRAY) {
             jsmntok_t* arr = &toks[k + 1];
-            for (unsigned int c = k + 2; c < tokc && toks[c].start >= arr->start && toks[c].end <= arr->end; c++) {
+            for (unsigned int c = k + 2; c < tokc && toks[c].start >= arr->start && toks[c].end <= arr->end; ) {
                 if (toks[c].type == JSMN_OBJECT) {
                     parse_widget_object(list, json, toks, tokc, c, model, styles, cursor_x, cursor_y);
                     // find last added widget to read its width/height
@@ -358,6 +368,7 @@ static void place_child_widgets(Widget** list, const char* json, jsmntok_t* toks
                         cursor_y += child_h + spacing;
                     }
                 }
+                c = skip_container(toks, tokc, c);
             }
         }
     }
@@ -452,7 +463,7 @@ Widget* parse_layout_json(const char* json, const Model* model, const Style* sty
         if (tok_is_key(json, &toks[i], "floating") && i + 1 < p.toknext && toks[i + 1].type == JSMN_ARRAY) {
             sections_found++;
             jsmntok_t* arr = &toks[i + 1];
-            for (unsigned int j = i + 2; j < p.toknext && toks[j].start >= arr->start && toks[j].end <= arr->end; j++) {
+            for (unsigned int j = i + 2; j < p.toknext && toks[j].start >= arr->start && toks[j].end <= arr->end; ) {
                 if (toks[j].type == JSMN_OBJECT) {
                     Widget* prev = widgets;
                     parse_widget_object(&widgets, json, toks, p.toknext, j, model, styles, 0.0f, 0.0f);
@@ -461,6 +472,7 @@ Widget* parse_layout_json(const char* json, const Model* model, const Style* sty
                 else {
                     fprintf(stderr, "Warning: non-object entry inside 'floating' array ignored\n");
                 }
+                j = skip_container(toks, p.toknext, j);
             }
         }
     }
