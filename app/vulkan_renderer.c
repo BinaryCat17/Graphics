@@ -28,6 +28,7 @@ static VkSurfaceKHR surface = VK_NULL_HANDLE;
 static VkSwapchainKHR swapchain = VK_NULL_HANDLE;
 static const char* g_vert_spv = NULL;
 static const char* g_frag_spv = NULL;
+static const char* g_font_path = NULL;
 static uint32_t swapchain_img_count = 0;
 static VkImage* swapchain_imgs = NULL;
 static VkImageView* swapchain_imgviews = NULL;
@@ -664,8 +665,9 @@ typedef struct { float u0, v0, u1, v1; float xoff, yoff; float w, h; float advan
 static Glyph glyphs[128];
 
 static void build_font_atlas(void) {
-    FILE* f = fopen("font.ttf", "rb");
-    if (!f) { fatal("font.ttf not found in cwd - place a TTF named font.ttf"); }
+    if (!g_font_path) fatal("Font path is null");
+    FILE* f = fopen(g_font_path, "rb");
+    if (!f) { fprintf(stderr, "Fatal: font not found at %s\n", g_font_path); fatal("font load"); }
     fseek(f, 0, SEEK_END); long sz = ftell(f); fseek(f, 0, SEEK_SET);
     ttf_buffer = malloc(sz); fread(ttf_buffer, 1, sz, f); fclose(f);
     stbtt_InitFont(&fontinfo, ttf_buffer, 0);
@@ -878,11 +880,12 @@ static void draw_frame(void) {
     if (present != VK_SUCCESS) fatal_vk("vkQueuePresentKHR", present);
 }
 
-bool vk_renderer_init(GLFWwindow* window, const char* vert_spv, const char* frag_spv, Widget* widgets) {
+bool vk_renderer_init(GLFWwindow* window, const char* vert_spv, const char* frag_spv, const char* font_path, Widget* widgets) {
     g_window = window;
     g_widgets = widgets;
     g_vert_spv = vert_spv;
     g_frag_spv = frag_spv;
+    g_font_path = font_path;
 
     create_instance();
     res = glfwCreateWindowSurface(instance, g_window, NULL, &surface);

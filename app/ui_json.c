@@ -168,17 +168,18 @@ int save_model(const Model* model) {
 }
 
 Model* parse_model_json(const char* json, const char* source_path) {
-    if (!json) return NULL;
+    if (!json) { fprintf(stderr, "Error: model JSON text is null\n"); return NULL; }
     Model* model = (Model*)calloc(1, sizeof(Model));
-    if (!model) return NULL;
+    if (!model) { fprintf(stderr, "Error: failed to allocate Model\n"); return NULL; }
     model->source_path = source_path ? strdup(source_path) : NULL;
 
     jsmn_parser p; jsmn_init(&p);
     size_t tokc = 1024;
     jsmntok_t* toks = (jsmntok_t*)malloc(sizeof(jsmntok_t) * tokc);
-    if (!toks) { free(model); return NULL; }
+    if (!toks) { fprintf(stderr, "Error: failed to allocate tokens for model JSON\n"); free(model); return NULL; }
     for (size_t i = 0; i < tokc; i++) { toks[i].start = toks[i].end = -1; toks[i].size = 0; toks[i].type = JSMN_UNDEFINED; }
-    if (jsmn_parse(&p, json, strlen(json), toks, tokc) < 0) { free(model); free(toks); return NULL; }
+    int parse_ret = jsmn_parse(&p, json, strlen(json), toks, tokc);
+    if (parse_ret < 0) { fprintf(stderr, "Error: failed to parse model JSON (code %d)\n", parse_ret); free(model); free(toks); return NULL; }
 
     for (unsigned int i = 0; i + 1 < p.toknext; i++) {
         if (tok_is_key(json, &toks[i], "model") && toks[i + 1].type == JSMN_OBJECT) {
@@ -226,14 +227,15 @@ static void read_color_array(Color* out, const char* json, const jsmntok_t* val,
 }
 
 Style* parse_styles_json(const char* json) {
-    if (!json) return NULL;
+    if (!json) { fprintf(stderr, "Error: styles JSON text is null\n"); return NULL; }
     Style* styles = NULL;
     jsmn_parser p; jsmn_init(&p);
     size_t tokc = 1024;
     jsmntok_t* toks = (jsmntok_t*)malloc(sizeof(jsmntok_t) * tokc);
-    if (!toks) return NULL;
+    if (!toks) { fprintf(stderr, "Error: failed to allocate tokens for styles JSON\n"); return NULL; }
     for (size_t i = 0; i < tokc; i++) { toks[i].start = toks[i].end = -1; toks[i].size = 0; toks[i].type = JSMN_UNDEFINED; }
-    if (jsmn_parse(&p, json, strlen(json), toks, tokc) < 0) { free(toks); return NULL; }
+    int parse_ret = jsmn_parse(&p, json, strlen(json), toks, tokc);
+    if (parse_ret < 0) { fprintf(stderr, "Error: failed to parse styles JSON (code %d)\n", parse_ret); free(toks); return NULL; }
 
     for (unsigned int i = 0; i + 1 < p.toknext; i++) {
         if (tok_is_key(json, &toks[i], "styles") && toks[i + 1].type == JSMN_OBJECT) {
@@ -423,28 +425,47 @@ static void parse_widget_object(Widget** list, const char* json, jsmntok_t* toks
 }
 
 Widget* parse_layout_json(const char* json, const Model* model, const Style* styles) {
-    if (!json) return NULL;
+    if (!json) { fprintf(stderr, "Error: layout JSON text is null\n"); return NULL; }
     Widget* widgets = NULL;
     jsmn_parser p; jsmn_init(&p);
     size_t tokc = 4096;
     jsmntok_t* toks = (jsmntok_t*)malloc(sizeof(jsmntok_t) * tokc);
-    if (!toks) return NULL;
+    if (!toks) { fprintf(stderr, "Error: failed to allocate tokens for layout JSON\n"); return NULL; }
     for (size_t i = 0; i < tokc; i++) { toks[i].start = toks[i].end = -1; toks[i].size = 0; toks[i].type = JSMN_UNDEFINED; }
-    if (jsmn_parse(&p, json, strlen(json), toks, tokc) < 0) { free(toks); return NULL; }
+    int parse_ret = jsmn_parse(&p, json, strlen(json), toks, tokc);
+    if (parse_ret < 0) { fprintf(stderr, "Error: failed to parse layout JSON (code %d)\n", parse_ret); free(toks); return NULL; }
 
+    int sections_found = 0;
+    int widgets_created = 0;
     for (unsigned int i = 0; i < p.toknext; i++) {
         if (tok_is_key(json, &toks[i], "layout")) {
+            sections_found++;
             if (i + 1 < p.toknext && toks[i + 1].type == JSMN_OBJECT) {
+                Widget* prev = widgets;
                 parse_widget_object(&widgets, json, toks, p.toknext, i + 1, model, styles, 0.0f, 0.0f);
+                if (widgets != prev) widgets_created = 1;
+            }
+            else {
+                fprintf(stderr, "Error: 'layout' section is not an object in layout.json\n");
             }
         }
         if (tok_is_key(json, &toks[i], "floating") && i + 1 < p.toknext && toks[i + 1].type == JSMN_ARRAY) {
+            sections_found++;
             jsmntok_t* arr = &toks[i + 1];
             for (unsigned int j = i + 2; j < p.toknext && toks[j].start >= arr->start && toks[j].end <= arr->end; j++) {
-                if (toks[j].type == JSMN_OBJECT) parse_widget_object(&widgets, json, toks, p.toknext, j, model, styles, 0.0f, 0.0f);
+                if (toks[j].type == JSMN_OBJECT) {
+                    Widget* prev = widgets;
+                    parse_widget_object(&widgets, json, toks, p.toknext, j, model, styles, 0.0f, 0.0f);
+                    if (widgets != prev) widgets_created = 1;
+                }
+                else {
+                    fprintf(stderr, "Warning: non-object entry inside 'floating' array ignored\n");
+                }
             }
         }
     }
+    if (sections_found == 0) fprintf(stderr, "Error: no 'layout' or 'floating' sections found in layout.json\n");
+    if (!widgets_created) fprintf(stderr, "Error: no widgets could be constructed from layout.json\n");
     free(toks);
     return widgets;
 }
