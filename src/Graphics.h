@@ -12,6 +12,20 @@ typedef struct Vec2 {
     float y;
 } Vec2;
 
+/**
+ * Shared coordinate transformer used by input and rendering paths.
+ *
+ * Spaces:
+ *  - World: authored layout or simulation units before UI scaling.
+ *  - Logical UI: after applying UI scale; used for layout and hit-tests.
+ *  - Screen: device pixels after DPI scaling; fed to GPU.
+ */
+typedef struct CoordinateTransformer {
+    float dpi_scale;
+    float ui_scale;
+    Vec2 viewport_size;
+} CoordinateTransformer;
+
 typedef struct Color {
     float r;
     float g;
@@ -26,8 +40,7 @@ typedef struct Color {
  */
 typedef struct RenderContext {
     float projection[16];
-    float dpi_scale;
-    Vec2 viewport_size;
+    CoordinateTransformer transformer;
 } RenderContext;
 
 /** Logical layout rect in UI units. */
@@ -87,9 +100,39 @@ typedef struct UiVertexBuffer {
     size_t capacity;
 } UiVertexBuffer;
 
-void render_context_init(RenderContext *ctx, float dpi_scale, Vec2 viewport_size, const float projection[16]);
+typedef struct UiTextVertex {
+    float position[3];
+    float uv[2];
+    Color color;
+} UiTextVertex;
+
+typedef struct UiTextVertexBuffer {
+    UiTextVertex *vertices;
+    size_t count;
+    size_t capacity;
+} UiTextVertexBuffer;
+
+typedef struct GlyphQuad {
+    Vec2 min;
+    Vec2 max;
+    Vec2 uv0;
+    Vec2 uv1;
+    Color color;
+    int z_index;
+} GlyphQuad;
+
+void coordinate_transformer_init(CoordinateTransformer *xfm, float dpi_scale, float ui_scale, Vec2 viewport_size);
+Vec2 coordinate_screen_to_logical(const CoordinateTransformer *xfm, Vec2 screen);
+Vec2 coordinate_logical_to_screen(const CoordinateTransformer *xfm, Vec2 logical);
+Vec2 coordinate_world_to_logical(const CoordinateTransformer *xfm, Vec2 world);
+Vec2 coordinate_logical_to_world(const CoordinateTransformer *xfm, Vec2 logical);
+Vec2 coordinate_world_to_screen(const CoordinateTransformer *xfm, Vec2 world);
+Vec2 coordinate_screen_to_world(const CoordinateTransformer *xfm, Vec2 screen);
+
+void render_context_init(RenderContext *ctx, const CoordinateTransformer *xfm, const float projection[16]);
 
 LayoutResult layout_resolve(const LayoutBox *logical, const RenderContext *ctx);
+int layout_hit_test(const LayoutResult *layout, Vec2 logical_point);
 
 void draw_list_init(DrawList *list, size_t initial_capacity);
 void draw_list_dispose(DrawList *list);
@@ -99,11 +142,16 @@ void draw_list_sort(DrawList *list);
 void renderer_init(Renderer *renderer, const RenderContext *context, size_t initial_capacity);
 void renderer_dispose(Renderer *renderer);
 void renderer_build_draw_list(Renderer *renderer, const ViewModel *view_models, size_t view_model_count);
-void renderer_fill_ui_vertices(Renderer *renderer, const ViewModel *view_models, size_t view_model_count, UiVertexBuffer *vertex_buffer);
+void renderer_fill_background_vertices(Renderer *renderer, const ViewModel *view_models, size_t view_model_count, UiVertexBuffer *vertex_buffer);
+void renderer_fill_text_vertices(const RenderContext *context, const GlyphQuad *glyphs, size_t glyph_count, UiTextVertexBuffer *vertex_buffer);
 
 void ui_vertex_buffer_init(UiVertexBuffer *buffer, size_t initial_capacity);
 void ui_vertex_buffer_dispose(UiVertexBuffer *buffer);
 void ui_vertex_buffer_reserve(UiVertexBuffer *buffer, size_t vertex_capacity);
+
+void ui_text_vertex_buffer_init(UiTextVertexBuffer *buffer, size_t initial_capacity);
+void ui_text_vertex_buffer_dispose(UiTextVertexBuffer *buffer);
+void ui_text_vertex_buffer_reserve(UiTextVertexBuffer *buffer, size_t vertex_capacity);
 
 #ifdef __cplusplus
 }
