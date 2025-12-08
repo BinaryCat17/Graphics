@@ -6,7 +6,9 @@
 typedef struct ScrollArea {
     char* name;
     Rect bounds;
+    Rect viewport;
     int has_bounds;
+    int has_viewport;
     int has_static_anchor;
     float offset;
     struct ScrollArea* next;
@@ -42,6 +44,7 @@ static ScrollArea* ensure_area(ScrollArea** areas, const char* name) {
     a->name = strdup(name);
     a->offset = 0.0f;
     a->has_bounds = 0;
+    a->has_viewport = 0;
     a->has_static_anchor = 0;
     a->next = *areas;
     *areas = a;
@@ -73,13 +76,19 @@ static void add_area_bounds(ScrollArea* a, const Widget* w) {
         a->bounds.w = new_maxx - new_minx;
         a->bounds.h = new_maxy - new_miny;
     }
+
+    if (w->scroll_static && !a->has_viewport) {
+        a->viewport = w->rect;
+        a->has_viewport = 1;
+    }
 }
 
 static ScrollArea* find_area_at_point(ScrollArea* areas, float x, float y) {
     for (ScrollArea* a = areas; a; a = a->next) {
         if (!a->has_bounds) continue;
-        if (x >= a->bounds.x && x <= a->bounds.x + a->bounds.w &&
-            y >= a->bounds.y && y <= a->bounds.y + a->bounds.h) {
+        Rect viewport = a->has_viewport ? a->viewport : a->bounds;
+        if (x >= viewport.x && x <= viewport.x + viewport.w &&
+            y >= viewport.y && y <= viewport.y + viewport.h) {
             return a;
         }
     }
@@ -119,11 +128,24 @@ void scroll_apply_offsets(ScrollContext* ctx, Widget* widgets, size_t widget_cou
     for (size_t i = 0; i < widget_count; i++) {
         Widget* w = &widgets[i];
         w->scroll_offset = 0.0f;
+        w->show_scrollbar = 0;
         if (!w->scroll_area) continue;
         ScrollArea* a = find_area(ctx->areas, w->scroll_area);
         if (!a) continue;
-        if (w->scroll_static) w->scroll_offset = 0.0f;
-        else w->scroll_offset = a->offset;
+        float viewport_h = a->has_viewport ? a->viewport.h : a->bounds.h;
+        float content_h = a->has_bounds ? a->bounds.h : viewport_h;
+        float overflow = content_h - viewport_h;
+        if (overflow < 0.0f) overflow = 0.0f;
+        if (!w->scroll_static) {
+            if (a->offset > overflow) a->offset = overflow;
+            if (a->offset < -overflow) a->offset = -overflow;
+            w->scroll_offset = a->offset;
+        }
+        if (w->scroll_static) {
+            w->scroll_viewport = viewport_h;
+            w->scroll_content = content_h;
+            w->show_scrollbar = overflow > 1.0f;
+        }
     }
 }
 

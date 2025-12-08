@@ -698,6 +698,17 @@ typedef struct {
     size_t capacity;
 } GlyphQuadArray;
 
+static int utf8_decode(const char* s, int* out_advance) {
+    unsigned char c = (unsigned char)*s;
+    if (c < 0x80) { *out_advance = 1; return c; }
+    if ((c >> 5) == 0x6) { *out_advance = 2; return ((int)(c & 0x1F) << 6) | ((int)(s[1] & 0x3F)); }
+    if ((c >> 4) == 0xE) { *out_advance = 3; return ((int)(c & 0x0F) << 12) | (((int)s[1] & 0x3F) << 6) | ((int)(s[2] & 0x3F)); }
+    if ((c >> 3) == 0x1E) { *out_advance = 4; return ((int)(c & 0x07) << 18) | (((int)s[1] & 0x3F) << 12) |
+                                        (((int)s[2] & 0x3F) << 6) | ((int)(s[3] & 0x3F)); }
+    *out_advance = 1;
+    return '?';
+}
+
 static void glyph_quad_array_reserve(GlyphQuadArray *arr, size_t required)
 {
     if (required <= arr->capacity) {
@@ -893,6 +904,40 @@ static void build_vertices_from_widgets(void) {
         vm.z_index = (int)view_model_count;
         vm.color = widget->color;
         view_models[view_model_count++] = vm;
+
+        if (widget->show_scrollbar && widget->scroll_viewport > 0.0f &&
+            widget->scroll_content > widget->scroll_viewport + 1.0f) {
+            float track_w = fmaxf(4.0f, widget->rect.w * 0.02f);
+            float track_h = widget->rect.h - widget->padding * 2.0f;
+            float track_x = widget->rect.x + widget->rect.w - track_w - widget->padding * 0.5f;
+            float track_y = widget->rect.y + widget->padding;
+            Color track_color = widget->text_color;
+            track_color.a *= 0.2f;
+
+            view_models[view_model_count++] = (ViewModel){
+                .id = widget->id,
+                .logical_box = { {track_x, track_y}, {track_w, track_h} },
+                .z_index = (int)view_model_count,
+                .color = track_color,
+            };
+
+            float thumb_ratio = widget->scroll_viewport / widget->scroll_content;
+            float thumb_h = fmaxf(track_h * thumb_ratio, 12.0f);
+            float max_offset = widget->scroll_content - widget->scroll_viewport;
+            float offset_t = (max_offset != 0.0f) ? (widget->scroll_offset / max_offset) : 0.0f;
+            if (offset_t < -1.0f) offset_t = -1.0f;
+            if (offset_t > 1.0f) offset_t = 1.0f;
+            float thumb_y = track_y + (track_h - thumb_h) * 0.5f - offset_t * (track_h - thumb_h);
+            Color thumb_color = widget->text_color;
+            thumb_color.a *= 0.6f;
+
+            view_models[view_model_count++] = (ViewModel){
+                .id = widget->id,
+                .logical_box = { {track_x, thumb_y}, {track_w, thumb_h} },
+                .z_index = (int)view_model_count,
+                .color = thumb_color,
+            };
+        }
     }
 
     int glyph_z_base = (int)view_model_count;
@@ -906,13 +951,13 @@ static void build_vertices_from_widgets(void) {
         float pen_x = widget->rect.x + widget->padding;
         float pen_y = widget->rect.y + widget->scroll_offset + widget->rect.h - widget->padding - (float)descent;
 
-        for (const char *c = widget->text; *c; ++c) {
-            unsigned char ch = (unsigned char)*c;
-            if (ch < 32 || ch >= 128) {
-                continue;
-            }
+        for (const char *c = widget->text; *c; ) {
+            int adv = 0;
+            int codepoint = utf8_decode(c, &adv);
+            if (adv <= 0) break;
+            if (codepoint < 32 || codepoint >= 128) { c += adv; continue; }
 
-            Glyph *g = &glyphs[ch];
+            Glyph *g = &glyphs[codepoint];
             float x0 = pen_x + g->xoff;
             float y0 = pen_y + g->yoff;
             float x1 = x0 + g->w;
@@ -933,6 +978,7 @@ static void build_vertices_from_widgets(void) {
             };
 
             pen_x += g->advance;
+            c += adv;
         }
     }
 

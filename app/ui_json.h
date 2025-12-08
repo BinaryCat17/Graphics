@@ -63,6 +63,8 @@ typedef struct UiNode {
     char* click_value;
     float minv, maxv, value;
     int has_min, has_max, has_value;
+    float max_w, max_h;
+    int has_max_w, has_max_h;
     char* scroll_area;
     int scroll_static;
     struct UiNode* children;
@@ -94,6 +96,9 @@ typedef struct Widget {
     char* id;
     char* scroll_area;
     int scroll_static;
+    float scroll_viewport;
+    float scroll_content;
+    int show_scrollbar;
 } Widget;
 
 typedef struct {
