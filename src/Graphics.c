@@ -2,6 +2,7 @@
 
 #include <stdlib.h>
 #include <string.h>
+#include <math.h>
 
 static void ensure_capacity(DrawList *list, size_t required)
 {
@@ -298,6 +299,11 @@ static void emit_text_vertices(const RenderContext *ctx, const GlyphQuad *glyph,
 {
     Vec2 device_min = coordinate_logical_to_screen(&ctx->transformer, glyph->min);
     Vec2 device_max = coordinate_logical_to_screen(&ctx->transformer, glyph->max);
+
+    device_min.x = roundf(device_min.x);
+    device_min.y = roundf(device_min.y);
+    device_max.x = roundf(device_max.x);
+    device_max.y = roundf(device_max.y);
     float z = (float)glyph->z_index;
 
     ui_text_vertex_buffer_reserve(vertex_buffer, vertex_buffer->count + 6);
