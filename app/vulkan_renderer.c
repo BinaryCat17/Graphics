@@ -55,6 +55,7 @@ typedef struct { float viewport[2]; } ViewConstants;
 typedef struct { float px, py; float u, v; float use_tex; float r, g, b, a; } Vtx;
 static Vtx* vtx_buf = NULL;
 static size_t vtx_count = 0;
+static size_t vtx_capacity = 0;
 
 /* GPU-side buffers (vertex) simple staging omitted: we'll create host-visible vertex buffer */
 static VkBuffer vertex_buffer = VK_NULL_HANDLE;
@@ -655,6 +656,27 @@ static void upload_vertices(void) {
     vkUnmapMemory(device, vertex_memory);
 }
 
+static bool ensure_vtx_capacity(size_t required)
+{
+    if (required <= vtx_capacity) {
+        return true;
+    }
+
+    size_t new_capacity = vtx_capacity == 0 ? required : vtx_capacity * 2;
+    while (new_capacity < required) {
+        new_capacity *= 2;
+    }
+
+    Vtx *expanded = realloc(vtx_buf, new_capacity * sizeof(Vtx));
+    if (!expanded) {
+        return false;
+    }
+
+    vtx_buf = expanded;
+    vtx_capacity = new_capacity;
+    return true;
+}
+
 /* record commands per framebuffer (we will re-record each frame in this simple example) */
 /* ---------- GUI building: convert g_widgets -> vertex list (rects + textured glyphs) ---------- */
 static unsigned char* ttf_buffer = NULL;
@@ -700,7 +722,7 @@ static void build_font_atlas(void) {
         stbtt_GetCodepointBitmapBox(&fontinfo, c, font_scale, font_scale, &box_x0, &box_y0, &box_x1, &box_y1);
         glyphs[c].advance = advance * font_scale;
         glyphs[c].xoff = (float)box_x0;
-        glyphs[c].yoff = -rowh;
+        glyphs[c].yoff = (float)box_y0;
         glyphs[c].w = (float)(box_x1 - box_x0);
         glyphs[c].h = (float)(box_y1 - box_y0);
         glyphs[c].u0 = (float)x / (float)atlas_w;
@@ -760,8 +782,6 @@ static void create_descriptor_pool_and_set(void) {
 
 /* build vtxs from g_widgets each frame */
 static void build_vertices_from_widgets(void) {
-    free(vtx_buf);
-    vtx_buf = NULL;
     vtx_count = 0;
 
     if (g_widgets.count == 0 || swapchain_extent.width == 0 || swapchain_extent.height == 0) {
@@ -801,14 +821,50 @@ static void build_vertices_from_widgets(void) {
 
     renderer_fill_ui_vertices(&renderer, view_models, g_widgets.count, &vertex_buffer);
 
-    if (vertex_buffer.count > 0) {
-        vtx_buf = malloc(sizeof(Vtx) * vertex_buffer.count);
-        if (vtx_buf) {
-            for (size_t i = 0; i < vertex_buffer.count; ++i) {
-                UiVertex v = vertex_buffer.vertices[i];
-                vtx_buf[i] = (Vtx){v.position[0], v.position[1], 0.0f, 0.0f, 0.0f, v.color.r, v.color.g, v.color.b, v.color.a};
+    if (vertex_buffer.count > 0 && ensure_vtx_capacity(vertex_buffer.count)) {
+        for (size_t i = 0; i < vertex_buffer.count; ++i) {
+            UiVertex v = vertex_buffer.vertices[i];
+            vtx_buf[i] = (Vtx){v.position[0], v.position[1], 0.0f, 0.0f, 0.0f, v.color.r, v.color.g, v.color.b, v.color.a};
+        }
+        vtx_count = vertex_buffer.count;
+    }
+
+    /* Append text glyphs on top of solid geometry. */
+    for (size_t i = 0; i < g_widgets.count; ++i) {
+        const Widget *widget = &g_widgets.items[i];
+        if (!widget->text || !*widget->text) {
+            continue;
+        }
+
+        float pen_x = widget->rect.x + widget->padding;
+        float pen_y = widget->rect.y + widget->padding + (float)ascent;
+
+        for (const char *c = widget->text; *c; ++c) {
+            unsigned char ch = (unsigned char)*c;
+            if (ch < 32 || ch >= 128) {
+                continue;
             }
-            vtx_count = vertex_buffer.count;
+
+            Glyph *g = &glyphs[ch];
+            float x0 = pen_x + g->xoff;
+            float y0 = pen_y + g->yoff;
+            float x1 = x0 + g->w;
+            float y1 = y0 + g->h;
+
+            if (!ensure_vtx_capacity(vtx_count + 6)) {
+                break;
+            }
+
+            Vtx *dst = &vtx_buf[vtx_count];
+            dst[0] = (Vtx){x0, y0, g->u0, g->v0, 1.0f, widget->text_color.r, widget->text_color.g, widget->text_color.b, widget->text_color.a};
+            dst[1] = (Vtx){x1, y0, g->u1, g->v0, 1.0f, widget->text_color.r, widget->text_color.g, widget->text_color.b, widget->text_color.a};
+            dst[2] = (Vtx){x1, y1, g->u1, g->v1, 1.0f, widget->text_color.r, widget->text_color.g, widget->text_color.b, widget->text_color.a};
+            dst[3] = dst[0];
+            dst[4] = dst[2];
+            dst[5] = (Vtx){x0, y1, g->u0, g->v1, 1.0f, widget->text_color.r, widget->text_color.g, widget->text_color.b, widget->text_color.a};
+            vtx_count += 6;
+
+            pen_x += g->advance;
         }
     }
 
@@ -934,6 +990,7 @@ void vk_renderer_cleanup(void) {
     ttf_buffer = NULL;
     free(vtx_buf);
     vtx_buf = NULL;
+    vtx_capacity = 0;
     destroy_device_resources();
     if (device) { vkDestroyDevice(device, NULL); device = VK_NULL_HANDLE; }
     if (surface) { vkDestroySurfaceKHR(instance, surface, NULL); surface = VK_NULL_HANDLE; }
