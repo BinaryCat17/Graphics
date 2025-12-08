@@ -17,16 +17,17 @@
     "spacing": 24,
     "children": [
       {
-        "type": "column",
+        "type": "row",
         "x": 0,
         "y": 0,
         "spacing": 12,
         "children": [
-          { "type": "panel", "id": "buttonsPanel", "w": 320, "h": 520, "style": "panelPrimary", "scrollArea": "buttons", "scrollStatic": true },
+          { "type": "panel", "id": "buttonsPanel", "w": 30, "h": 800, "style": "panelPrimary", "scrollArea": "buttons", "scrollStatic": true },
           {
             "type": "column",
             "x": 12,
             "y": 12,
+            "maxHeight":  300,
             "spacing": 10,
             "scrollArea": "buttons",
             "children": [
@@ -62,16 +63,17 @@
         ]
       },
       {
-        "type": "column",
-        "x": 360,
+        "type": "row",
+        "x": 50,
         "y": 0,
         "spacing": 12,
         "children": [
-          { "type": "panel", "id": "slidersPanel", "w": 360, "h": 520, "style": "panelSecondary", "scrollArea": "sliders", "scrollStatic": true },
+          { "type": "panel", "id": "slidersPanel", "w": 30, "h": 800, "style": "panelSecondary", "scrollArea": "sliders", "scrollStatic": true },
           {
             "type": "column",
             "x": 12,
             "y": 12,
+            "maxHeight":  300,
             "spacing": 14,
             "scrollArea": "sliders",
             "children": [
@@ -100,16 +102,17 @@
         ]
       },
       {
-        "type": "column",
-        "x": 740,
+        "type": "row",
+        "x": 200,
         "y": 0,
         "spacing": 12,
         "children": [
-          { "type": "panel", "id": "inspector", "w": 260, "h": 520, "style": "panelSecondary" },
+          { "type": "panel", "id": "inspector", "w": 30, "h": 800, "style": "panelSecondary" },
           {
             "type": "column",
             "x": 12,
             "y": 12,
+            "maxHeight":  300,
             "spacing": 10,
             "children": [
               { "use": "mutedLabel", "text": "Монитор состояний" },
