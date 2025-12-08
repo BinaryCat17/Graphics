@@ -723,10 +723,16 @@ static int apply_clip_rect(const Widget* widget, const Rect* input, Rect* out) {
     if (!widget || !input || !out) return 0;
     *out = *input;
     if (!widget->has_clip) return 1;
-    float x0 = fmaxf(input->x, widget->clip.x);
-    float y0 = fmaxf(input->y, widget->clip.y);
-    float x1 = fminf(input->x + input->w, widget->clip.x + widget->clip.w);
-    float y1 = fminf(input->y + input->h, widget->clip.y + widget->clip.h);
+
+    float clip_x0 = roundf(widget->clip.x);
+    float clip_y0 = roundf(widget->clip.y);
+    float clip_x1 = roundf(widget->clip.x + widget->clip.w);
+    float clip_y1 = roundf(widget->clip.y + widget->clip.h);
+
+    float x0 = fmaxf(input->x, clip_x0);
+    float y0 = fmaxf(input->y, clip_y0);
+    float x1 = fminf(input->x + input->w, clip_x1);
+    float y1 = fminf(input->y + input->h, clip_y1);
     if (x1 <= x0 || y1 <= y0) return 0;
     out->x = x0;
     out->y = y0;
