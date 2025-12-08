@@ -719,6 +719,10 @@ static const Glyph* get_glyph(int codepoint) {
     return NULL;
 }
 
+static float snap_to_pixel(float value) {
+    return floorf(value + 0.5f);
+}
+
 static int apply_clip_rect(const Widget* widget, const Rect* input, Rect* out) {
     if (!widget || !input || !out) return 0;
     *out = *input;
@@ -914,7 +918,8 @@ static void build_vertices_from_widgets(void) {
     for (size_t i = 0; i < g_widgets.count; ++i) {
         const Widget *widget = &g_widgets.items[i];
 
-        float effective_offset = widget->scroll_static ? 0.0f : -widget->scroll_offset;
+        float scroll_offset = widget->scroll_static ? 0.0f : widget->scroll_offset;
+        float effective_offset = -snap_to_pixel(scroll_offset);
         Rect widget_rect = { widget->rect.x, widget->rect.y + effective_offset, widget->rect.w, widget->rect.h };
         Rect inner_rect = widget_rect;
         if (widget->border_thickness > 0.0f) {
@@ -1066,7 +1071,8 @@ static void build_vertices_from_widgets(void) {
             continue;
         }
 
-        float effective_offset = widget->scroll_static ? 0.0f : -widget->scroll_offset;
+        float scroll_offset = widget->scroll_static ? 0.0f : widget->scroll_offset;
+        float effective_offset = -snap_to_pixel(scroll_offset);
         float pen_x = widget->rect.x + widget->padding;
         float pen_y = widget->rect.y + effective_offset + widget->padding + (float)ascent;
 
