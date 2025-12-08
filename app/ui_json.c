@@ -324,7 +324,7 @@ void update_widget_bindings(Widget* widgets, const Model* model) {
     }
 }
 
-static void parse_widget_object(Widget** list, const char* json, jsmntok_t* toks, unsigned int tokc, unsigned int start_idx, const Model* model, const Style* styles, float base_x, float base_y);
+static void parse_widget_object(Widget** list, const char* json, jsmntok_t* toks, unsigned int tokc, unsigned int start_idx, const Model* model, const Style* styles, float base_x, float base_y, float origin_x, float origin_y);
 
 static unsigned int skip_container(const jsmntok_t* toks, unsigned int tokc, unsigned int idx) {
     if (idx >= tokc) return tokc;
@@ -336,17 +336,19 @@ static unsigned int skip_container(const jsmntok_t* toks, unsigned int tokc, uns
     return i;
 }
 
-static void place_child_widgets(Widget** list, const char* json, jsmntok_t* toks, unsigned int tokc, unsigned int start_idx, const Model* model, const Style* styles, float base_x, float base_y, const char* direction, float spacing, int columns) {
+static void place_child_widgets(Widget** list, const char* json, jsmntok_t* toks, unsigned int tokc, unsigned int start_idx, const Model* model, const Style* styles, float origin_x, float origin_y, const char* direction, float spacing, int columns) {
     jsmntok_t* obj = &toks[start_idx];
-    float cursor_x = base_x;
-    float cursor_y = base_y;
+    float cursor_x = 0.0f;
+    float cursor_y = 0.0f;
     int col_idx = 0;
     for (unsigned int k = start_idx + 1; k < tokc && toks[k].start >= obj->start && toks[k].end <= obj->end; k++) {
         if (tok_is_key(json, &toks[k], "children") && k + 1 < tokc && toks[k + 1].type == JSMN_ARRAY) {
             jsmntok_t* arr = &toks[k + 1];
             for (unsigned int c = k + 2; c < tokc && toks[c].start >= arr->start && toks[c].end <= arr->end; ) {
                 if (toks[c].type == JSMN_OBJECT) {
-                    parse_widget_object(list, json, toks, tokc, c, model, styles, cursor_x, cursor_y);
+                    float child_base_x = origin_x + cursor_x;
+                    float child_base_y = origin_y + cursor_y;
+                    parse_widget_object(list, json, toks, tokc, c, model, styles, child_base_x, child_base_y, origin_x, origin_y);
                     // find last added widget to read its width/height
                     float advance_x = 0.0f, advance_y = 0.0f;
                     // To compute advance, read w/h from object tokens
@@ -363,7 +365,7 @@ static void place_child_widgets(Widget** list, const char* json, jsmntok_t* toks
                     }
                     else if (direction && strcmp(direction, "table") == 0 && columns > 0) {
                         col_idx++;
-                        if (col_idx >= columns) { col_idx = 0; cursor_x = base_x; cursor_y += child_h + spacing; }
+                        if (col_idx >= columns) { col_idx = 0; cursor_x = 0.0f; cursor_y += child_h + spacing; }
                         else cursor_x += child_w + spacing;
                     }
                     else { // column
@@ -376,7 +378,7 @@ static void place_child_widgets(Widget** list, const char* json, jsmntok_t* toks
     }
 }
 
-static void parse_widget_object(Widget** list, const char* json, jsmntok_t* toks, unsigned int tokc, unsigned int start_idx, const Model* model, const Style* styles, float base_x, float base_y) {
+static void parse_widget_object(Widget** list, const char* json, jsmntok_t* toks, unsigned int tokc, unsigned int start_idx, const Model* model, const Style* styles, float base_x, float base_y, float origin_x, float origin_y) {
     Widget* w = NULL;
     jsmntok_t* obj = &toks[start_idx];
     char* type = NULL;
@@ -396,7 +398,9 @@ static void parse_widget_object(Widget** list, const char* json, jsmntok_t* toks
     }
 
     if (type && (strcmp(type, "row") == 0 || strcmp(type, "column") == 0 || strcmp(type, "table") == 0)) {
-        place_child_widgets(list, json, toks, tokc, start_idx, model, styles, base_x + offset_x, base_y + offset_y, type, spacing, columns);
+        float child_origin_x = origin_x + offset_x;
+        float child_origin_y = origin_y + offset_y;
+        place_child_widgets(list, json, toks, tokc, start_idx, model, styles, child_origin_x, child_origin_y, type, spacing, columns);
         free(type); free(style_name);
         return;
     }
@@ -418,8 +422,8 @@ static void parse_widget_object(Widget** list, const char* json, jsmntok_t* toks
             else if (strcmp(s, "hslider") == 0) w->type = W_HSLIDER;
             free(s);
         }
-        else if (tok_is_key(json, &toks[k], "x")) w->rect.x = base_x + parse_number(json, val, w->rect.x);
-        else if (tok_is_key(json, &toks[k], "y")) w->rect.y = base_y + parse_number(json, val, w->rect.y);
+        else if (tok_is_key(json, &toks[k], "x")) w->rect.x = origin_x + parse_number(json, val, w->rect.x - base_x);
+        else if (tok_is_key(json, &toks[k], "y")) w->rect.y = origin_y + parse_number(json, val, w->rect.y - base_y);
         else if (tok_is_key(json, &toks[k], "w")) w->rect.w = parse_number(json, val, w->rect.w);
         else if (tok_is_key(json, &toks[k], "h")) w->rect.h = parse_number(json, val, w->rect.h);
         else if (tok_is_key(json, &toks[k], "id") && val->type == JSMN_STRING) w->id = tok_copy(json, val);
@@ -467,7 +471,7 @@ Widget* parse_layout_json(const char* json, const Model* model, const Style* sty
             sections_found++;
             if (i + 1 < p.toknext && toks[i + 1].type == JSMN_OBJECT) {
                 Widget* prev = widgets;
-                parse_widget_object(&widgets, json, toks, p.toknext, i + 1, model, styles, 0.0f, 0.0f);
+                parse_widget_object(&widgets, json, toks, p.toknext, i + 1, model, styles, 0.0f, 0.0f, 0.0f, 0.0f);
                 if (widgets != prev) widgets_created = 1;
             }
             else {
@@ -480,7 +484,7 @@ Widget* parse_layout_json(const char* json, const Model* model, const Style* sty
             for (unsigned int j = i + 2; j < p.toknext && toks[j].start >= arr->start && toks[j].end <= arr->end; ) {
                 if (toks[j].type == JSMN_OBJECT) {
                     Widget* prev = widgets;
-                    parse_widget_object(&widgets, json, toks, p.toknext, j, model, styles, 0.0f, 0.0f);
+                    parse_widget_object(&widgets, json, toks, p.toknext, j, model, styles, 0.0f, 0.0f, 0.0f, 0.0f);
                     if (widgets != prev) widgets_created = 1;
                 }
                 else {
