@@ -24,6 +24,8 @@ typedef struct GLFWwindow {
     int placeholder;
 } GLFWwindow;
 
+typedef void (*GLFWscrollfun)(GLFWwindow*, double, double);
+
 #define GLFW_CLIENT_API 0x00022001
 #define GLFW_NO_API 0
 
@@ -39,6 +41,10 @@ void glfwGetFramebufferSize(GLFWwindow* window, int* width, int* height);
 void glfwWaitEvents(void);
 int glfwWindowShouldClose(GLFWwindow* window);
 void glfwPollEvents(void);
+void* glfwGetWindowUserPointer(GLFWwindow* window);
+void glfwSetWindowUserPointer(GLFWwindow* window, void* pointer);
+void glfwGetCursorPos(GLFWwindow* window, double* xpos, double* ypos);
+void glfwSetScrollCallback(GLFWwindow* window, GLFWscrollfun cbfun);
 
 #ifdef __cplusplus
 }

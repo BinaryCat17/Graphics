@@ -2,6 +2,8 @@
 
 project ("Graphics")
 
+enable_testing()
+
 set(CMAKE_C_STANDARD 11)
 set(CMAKE_C_STANDARD_REQUIRED ON)
 
@@ -84,3 +86,10 @@ endif()
 target_link_libraries(Graphics PRIVATE glfw)
 target_link_libraries(Graphics PRIVATE Vulkan::Vulkan)
 target_include_directories(Graphics PRIVATE ${Stb_INCLUDE_DIR})
+
+add_executable(layout_tests
+        app/layout_tests.c
+        app/ui_json.c app/ui_json.h
+        app/scroll.c app/scroll.h)
+target_link_libraries(layout_tests PRIVATE glfw)
+add_test(NAME layout_tests COMMAND layout_tests)

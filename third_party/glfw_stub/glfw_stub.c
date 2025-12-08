@@ -70,3 +70,24 @@ int glfwWindowShouldClose(GLFWwindow* window) {
 void glfwPollEvents(void) {
 }
 
+void* glfwGetWindowUserPointer(GLFWwindow* window) {
+    (void)window;
+    return NULL;
+}
+
+void glfwSetWindowUserPointer(GLFWwindow* window, void* pointer) {
+    (void)window;
+    (void)pointer;
+}
+
+void glfwGetCursorPos(GLFWwindow* window, double* xpos, double* ypos) {
+    (void)window;
+    if (xpos) *xpos = 0.0;
+    if (ypos) *ypos = 0.0;
+}
+
+void glfwSetScrollCallback(GLFWwindow* window, GLFWscrollfun cbfun) {
+    (void)window;
+    (void)cbfun;
+}
+

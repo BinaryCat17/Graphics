@@ -7,6 +7,14 @@ typedef struct { float x, y, w, h; } Rect;
 typedef struct { float r, g, b, a; } Color;
 typedef enum { W_PANEL, W_LABEL, W_BUTTON, W_HSLIDER } WidgetType;
 
+typedef enum {
+    UI_LAYOUT_NONE,
+    UI_LAYOUT_ROW,
+    UI_LAYOUT_COLUMN,
+    UI_LAYOUT_TABLE,
+    UI_LAYOUT_ABSOLUTE
+} LayoutType;
+
 typedef struct ModelEntry {
     char* key;
     char* string_value;
@@ -24,8 +32,42 @@ typedef struct Style {
     char* name;
     Color background;
     Color text;
+    float padding;
     struct Style* next;
 } Style;
+
+typedef struct UiNode {
+    char* type;
+    LayoutType layout;
+    WidgetType widget_type;
+    Rect rect;
+    int has_x, has_y, has_w, has_h;
+    float spacing;
+    int columns;
+    const Style* style;
+    Color color;
+    Color text_color;
+    int has_color;
+    int has_text_color;
+    char* style_name;
+    char* id;
+    char* text;
+    char* text_binding;
+    char* value_binding;
+    float minv, maxv, value;
+    int has_min, has_max, has_value;
+    char* scroll_area;
+    int scroll_static;
+    struct UiNode* children;
+    size_t child_count;
+} UiNode;
+
+typedef struct LayoutNode {
+    const UiNode* source;
+    Rect rect;
+    struct LayoutNode* children;
+    size_t child_count;
+} LayoutNode;
 
 typedef struct Widget {
     WidgetType type;
@@ -33,6 +75,7 @@ typedef struct Widget {
     float scroll_offset;
     Color color;
     Color text_color;
+    float padding;
     char* text; /* for labels/buttons */
     char* text_binding;
     char* value_binding;
@@ -40,14 +83,26 @@ typedef struct Widget {
     char* id;
     char* scroll_area;
     int scroll_static;
-    struct Widget* next;
 } Widget;
+
+typedef struct {
+    Widget* items;
+    size_t count;
+} WidgetArray;
 
 Model* parse_model_json(const char* json_text, const char* source_path);
 Style* parse_styles_json(const char* json_text);
-Widget* parse_layout_json(const char* json_text, const Model* model, const Style* styles);
+UiNode* parse_layout_json(const char* json_text, const Model* model, const Style* styles);
 
-void update_widget_bindings(Widget* widgets, const Model* model);
+void update_widget_bindings(UiNode* root, const Model* model);
+
+LayoutNode* build_layout_tree(const UiNode* root);
+void free_layout_tree(LayoutNode* root);
+void measure_layout(LayoutNode* root);
+void assign_layout(LayoutNode* root, float origin_x, float origin_y);
+size_t count_layout_widgets(const LayoutNode* root);
+void populate_widgets_from_layout(const LayoutNode* root, Widget* widgets, size_t widget_count);
+WidgetArray materialize_widgets(const LayoutNode* root);
 
 float model_get_number(const Model* model, const char* key, float fallback);
 const char* model_get_string(const Model* model, const char* key, const char* fallback);
@@ -57,6 +112,7 @@ int save_model(const Model* model);
 
 void free_model(Model* model);
 void free_styles(Style* styles);
-void free_widgets(Widget* widgets);
+void free_widgets(WidgetArray widgets);
+void free_ui_tree(UiNode* root);
 
 #endif // UI_JSON_H
