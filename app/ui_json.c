@@ -145,19 +145,33 @@ static int ensure_font_metrics(const char* font_path) {
     return 1;
 }
 
+static int utf8_decode(const char* s, int* out_advance) {
+    unsigned char c = (unsigned char)*s;
+    if (c < 0x80) { *out_advance = 1; return c; }
+    if ((c >> 5) == 0x6) { *out_advance = 2; return ((int)(c & 0x1F) << 6) | ((int)(s[1] & 0x3F)); }
+    if ((c >> 4) == 0xE) { *out_advance = 3; return ((int)(c & 0x0F) << 12) | (((int)s[1] & 0x3F) << 6) | ((int)(s[2] & 0x3F)); }
+    if ((c >> 3) == 0x1E) { *out_advance = 4; return ((int)(c & 0x07) << 18) | (((int)s[1] & 0x3F) << 12) |
+                                        (((int)s[2] & 0x3F) << 6) | ((int)(s[3] & 0x3F)); }
+    *out_advance = 1;
+    return '?';
+}
+
 static void measure_text(const char* text, float* out_w, float* out_h) {
     float width = 0.0f;
     float height = fallback_line_height();
 
     if (g_font_ready && text && *text) {
         int prev = 0;
-        for (const char* c = text; *c; ++c) {
-            int ch = (unsigned char)(*c);
+        for (const char* c = text; *c; ) {
+            int adv = 0;
+            int ch = utf8_decode(c, &adv);
+            if (adv <= 0) break;
             int advance = 0, lsb = 0;
             stbtt_GetCodepointHMetrics(&g_font_info, ch, &advance, &lsb);
             width += advance * g_font_scale;
             if (prev) width += stbtt_GetCodepointKernAdvance(&g_font_info, prev, ch) * g_font_scale;
             prev = ch;
+            c += adv;
         }
     }
 
@@ -381,6 +395,8 @@ static UiNode* create_node(void) {
     node->text_color = DEFAULT_STYLE.text;
     node->has_min = node->has_max = node->has_value = 0;
     node->minv = 0.0f; node->maxv = 1.0f; node->value = 0.0f;
+    node->max_w = 0.0f; node->max_h = 0.0f;
+    node->has_max_w = node->has_max_h = 0;
     node->has_color = 0;
     node->has_text_color = 0;
     return node;
@@ -421,6 +437,8 @@ static UiNode* parse_ui_node(const char* json, jsmntok_t* toks, unsigned int tok
         else if (tok_is_key(json, &toks[k], "min")) { node->minv = parse_number(json, val, node->minv); node->has_min = 1; }
         else if (tok_is_key(json, &toks[k], "max")) { node->maxv = parse_number(json, val, node->maxv); node->has_max = 1; }
         else if (tok_is_key(json, &toks[k], "value")) { node->value = parse_number(json, val, node->value); node->has_value = 1; }
+        else if (tok_is_key(json, &toks[k], "maxWidth")) { node->max_w = parse_number(json, val, node->max_w); node->has_max_w = 1; }
+        else if (tok_is_key(json, &toks[k], "maxHeight")) { node->max_h = parse_number(json, val, node->max_h); node->has_max_h = 1; }
         else if (tok_is_key(json, &toks[k], "scrollArea") && val->type == JSMN_STRING) node->scroll_area = tok_copy(json, val);
         else if (tok_is_key(json, &toks[k], "scrollStatic") && val->type == JSMN_PRIMITIVE) {
             int len = val->end - val->start;
@@ -499,6 +517,8 @@ static void merge_node(UiNode* node, const UiNode* proto) {
     if (!node->has_min && proto->has_min) { node->minv = proto->minv; node->has_min = 1; }
     if (!node->has_max && proto->has_max) { node->maxv = proto->maxv; node->has_max = 1; }
     if (!node->has_value && proto->has_value) { node->value = proto->value; node->has_value = 1; }
+    if (!node->has_max_w && proto->has_max_w) { node->max_w = proto->max_w; node->has_max_w = 1; }
+    if (!node->has_max_h && proto->has_max_h) { node->max_h = proto->max_h; node->has_max_h = 1; }
     if (!node->scroll_area && proto->scroll_area) node->scroll_area = strdup(proto->scroll_area);
     if (!node->scroll_static && proto->scroll_static) node->scroll_static = 1;
 
@@ -537,6 +557,8 @@ static UiNode* clone_node(const UiNode* src) {
     n->click_value = src->click_value ? strdup(src->click_value) : NULL;
     n->minv = src->minv; n->maxv = src->maxv; n->value = src->value;
     n->has_min = src->has_min; n->has_max = src->has_max; n->has_value = src->has_value;
+    n->max_w = src->max_w; n->max_h = src->max_h;
+    n->has_max_w = src->has_max_w; n->has_max_h = src->has_max_h;
     n->scroll_area = src->scroll_area ? strdup(src->scroll_area) : NULL;
     n->scroll_static = src->scroll_static;
 
@@ -770,6 +792,7 @@ static void measure_node(LayoutNode* node) {
         }
         node->rect.w = content_w + padding * 2.0f;
         node->rect.h = content_h + padding * 2.0f;
+        if (node->source->has_max_w && node->rect.w > node->source->max_w) node->rect.w = node->source->max_w;
     } else if (node->source->layout == UI_LAYOUT_COLUMN) {
         float content_w = 0.0f;
         float content_h = 0.0f;
@@ -781,6 +804,7 @@ static void measure_node(LayoutNode* node) {
         }
         node->rect.w = content_w + padding * 2.0f;
         node->rect.h = content_h + padding * 2.0f;
+        if (node->source->has_max_h && node->rect.h > node->source->max_h) node->rect.h = node->source->max_h;
     } else if (node->source->layout == UI_LAYOUT_TABLE && node->source->columns > 0) {
         int cols = node->source->columns;
         int rows = (int)((node->child_count + (size_t)cols - 1) / (size_t)cols);
@@ -936,6 +960,9 @@ static void populate_widgets_recursive(const LayoutNode* node, Widget* widgets, 
         w->id = node->source->id;
         w->scroll_area = node->source->scroll_area;
         w->scroll_static = node->source->scroll_static;
+        w->scroll_viewport = 0.0f;
+        w->scroll_content = 0.0f;
+        w->show_scrollbar = 0;
         return;
     }
     for (size_t i = 0; i < node->child_count; i++) populate_widgets_recursive(&node->children[i], widgets, widget_count, idx);
