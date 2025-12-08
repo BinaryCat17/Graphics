@@ -48,7 +48,7 @@ static void test_row_layout(void) {
 
 static void test_column_layout_with_scroll(void) {
     const char* styles_json = "{\"styles\":{\"zeroPad\":{\"padding\":0}}}";
-    const char* layout_json = "{\"layout\":{\"type\":\"column\",\"style\":\"zeroPad\",\"spacing\":7,\"children\":[{\"type\":\"button\",\"w\":40,\"h\":18,\"scrollArea\":\"area1\"},{\"type\":\"button\",\"w\":40,\"h\":12,\"scrollArea\":\"area1\"}]}}";
+    const char* layout_json = "{\"layout\":{\"type\":\"column\",\"style\":\"zeroPad\",\"spacing\":7,\"children\":[{\"type\":\"button\",\"w\":40,\"h\":18},{\"type\":\"button\",\"w\":40,\"h\":12}]}}";
     LayoutFixture fx = build_widgets(styles_json, layout_json);
     assert(fx.widgets.count == 2);
     assert(fx.widgets.items[0].rect.x == 0.0f);
@@ -96,7 +96,7 @@ static void test_label_text_preserved_utf8(void) {
 
 static void test_scrollbar_shown_for_overflow(void) {
     const char* styles_json = "{\"styles\":{\"zero\":{\"padding\":0}}}";
-    const char* layout_json = "{\"layout\":{\"type\":\"column\",\"style\":\"zero\",\"children\":[{\"type\":\"panel\",\"h\":40,\"scrollArea\":\"area\",\"scrollStatic\":true},{\"type\":\"column\",\"scrollArea\":\"area\",\"maxHeight\":40,\"children\":[{\"type\":\"button\",\"h\":30},{\"type\":\"button\",\"h\":30},{\"type\":\"button\",\"h\":30}] }]}}";
+    const char* layout_json = "{\"layout\":{\"type\":\"column\",\"style\":\"zero\",\"children\":[{\"type\":\"column\",\"scrollStatic\":true,\"maxHeight\":40,\"children\":[{\"type\":\"button\",\"h\":30},{\"type\":\"button\",\"h\":30},{\"type\":\"button\",\"h\":30}]} ]}}";
     LayoutFixture fx = build_widgets(styles_json, layout_json);
     ScrollContext* ctx = scroll_init(fx.widgets.items, fx.widgets.count);
     assert(ctx != NULL);

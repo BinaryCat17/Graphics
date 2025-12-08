@@ -22,14 +22,12 @@
         "y": 0,
         "spacing": 12,
         "children": [
-          { "type": "panel", "id": "buttonsPanel", "w": 30, "h": 340, "style": "panelPrimary", "scrollArea": "buttons", "scrollStatic": true },
           {
             "type": "column",
-            "x": 12,
-            "y": 12,
-            "maxHeight":  320,
+            "style": "panelPrimary",
+            "scrollStatic": true,
+            "maxHeight":  340,
             "spacing": 10,
-            "scrollArea": "buttons",
             "children": [
               { "use": "mutedLabel", "text": "Последнее действие:", "style": "mutedLabel" },
               { "use": "mutedLabel", "textBinding": "lastAction", "style": "mutedLabel", "padding": 4 },
@@ -68,14 +66,12 @@
         "y": 0,
         "spacing": 12,
         "children": [
-          { "type": "panel", "id": "slidersPanel", "w": 30, "h": 340, "style": "panelSecondary", "scrollArea": "sliders", "scrollStatic": true },
           {
             "type": "column",
-            "x": 12,
-            "y": 12,
-            "maxHeight":  320,
+            "style": "panelSecondary",
+            "scrollStatic": true,
+            "maxHeight":  340,
             "spacing": 14,
-            "scrollArea": "sliders",
             "children": [
               { "use": "sliderBase", "id": "s01", "valueBinding": "slider01" },
               { "use": "sliderBase", "id": "s02", "valueBinding": "slider02" },

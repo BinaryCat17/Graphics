@@ -5,7 +5,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "stb_truetype.h"
+#include "stb/stb_truetype.h"
 
 typedef enum { JSMN_UNDEFINED = 0, JSMN_OBJECT = 1, JSMN_ARRAY = 2, JSMN_STRING = 3, JSMN_PRIMITIVE = 4 } jsmntype_t;
 typedef struct { jsmntype_t type; int start; int end; int size; } jsmntok_t;
@@ -109,6 +109,8 @@ static float fallback_line_height(void) {
     float line = (float)(g_font_ascent - g_font_descent);
     return line > 0.0f ? line : 18.0f;
 }
+
+static unsigned int skip_container(const jsmntok_t* toks, unsigned int tokc, unsigned int idx);
 
 static int ensure_font_metrics(const char* font_path) {
     if (g_font_ready) return 1;
@@ -343,35 +345,37 @@ Style* parse_styles_json(const char* json) {
                     jsmntok_t* sobj = &toks[j + 1];
                     unsigned int k = j + 2;
                     while (k < p.toknext && toks[k].start >= sobj->start && toks[k].end <= sobj->end) {
-                        if (tok_is_key(json, &toks[k], "color") && k + 1 < p.toknext) {
-                            read_color_array(&st->background, json, &toks[k + 1], toks, p.toknext);
+                        if (toks[k].type != JSMN_STRING || k + 1 >= p.toknext) { k++; continue; }
+                        jsmntok_t* val = &toks[k + 1];
+                        if (tok_is_key(json, &toks[k], "color")) {
+                            read_color_array(&st->background, json, val, toks, p.toknext);
+                            k = skip_container(toks, p.toknext, (unsigned int)(val - toks));
+                            continue;
+                        }
+                        if (tok_is_key(json, &toks[k], "textColor")) {
+                            read_color_array(&st->text, json, val, toks, p.toknext);
+                            k = skip_container(toks, p.toknext, (unsigned int)(val - toks));
+                            continue;
+                        }
+                        if (tok_is_key(json, &toks[k], "borderColor")) {
+                            read_color_array(&st->border_color, json, val, toks, p.toknext);
+                            k = skip_container(toks, p.toknext, (unsigned int)(val - toks));
+                            continue;
+                        }
+                        if (tok_is_key(json, &toks[k], "padding") && val->type == JSMN_PRIMITIVE) {
+                            st->padding = parse_number(json, val, st->padding);
                             k += 2;
                             continue;
                         }
-                        if (tok_is_key(json, &toks[k], "textColor") && k + 1 < p.toknext) {
-                            read_color_array(&st->text, json, &toks[k + 1], toks, p.toknext);
-                            k += 2;
-                            continue;
-                        }
-                        if (tok_is_key(json, &toks[k], "borderColor") && k + 1 < p.toknext) {
-                            read_color_array(&st->border_color, json, &toks[k + 1], toks, p.toknext);
-                            k += 2;
-                            continue;
-                        }
-                        if (tok_is_key(json, &toks[k], "padding") && k + 1 < p.toknext && toks[k + 1].type == JSMN_PRIMITIVE) {
-                            st->padding = parse_number(json, &toks[k + 1], st->padding);
-                            k += 2;
-                            continue;
-                        }
-                        if (tok_is_key(json, &toks[k], "borderThickness") && k + 1 < p.toknext && toks[k + 1].type == JSMN_PRIMITIVE) {
-                            st->border_thickness = parse_number(json, &toks[k + 1], st->border_thickness);
+                        if (tok_is_key(json, &toks[k], "borderThickness") && val->type == JSMN_PRIMITIVE) {
+                            st->border_thickness = parse_number(json, val, st->border_thickness);
                             k += 2;
                             continue;
                         }
                         char* key_name = tok_copy(json, &toks[k]);
                         fprintf(stderr, "Error: unknown style field '%s' in style '%s'\n", key_name ? key_name : "<null>", st->name);
                         free(key_name);
-                        k++;
+                        k = skip_container(toks, p.toknext, (unsigned int)(val - toks));
                     }
                     j += 2;
                 }
@@ -437,51 +441,58 @@ static UiNode* parse_ui_node(const char* json, jsmntok_t* toks, unsigned int tok
     UiNode* node = create_node();
     if (!node) return NULL;
     jsmntok_t* obj = &toks[start_idx];
-    for (unsigned int k = start_idx + 1; k < tokc && toks[k].start >= obj->start && toks[k].end <= obj->end; k++) {
-        if (toks[k].type != JSMN_STRING || k + 1 >= tokc) continue;
+    for (unsigned int k = start_idx + 1; k < tokc && toks[k].start >= obj->start && toks[k].end <= obj->end; ) {
+        if (toks[k].type != JSMN_STRING || k + 1 >= tokc) { k++; continue; }
         jsmntok_t* val = &toks[k + 1];
-        if (tok_is_key(json, &toks[k], "type") && val->type == JSMN_STRING) node->type = tok_copy(json, val);
-        else if (tok_is_key(json, &toks[k], "style") && val->type == JSMN_STRING) node->style_name = tok_copy(json, val);
-        else if (tok_is_key(json, &toks[k], "x")) { node->rect.x = parse_number(json, val, node->rect.x); node->has_x = 1; }
-        else if (tok_is_key(json, &toks[k], "y")) { node->rect.y = parse_number(json, val, node->rect.y); node->has_y = 1; }
-        else if (tok_is_key(json, &toks[k], "w")) { node->rect.w = parse_number(json, val, node->rect.w); node->has_w = 1; }
-        else if (tok_is_key(json, &toks[k], "h")) { node->rect.h = parse_number(json, val, node->rect.h); node->has_h = 1; }
-        else if (tok_is_key(json, &toks[k], "id") && val->type == JSMN_STRING) node->id = tok_copy(json, val);
-        else if (tok_is_key(json, &toks[k], "use") && val->type == JSMN_STRING) node->use = tok_copy(json, val);
-        else if (tok_is_key(json, &toks[k], "text") && val->type == JSMN_STRING) node->text = tok_copy(json, val);
-        else if (tok_is_key(json, &toks[k], "textBinding") && val->type == JSMN_STRING) node->text_binding = tok_copy(json, val);
-        else if (tok_is_key(json, &toks[k], "valueBinding") && val->type == JSMN_STRING) node->value_binding = tok_copy(json, val);
-        else if (tok_is_key(json, &toks[k], "onClick") && val->type == JSMN_STRING) node->click_binding = tok_copy(json, val);
-        else if (tok_is_key(json, &toks[k], "clickValue") && val->type == JSMN_STRING) node->click_value = tok_copy(json, val);
-        else if (tok_is_key(json, &toks[k], "min")) { node->minv = parse_number(json, val, node->minv); node->has_min = 1; }
-        else if (tok_is_key(json, &toks[k], "max")) { node->maxv = parse_number(json, val, node->maxv); node->has_max = 1; }
-        else if (tok_is_key(json, &toks[k], "value")) { node->value = parse_number(json, val, node->value); node->has_value = 1; }
-        else if (tok_is_key(json, &toks[k], "maxWidth")) { node->max_w = parse_number(json, val, node->max_w); node->has_max_w = 1; }
-        else if (tok_is_key(json, &toks[k], "maxHeight")) { node->max_h = parse_number(json, val, node->max_h); node->has_max_h = 1; }
-        else if (tok_is_key(json, &toks[k], "scrollArea") && val->type == JSMN_STRING) node->scroll_area = tok_copy(json, val);
-        else if (tok_is_key(json, &toks[k], "scrollStatic") && val->type == JSMN_PRIMITIVE) {
+        if (tok_is_key(json, &toks[k], "type") && val->type == JSMN_STRING) { node->type = tok_copy(json, val); k += 2; continue; }
+        if (tok_is_key(json, &toks[k], "style") && val->type == JSMN_STRING) { node->style_name = tok_copy(json, val); k += 2; continue; }
+        if (tok_is_key(json, &toks[k], "x")) { node->rect.x = parse_number(json, val, node->rect.x); node->has_x = 1; k += 2; continue; }
+        if (tok_is_key(json, &toks[k], "y")) { node->rect.y = parse_number(json, val, node->rect.y); node->has_y = 1; k += 2; continue; }
+        if (tok_is_key(json, &toks[k], "w")) { node->rect.w = parse_number(json, val, node->rect.w); node->has_w = 1; k += 2; continue; }
+        if (tok_is_key(json, &toks[k], "h")) { node->rect.h = parse_number(json, val, node->rect.h); node->has_h = 1; k += 2; continue; }
+        if (tok_is_key(json, &toks[k], "id") && val->type == JSMN_STRING) { node->id = tok_copy(json, val); k += 2; continue; }
+        if (tok_is_key(json, &toks[k], "use") && val->type == JSMN_STRING) { node->use = tok_copy(json, val); k += 2; continue; }
+        if (tok_is_key(json, &toks[k], "text") && val->type == JSMN_STRING) { node->text = tok_copy(json, val); k += 2; continue; }
+        if (tok_is_key(json, &toks[k], "textBinding") && val->type == JSMN_STRING) { node->text_binding = tok_copy(json, val); k += 2; continue; }
+        if (tok_is_key(json, &toks[k], "valueBinding") && val->type == JSMN_STRING) { node->value_binding = tok_copy(json, val); k += 2; continue; }
+        if (tok_is_key(json, &toks[k], "onClick") && val->type == JSMN_STRING) { node->click_binding = tok_copy(json, val); k += 2; continue; }
+        if (tok_is_key(json, &toks[k], "clickValue") && val->type == JSMN_STRING) { node->click_value = tok_copy(json, val); k += 2; continue; }
+        if (tok_is_key(json, &toks[k], "min")) { node->minv = parse_number(json, val, node->minv); node->has_min = 1; k += 2; continue; }
+        if (tok_is_key(json, &toks[k], "max")) { node->maxv = parse_number(json, val, node->maxv); node->has_max = 1; k += 2; continue; }
+        if (tok_is_key(json, &toks[k], "value")) { node->value = parse_number(json, val, node->value); node->has_value = 1; k += 2; continue; }
+        if (tok_is_key(json, &toks[k], "maxWidth")) { node->max_w = parse_number(json, val, node->max_w); node->has_max_w = 1; k += 2; continue; }
+        if (tok_is_key(json, &toks[k], "maxHeight")) { node->max_h = parse_number(json, val, node->max_h); node->has_max_h = 1; k += 2; continue; }
+        if (tok_is_key(json, &toks[k], "scrollArea") && val->type == JSMN_STRING) { node->scroll_area = tok_copy(json, val); k += 2; continue; }
+        if (tok_is_key(json, &toks[k], "scrollStatic") && val->type == JSMN_PRIMITIVE) {
             int len = val->end - val->start;
             if (len == 4 && strncmp(json + val->start, "true", 4) == 0) node->scroll_static = 1;
             if (len == 5 && strncmp(json + val->start, "false", 5) == 0) node->scroll_static = 0;
+            k += 2;
+            continue;
         }
-        else if (tok_is_key(json, &toks[k], "spacing")) { node->spacing = parse_number(json, val, node->spacing); node->has_spacing = 1; }
-        else if (tok_is_key(json, &toks[k], "columns")) { node->columns = (int)parse_number(json, val, (float)node->columns); node->has_columns = 1; }
-        else if (tok_is_key(json, &toks[k], "padding")) { node->padding_override = parse_number(json, val, node->padding_override); node->has_padding_override = 1; }
-        else if (tok_is_key(json, &toks[k], "borderThickness")) { node->border_thickness = parse_number(json, val, node->border_thickness); node->has_border_thickness = 1; }
-        else if (tok_is_key(json, &toks[k], "color")) {
-            node->color = node->color;
+        if (tok_is_key(json, &toks[k], "spacing")) { node->spacing = parse_number(json, val, node->spacing); node->has_spacing = 1; k += 2; continue; }
+        if (tok_is_key(json, &toks[k], "columns")) { node->columns = (int)parse_number(json, val, (float)node->columns); node->has_columns = 1; k += 2; continue; }
+        if (tok_is_key(json, &toks[k], "padding")) { node->padding_override = parse_number(json, val, node->padding_override); node->has_padding_override = 1; k += 2; continue; }
+        if (tok_is_key(json, &toks[k], "borderThickness")) { node->border_thickness = parse_number(json, val, node->border_thickness); node->has_border_thickness = 1; k += 2; continue; }
+        if (tok_is_key(json, &toks[k], "color")) {
             read_color_array(&node->color, json, val, toks, tokc);
             node->has_color = 1;
+            k = skip_container(toks, tokc, (unsigned int)(val - toks));
+            continue;
         }
-        else if (tok_is_key(json, &toks[k], "borderColor")) {
+        if (tok_is_key(json, &toks[k], "borderColor")) {
             read_color_array(&node->border_color, json, val, toks, tokc);
             node->has_border_color = 1;
+            k = skip_container(toks, tokc, (unsigned int)(val - toks));
+            continue;
         }
-        else if (tok_is_key(json, &toks[k], "textColor")) {
+        if (tok_is_key(json, &toks[k], "textColor")) {
             read_color_array(&node->text_color, json, val, toks, tokc);
             node->has_text_color = 1;
+            k = skip_container(toks, tokc, (unsigned int)(val - toks));
+            continue;
         }
-        else if (tok_is_key(json, &toks[k], "children") && val->type == JSMN_ARRAY) {
+        if (tok_is_key(json, &toks[k], "children") && val->type == JSMN_ARRAY) {
             jsmntok_t* arr = val;
             for (unsigned int c = k + 2; c < tokc && toks[c].start >= arr->start && toks[c].end <= arr->end; ) {
                 if (toks[c].type == JSMN_OBJECT) {
@@ -490,13 +501,13 @@ static UiNode* parse_ui_node(const char* json, jsmntok_t* toks, unsigned int tok
                 }
                 c = skip_container(toks, tokc, c);
             }
-            k = skip_container(toks, tokc, (unsigned int)(val - toks)) - 1;
+            k = skip_container(toks, tokc, (unsigned int)(val - toks));
+            continue;
         }
-        else {
-            char* key_name = tok_copy(json, &toks[k]);
-            fprintf(stderr, "Error: unknown layout field '%s'\n", key_name ? key_name : "<null>");
-            free(key_name);
-        }
+        char* key_name = tok_copy(json, &toks[k]);
+        fprintf(stderr, "Error: unknown layout field '%s'\n", key_name ? key_name : "<null>");
+        free(key_name);
+        k = skip_container(toks, tokc, (unsigned int)(val - toks));
     }
     return node;
 }
@@ -670,6 +681,21 @@ static void resolve_styles_and_defaults(UiNode* node, const Style* styles) {
     }
 }
 
+static void auto_assign_scroll_areas(UiNode* node, int* counter, const char* inherited) {
+    if (!node || !counter) return;
+    const char* active = inherited;
+    if (node->scroll_static && !node->scroll_area) {
+        char buf[32];
+        snprintf(buf, sizeof(buf), "scrollArea%d", *counter);
+        *counter += 1;
+        node->scroll_area = strdup(buf);
+    }
+    if (node->scroll_area) active = node->scroll_area;
+    for (size_t i = 0; i < node->child_count; i++) {
+        auto_assign_scroll_areas(&node->children[i], counter, active);
+    }
+}
+
 static void bind_model_values_to_nodes(UiNode* node, const Model* model) {
     if (!node || !model) return;
     if (node->text_binding) {
@@ -767,6 +793,8 @@ UiNode* parse_layout_json(const char* json, const Model* model, const Style* sty
     apply_prototypes(root, prototypes);
     resolve_styles_and_defaults(root, styles);
     bind_model_values_to_nodes(root, model);
+    int scroll_counter = 0;
+    auto_assign_scroll_areas(root, &scroll_counter, NULL);
     free_prototypes(prototypes);
     return root;
 }
@@ -966,16 +994,16 @@ void capture_layout_base(LayoutNode* root) { copy_base_rect(root); }
 
 size_t count_layout_widgets(const LayoutNode* root) {
     if (!root) return 0;
-    if (root->source && root->source->layout == UI_LAYOUT_NONE) return 1;
     size_t total = 0;
+    if (root->source && (root->source->layout == UI_LAYOUT_NONE || root->source->scroll_static)) total += 1;
     for (size_t i = 0; i < root->child_count; i++) total += count_layout_widgets(&root->children[i]);
     return total;
 }
 
-static void populate_widgets_recursive(const LayoutNode* node, Widget* widgets, size_t widget_count, size_t* idx, const char* inherited_scroll_area) {
+static void populate_widgets_recursive(const LayoutNode* node, Widget* widgets, size_t widget_count, size_t* idx, char* inherited_scroll_area) {
     if (!node || !widgets || !idx || *idx >= widget_count) return;
-    const char* active_scroll_area = node->source && node->source->scroll_area ? node->source->scroll_area : inherited_scroll_area;
-    if (node->source && node->source->layout == UI_LAYOUT_NONE) {
+    char* active_scroll_area = node->source && node->source->scroll_area ? node->source->scroll_area : inherited_scroll_area;
+    if (node->source && (node->source->layout == UI_LAYOUT_NONE || node->source->scroll_static)) {
         Widget* w = &widgets[*idx];
         (*idx)++;
         w->type = node->source->widget_type;
@@ -1003,7 +1031,10 @@ static void populate_widgets_recursive(const LayoutNode* node, Widget* widgets, 
         w->scroll_viewport = 0.0f;
         w->scroll_content = 0.0f;
         w->show_scrollbar = 0;
-        return;
+        if (node->source->layout != UI_LAYOUT_NONE) {
+            w->type = node->source->widget_type == W_PANEL ? node->source->widget_type : W_PANEL;
+        }
+        if (node->source->layout == UI_LAYOUT_NONE) return;
     }
     for (size_t i = 0; i < node->child_count; i++) populate_widgets_recursive(&node->children[i], widgets, widget_count, idx, active_scroll_area);
 }

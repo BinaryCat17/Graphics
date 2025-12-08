@@ -1,8 +1,6 @@
 #ifndef SCROLL_H
 #define SCROLL_H
 
-#include <GLFW/glfw3.h>
-
 #include "ui_json.h"
 
 typedef struct ScrollContext ScrollContext;
