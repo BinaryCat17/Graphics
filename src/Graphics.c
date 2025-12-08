@@ -23,10 +23,51 @@ static void ensure_capacity(DrawList *list, size_t required)
     list->capacity = new_capacity;
 }
 
-void render_context_init(RenderContext *ctx, float dpi_scale, Vec2 viewport_size, const float projection[16])
+void coordinate_transformer_init(CoordinateTransformer *xfm, float dpi_scale, float ui_scale, Vec2 viewport_size)
 {
-    ctx->dpi_scale = dpi_scale;
-    ctx->viewport_size = viewport_size;
+    xfm->dpi_scale = dpi_scale;
+    xfm->ui_scale = ui_scale;
+    xfm->viewport_size = viewport_size;
+}
+
+Vec2 coordinate_screen_to_logical(const CoordinateTransformer *xfm, Vec2 screen)
+{
+    Vec2 logical = {screen.x / xfm->dpi_scale, screen.y / xfm->dpi_scale};
+    return logical;
+}
+
+Vec2 coordinate_logical_to_screen(const CoordinateTransformer *xfm, Vec2 logical)
+{
+    Vec2 screen = {logical.x * xfm->dpi_scale, logical.y * xfm->dpi_scale};
+    return screen;
+}
+
+Vec2 coordinate_world_to_logical(const CoordinateTransformer *xfm, Vec2 world)
+{
+    Vec2 logical = {world.x * xfm->ui_scale, world.y * xfm->ui_scale};
+    return logical;
+}
+
+Vec2 coordinate_logical_to_world(const CoordinateTransformer *xfm, Vec2 logical)
+{
+    float inv = xfm->ui_scale != 0.0f ? 1.0f / xfm->ui_scale : 1.0f;
+    Vec2 world = {logical.x * inv, logical.y * inv};
+    return world;
+}
+
+Vec2 coordinate_world_to_screen(const CoordinateTransformer *xfm, Vec2 world)
+{
+    return coordinate_logical_to_screen(xfm, coordinate_world_to_logical(xfm, world));
+}
+
+Vec2 coordinate_screen_to_world(const CoordinateTransformer *xfm, Vec2 screen)
+{
+    return coordinate_logical_to_world(xfm, coordinate_screen_to_logical(xfm, screen));
+}
+
+void render_context_init(RenderContext *ctx, const CoordinateTransformer *xfm, const float projection[16])
+{
+    ctx->transformer = *xfm;
     if (projection) {
         memcpy(ctx->projection, projection, sizeof(float) * 16);
     } else {
@@ -43,12 +84,20 @@ LayoutResult layout_resolve(const LayoutBox *logical, const RenderContext *ctx)
     LayoutResult result;
     result.logical = *logical;
 
-    result.device.origin.x = logical->origin.x * ctx->dpi_scale;
-    result.device.origin.y = logical->origin.y * ctx->dpi_scale;
-    result.device.size.x = logical->size.x * ctx->dpi_scale;
-    result.device.size.y = logical->size.y * ctx->dpi_scale;
+    result.device.origin = coordinate_logical_to_screen(&ctx->transformer, logical->origin);
+    result.device.size = coordinate_logical_to_screen(&ctx->transformer, logical->size);
 
     return result;
+}
+
+int layout_hit_test(const LayoutResult *layout, Vec2 logical_point)
+{
+    float minx = layout->logical.origin.x;
+    float miny = layout->logical.origin.y;
+    float maxx = minx + layout->logical.size.x;
+    float maxy = miny + layout->logical.size.y;
+    return logical_point.x >= minx && logical_point.x <= maxx &&
+           logical_point.y >= miny && logical_point.y <= maxy;
 }
 
 void draw_list_init(DrawList *list, size_t initial_capacity)
@@ -196,13 +245,86 @@ static void emit_quad_vertices(const RenderContext *ctx, const DrawCommand *comm
     vertex_buffer->count += 6;
 }
 
-void renderer_fill_ui_vertices(Renderer *renderer, const ViewModel *view_models, size_t view_model_count, UiVertexBuffer *vertex_buffer)
+void renderer_fill_background_vertices(Renderer *renderer, const ViewModel *view_models, size_t view_model_count, UiVertexBuffer *vertex_buffer)
 {
     renderer_build_draw_list(renderer, view_models, view_model_count);
     vertex_buffer->count = 0;
 
     for (size_t i = 0; i < renderer->draw_list.count; ++i) {
         emit_quad_vertices(&renderer->context, &renderer->draw_list.commands[i], vertex_buffer);
+    }
+}
+
+void ui_text_vertex_buffer_init(UiTextVertexBuffer *buffer, size_t initial_capacity)
+{
+    buffer->vertices = NULL;
+    buffer->count = 0;
+    buffer->capacity = 0;
+    ui_text_vertex_buffer_reserve(buffer, initial_capacity);
+}
+
+void ui_text_vertex_buffer_dispose(UiTextVertexBuffer *buffer)
+{
+    free(buffer->vertices);
+    buffer->vertices = NULL;
+    buffer->count = 0;
+    buffer->capacity = 0;
+}
+
+void ui_text_vertex_buffer_reserve(UiTextVertexBuffer *buffer, size_t vertex_capacity)
+{
+    if (vertex_capacity <= buffer->capacity) {
+        return;
+    }
+
+    size_t new_capacity = buffer->capacity == 0 ? 6 : buffer->capacity * 2;
+    while (new_capacity < vertex_capacity) {
+        new_capacity *= 2;
+    }
+
+    UiTextVertex *expanded = (UiTextVertex *)realloc(buffer->vertices, new_capacity * sizeof(UiTextVertex));
+    if (!expanded) {
+        return;
+    }
+
+    buffer->vertices = expanded;
+    buffer->capacity = new_capacity;
+}
+
+static void emit_text_vertices(const RenderContext *ctx, const GlyphQuad *glyph, UiTextVertexBuffer *vertex_buffer)
+{
+    Vec2 device_min = coordinate_logical_to_screen(&ctx->transformer, glyph->min);
+    Vec2 device_max = coordinate_logical_to_screen(&ctx->transformer, glyph->max);
+    float z = (float)glyph->z_index;
+
+    ui_text_vertex_buffer_reserve(vertex_buffer, vertex_buffer->count + 6);
+    if (vertex_buffer->capacity < vertex_buffer->count + 6) {
+        return;
+    }
+
+    UiTextVertex quad[6];
+    Vec2 corners[4] = {{device_min.x, device_min.y}, {device_max.x, device_min.y}, {device_max.x, device_max.y}, {device_min.x, device_max.y}};
+    Vec2 uvs[4] = {{glyph->uv0.x, glyph->uv0.y}, {glyph->uv1.x, glyph->uv0.y}, {glyph->uv1.x, glyph->uv1.y}, {glyph->uv0.x, glyph->uv1.y}};
+    int indices[6] = {0, 1, 2, 0, 2, 3};
+
+    for (int i = 0; i < 6; ++i) {
+        UiTextVertex v = {0};
+        project_point(ctx, corners[indices[i]], z, v.position);
+        v.uv[0] = uvs[indices[i]].x;
+        v.uv[1] = uvs[indices[i]].y;
+        v.color = glyph->color;
+        quad[i] = v;
+    }
+
+    memcpy(&vertex_buffer->vertices[vertex_buffer->count], quad, sizeof(UiTextVertex) * 6);
+    vertex_buffer->count += 6;
+}
+
+void renderer_fill_text_vertices(const RenderContext *context, const GlyphQuad *glyphs, size_t glyph_count, UiTextVertexBuffer *vertex_buffer)
+{
+    vertex_buffer->count = 0;
+    for (size_t i = 0; i < glyph_count; ++i) {
+        emit_text_vertices(context, &glyphs[i], vertex_buffer);
     }
 }
 

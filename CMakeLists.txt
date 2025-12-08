@@ -93,4 +93,12 @@ add_executable(layout_tests
         app/ui_json.c app/ui_json.h
         app/scroll.c app/scroll.h)
 target_link_libraries(layout_tests PRIVATE glfw)
+target_include_directories(layout_tests PRIVATE src)
 add_test(NAME layout_tests COMMAND layout_tests)
+
+add_executable(transform_tests
+        app/transform_tests.c
+        src/Graphics.c src/Graphics.h)
+target_link_libraries(transform_tests PRIVATE glfw)
+target_include_directories(transform_tests PRIVATE src)
+add_test(NAME transform_tests COMMAND transform_tests)

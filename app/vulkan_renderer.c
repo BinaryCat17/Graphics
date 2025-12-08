@@ -70,6 +70,7 @@ static VkSampler font_sampler = VK_NULL_HANDLE;
 static VkDescriptorSetLayout descriptor_layout = VK_NULL_HANDLE;
 static VkDescriptorPool descriptor_pool = VK_NULL_HANDLE;
 static VkDescriptorSet descriptor_set = VK_NULL_HANDLE;
+static CoordinateTransformer g_transformer = {0};
 
 /* Utility: read file into memory */
 static char* read_file_text(const char* path, size_t * out_len) {
@@ -343,6 +344,8 @@ static void create_swapchain_and_views(VkSwapchainKHR old_swapchain) {
         if (clamped_h > caps.maxImageExtent.height) clamped_h = caps.maxImageExtent.height;
         swapchain_extent.width = clamped_w; swapchain_extent.height = clamped_h;
     }
+
+    g_transformer.viewport_size = (Vec2){(float)swapchain_extent.width, (float)swapchain_extent.height};
 
     VkCompositeAlphaFlagBitsKHR comp_alpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR;
     VkCompositeAlphaFlagBitsKHR pref_alphas[] = {
@@ -688,6 +691,32 @@ static int ascent = 0;
 typedef struct { float u0, v0, u1, v1; float xoff, yoff; float w, h; float advance; } Glyph;
 static Glyph glyphs[128];
 
+typedef struct {
+    GlyphQuad *items;
+    size_t count;
+    size_t capacity;
+} GlyphQuadArray;
+
+static void glyph_quad_array_reserve(GlyphQuadArray *arr, size_t required)
+{
+    if (required <= arr->capacity) {
+        return;
+    }
+
+    size_t new_capacity = arr->capacity == 0 ? required : arr->capacity * 2;
+    while (new_capacity < required) {
+        new_capacity *= 2;
+    }
+
+    GlyphQuad *expanded = realloc(arr->items, new_capacity * sizeof(GlyphQuad));
+    if (!expanded) {
+        return;
+    }
+
+    arr->items = expanded;
+    arr->capacity = new_capacity;
+}
+
 static void build_font_atlas(void) {
     if (!g_font_path) fatal("Font path is null");
     FILE* f = fopen(g_font_path, "rb");
@@ -789,10 +818,12 @@ static void build_vertices_from_widgets(void) {
     }
 
     ViewModel *view_models = calloc(g_widgets.count, sizeof(ViewModel));
+    GlyphQuadArray glyph_quads = {0};
     if (!view_models) {
         return;
     }
 
+    int glyph_z_base = (int)g_widgets.count;
     for (size_t i = 0; i < g_widgets.count; ++i) {
         const Widget *widget = &g_widgets.items[i];
         view_models[i].id = widget->id;
@@ -802,42 +833,13 @@ static void build_vertices_from_widgets(void) {
         view_models[i].logical_box.size.y = widget->rect.h;
         view_models[i].z_index = (int)i;
         view_models[i].color = widget->color;
-    }
 
-    float projection[16] = {0};
-    projection[0] = 1.0f;
-    projection[5] = 1.0f;
-    projection[10] = 1.0f;
-    projection[15] = 1.0f;
-
-    RenderContext context;
-    render_context_init(&context, 1.0f, (Vec2){(float)swapchain_extent.width, (float)swapchain_extent.height}, projection);
-
-    Renderer renderer;
-    renderer_init(&renderer, &context, g_widgets.count);
-
-    UiVertexBuffer vertex_buffer;
-    ui_vertex_buffer_init(&vertex_buffer, g_widgets.count * 6);
-
-    renderer_fill_ui_vertices(&renderer, view_models, g_widgets.count, &vertex_buffer);
-
-    if (vertex_buffer.count > 0 && ensure_vtx_capacity(vertex_buffer.count)) {
-        for (size_t i = 0; i < vertex_buffer.count; ++i) {
-            UiVertex v = vertex_buffer.vertices[i];
-            vtx_buf[i] = (Vtx){v.position[0], v.position[1], 0.0f, 0.0f, 0.0f, v.color.r, v.color.g, v.color.b, v.color.a};
-        }
-        vtx_count = vertex_buffer.count;
-    }
-
-    /* Append text glyphs on top of solid geometry. */
-    for (size_t i = 0; i < g_widgets.count; ++i) {
-        const Widget *widget = &g_widgets.items[i];
         if (!widget->text || !*widget->text) {
             continue;
         }
 
         float pen_x = widget->rect.x + widget->padding;
-        float pen_y = widget->rect.y + widget->padding + (float)ascent;
+        float pen_y = widget->rect.y + widget->scroll_offset + widget->padding + (float)ascent;
 
         for (const char *c = widget->text; *c; ++c) {
             unsigned char ch = (unsigned char)*c;
@@ -851,25 +853,67 @@ static void build_vertices_from_widgets(void) {
             float x1 = x0 + g->w;
             float y1 = y0 + g->h;
 
-            if (!ensure_vtx_capacity(vtx_count + 6)) {
+            glyph_quad_array_reserve(&glyph_quads, glyph_quads.count + 1);
+            if (glyph_quads.capacity < glyph_quads.count + 1) {
                 break;
             }
 
-            Vtx *dst = &vtx_buf[vtx_count];
-            dst[0] = (Vtx){x0, y0, g->u0, g->v0, 1.0f, widget->text_color.r, widget->text_color.g, widget->text_color.b, widget->text_color.a};
-            dst[1] = (Vtx){x1, y0, g->u1, g->v0, 1.0f, widget->text_color.r, widget->text_color.g, widget->text_color.b, widget->text_color.a};
-            dst[2] = (Vtx){x1, y1, g->u1, g->v1, 1.0f, widget->text_color.r, widget->text_color.g, widget->text_color.b, widget->text_color.a};
-            dst[3] = dst[0];
-            dst[4] = dst[2];
-            dst[5] = (Vtx){x0, y1, g->u0, g->v1, 1.0f, widget->text_color.r, widget->text_color.g, widget->text_color.b, widget->text_color.a};
-            vtx_count += 6;
+            glyph_quads.items[glyph_quads.count++] = (GlyphQuad){
+                .min = {x0, y0},
+                .max = {x1, y1},
+                .uv0 = {g->u0, g->v0},
+                .uv1 = {g->u1, g->v1},
+                .color = widget->text_color,
+                .z_index = glyph_z_base + (int)glyph_quads.count,
+            };
 
             pen_x += g->advance;
         }
     }
 
-    ui_vertex_buffer_dispose(&vertex_buffer);
+    float projection[16] = {0};
+    projection[0] = 1.0f;
+    projection[5] = 1.0f;
+    projection[10] = 1.0f;
+    projection[15] = 1.0f;
+
+    CoordinateTransformer transformer = g_transformer;
+    transformer.viewport_size = (Vec2){(float)swapchain_extent.width, (float)swapchain_extent.height};
+
+    RenderContext context;
+    render_context_init(&context, &transformer, projection);
+
+    Renderer renderer;
+    renderer_init(&renderer, &context, g_widgets.count);
+
+    UiVertexBuffer background_buffer;
+    ui_vertex_buffer_init(&background_buffer, g_widgets.count * 6);
+    renderer_fill_background_vertices(&renderer, view_models, g_widgets.count, &background_buffer);
+
+    UiTextVertexBuffer text_buffer;
+    ui_text_vertex_buffer_init(&text_buffer, glyph_quads.count * 6);
+    renderer_fill_text_vertices(&context, glyph_quads.items, glyph_quads.count, &text_buffer);
+
+    size_t total_vertices = background_buffer.count + text_buffer.count;
+    if (total_vertices > 0 && ensure_vtx_capacity(total_vertices)) {
+        size_t cursor = 0;
+        for (size_t i = 0; i < background_buffer.count; ++i) {
+            UiVertex v = background_buffer.vertices[i];
+            vtx_buf[cursor++] = (Vtx){v.position[0], v.position[1], 0.0f, 0.0f, 0.0f, v.color.r, v.color.g, v.color.b, v.color.a};
+        }
+
+        for (size_t i = 0; i < text_buffer.count; ++i) {
+            UiTextVertex v = text_buffer.vertices[i];
+            vtx_buf[cursor++] = (Vtx){v.position[0], v.position[1], v.uv[0], v.uv[1], 1.0f, v.color.r, v.color.g, v.color.b, v.color.a};
+        }
+
+        vtx_count = cursor;
+    }
+
+    ui_text_vertex_buffer_dispose(&text_buffer);
+    ui_vertex_buffer_dispose(&background_buffer);
     renderer_dispose(&renderer);
+    free(glyph_quads.items);
     free(view_models);
 }
 
@@ -953,12 +997,18 @@ static void draw_frame(void) {
     if (present != VK_SUCCESS) fatal_vk("vkQueuePresentKHR", present);
 }
 
-bool vk_renderer_init(GLFWwindow* window, const char* vert_spv, const char* frag_spv, const char* font_path, WidgetArray widgets) {
+bool vk_renderer_init(GLFWwindow* window, const char* vert_spv, const char* frag_spv, const char* font_path, WidgetArray widgets, const CoordinateTransformer* transformer) {
     g_window = window;
     g_widgets = widgets;
     g_vert_spv = vert_spv;
     g_frag_spv = frag_spv;
     g_font_path = font_path;
+
+    if (transformer) {
+        g_transformer = *transformer;
+    } else {
+        coordinate_transformer_init(&g_transformer, 1.0f, 1.0f, (Vec2){0.0f, 0.0f});
+    }
 
     create_instance();
     res = glfwCreateWindowSurface(instance, g_window, NULL, &surface);
@@ -976,6 +1026,12 @@ bool vk_renderer_init(GLFWwindow* window, const char* vert_spv, const char* frag
     create_descriptor_pool_and_set();
     build_vertices_from_widgets();
     return true;
+}
+
+void vk_renderer_update_transformer(const CoordinateTransformer* transformer) {
+    if (!transformer) return;
+    g_transformer = *transformer;
+    g_transformer.viewport_size = (Vec2){(float)swapchain_extent.width, (float)swapchain_extent.height};
 }
 
 void vk_renderer_draw_frame(void) {

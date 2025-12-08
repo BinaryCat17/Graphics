@@ -12,6 +12,7 @@
 #include "vulkan_renderer.h"
 #include "assets.h"
 #include "scroll.h"
+#include "Graphics.h"
 
 static void fatal(const char* msg) {
     fprintf(stderr, "Fatal: %s\n", msg);
@@ -26,8 +27,7 @@ typedef struct {
     float base_w;
     float base_h;
     float ui_scale;
-    float input_scale_x;
-    float input_scale_y;
+    CoordinateTransformer transformer;
 } AppContext;
 
 static void scale_layout(LayoutNode* node, float scale) {
@@ -55,18 +55,19 @@ static float compute_ui_scale(float base_w, float base_h, float target_w, float 
     return ui_scale;
 }
 
-static void update_input_scale(AppContext* ctx, GLFWwindow* window) {
+static void update_transformer(AppContext* ctx, GLFWwindow* window) {
     if (!ctx || !window) return;
     int win_w = 0, win_h = 0, fb_w = 0, fb_h = 0;
     glfwGetWindowSize(window, &win_w, &win_h);
     glfwGetFramebufferSize(window, &fb_w, &fb_h);
-    if (win_w <= 0 || win_h <= 0 || fb_w <= 0 || fb_h <= 0) {
-        ctx->input_scale_x = 1.0f;
-        ctx->input_scale_y = 1.0f;
-        return;
-    }
-    ctx->input_scale_x = (float)fb_w / (float)win_w;
-    ctx->input_scale_y = (float)fb_h / (float)win_h;
+    float dpi_scale_x = (win_w > 0) ? (float)fb_w / (float)win_w : 1.0f;
+    float dpi_scale_y = (win_h > 0) ? (float)fb_h / (float)win_h : 1.0f;
+    float dpi_scale = (dpi_scale_x + dpi_scale_y) * 0.5f;
+    if (dpi_scale <= 0.0f) dpi_scale = 1.0f;
+
+    coordinate_transformer_init(&ctx->transformer, dpi_scale, ctx->ui_scale,
+                                (Vec2){(float)fb_w, (float)fb_h});
+    vk_renderer_update_transformer(&ctx->transformer);
 }
 
 static void refresh_layout_for_scale(AppContext* ctx, float new_scale) {
@@ -80,7 +81,7 @@ static void refresh_layout_for_scale(AppContext* ctx, float new_scale) {
     scroll_rebuild(ctx->scroll, ctx->widgets->items, ctx->widgets->count, ratio);
 }
 
-static void apply_slider_action(Widget* w, Model* model, double mx) {
+static void apply_slider_action(Widget* w, Model* model, float mx) {
     if (!w) return;
     float local_t = (float)((mx - w->rect.x) / w->rect.w);
     local_t = clamp01(local_t);
@@ -131,13 +132,13 @@ static void on_mouse_button(GLFWwindow* window, int button, int action, int mods
     if (!ctx || !ctx->widgets) return;
     double mx = 0.0, my = 0.0;
     glfwGetCursorPos(window, &mx, &my);
-    mx *= ctx->input_scale_x;
-    my *= ctx->input_scale_y;
+    Vec2 screen = {(float)(mx * ctx->transformer.dpi_scale), (float)(my * ctx->transformer.dpi_scale)};
+    Vec2 logical = coordinate_screen_to_logical(&ctx->transformer, screen);
     for (size_t i = 0; i < ctx->widgets->count; i++) {
         Widget* w = &ctx->widgets->items[i];
-        if ((w->type == W_BUTTON || w->type == W_CHECKBOX || w->type == W_HSLIDER) && point_in_widget(w, mx, my)) {
+        if ((w->type == W_BUTTON || w->type == W_CHECKBOX || w->type == W_HSLIDER) && point_in_widget(w, logical.x, logical.y)) {
             if (w->type == W_HSLIDER) {
-                apply_slider_action(w, ctx->model, mx);
+                apply_slider_action(w, ctx->model, logical.x);
             } else {
                 apply_click_action(w, ctx->model);
             }
@@ -152,9 +153,9 @@ static void on_scroll(GLFWwindow* window, double xoff, double yoff) {
     if (!ctx || !ctx->widgets) return;
     double mx = 0.0, my = 0.0;
     glfwGetCursorPos(window, &mx, &my);
-    mx *= ctx->input_scale_x;
-    my *= ctx->input_scale_y;
-    scroll_handle_event(ctx->scroll, ctx->widgets->items, ctx->widgets->count, mx, my, yoff);
+    Vec2 screen = {(float)(mx * ctx->transformer.dpi_scale), (float)(my * ctx->transformer.dpi_scale)};
+    Vec2 logical = coordinate_screen_to_logical(&ctx->transformer, screen);
+    scroll_handle_event(ctx->scroll, ctx->widgets->items, ctx->widgets->count, logical.x, logical.y, yoff);
 }
 
 static void on_framebuffer_size(GLFWwindow* window, int width, int height) {
@@ -163,7 +164,7 @@ static void on_framebuffer_size(GLFWwindow* window, int width, int height) {
     if (!ctx) return;
     float new_scale = compute_ui_scale(ctx->base_w, ctx->base_h, (float)width, (float)height);
     refresh_layout_for_scale(ctx, new_scale);
-    update_input_scale(ctx, window);
+    update_transformer(ctx, window);
 }
 
 int main(int argc, char** argv) {
@@ -220,15 +221,16 @@ int main(int argc, char** argv) {
         free_assets(&assets);
         return 1;
     }
-    AppContext app_ctx = { .scroll = scroll_ctx, .widgets = &widgets, .model = model, .layout_root = layout_root, .base_w = base_w, .base_h = base_h, .ui_scale = layout_scale, .input_scale_x = 1.0f, .input_scale_y = 1.0f };
+    CoordinateTransformer transformer = {0};
+    AppContext app_ctx = { .scroll = scroll_ctx, .widgets = &widgets, .model = model, .layout_root = layout_root, .base_w = base_w, .base_h = base_h, .ui_scale = layout_scale, .transformer = transformer };
     glfwSetWindowUserPointer(window, &app_ctx);
     glfwSetFramebufferSizeCallback(window, on_framebuffer_size);
     glfwSetScrollCallback(window, on_scroll);
     glfwSetMouseButtonCallback(window, on_mouse_button);
 
-    update_input_scale(&app_ctx, window);
+    update_transformer(&app_ctx, window);
 
-    if (!vk_renderer_init(window, assets.vert_spv_path, assets.frag_spv_path, assets.font_path, widgets)) {
+    if (!vk_renderer_init(window, assets.vert_spv_path, assets.frag_spv_path, assets.font_path, widgets, &app_ctx.transformer)) {
         glfwDestroyWindow(window);
         glfwTerminate();
         free_model(model);
