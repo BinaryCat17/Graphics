@@ -12,6 +12,8 @@
 #define GLFW_INCLUDE_VULKAN
 #include <GLFW/glfw3.h>
 
+#include "Graphics.h"
+
 #define STB_TRUETYPE_IMPLEMENTATION
 #include "stb_truetype.h"
 
@@ -67,21 +69,6 @@ static VkSampler font_sampler = VK_NULL_HANDLE;
 static VkDescriptorSetLayout descriptor_layout = VK_NULL_HANDLE;
 static VkDescriptorPool descriptor_pool = VK_NULL_HANDLE;
 static VkDescriptorSet descriptor_set = VK_NULL_HANDLE;
-
-static Color color_scale(Color c, float scale) {
-    Color out = { c.r * scale, c.g * scale, c.b * scale, c.a };
-    if (out.r < 0.0f) out.r = 0.0f; if (out.g < 0.0f) out.g = 0.0f; if (out.b < 0.0f) out.b = 0.0f;
-    return out;
-}
-
-static Color color_mix(Color a, Color b, float t) {
-    Color out;
-    out.r = a.r + (b.r - a.r) * t;
-    out.g = a.g + (b.g - a.g) * t;
-    out.b = a.b + (b.b - a.b) * t;
-    out.a = a.a + (b.a - a.a) * t;
-    return out;
-}
 
 /* Utility: read file into memory */
 static char* read_file_text(const char* path, size_t * out_len) {
@@ -725,39 +712,6 @@ static void build_font_atlas(void) {
     }
 }
 
-static void append_quad(float x0, float y0, float x1, float y1, float u0, float v0, float u1, float v1, Color col, float use_tex) {
-    size_t base = vtx_count;
-    vtx_buf = realloc(vtx_buf, (vtx_count + 6) * sizeof(Vtx));
-    vtx_buf[base + 0] = (Vtx){ x0, y0, u0, v0, use_tex, col.r, col.g, col.b, col.a };
-    vtx_buf[base + 1] = (Vtx){ x1, y0, u1, v0, use_tex, col.r, col.g, col.b, col.a };
-    vtx_buf[base + 2] = (Vtx){ x1, y1, u1, v1, use_tex, col.r, col.g, col.b, col.a };
-    vtx_buf[base + 3] = (Vtx){ x0, y0, u0, v0, use_tex, col.r, col.g, col.b, col.a };
-    vtx_buf[base + 4] = (Vtx){ x1, y1, u1, v1, use_tex, col.r, col.g, col.b, col.a };
-    vtx_buf[base + 5] = (Vtx){ x0, y1, u0, v1, use_tex, col.r, col.g, col.b, col.a };
-    vtx_count += 6;
-}
-
-static void append_rect(float x, float y, float w, float h, Color col) {
-    append_quad(x, y, x + w, y + h, 0.0f, 0.0f, 0.0f, 0.0f, col, 0.0f);
-}
-
-static void append_text(const char* text, float x, float y, Color col) {
-    if (!text || !atlas) return;
-    float pen_x = x;
-    float base_y = y + (float)ascent;
-    for (const char* p = text; *p; ++p) {
-        unsigned char c = (unsigned char)*p;
-        if (c < 32 || c >= 128) { pen_x += 8.0f; continue; }
-        Glyph* g = &glyphs[c];
-        float x0 = pen_x + g->xoff;
-        float y0 = base_y + g->yoff;
-        float x1 = x0 + g->w;
-        float y1 = y0 + g->h;
-        append_quad(x0, y0, x1, y1, g->u0, g->v0, g->u1, g->v1, col, 1.0f);
-        pen_x += g->advance;
-    }
-}
-
 static void create_font_texture(void) {
     if (!atlas) fatal("font atlas not built");
     VkImageCreateInfo ici = { .sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO, .imageType = VK_IMAGE_TYPE_2D, .format = VK_FORMAT_R8_UNORM, .extent = { (uint32_t)atlas_w, (uint32_t)atlas_h, 1 }, .mipLevels = 1, .arrayLayers = 1, .samples = VK_SAMPLE_COUNT_1_BIT, .tiling = VK_IMAGE_TILING_OPTIMAL, .usage = VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, .sharingMode = VK_SHARING_MODE_EXCLUSIVE, .initialLayout = VK_IMAGE_LAYOUT_UNDEFINED }; 
@@ -806,63 +760,61 @@ static void create_descriptor_pool_and_set(void) {
 
 /* build vtxs from g_widgets each frame */
 static void build_vertices_from_widgets(void) {
-    free(vtx_buf); vtx_buf = NULL; vtx_count = 0;
-    for (size_t i = 0; i < g_widgets.count; i++) {
-        const Widget* w = &g_widgets.items[i];
-        float draw_x = w->rect.x;
-        float draw_y = w->rect.y + w->scroll_offset;
-        switch (w->type) {
-        case W_SPACER:
-            break;
-        case W_LABEL:
-            if (w->color.a > 0.01f) append_rect(draw_x, draw_y, w->rect.w, w->rect.h, w->color);
-            if (w->text) append_text(w->text, draw_x + w->padding, draw_y + w->padding, w->text_color);
-            break;
-        case W_HSLIDER: {
-            float t = (w->maxv > w->minv) ? (w->value - w->minv) / (w->maxv - w->minv) : 0.0f;
-            if (t < 0.0f) t = 0.0f; if (t > 1.0f) t = 1.0f;
-            float track_h = w->rect.h * 0.35f;
-            float track_y = draw_y + (w->rect.h - track_h) * 0.5f;
-            Color track = color_scale(w->color, 0.6f);
-            Color fill = color_scale(w->text_color.a > 0.0f ? w->text_color : w->color, 1.1f);
-            append_rect(draw_x, track_y, w->rect.w, track_h, track);
-            append_rect(draw_x, track_y, w->rect.w * t, track_h, fill);
-            float knob_w = w->rect.h * 0.6f;
-            float knob_x = draw_x + (w->rect.w - knob_w) * t;
-            Color knob = color_mix(fill, color_scale(fill, 0.7f), 0.5f);
-            append_rect(knob_x, draw_y, knob_w, w->rect.h, knob);
-            char buf[32];
-            snprintf(buf, sizeof(buf), "%3.0f%%", t * 100.0f);
-            append_text(buf, draw_x + w->padding, draw_y + w->padding, w->text_color);
-            break; }
-        case W_CHECKBOX: {
-            float box = w->rect.h;
-            Color frame = w->color;
-            append_rect(draw_x, draw_y, box, box, frame);
-            Color inner = color_scale(frame, 0.2f);
-            append_rect(draw_x + 2.0f, draw_y + 2.0f, box - 4.0f, box - 4.0f, inner);
-            if (w->value > 0.5f) {
-                Color check = w->text_color.a > 0.0f ? w->text_color : color_scale(frame, 1.5f);
-                append_rect(draw_x + 4.0f, draw_y + 4.0f, box - 8.0f, box - 8.0f, check);
+    free(vtx_buf);
+    vtx_buf = NULL;
+    vtx_count = 0;
+
+    if (g_widgets.count == 0 || swapchain_extent.width == 0 || swapchain_extent.height == 0) {
+        return;
+    }
+
+    ViewModel *view_models = calloc(g_widgets.count, sizeof(ViewModel));
+    if (!view_models) {
+        return;
+    }
+
+    for (size_t i = 0; i < g_widgets.count; ++i) {
+        const Widget *widget = &g_widgets.items[i];
+        view_models[i].id = widget->id;
+        view_models[i].logical_box.origin.x = widget->rect.x;
+        view_models[i].logical_box.origin.y = widget->rect.y + widget->scroll_offset;
+        view_models[i].logical_box.size.x = widget->rect.w;
+        view_models[i].logical_box.size.y = widget->rect.h;
+        view_models[i].z_index = (int)i;
+        view_models[i].color = widget->color;
+    }
+
+    float projection[16] = {0};
+    projection[0] = 1.0f;
+    projection[5] = 1.0f;
+    projection[10] = 1.0f;
+    projection[15] = 1.0f;
+
+    RenderContext context;
+    render_context_init(&context, 1.0f, (Vec2){(float)swapchain_extent.width, (float)swapchain_extent.height}, projection);
+
+    Renderer renderer;
+    renderer_init(&renderer, &context, g_widgets.count);
+
+    UiVertexBuffer vertex_buffer;
+    ui_vertex_buffer_init(&vertex_buffer, g_widgets.count * 6);
+
+    renderer_fill_ui_vertices(&renderer, view_models, g_widgets.count, &vertex_buffer);
+
+    if (vertex_buffer.count > 0) {
+        vtx_buf = malloc(sizeof(Vtx) * vertex_buffer.count);
+        if (vtx_buf) {
+            for (size_t i = 0; i < vertex_buffer.count; ++i) {
+                UiVertex v = vertex_buffer.vertices[i];
+                vtx_buf[i] = (Vtx){v.position[0], v.position[1], 0.0f, 0.0f, 0.0f, v.color.r, v.color.g, v.color.b, v.color.a};
             }
-            if (w->text) append_text(w->text, draw_x + box + w->padding, draw_y + w->padding, w->text_color);
-            break; }
-        case W_PROGRESS: {
-            append_rect(draw_x, draw_y, w->rect.w, w->rect.h, color_scale(w->color, 0.6f));
-            float t = (w->maxv > w->minv) ? (w->value - w->minv) / (w->maxv - w->minv) : 0.0f;
-            if (t < 0.0f) t = 0.0f; if (t > 1.0f) t = 1.0f;
-            append_rect(draw_x, draw_y, w->rect.w * t, w->rect.h, w->color);
-            if (w->text) append_text(w->text, draw_x + w->padding, draw_y + w->padding, w->text_color);
-            break; }
-        case W_RECT:
-        case W_PANEL:
-        case W_BUTTON:
-        default:
-            append_rect(draw_x, draw_y, w->rect.w, w->rect.h, w->color);
-            if (w->text) append_text(w->text, draw_x + w->padding, draw_y + w->padding, w->text_color);
-            break;
+            vtx_count = vertex_buffer.count;
         }
     }
+
+    ui_vertex_buffer_dispose(&vertex_buffer);
+    renderer_dispose(&renderer);
+    free(view_models);
 }
 
 static bool recover_device_loss(void) {
