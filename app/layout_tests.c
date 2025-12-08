@@ -1,5 +1,6 @@
 #include <assert.h>
 #include <math.h>
+#include <string.h>
 #include <stdio.h>
 
 #include "ui_json.h"
@@ -47,7 +48,7 @@ static void test_row_layout(void) {
 
 static void test_column_layout_with_scroll(void) {
     const char* styles_json = "{\"styles\":{\"zeroPad\":{\"padding\":0}}}";
-    const char* layout_json = "{\"layout\":{\"type\":\"column\",\"style\":\"zeroPad\",\"spacing\":7,\"children\":[{\"type\":\"button\",\"w\":40,\"h\":18,\"scrollArea\":\"area1\"},{\"type\":\"button\",\"w\":40,\"h\":12,\"scrollArea\":\"area1\"}]}}";
+    const char* layout_json = "{\"layout\":{\"type\":\"column\",\"style\":\"zeroPad\",\"spacing\":7,\"children\":[{\"type\":\"button\",\"w\":40,\"h\":18},{\"type\":\"button\",\"w\":40,\"h\":12}]}}";
     LayoutFixture fx = build_widgets(styles_json, layout_json);
     assert(fx.widgets.count == 2);
     assert(fx.widgets.items[0].rect.x == 0.0f);
@@ -84,11 +85,51 @@ static void test_padding_scale_is_stable(void) {
     assert(fabsf(w.padding - 5.0f) < 0.001f);
 }
 
+static void test_label_text_preserved_utf8(void) {
+    const char* layout_json = "{\"layout\":{\"type\":\"column\",\"children\":[{\"type\":\"label\",\"text\":\"Привет мир\",\"style\":\"zero\"}]}}";
+    const char* styles_json = "{\"styles\":{\"zero\":{\"padding\":0}}}";
+    LayoutFixture fx = build_widgets(styles_json, layout_json);
+    assert(fx.widgets.count == 1);
+    assert(strcmp(fx.widgets.items[0].text, "Привет мир") == 0);
+    free_fixture(&fx);
+}
+
+static void test_scrollbar_shown_for_overflow(void) {
+    const char* styles_json = "{\"styles\":{\"zero\":{\"padding\":0}}}";
+    const char* layout_json = "{\"layout\":{\"type\":\"column\",\"style\":\"zero\",\"children\":[{\"type\":\"column\",\"scrollStatic\":true,\"maxHeight\":40,\"children\":[{\"type\":\"button\",\"h\":30},{\"type\":\"button\",\"h\":30},{\"type\":\"button\",\"h\":30}]} ]}}";
+    LayoutFixture fx = build_widgets(styles_json, layout_json);
+    ScrollContext* ctx = scroll_init(fx.widgets.items, fx.widgets.count);
+    assert(ctx != NULL);
+    int found = 0;
+    for (size_t i = 0; i < fx.widgets.count; i++) {
+        Widget* w = &fx.widgets.items[i];
+        if (w->scroll_static) {
+            found = 1;
+            assert(w->show_scrollbar);
+        }
+    }
+    assert(found);
+    scroll_free(ctx);
+    free_fixture(&fx);
+}
+
+static void test_border_changes_size(void) {
+    const char* styles_json = "{\"styles\":{\"bordered\":{\"padding\":0,\"borderThickness\":2}}}";
+    const char* layout_json = "{\"layout\":{\"type\":\"column\",\"children\":[{\"type\":\"label\",\"style\":\"bordered\"}]}}";
+    LayoutFixture fx = build_widgets(styles_json, layout_json);
+    assert(fx.widgets.count == 1);
+    assert(fabsf(fx.widgets.items[0].rect.h - 22.0f) < 0.01f);
+    free_fixture(&fx);
+}
+
 int main(void) {
     test_row_layout();
     test_column_layout_with_scroll();
     test_table_layout();
     test_padding_scale_is_stable();
+    test_label_text_preserved_utf8();
+    test_scrollbar_shown_for_overflow();
+    test_border_changes_size();
     printf("layout_tests passed\n");
     return 0;
 }

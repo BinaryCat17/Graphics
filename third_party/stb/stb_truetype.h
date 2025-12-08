@@ -103,6 +103,12 @@ STBTT_DEF void stbtt_GetCodepointHMetrics(const stbtt_fontinfo *info, int codepo
     if (leftSideBearing) *leftSideBearing = 0;
 }
 
+STBTT_DEF int stbtt_GetCodepointKernAdvance(const stbtt_fontinfo *info, int ch1, int ch2)
+{
+    (void)info; (void)ch1; (void)ch2;
+    return 0;
+}
+
 #ifdef __cplusplus
 }
 #endif

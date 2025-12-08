@@ -32,7 +32,9 @@ typedef struct Style {
     char* name;
     Color background;
     Color text;
+    Color border_color;
     float padding;
+    float border_thickness;
     struct Style* next;
 } Style;
 
@@ -49,6 +51,10 @@ typedef struct UiNode {
     const Style* style;
     float padding_override;
     int has_padding_override;
+    float border_thickness;
+    int has_border_thickness;
+    int has_border_color;
+    Color border_color;
     Color color;
     Color text_color;
     int has_color;
@@ -87,6 +93,9 @@ typedef struct Widget {
     Color text_color;
     float base_padding;
     float padding;
+    float base_border_thickness;
+    float border_thickness;
+    Color border_color;
     char* text; /* for labels/buttons */
     char* text_binding;
     char* value_binding;
@@ -96,6 +105,8 @@ typedef struct Widget {
     char* id;
     char* scroll_area;
     int scroll_static;
+    int has_clip;
+    Rect clip;
     float scroll_viewport;
     float scroll_content;
     int show_scrollbar;

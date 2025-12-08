@@ -146,6 +146,13 @@ void scroll_apply_offsets(ScrollContext* ctx, Widget* widgets, size_t widget_cou
             w->scroll_content = content_h;
             w->show_scrollbar = overflow > 1.0f;
         }
+        if (a->has_viewport) {
+            w->has_clip = 1;
+            w->clip = a->viewport;
+        } else if (a->has_bounds) {
+            w->has_clip = 1;
+            w->clip = a->bounds;
+        }
     }
 }
 
