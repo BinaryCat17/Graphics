@@ -2,6 +2,7 @@
 
 #include <stdlib.h>
 #include <string.h>
+#include <math.h>
 
 typedef struct ScrollArea {
     char* name;
@@ -18,6 +19,11 @@ struct ScrollContext {
     ScrollArea* areas;
     Widget* widgets;
     size_t widget_count;
+    ScrollArea* dragging_area;
+    Rect drag_track;
+    float drag_thumb_h;
+    float drag_grab_offset;
+    float drag_max_offset;
 };
 
 static void free_scroll_areas(ScrollArea* areas) {
@@ -95,6 +101,63 @@ static ScrollArea* find_area_at_point(ScrollArea* areas, float x, float y) {
     return NULL;
 }
 
+static Widget* find_scrollbar_widget(Widget* widgets, size_t widget_count, const ScrollArea* area) {
+    if (!area) return NULL;
+    for (size_t i = 0; i < widget_count; i++) {
+        Widget* w = &widgets[i];
+        if (!w->scroll_area || !w->scroll_static) continue;
+        if (strcmp(w->scroll_area, area->name) == 0) return w;
+    }
+    return NULL;
+}
+
+static int compute_scrollbar_geometry(const Widget* w, Rect* out_track, Rect* out_thumb, float* out_max_offset) {
+    if (!w || !w->scrollbar_enabled || !w->show_scrollbar || w->scroll_viewport <= 0.0f) return 0;
+    float max_offset = w->scroll_content - w->scroll_viewport;
+    if (max_offset <= 1.0f) return 0;
+    Rect widget_rect = { w->rect.x, w->rect.y + w->scroll_offset, w->rect.w, w->rect.h };
+    Rect inner_rect = widget_rect;
+    if (w->border_thickness > 0.0f) {
+        inner_rect.x += w->border_thickness;
+        inner_rect.y += w->border_thickness;
+        inner_rect.w -= w->border_thickness * 2.0f;
+        inner_rect.h -= w->border_thickness * 2.0f;
+        if (inner_rect.w < 0.0f) inner_rect.w = 0.0f;
+        if (inner_rect.h < 0.0f) inner_rect.h = 0.0f;
+    }
+    float track_w = w->scrollbar_width > 0.0f ? w->scrollbar_width : fmaxf(4.0f, inner_rect.w * 0.02f);
+    float track_h = inner_rect.h - w->padding * 2.0f;
+    if (track_h <= 0.0f) return 0;
+    float track_x = inner_rect.x + inner_rect.w - track_w - w->padding * 0.5f;
+    float track_y = inner_rect.y + w->padding;
+    float thumb_ratio = w->scroll_viewport / w->scroll_content;
+    float thumb_h = fmaxf(track_h * thumb_ratio, 12.0f);
+    float offset_t = (max_offset != 0.0f) ? (w->scroll_offset / max_offset) : 0.0f;
+    if (offset_t < -1.0f) offset_t = -1.0f;
+    if (offset_t > 1.0f) offset_t = 1.0f;
+    float thumb_y = track_y + (track_h - thumb_h) * 0.5f - offset_t * (track_h - thumb_h);
+    if (out_track) *out_track = (Rect){ track_x, track_y, track_w, track_h };
+    if (out_thumb) *out_thumb = (Rect){ track_x, thumb_y, track_w, thumb_h };
+    if (out_max_offset) *out_max_offset = max_offset;
+    return 1;
+}
+
+static float offset_from_cursor(const Rect* track, float thumb_h, float max_offset, float mouse_y, float grab_offset) {
+    if (!track || max_offset <= 0.0f) return 0.0f;
+    float range = track->h - thumb_h;
+    if (range <= 0.0f) return 0.0f;
+    float thumb_y = mouse_y - grab_offset;
+    float min_y = track->y;
+    float max_y = track->y + range;
+    if (thumb_y < min_y) thumb_y = min_y;
+    if (thumb_y > max_y) thumb_y = max_y;
+    float offset_t = (track->y + range * 0.5f - thumb_y) / range;
+    float offset = offset_t * max_offset;
+    if (offset > max_offset) offset = max_offset;
+    if (offset < -max_offset) offset = -max_offset;
+    return offset;
+}
+
 static void build_scroll_areas(ScrollContext* ctx, Widget* widgets, size_t widget_count) {
     free_scroll_areas(ctx->areas);
     ctx->areas = NULL;
@@ -144,7 +207,7 @@ void scroll_apply_offsets(ScrollContext* ctx, Widget* widgets, size_t widget_cou
         if (w->scroll_static) {
             w->scroll_viewport = viewport_h;
             w->scroll_content = content_h;
-            w->show_scrollbar = overflow > 1.0f;
+            w->show_scrollbar = w->scrollbar_enabled && overflow > 1.0f;
         }
         if (a->has_viewport) {
             w->has_clip = 1;
@@ -167,9 +230,65 @@ void scroll_handle_event(ScrollContext* ctx, Widget* widgets, size_t widget_coun
     scroll_apply_offsets(ctx, widgets, widget_count);
 }
 
+int scroll_handle_mouse_button(ScrollContext* ctx, Widget* widgets, size_t widget_count, double mouse_x, double mouse_y, int pressed) {
+    if (!ctx || !widgets) return 0;
+    ctx->widgets = widgets;
+    ctx->widget_count = widget_count;
+    int consumed = 0;
+
+    if (!pressed) {
+        if (ctx->dragging_area) consumed = 1;
+        ctx->dragging_area = NULL;
+        return consumed;
+    }
+
+    for (size_t i = 0; i < widget_count; i++) {
+        Widget* w = &widgets[i];
+        if (!w->scroll_area) continue;
+        ScrollArea* area = find_area(ctx->areas, w->scroll_area);
+        if (!area) continue;
+        Rect track = {0};
+        Rect thumb = {0};
+        float max_offset = 0.0f;
+        if (!compute_scrollbar_geometry(w, &track, &thumb, &max_offset)) continue;
+        if (mouse_x >= track.x && mouse_x <= track.x + track.w && mouse_y >= track.y && mouse_y <= track.y + track.h) {
+            ctx->dragging_area = area;
+            ctx->drag_track = track;
+            ctx->drag_thumb_h = thumb.h;
+            ctx->drag_max_offset = max_offset;
+            ctx->drag_grab_offset = (float)(mouse_y - thumb.y);
+            consumed = 1;
+            if (!(mouse_y >= thumb.y && mouse_y <= thumb.y + thumb.h)) {
+                ctx->drag_grab_offset = thumb.h * 0.5f;
+                area->offset = offset_from_cursor(&track, thumb.h, max_offset, (float)mouse_y, ctx->drag_grab_offset);
+                scroll_apply_offsets(ctx, widgets, widget_count);
+            }
+            break;
+        }
+    }
+    return consumed;
+}
+
+void scroll_handle_cursor(ScrollContext* ctx, Widget* widgets, size_t widget_count, double mouse_x, double mouse_y) {
+    if (!ctx || !ctx->dragging_area || !widgets) return;
+    ctx->widgets = widgets;
+    ctx->widget_count = widget_count;
+    Widget* anchor = find_scrollbar_widget(widgets, widget_count, ctx->dragging_area);
+    if (!anchor) { ctx->dragging_area = NULL; return; }
+
+    Rect track = {0};
+    Rect thumb = {0};
+    float max_offset = 0.0f;
+    if (!compute_scrollbar_geometry(anchor, &track, &thumb, &max_offset)) { ctx->dragging_area = NULL; return; }
+    float grab = ctx->drag_grab_offset > 0.0f ? ctx->drag_grab_offset : thumb.h * 0.5f;
+    ctx->dragging_area->offset = offset_from_cursor(&track, thumb.h, max_offset, (float)mouse_y, grab);
+    scroll_apply_offsets(ctx, widgets, widget_count);
+}
+
 void scroll_rebuild(ScrollContext* ctx, Widget* widgets, size_t widget_count, float offset_scale) {
     if (!ctx) return;
     ScrollArea* old = ctx->areas;
+    ctx->dragging_area = NULL;
     ctx->areas = NULL;
     ctx->widgets = widgets;
     ctx->widget_count = widget_count;
