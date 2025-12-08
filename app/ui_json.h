@@ -30,6 +30,7 @@ typedef struct Style {
 typedef struct Widget {
     WidgetType type;
     Rect rect;
+    float scroll_offset;
     Color color;
     Color text_color;
     char* text; /* for labels/buttons */
@@ -37,6 +38,8 @@ typedef struct Widget {
     char* value_binding;
     float minv, maxv, value;
     char* id;
+    char* scroll_area;
+    int scroll_static;
     struct Widget* next;
 } Widget;
 

@@ -290,6 +290,8 @@ static Widget* create_widget(void) {
     w->color = default_color();
     w->text_color = (Color){ 1.0f, 1.0f, 1.0f, 1.0f };
     w->minv = 0.0f; w->maxv = 1.0f; w->value = 0.0f;
+    w->scroll_offset = 0.0f;
+    w->scroll_static = 0;
     return w;
 }
 
@@ -381,6 +383,7 @@ static void parse_widget_object(Widget** list, const char* json, jsmntok_t* toks
     char* style_name = NULL;
     float spacing = 8.0f;
     int columns = 0;
+    float offset_x = 0.0f, offset_y = 0.0f;
     for (unsigned int k = start_idx + 1; k < tokc && toks[k].start >= obj->start && toks[k].end <= obj->end; k++) {
         if (toks[k].type != JSMN_STRING || k + 1 >= tokc) continue;
         jsmntok_t* val = &toks[k + 1];
@@ -388,10 +391,12 @@ static void parse_widget_object(Widget** list, const char* json, jsmntok_t* toks
         if (tok_is_key(json, &toks[k], "style") && val->type == JSMN_STRING) { style_name = tok_copy(json, val); }
         if (tok_is_key(json, &toks[k], "spacing")) spacing = parse_number(json, val, spacing);
         if (tok_is_key(json, &toks[k], "columns")) columns = (int)parse_number(json, val, (float)columns);
+        if (tok_is_key(json, &toks[k], "x")) offset_x = parse_number(json, val, offset_x);
+        if (tok_is_key(json, &toks[k], "y")) offset_y = parse_number(json, val, offset_y);
     }
 
     if (type && (strcmp(type, "row") == 0 || strcmp(type, "column") == 0 || strcmp(type, "table") == 0)) {
-        place_child_widgets(list, json, toks, tokc, start_idx, model, styles, base_x, base_y, type, spacing, columns);
+        place_child_widgets(list, json, toks, tokc, start_idx, model, styles, base_x + offset_x, base_y + offset_y, type, spacing, columns);
         free(type); free(style_name);
         return;
     }
@@ -421,6 +426,12 @@ static void parse_widget_object(Widget** list, const char* json, jsmntok_t* toks
         else if (tok_is_key(json, &toks[k], "min")) w->minv = parse_number(json, val, w->minv);
         else if (tok_is_key(json, &toks[k], "max")) w->maxv = parse_number(json, val, w->maxv);
         else if (tok_is_key(json, &toks[k], "value")) w->value = parse_number(json, val, w->value);
+        else if (tok_is_key(json, &toks[k], "scrollArea") && val->type == JSMN_STRING) w->scroll_area = tok_copy(json, val);
+        else if (tok_is_key(json, &toks[k], "scrollStatic") && val->type == JSMN_PRIMITIVE) {
+            int len = val->end - val->start;
+            if (len == 4 && strncmp(json + val->start, "true", 4) == 0) w->scroll_static = 1;
+            if (len == 5 && strncmp(json + val->start, "false", 5) == 0) w->scroll_static = 0;
+        }
         else if (tok_is_key(json, &toks[k], "color")) {
             Color col = w->color;
             read_color_array(&col, json, val, toks, tokc);
@@ -512,6 +523,7 @@ void free_widgets(Widget* widgets) {
         free(widgets->text_binding);
         free(widgets->value_binding);
         free(widgets->id);
+        free(widgets->scroll_area);
         free(widgets);
         widgets = n;
     }

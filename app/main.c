@@ -10,6 +10,18 @@
 #include "ui_json.h"
 #include "vulkan_renderer.h"
 
+typedef struct ScrollArea {
+    char* name;
+    Rect bounds;
+    int has_bounds;
+    int has_static_anchor;
+    float offset;
+    struct ScrollArea* next;
+} ScrollArea;
+
+static ScrollArea* g_scroll_areas = NULL;
+static Widget* g_widgets_for_scroll = NULL;
+
 static char* read_file_text(const char* path, size_t * out_len) {
     FILE* f = fopen(path, "rb"); if (!f) { fprintf(stderr, "Failed open %s\n", path); return NULL; }
     fseek(f, 0, SEEK_END); long len = ftell(f); fseek(f, 0, SEEK_SET);
@@ -34,6 +46,108 @@ static char* join_path(const char* dir, const char* leaf) {
 static void fatal(const char* msg) {
     fprintf(stderr, "Fatal: %s\n", msg);
     exit(1);
+}
+
+static void free_scroll_areas(void) {
+    while (g_scroll_areas) {
+        ScrollArea* n = g_scroll_areas->next;
+        free(g_scroll_areas->name);
+        free(g_scroll_areas);
+        g_scroll_areas = n;
+    }
+}
+
+static ScrollArea* find_area(const char* name) {
+    for (ScrollArea* a = g_scroll_areas; a; a = a->next) {
+        if (strcmp(a->name, name) == 0) return a;
+    }
+    return NULL;
+}
+
+static ScrollArea* ensure_area(const char* name) {
+    ScrollArea* a = find_area(name);
+    if (a) return a;
+    a = (ScrollArea*)calloc(1, sizeof(ScrollArea));
+    if (!a) return NULL;
+    a->name = strdup(name);
+    a->offset = 0.0f;
+    a->has_bounds = 0;
+    a->has_static_anchor = 0;
+    a->next = g_scroll_areas;
+    g_scroll_areas = a;
+    return a;
+}
+
+static void add_area_bounds(ScrollArea* a, const Widget* w) {
+    if (!a || !w) return;
+    Rect r = w->rect;
+    float minx = r.x;
+    float miny = r.y;
+    float maxx = r.x + r.w;
+    float maxy = r.y + r.h;
+    if (!a->has_bounds) {
+        a->bounds.x = minx;
+        a->bounds.y = miny;
+        a->bounds.w = r.w;
+        a->bounds.h = r.h;
+        a->has_bounds = 1;
+    } else {
+        float old_maxx = a->bounds.x + a->bounds.w;
+        float old_maxy = a->bounds.y + a->bounds.h;
+        float new_minx = (minx < a->bounds.x) ? minx : a->bounds.x;
+        float new_miny = (miny < a->bounds.y) ? miny : a->bounds.y;
+        float new_maxx = (maxx > old_maxx) ? maxx : old_maxx;
+        float new_maxy = (maxy > old_maxy) ? maxy : old_maxy;
+        a->bounds.x = new_minx;
+        a->bounds.y = new_miny;
+        a->bounds.w = new_maxx - new_minx;
+        a->bounds.h = new_maxy - new_miny;
+    }
+}
+
+static void build_scroll_areas(Widget* widgets) {
+    free_scroll_areas();
+    for (Widget* w = widgets; w; w = w->next) {
+        w->scroll_offset = 0.0f;
+        if (!w->scroll_area) continue;
+        ScrollArea* area = ensure_area(w->scroll_area);
+        if (!area) continue;
+        if (w->scroll_static) area->has_static_anchor = 1;
+        add_area_bounds(area, w);
+    }
+}
+
+static void apply_scroll_offsets(Widget* widgets) {
+    for (Widget* w = widgets; w; w = w->next) {
+        w->scroll_offset = 0.0f;
+        if (!w->scroll_area) continue;
+        ScrollArea* a = find_area(w->scroll_area);
+        if (!a) continue;
+        if (w->scroll_static) w->scroll_offset = 0.0f;
+        else w->scroll_offset = a->offset;
+    }
+}
+
+static ScrollArea* find_area_at_point(float x, float y) {
+    for (ScrollArea* a = g_scroll_areas; a; a = a->next) {
+        if (!a->has_bounds) continue;
+        if (x >= a->bounds.x && x <= a->bounds.x + a->bounds.w &&
+            y >= a->bounds.y && y <= a->bounds.y + a->bounds.h) {
+            return a;
+        }
+    }
+    return NULL;
+}
+
+static void on_scroll(GLFWwindow* window, double xoff, double yoff) {
+    (void)xoff;
+    if (!g_widgets_for_scroll) return;
+    double mx = 0.0, my = 0.0;
+    glfwGetCursorPos(window, &mx, &my);
+    ScrollArea* target = find_area_at_point((float)mx, (float)my);
+    if (!target) return;
+    target->offset += (float)yoff * 24.0f;
+    apply_scroll_offsets(g_widgets_for_scroll);
 }
 
 int main(int argc, char** argv) {
@@ -68,6 +182,10 @@ int main(int argc, char** argv) {
     glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
     GLFWwindow* window = glfwCreateWindow(1024, 640, "vk_gui (Vulkan)", NULL, NULL);
     if (!window) fatal("glfwCreateWindow");
+    g_widgets_for_scroll = widgets;
+    build_scroll_areas(widgets);
+    apply_scroll_offsets(widgets);
+    glfwSetScrollCallback(window, on_scroll);
 
     if (!vk_renderer_init(window, vert_spv, frag_spv, font_path, widgets)) {
         glfwDestroyWindow(window);
@@ -75,12 +193,14 @@ int main(int argc, char** argv) {
         free_model(model);
         free_styles(styles);
         free_widgets(widgets);
+        free_scroll_areas();
         free(model_path); free(layout_path); free(styles_path); free(vert_spv); free(frag_spv); free(font_path); return 1;
     }
 
     while (!glfwWindowShouldClose(window)) {
         glfwPollEvents();
         update_widget_bindings(widgets, model);
+        apply_scroll_offsets(widgets);
         vk_renderer_draw_frame();
     }
 
@@ -89,6 +209,7 @@ int main(int argc, char** argv) {
     free_model(model);
     free_styles(styles);
     free_widgets(widgets);
+    free_scroll_areas();
     free(model_path); free(layout_path); free(styles_path); free(vert_spv); free(frag_spv); free(font_path);
     glfwDestroyWindow(window);
     glfwTerminate();

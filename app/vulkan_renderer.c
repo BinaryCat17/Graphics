@@ -793,9 +793,11 @@ static void create_descriptor_pool_and_set(void) {
 static void build_vertices_from_widgets(void) {
     free(vtx_buf); vtx_buf = NULL; vtx_count = 0;
     for (const Widget* w = g_widgets; w; w = w->next) {
-        append_rect(w->rect.x, w->rect.y, w->rect.w, w->rect.h, w->color);
+        float draw_x = w->rect.x;
+        float draw_y = w->rect.y + w->scroll_offset;
+        append_rect(draw_x, draw_y, w->rect.w, w->rect.h, w->color);
         if (w->text) {
-            append_text(w->text, w->rect.x + 6.0f, w->rect.y + 6.0f, w->text_color);
+            append_text(w->text, draw_x + 6.0f, draw_y + 6.0f, w->text_color);
         }
     }
 }
