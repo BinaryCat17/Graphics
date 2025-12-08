@@ -84,6 +84,10 @@ if (NOT VULKAN_STUB)
     )
 endif()
 
+if (NOT Stb_FOUND)
+    target_include_directories(Graphics PRIVATE "third_party/stb")
+endif()
+
 target_link_libraries(Graphics PRIVATE glfw)
 target_link_libraries(Graphics PRIVATE Vulkan::Vulkan)
 target_include_directories(Graphics PRIVATE ${Stb_INCLUDE_DIR})
