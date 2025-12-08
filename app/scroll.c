@@ -199,11 +199,9 @@ void scroll_apply_offsets(ScrollContext* ctx, Widget* widgets, size_t widget_cou
         float content_h = a->has_bounds ? a->bounds.h : viewport_h;
         float overflow = content_h - viewport_h;
         if (overflow < 0.0f) overflow = 0.0f;
-        if (!w->scroll_static) {
-            if (a->offset > overflow) a->offset = overflow;
-            if (a->offset < -overflow) a->offset = -overflow;
-            w->scroll_offset = a->offset;
-        }
+        if (a->offset > overflow) a->offset = overflow;
+        if (a->offset < -overflow) a->offset = -overflow;
+        w->scroll_offset = a->offset;
         if (w->scroll_static) {
             w->scroll_viewport = viewport_h;
             w->scroll_content = content_h;

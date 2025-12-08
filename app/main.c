@@ -101,7 +101,8 @@ static void apply_slider_action(Widget* w, Model* model, float mx) {
 static int point_in_widget(const Widget* w, double mx, double my) {
     if (!w) return 0;
     float x = w->rect.x;
-    float y = w->rect.y + w->scroll_offset;
+    float y_offset = w->scroll_static ? 0.0f : w->scroll_offset;
+    float y = w->rect.y + y_offset;
     return mx >= x && mx <= x + w->rect.w && my >= y && my <= y + w->rect.h;
 }
 

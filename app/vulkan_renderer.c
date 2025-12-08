@@ -881,7 +881,8 @@ static void build_vertices_from_widgets(void) {
     for (size_t i = 0; i < g_widgets.count; ++i) {
         const Widget *widget = &g_widgets.items[i];
 
-        Rect widget_rect = { widget->rect.x, widget->rect.y + widget->scroll_offset, widget->rect.w, widget->rect.h };
+        float effective_offset = widget->scroll_static ? 0.0f : widget->scroll_offset;
+        Rect widget_rect = { widget->rect.x, widget->rect.y + effective_offset, widget->rect.w, widget->rect.h };
         Rect inner_rect = widget_rect;
         if (widget->border_thickness > 0.0f) {
             inner_rect.x += widget->border_thickness;
@@ -1017,8 +1018,9 @@ static void build_vertices_from_widgets(void) {
             continue;
         }
 
+        float effective_offset = widget->scroll_static ? 0.0f : widget->scroll_offset;
         float pen_x = widget->rect.x + widget->padding;
-        float pen_y = widget->rect.y + widget->scroll_offset + widget->rect.h - widget->padding - (float)descent;
+        float pen_y = widget->rect.y + effective_offset + widget->padding + (float)ascent;
 
         for (const char *c = widget->text; *c; ) {
             int adv = 0;
