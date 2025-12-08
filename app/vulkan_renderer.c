@@ -719,14 +719,24 @@ static const Glyph* get_glyph(int codepoint) {
     return NULL;
 }
 
+static float snap_to_pixel(float value) {
+    return floorf(value + 0.5f);
+}
+
 static int apply_clip_rect(const Widget* widget, const Rect* input, Rect* out) {
     if (!widget || !input || !out) return 0;
     *out = *input;
     if (!widget->has_clip) return 1;
-    float x0 = fmaxf(input->x, widget->clip.x);
-    float y0 = fmaxf(input->y, widget->clip.y);
-    float x1 = fminf(input->x + input->w, widget->clip.x + widget->clip.w);
-    float y1 = fminf(input->y + input->h, widget->clip.y + widget->clip.h);
+
+    float clip_x0 = roundf(widget->clip.x);
+    float clip_y0 = roundf(widget->clip.y);
+    float clip_x1 = roundf(widget->clip.x + widget->clip.w);
+    float clip_y1 = roundf(widget->clip.y + widget->clip.h);
+
+    float x0 = fmaxf(input->x, clip_x0);
+    float y0 = fmaxf(input->y, clip_y0);
+    float x1 = fminf(input->x + input->w, clip_x1);
+    float y1 = fminf(input->y + input->h, clip_y1);
     if (x1 <= x0 || y1 <= y0) return 0;
     out->x = x0;
     out->y = y0;
@@ -753,6 +763,32 @@ static void glyph_quad_array_reserve(GlyphQuadArray *arr, size_t required)
 
     arr->items = expanded;
     arr->capacity = new_capacity;
+}
+
+static bool ensure_view_model_capacity(ViewModel **view_models, size_t *capacity, size_t required, bool *ok)
+{
+    if (!ok || !*ok) {
+        return false;
+    }
+    if (required <= *capacity) {
+        return true;
+    }
+
+    size_t new_capacity = *capacity == 0 ? required : (*capacity * 2);
+    while (new_capacity < required) {
+        new_capacity *= 2;
+    }
+
+    ViewModel *expanded = realloc(*view_models, new_capacity * sizeof(ViewModel));
+    if (!expanded) {
+        *ok = false;
+        return false;
+    }
+
+    memset(expanded + *capacity, 0, (new_capacity - *capacity) * sizeof(ViewModel));
+    *view_models = expanded;
+    *capacity = new_capacity;
+    return true;
 }
 
 static void build_font_atlas(void) {
@@ -873,6 +909,7 @@ static void build_vertices_from_widgets(void) {
     size_t view_model_capacity = g_widgets.count * 4 + slider_extras;
     ViewModel *view_models = calloc(view_model_capacity, sizeof(ViewModel));
     GlyphQuadArray glyph_quads = {0};
+    bool view_models_ok = view_models != NULL;
     if (!view_models) {
         return;
     }
@@ -881,7 +918,9 @@ static void build_vertices_from_widgets(void) {
     for (size_t i = 0; i < g_widgets.count; ++i) {
         const Widget *widget = &g_widgets.items[i];
 
-        float effective_offset = widget->scroll_static ? 0.0f : -widget->scroll_offset;
+        float scroll_offset = widget->scroll_static ? 0.0f : widget->scroll_offset;
+        float snapped_scroll_pixels = -snap_to_pixel(scroll_offset * g_transformer.dpi_scale);
+        float effective_offset = snapped_scroll_pixels / g_transformer.dpi_scale;
         Rect widget_rect = { widget->rect.x, widget->rect.y + effective_offset, widget->rect.w, widget->rect.h };
         Rect inner_rect = widget_rect;
         if (widget->border_thickness > 0.0f) {
@@ -892,7 +931,8 @@ static void build_vertices_from_widgets(void) {
             if (inner_rect.w < 0.0f) inner_rect.w = 0.0f;
             if (inner_rect.h < 0.0f) inner_rect.h = 0.0f;
             Rect clipped_border;
-            if (apply_clip_rect(widget, &widget_rect, &clipped_border)) {
+            if (apply_clip_rect(widget, &widget_rect, &clipped_border) &&
+                ensure_view_model_capacity(&view_models, &view_model_capacity, view_model_count + 1, &view_models_ok)) {
                 view_models[view_model_count++] = (ViewModel){
                     .id = widget->id,
                     .logical_box = { {clipped_border.x, clipped_border.y}, {clipped_border.w, clipped_border.h} },
@@ -917,7 +957,8 @@ static void build_vertices_from_widgets(void) {
             track_color.a *= 0.35f;
             Rect track_rect = { track_x, track_y, track_w, track_height };
             Rect clipped_track;
-            if (apply_clip_rect(widget, &track_rect, &clipped_track)) {
+            if (apply_clip_rect(widget, &track_rect, &clipped_track) &&
+                ensure_view_model_capacity(&view_models, &view_model_capacity, view_model_count + 1, &view_models_ok)) {
                 view_models[view_model_count++] = (ViewModel){
                     .id = widget->id,
                     .logical_box = { {clipped_track.x, clipped_track.y}, {clipped_track.w, clipped_track.h} },
@@ -929,7 +970,8 @@ static void build_vertices_from_widgets(void) {
             float fill_w = track_w * t;
             Rect fill_rect = { track_x, track_y, fill_w, track_height };
             Rect clipped_fill;
-            if (apply_clip_rect(widget, &fill_rect, &clipped_fill)) {
+            if (apply_clip_rect(widget, &fill_rect, &clipped_fill) &&
+                ensure_view_model_capacity(&view_models, &view_model_capacity, view_model_count + 1, &view_models_ok)) {
                 view_models[view_model_count++] = (ViewModel){
                     .id = widget->id,
                     .logical_box = { {clipped_fill.x, clipped_fill.y}, {clipped_fill.w, clipped_fill.h} },
@@ -949,7 +991,8 @@ static void build_vertices_from_widgets(void) {
             if (knob_color.a <= 0.0f) knob_color = (Color){1.0f, 1.0f, 1.0f, 1.0f};
             Rect knob_rect = { knob_x, knob_y, knob_w, knob_h };
             Rect clipped_knob;
-            if (apply_clip_rect(widget, &knob_rect, &clipped_knob)) {
+            if (apply_clip_rect(widget, &knob_rect, &clipped_knob) &&
+                ensure_view_model_capacity(&view_models, &view_model_capacity, view_model_count + 1, &view_models_ok)) {
                 view_models[view_model_count++] = (ViewModel){
                     .id = widget->id,
                     .logical_box = { {clipped_knob.x, clipped_knob.y}, {clipped_knob.w, clipped_knob.h} },
@@ -961,7 +1004,8 @@ static void build_vertices_from_widgets(void) {
         }
 
         Rect clipped_fill;
-        if (apply_clip_rect(widget, &inner_rect, &clipped_fill)) {
+        if (apply_clip_rect(widget, &inner_rect, &clipped_fill) &&
+            ensure_view_model_capacity(&view_models, &view_model_capacity, view_model_count + 1, &view_models_ok)) {
             view_models[view_model_count++] = (ViewModel){
                 .id = widget->id,
                 .logical_box = { {clipped_fill.x, clipped_fill.y}, {clipped_fill.w, clipped_fill.h} },
@@ -981,7 +1025,8 @@ static void build_vertices_from_widgets(void) {
             Rect clipped_track;
             const int scrollbar_z = 1000000;
 
-            if (apply_clip_rect(widget, &scroll_track, &clipped_track)) {
+            if (apply_clip_rect(widget, &scroll_track, &clipped_track) &&
+                ensure_view_model_capacity(&view_models, &view_model_capacity, view_model_count + 1, &view_models_ok)) {
                 view_models[view_model_count++] = (ViewModel){
                     .id = widget->id,
                     .logical_box = { {clipped_track.x, clipped_track.y}, {clipped_track.w, clipped_track.h} },
@@ -1002,7 +1047,8 @@ static void build_vertices_from_widgets(void) {
 
             Rect thumb_rect = { track_x, thumb_y, track_w, thumb_h };
             Rect clipped_thumb;
-            if (apply_clip_rect(widget, &thumb_rect, &clipped_thumb)) {
+            if (apply_clip_rect(widget, &thumb_rect, &clipped_thumb) &&
+                ensure_view_model_capacity(&view_models, &view_model_capacity, view_model_count + 1, &view_models_ok)) {
                 view_models[view_model_count++] = (ViewModel){
                     .id = widget->id,
                     .logical_box = { {clipped_thumb.x, clipped_thumb.y}, {clipped_thumb.w, clipped_thumb.h} },
@@ -1012,6 +1058,12 @@ static void build_vertices_from_widgets(void) {
             }
         }
     }
+    if (!view_models_ok) {
+        free(glyph_quads.items);
+        free(view_models);
+        return;
+    }
+
     int glyph_z_base = (int)view_model_count;
     for (size_t i = 0; i < g_widgets.count; ++i) {
         const Widget *widget = &g_widgets.items[i];
@@ -1020,7 +1072,9 @@ static void build_vertices_from_widgets(void) {
             continue;
         }
 
-        float effective_offset = widget->scroll_static ? 0.0f : -widget->scroll_offset;
+        float scroll_offset = widget->scroll_static ? 0.0f : widget->scroll_offset;
+        float snapped_scroll_pixels = -snap_to_pixel(scroll_offset * g_transformer.dpi_scale);
+        float effective_offset = snapped_scroll_pixels / g_transformer.dpi_scale;
         float pen_x = widget->rect.x + widget->padding;
         float pen_y = widget->rect.y + effective_offset + widget->padding + (float)ascent;
 
@@ -1032,8 +1086,10 @@ static void build_vertices_from_widgets(void) {
 
             const Glyph *g = get_glyph(codepoint);
             if (!g) { c += adv; continue; }
-            float x0 = pen_x + g->xoff;
-            float y0 = pen_y + g->yoff;
+            float snapped_pen_x = floorf(pen_x + 0.5f);
+            float snapped_pen_y = floorf(pen_y + 0.5f);
+            float x0 = snapped_pen_x + g->xoff;
+            float y0 = snapped_pen_y + g->yoff;
             Rect glyph_rect = { x0, y0, g->w, g->h };
             Rect clipped_rect;
             if (!apply_clip_rect(widget, &glyph_rect, &clipped_rect)) { pen_x += g->advance; c += adv; continue; }
@@ -1117,6 +1173,8 @@ static void build_vertices_from_widgets(void) {
         }
 
         vtx_count = cursor;
+    } else {
+        vtx_count = 0;
     }
 
     ui_text_vertex_buffer_dispose(&text_buffer);

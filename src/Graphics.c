@@ -2,6 +2,7 @@
 
 #include <stdlib.h>
 #include <string.h>
+#include <math.h>
 
 static void ensure_capacity(DrawList *list, size_t required)
 {
@@ -298,6 +299,35 @@ static void emit_text_vertices(const RenderContext *ctx, const GlyphQuad *glyph,
 {
     Vec2 device_min = coordinate_logical_to_screen(&ctx->transformer, glyph->min);
     Vec2 device_max = coordinate_logical_to_screen(&ctx->transformer, glyph->max);
+
+    Vec2 snapped_min = {roundf(device_min.x), roundf(device_min.y)};
+    Vec2 snapped_max = {roundf(device_max.x), roundf(device_max.y)};
+
+    float device_w = device_max.x - device_min.x;
+    float device_h = device_max.y - device_min.y;
+    float u0 = glyph->uv0.x;
+    float v0 = glyph->uv0.y;
+    float u1 = glyph->uv1.x;
+    float v1 = glyph->uv1.y;
+
+    if (device_w != 0.0f) {
+        float du = (u1 - u0) / device_w;
+        float delta_min = snapped_min.x - device_min.x;
+        float delta_max = snapped_max.x - device_max.x;
+        u0 += du * delta_min;
+        u1 += du * delta_max;
+    }
+
+    if (device_h != 0.0f) {
+        float dv = (v1 - v0) / device_h;
+        float delta_min = snapped_min.y - device_min.y;
+        float delta_max = snapped_max.y - device_max.y;
+        v0 += dv * delta_min;
+        v1 += dv * delta_max;
+    }
+
+    device_min = snapped_min;
+    device_max = snapped_max;
     float z = (float)glyph->z_index;
 
     ui_text_vertex_buffer_reserve(vertex_buffer, vertex_buffer->count + 6);
@@ -307,7 +337,7 @@ static void emit_text_vertices(const RenderContext *ctx, const GlyphQuad *glyph,
 
     UiTextVertex quad[6];
     Vec2 corners[4] = {{device_min.x, device_min.y}, {device_max.x, device_min.y}, {device_max.x, device_max.y}, {device_min.x, device_max.y}};
-    Vec2 uvs[4] = {{glyph->uv0.x, glyph->uv0.y}, {glyph->uv1.x, glyph->uv0.y}, {glyph->uv1.x, glyph->uv1.y}, {glyph->uv0.x, glyph->uv1.y}};
+    Vec2 uvs[4] = {{u0, v0}, {u1, v0}, {u1, v1}, {u0, v1}};
     int indices[6] = {0, 1, 2, 0, 2, 3};
 
     for (int i = 0; i < 6; ++i) {
