@@ -5,7 +5,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "stb/stb_truetype.h"
+#include "stb_truetype.h"
 
 typedef enum { JSMN_UNDEFINED = 0, JSMN_OBJECT = 1, JSMN_ARRAY = 2, JSMN_STRING = 3, JSMN_PRIMITIVE = 4 } jsmntype_t;
 typedef struct { jsmntype_t type; int start; int end; int size; } jsmntok_t;
