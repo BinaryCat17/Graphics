@@ -127,23 +127,15 @@ void scroll_apply_offsets(ScrollContext* ctx, Widget* widgets, size_t widget_cou
     }
 }
 
-static void on_scroll(GLFWwindow* window, double xoff, double yoff) {
-    (void)xoff;
-    ScrollContext* ctx = (ScrollContext*)glfwGetWindowUserPointer(window);
-    if (!ctx || !ctx->widgets) return;
-
-    double mx = 0.0, my = 0.0;
-    glfwGetCursorPos(window, &mx, &my);
-    ScrollArea* target = find_area_at_point(ctx->areas, (float)mx, (float)my);
+void scroll_handle_event(ScrollContext* ctx, Widget* widgets, size_t widget_count, double mouse_x, double mouse_y, double yoff) {
+    if (!ctx || !widgets) return;
+    ctx->widgets = widgets;
+    ctx->widget_count = widget_count;
+    ScrollArea* target = find_area_at_point(ctx->areas, (float)mouse_x, (float)mouse_y);
     if (!target) return;
 
     target->offset += (float)yoff * 24.0f;
-    scroll_apply_offsets(ctx, ctx->widgets, ctx->widget_count);
-}
-
-void scroll_set_callback(GLFWwindow* window, ScrollContext* ctx) {
-    glfwSetWindowUserPointer(window, ctx);
-    glfwSetScrollCallback(window, on_scroll);
+    scroll_apply_offsets(ctx, widgets, widget_count);
 }
 
 void scroll_free(ScrollContext* ctx) {

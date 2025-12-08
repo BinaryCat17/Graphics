@@ -5,7 +5,7 @@
 
 typedef struct { float x, y, w, h; } Rect;
 typedef struct { float r, g, b, a; } Color;
-typedef enum { W_PANEL, W_LABEL, W_BUTTON, W_HSLIDER } WidgetType;
+typedef enum { W_PANEL, W_LABEL, W_BUTTON, W_HSLIDER, W_RECT, W_SPACER, W_CHECKBOX, W_PROGRESS } WidgetType;
 
 typedef enum {
     UI_LAYOUT_NONE,
@@ -43,17 +43,24 @@ typedef struct UiNode {
     Rect rect;
     int has_x, has_y, has_w, has_h;
     float spacing;
+    int has_spacing;
     int columns;
+    int has_columns;
     const Style* style;
+    float padding_override;
+    int has_padding_override;
     Color color;
     Color text_color;
     int has_color;
     int has_text_color;
     char* style_name;
+    char* use;
     char* id;
     char* text;
     char* text_binding;
     char* value_binding;
+    char* click_binding;
+    char* click_value;
     float minv, maxv, value;
     int has_min, has_max, has_value;
     char* scroll_area;
@@ -79,6 +86,8 @@ typedef struct Widget {
     char* text; /* for labels/buttons */
     char* text_binding;
     char* value_binding;
+    char* click_binding;
+    char* click_value;
     float minv, maxv, value;
     char* id;
     char* scroll_area;

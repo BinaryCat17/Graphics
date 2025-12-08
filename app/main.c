@@ -17,6 +17,63 @@ static void fatal(const char* msg) {
     exit(1);
 }
 
+typedef struct {
+    ScrollContext* scroll;
+    WidgetArray* widgets;
+    Model* model;
+} AppContext;
+
+static int point_in_widget(const Widget* w, double mx, double my) {
+    if (!w) return 0;
+    float x = w->rect.x;
+    float y = w->rect.y + w->scroll_offset;
+    return mx >= x && mx <= x + w->rect.w && my >= y && my <= y + w->rect.h;
+}
+
+static void apply_click_action(Widget* w, Model* model) {
+    if (!w || !model) return;
+    if (w->type == W_BUTTON && w->click_binding) {
+        const char* payload = w->click_value ? w->click_value : (w->id ? w->id : w->text);
+        if (payload) model_set_string(model, w->click_binding, payload);
+    }
+    if (w->type == W_CHECKBOX) {
+        float new_val = (w->value > 0.5f) ? 0.0f : 1.0f;
+        w->value = new_val;
+        if (w->value_binding) {
+            model_set_number(model, w->value_binding, new_val);
+        }
+        if (w->click_binding) {
+            const char* payload = (new_val > 0.5f) ? (w->click_value ? w->click_value : "1") : "0";
+            model_set_string(model, w->click_binding, payload);
+        }
+    }
+}
+
+static void on_mouse_button(GLFWwindow* window, int button, int action, int mods) {
+    (void)mods;
+    if (button != GLFW_MOUSE_BUTTON_LEFT || action != GLFW_PRESS) return;
+    AppContext* ctx = (AppContext*)glfwGetWindowUserPointer(window);
+    if (!ctx || !ctx->widgets) return;
+    double mx = 0.0, my = 0.0;
+    glfwGetCursorPos(window, &mx, &my);
+    for (size_t i = 0; i < ctx->widgets->count; i++) {
+        Widget* w = &ctx->widgets->items[i];
+        if ((w->type == W_BUTTON || w->type == W_CHECKBOX) && point_in_widget(w, mx, my)) {
+            apply_click_action(w, ctx->model);
+            break;
+        }
+    }
+}
+
+static void on_scroll(GLFWwindow* window, double xoff, double yoff) {
+    (void)xoff;
+    AppContext* ctx = (AppContext*)glfwGetWindowUserPointer(window);
+    if (!ctx || !ctx->widgets) return;
+    double mx = 0.0, my = 0.0;
+    glfwGetCursorPos(window, &mx, &my);
+    scroll_handle_event(ctx->scroll, ctx->widgets->items, ctx->widgets->count, mx, my, yoff);
+}
+
 int main(int argc, char** argv) {
     const char* assets_dir = argc >= 2 ? argv[1] : "assets";
     Assets assets;
@@ -52,7 +109,10 @@ int main(int argc, char** argv) {
         free_assets(&assets);
         return 1;
     }
-    scroll_set_callback(window, scroll_ctx);
+    AppContext app_ctx = { .scroll = scroll_ctx, .widgets = &widgets, .model = model };
+    glfwSetWindowUserPointer(window, &app_ctx);
+    glfwSetScrollCallback(window, on_scroll);
+    glfwSetMouseButtonCallback(window, on_mouse_button);
 
     if (!vk_renderer_init(window, assets.vert_spv_path, assets.frag_spv_path, assets.font_path, widgets)) {
         glfwDestroyWindow(window);
