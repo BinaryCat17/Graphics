@@ -74,6 +74,7 @@ endif()
 
 # Добавьте источник в исполняемый файл этого проекта.
 add_executable (Graphics ${APP_SOURCES})
+target_include_directories(Graphics PRIVATE "src/")
 
 if (NOT VULKAN_STUB)
     add_dependencies(Graphics Shaders)

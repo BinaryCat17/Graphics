@@ -2,9 +2,9 @@
 #define UI_JSON_H
 
 #include <stddef.h>
+#include "Graphics.h"
 
 typedef struct { float x, y, w, h; } Rect;
-typedef struct { float r, g, b, a; } Color;
 typedef enum { W_PANEL, W_LABEL, W_BUTTON, W_HSLIDER, W_RECT, W_SPACER, W_CHECKBOX, W_PROGRESS } WidgetType;
 
 typedef enum {
