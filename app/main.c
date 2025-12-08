@@ -101,7 +101,8 @@ static void apply_slider_action(Widget* w, Model* model, float mx) {
 static int point_in_widget(const Widget* w, double mx, double my) {
     if (!w) return 0;
     float x = w->rect.x;
-    float y = w->rect.y + w->scroll_offset;
+    float y_offset = w->scroll_static ? 0.0f : w->scroll_offset;
+    float y = w->rect.y + y_offset;
     return mx >= x && mx <= x + w->rect.w && my >= y && my <= y + w->rect.h;
 }
 
@@ -127,13 +128,15 @@ static void apply_click_action(Widget* w, Model* model) {
 
 static void on_mouse_button(GLFWwindow* window, int button, int action, int mods) {
     (void)mods;
-    if (button != GLFW_MOUSE_BUTTON_LEFT || action != GLFW_PRESS) return;
     AppContext* ctx = (AppContext*)glfwGetWindowUserPointer(window);
     if (!ctx || !ctx->widgets) return;
     double mx = 0.0, my = 0.0;
     glfwGetCursorPos(window, &mx, &my);
     Vec2 screen = {(float)(mx * ctx->transformer.dpi_scale), (float)(my * ctx->transformer.dpi_scale)};
     Vec2 logical = coordinate_screen_to_logical(&ctx->transformer, screen);
+    int pressed = (button == GLFW_MOUSE_BUTTON_LEFT && action == GLFW_PRESS);
+    if (scroll_handle_mouse_button(ctx->scroll, ctx->widgets->items, ctx->widgets->count, logical.x, logical.y, pressed)) return;
+    if (button != GLFW_MOUSE_BUTTON_LEFT || action != GLFW_PRESS) return;
     for (size_t i = 0; i < ctx->widgets->count; i++) {
         Widget* w = &ctx->widgets->items[i];
         if ((w->type == W_BUTTON || w->type == W_CHECKBOX || w->type == W_HSLIDER) && point_in_widget(w, logical.x, logical.y)) {
@@ -156,6 +159,14 @@ static void on_scroll(GLFWwindow* window, double xoff, double yoff) {
     Vec2 screen = {(float)(mx * ctx->transformer.dpi_scale), (float)(my * ctx->transformer.dpi_scale)};
     Vec2 logical = coordinate_screen_to_logical(&ctx->transformer, screen);
     scroll_handle_event(ctx->scroll, ctx->widgets->items, ctx->widgets->count, logical.x, logical.y, yoff);
+}
+
+static void on_cursor_pos(GLFWwindow* window, double x, double y) {
+    AppContext* ctx = (AppContext*)glfwGetWindowUserPointer(window);
+    if (!ctx || !ctx->widgets) return;
+    Vec2 screen = {(float)(x * ctx->transformer.dpi_scale), (float)(y * ctx->transformer.dpi_scale)};
+    Vec2 logical = coordinate_screen_to_logical(&ctx->transformer, screen);
+    scroll_handle_cursor(ctx->scroll, ctx->widgets->items, ctx->widgets->count, logical.x, logical.y);
 }
 
 static void on_framebuffer_size(GLFWwindow* window, int width, int height) {
@@ -227,6 +238,7 @@ int main(int argc, char** argv) {
     glfwSetFramebufferSizeCallback(window, on_framebuffer_size);
     glfwSetScrollCallback(window, on_scroll);
     glfwSetMouseButtonCallback(window, on_mouse_button);
+    glfwSetCursorPosCallback(window, on_cursor_pos);
 
     update_transformer(&app_ctx, window);
 

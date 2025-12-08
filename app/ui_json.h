@@ -33,8 +33,12 @@ typedef struct Style {
     Color background;
     Color text;
     Color border_color;
+    Color scrollbar_track_color;
+    Color scrollbar_thumb_color;
     float padding;
     float border_thickness;
+    float scrollbar_width;
+    int has_scrollbar_width;
     struct Style* next;
 } Style;
 
@@ -73,6 +77,13 @@ typedef struct UiNode {
     int has_max_w, has_max_h;
     char* scroll_area;
     int scroll_static;
+    int scrollbar_enabled;
+    float scrollbar_width;
+    int has_scrollbar_width;
+    Color scrollbar_track_color;
+    Color scrollbar_thumb_color;
+    int has_scrollbar_track_color;
+    int has_scrollbar_thumb_color;
     struct UiNode* children;
     size_t child_count;
 } UiNode;
@@ -105,6 +116,10 @@ typedef struct Widget {
     char* id;
     char* scroll_area;
     int scroll_static;
+    int scrollbar_enabled;
+    float scrollbar_width;
+    Color scrollbar_track_color;
+    Color scrollbar_thumb_color;
     int has_clip;
     Rect clip;
     float scroll_viewport;

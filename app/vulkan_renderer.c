@@ -881,7 +881,8 @@ static void build_vertices_from_widgets(void) {
     for (size_t i = 0; i < g_widgets.count; ++i) {
         const Widget *widget = &g_widgets.items[i];
 
-        Rect widget_rect = { widget->rect.x, widget->rect.y + widget->scroll_offset, widget->rect.w, widget->rect.h };
+        float effective_offset = widget->scroll_static ? 0.0f : widget->scroll_offset;
+        Rect widget_rect = { widget->rect.x, widget->rect.y + effective_offset, widget->rect.w, widget->rect.h };
         Rect inner_rect = widget_rect;
         if (widget->border_thickness > 0.0f) {
             inner_rect.x += widget->border_thickness;
@@ -969,14 +970,13 @@ static void build_vertices_from_widgets(void) {
             };
         }
 
-        if (widget->show_scrollbar && widget->scroll_viewport > 0.0f &&
+        if (widget->scrollbar_enabled && widget->show_scrollbar && widget->scroll_viewport > 0.0f &&
             widget->scroll_content > widget->scroll_viewport + 1.0f) {
-            float track_w = fmaxf(4.0f, inner_rect.w * 0.02f);
+            float track_w = widget->scrollbar_width > 0.0f ? widget->scrollbar_width : fmaxf(4.0f, inner_rect.w * 0.02f);
             float track_h = inner_rect.h - widget->padding * 2.0f;
             float track_x = inner_rect.x + inner_rect.w - track_w - widget->padding * 0.5f;
             float track_y = inner_rect.y + widget->padding;
-            Color track_color = widget->color;
-            track_color.a *= 0.6f;
+            Color track_color = widget->scrollbar_track_color;
             Rect scroll_track = { track_x, track_y, track_w, track_h };
             Rect clipped_track;
 
@@ -996,8 +996,7 @@ static void build_vertices_from_widgets(void) {
             if (offset_t < -1.0f) offset_t = -1.0f;
             if (offset_t > 1.0f) offset_t = 1.0f;
             float thumb_y = track_y + (track_h - thumb_h) * 0.5f - offset_t * (track_h - thumb_h);
-            Color thumb_color = widget->text_color;
-            thumb_color.a *= 0.6f;
+            Color thumb_color = widget->scrollbar_thumb_color;
 
             Rect thumb_rect = { track_x, thumb_y, track_w, thumb_h };
             Rect clipped_thumb;
@@ -1019,8 +1018,9 @@ static void build_vertices_from_widgets(void) {
             continue;
         }
 
+        float effective_offset = widget->scroll_static ? 0.0f : widget->scroll_offset;
         float pen_x = widget->rect.x + widget->padding;
-        float pen_y = widget->rect.y + widget->scroll_offset + widget->rect.h - widget->padding - (float)descent;
+        float pen_y = widget->rect.y + effective_offset + widget->padding + (float)ascent;
 
         for (const char *c = widget->text; *c; ) {
             int adv = 0;

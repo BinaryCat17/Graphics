@@ -95,8 +95,8 @@ static float parse_number(const char* json, const jsmntok_t* tok, float fallback
     return v;
 }
 
-static const Style DEFAULT_STYLE = { .name = NULL, .background = {0.6f, 0.6f, 0.6f, 1.0f}, .text = {1.0f, 1.0f, 1.0f, 1.0f}, .border_color = {1.0f, 1.0f, 1.0f, 1.0f}, .padding = 6.0f, .border_thickness = 0.0f, .next = NULL };
-static const Style ROOT_STYLE = { .name = NULL, .background = {0.0f, 0.0f, 0.0f, 0.0f}, .text = {1.0f, 1.0f, 1.0f, 1.0f}, .border_color = {1.0f, 1.0f, 1.0f, 0.0f}, .padding = 0.0f, .border_thickness = 0.0f, .next = NULL };
+static const Style DEFAULT_STYLE = { .name = NULL, .background = {0.6f, 0.6f, 0.6f, 1.0f}, .text = {1.0f, 1.0f, 1.0f, 1.0f}, .border_color = {1.0f, 1.0f, 1.0f, 1.0f}, .scrollbar_track_color = {0.6f, 0.6f, 0.6f, 0.4f}, .scrollbar_thumb_color = {1.0f, 1.0f, 1.0f, 0.7f}, .padding = 6.0f, .border_thickness = 0.0f, .scrollbar_width = 0.0f, .has_scrollbar_width = 0, .next = NULL };
+static const Style ROOT_STYLE = { .name = NULL, .background = {0.0f, 0.0f, 0.0f, 0.0f}, .text = {1.0f, 1.0f, 1.0f, 1.0f}, .border_color = {1.0f, 1.0f, 1.0f, 0.0f}, .scrollbar_track_color = {0.6f, 0.6f, 0.6f, 0.4f}, .scrollbar_thumb_color = {1.0f, 1.0f, 1.0f, 0.7f}, .padding = 0.0f, .border_thickness = 0.0f, .scrollbar_width = 0.0f, .has_scrollbar_width = 0, .next = NULL };
 
 static unsigned char* g_font_buffer = NULL;
 static stbtt_fontinfo g_font_info;
@@ -340,6 +340,10 @@ Style* parse_styles_json(const char* json) {
                     st->border_color = DEFAULT_STYLE.border_color;
                     st->padding = DEFAULT_STYLE.padding;
                     st->border_thickness = DEFAULT_STYLE.border_thickness;
+                    st->scrollbar_track_color = DEFAULT_STYLE.scrollbar_track_color;
+                    st->scrollbar_thumb_color = DEFAULT_STYLE.scrollbar_thumb_color;
+                    st->scrollbar_width = DEFAULT_STYLE.scrollbar_width;
+                    st->has_scrollbar_width = DEFAULT_STYLE.has_scrollbar_width;
                     st->next = styles;
                     styles = st;
                     jsmntok_t* sobj = &toks[j + 1];
@@ -369,6 +373,22 @@ Style* parse_styles_json(const char* json) {
                         }
                         if (tok_is_key(json, &toks[k], "borderThickness") && val->type == JSMN_PRIMITIVE) {
                             st->border_thickness = parse_number(json, val, st->border_thickness);
+                            k += 2;
+                            continue;
+                        }
+                        if (tok_is_key(json, &toks[k], "scrollbarTrackColor")) {
+                            read_color_array(&st->scrollbar_track_color, json, val, toks, p.toknext);
+                            k = skip_container(toks, p.toknext, (unsigned int)(val - toks));
+                            continue;
+                        }
+                        if (tok_is_key(json, &toks[k], "scrollbarThumbColor")) {
+                            read_color_array(&st->scrollbar_thumb_color, json, val, toks, p.toknext);
+                            k = skip_container(toks, p.toknext, (unsigned int)(val - toks));
+                            continue;
+                        }
+                        if (tok_is_key(json, &toks[k], "scrollbarWidth") && val->type == JSMN_PRIMITIVE) {
+                            st->scrollbar_width = parse_number(json, val, st->scrollbar_width);
+                            st->has_scrollbar_width = 1;
                             k += 2;
                             continue;
                         }
@@ -416,6 +436,13 @@ static UiNode* create_node(void) {
     node->border_color = DEFAULT_STYLE.border_color;
     node->color = DEFAULT_STYLE.background;
     node->text_color = DEFAULT_STYLE.text;
+    node->scrollbar_enabled = 1;
+    node->scrollbar_width = 0.0f;
+    node->has_scrollbar_width = 0;
+    node->scrollbar_track_color = DEFAULT_STYLE.scrollbar_track_color;
+    node->scrollbar_thumb_color = DEFAULT_STYLE.scrollbar_thumb_color;
+    node->has_scrollbar_track_color = 0;
+    node->has_scrollbar_thumb_color = 0;
     node->has_min = node->has_max = node->has_value = 0;
     node->minv = 0.0f; node->maxv = 1.0f; node->value = 0.0f;
     node->max_w = 0.0f; node->max_h = 0.0f;
@@ -470,6 +497,19 @@ static UiNode* parse_ui_node(const char* json, jsmntok_t* toks, unsigned int tok
             k += 2;
             continue;
         }
+        if (tok_is_key(json, &toks[k], "scrollbar") && val->type == JSMN_PRIMITIVE) {
+            int len = val->end - val->start;
+            if (len == 4 && strncmp(json + val->start, "true", 4) == 0) node->scrollbar_enabled = 1;
+            if (len == 5 && strncmp(json + val->start, "false", 5) == 0) node->scrollbar_enabled = 0;
+            k += 2;
+            continue;
+        }
+        if (tok_is_key(json, &toks[k], "scrollbarWidth")) {
+            node->scrollbar_width = parse_number(json, val, node->scrollbar_width);
+            node->has_scrollbar_width = 1;
+            k += 2;
+            continue;
+        }
         if (tok_is_key(json, &toks[k], "spacing")) { node->spacing = parse_number(json, val, node->spacing); node->has_spacing = 1; k += 2; continue; }
         if (tok_is_key(json, &toks[k], "columns")) { node->columns = (int)parse_number(json, val, (float)node->columns); node->has_columns = 1; k += 2; continue; }
         if (tok_is_key(json, &toks[k], "padding")) { node->padding_override = parse_number(json, val, node->padding_override); node->has_padding_override = 1; k += 2; continue; }
@@ -489,6 +529,18 @@ static UiNode* parse_ui_node(const char* json, jsmntok_t* toks, unsigned int tok
         if (tok_is_key(json, &toks[k], "textColor")) {
             read_color_array(&node->text_color, json, val, toks, tokc);
             node->has_text_color = 1;
+            k = skip_container(toks, tokc, (unsigned int)(val - toks));
+            continue;
+        }
+        if (tok_is_key(json, &toks[k], "scrollbarTrackColor")) {
+            read_color_array(&node->scrollbar_track_color, json, val, toks, tokc);
+            node->has_scrollbar_track_color = 1;
+            k = skip_container(toks, tokc, (unsigned int)(val - toks));
+            continue;
+        }
+        if (tok_is_key(json, &toks[k], "scrollbarThumbColor")) {
+            read_color_array(&node->scrollbar_thumb_color, json, val, toks, tokc);
+            node->has_scrollbar_thumb_color = 1;
             k = skip_container(toks, tokc, (unsigned int)(val - toks));
             continue;
         }
@@ -550,6 +602,10 @@ static void merge_node(UiNode* node, const UiNode* proto) {
     if (!node->has_border_color && proto->has_border_color) { node->border_color = proto->border_color; node->has_border_color = 1; }
     if (!node->has_color && proto->has_color) { node->color = proto->color; node->has_color = 1; }
     if (!node->has_text_color && proto->has_text_color) { node->text_color = proto->text_color; node->has_text_color = 1; }
+    if (!node->has_scrollbar_width && proto->has_scrollbar_width) { node->scrollbar_width = proto->scrollbar_width; node->has_scrollbar_width = 1; }
+    if (!node->has_scrollbar_track_color && proto->has_scrollbar_track_color) { node->scrollbar_track_color = proto->scrollbar_track_color; node->has_scrollbar_track_color = 1; }
+    if (!node->has_scrollbar_thumb_color && proto->has_scrollbar_thumb_color) { node->scrollbar_thumb_color = proto->scrollbar_thumb_color; node->has_scrollbar_thumb_color = 1; }
+    if (!proto->scrollbar_enabled) node->scrollbar_enabled = 0;
     if (!node->id && proto->id) node->id = strdup(proto->id);
     if (!node->text && proto->text) node->text = strdup(proto->text);
     if (!node->text_binding && proto->text_binding) node->text_binding = strdup(proto->text_binding);
@@ -589,6 +645,13 @@ static UiNode* clone_node(const UiNode* src) {
     n->padding_override = src->padding_override; n->has_padding_override = src->has_padding_override;
     n->color = src->color; n->text_color = src->text_color;
     n->has_color = src->has_color; n->has_text_color = src->has_text_color;
+    n->scrollbar_enabled = src->scrollbar_enabled;
+    n->scrollbar_width = src->scrollbar_width;
+    n->has_scrollbar_width = src->has_scrollbar_width;
+    n->scrollbar_track_color = src->scrollbar_track_color;
+    n->scrollbar_thumb_color = src->scrollbar_thumb_color;
+    n->has_scrollbar_track_color = src->has_scrollbar_track_color;
+    n->has_scrollbar_thumb_color = src->has_scrollbar_thumb_color;
     n->style_name = src->style_name ? strdup(src->style_name) : NULL;
     n->use = src->use ? strdup(src->use) : NULL;
     n->id = src->id ? strdup(src->id) : NULL;
@@ -671,6 +734,9 @@ static void resolve_styles_and_defaults(UiNode* node, const Style* styles) {
     if (!node->has_text_color) node->text_color = st->text;
     if (!node->has_border_color) node->border_color = st->border_color;
     if (!node->has_border_thickness) node->border_thickness = st->border_thickness;
+    if (!node->has_scrollbar_width && st->has_scrollbar_width) { node->scrollbar_width = st->scrollbar_width; node->has_scrollbar_width = 1; }
+    if (!node->has_scrollbar_track_color) node->scrollbar_track_color = st->scrollbar_track_color;
+    if (!node->has_scrollbar_thumb_color) node->scrollbar_thumb_color = st->scrollbar_thumb_color;
 
     if (!node->has_min) node->minv = 0.0f;
     if (!node->has_max) node->maxv = 1.0f;
@@ -1014,6 +1080,10 @@ static void populate_widgets_recursive(const LayoutNode* node, Widget* widgets, 
         w->base_border_thickness = node->source->border_thickness;
         w->border_thickness = w->base_border_thickness;
         w->border_color = node->source->border_color;
+        w->scrollbar_enabled = node->source->scrollbar_enabled;
+        w->scrollbar_width = node->source->scrollbar_width;
+        w->scrollbar_track_color = node->source->scrollbar_track_color;
+        w->scrollbar_thumb_color = node->source->scrollbar_thumb_color;
         w->base_padding = (node->source->has_padding_override ? node->source->padding_override : (node->source->style ? node->source->style->padding : DEFAULT_STYLE.padding)) + w->base_border_thickness;
         w->padding = w->base_padding;
         w->text = node->source->text;

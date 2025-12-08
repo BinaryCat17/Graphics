@@ -26,6 +26,8 @@
             "type": "column",
             "style": "panelPrimary",
             "scrollStatic": true,
+            "scrollbar": true,
+            "scrollbarWidth": 12,
             "maxHeight":  340,
             "spacing": 10,
             "children": [
@@ -70,6 +72,7 @@
             "type": "column",
             "style": "panelSecondary",
             "scrollStatic": true,
+            "scrollbar": true,
             "maxHeight":  340,
             "spacing": 14,
             "children": [
