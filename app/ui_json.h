@@ -82,6 +82,7 @@ typedef struct Widget {
     float scroll_offset;
     Color color;
     Color text_color;
+    float base_padding;
     float padding;
     char* text; /* for labels/buttons */
     char* text_binding;
@@ -112,6 +113,7 @@ void assign_layout(LayoutNode* root, float origin_x, float origin_y);
 size_t count_layout_widgets(const LayoutNode* root);
 void populate_widgets_from_layout(const LayoutNode* root, Widget* widgets, size_t widget_count);
 WidgetArray materialize_widgets(const LayoutNode* root);
+void apply_widget_padding_scale(WidgetArray* widgets, float scale);
 
 float model_get_number(const Model* model, const char* key, float fallback);
 const char* model_get_string(const Model* model, const char* key, const char* fallback);

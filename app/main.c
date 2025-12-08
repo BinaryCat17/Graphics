@@ -38,13 +38,6 @@ static void scale_layout(LayoutNode* node, float scale) {
     }
 }
 
-static void scale_widget_padding(WidgetArray* widgets, float scale) {
-    if (!widgets) return;
-    for (size_t i = 0; i < widgets->count; i++) {
-        widgets->items[i].padding *= scale;
-    }
-}
-
 static float clamp01(float v) {
     if (v < 0.0f) return 0.0f;
     if (v > 1.0f) return 1.0f;
@@ -102,8 +95,6 @@ static void on_mouse_button(GLFWwindow* window, int button, int action, int mods
     if (!ctx || !ctx->widgets) return;
     double mx = 0.0, my = 0.0;
     glfwGetCursorPos(window, &mx, &my);
-    mx *= ctx->input_scale_x;
-    my *= ctx->input_scale_y;
     for (size_t i = 0; i < ctx->widgets->count; i++) {
         Widget* w = &ctx->widgets->items[i];
         if ((w->type == W_BUTTON || w->type == W_CHECKBOX || w->type == W_HSLIDER) && point_in_widget(w, mx, my)) {
@@ -123,8 +114,6 @@ static void on_scroll(GLFWwindow* window, double xoff, double yoff) {
     if (!ctx || !ctx->widgets) return;
     double mx = 0.0, my = 0.0;
     glfwGetCursorPos(window, &mx, &my);
-    mx *= ctx->input_scale_x;
-    my *= ctx->input_scale_y;
     scroll_handle_event(ctx->scroll, ctx->widgets->items, ctx->widgets->count, mx, my, yoff);
 }
 
@@ -156,20 +145,16 @@ int main(int argc, char** argv) {
     if (ui_scale < 0.8f) ui_scale = 0.8f;
     if (ui_scale > 1.35f) ui_scale = 1.35f;
 
-    float dpi_scale_x = 1.0f, dpi_scale_y = 1.0f;
-    if (monitor) glfwGetMonitorContentScale(monitor, &dpi_scale_x, &dpi_scale_y);
-    float dpi_scale = fmaxf(dpi_scale_x, dpi_scale_y);
-    float combined_scale = ui_scale * dpi_scale;
-
-    scale_layout(layout_root, combined_scale);
+    float layout_scale = ui_scale;
+    scale_layout(layout_root, layout_scale);
 
     WidgetArray widgets = materialize_widgets(layout_root);
-    scale_widget_padding(&widgets, combined_scale);
+    apply_widget_padding_scale(&widgets, layout_scale);
     update_widget_bindings(ui_root, model);
     populate_widgets_from_layout(layout_root, widgets.items, widgets.count);
 
-    int window_w = (int)(base_w * ui_scale);
-    int window_h = (int)(base_h * ui_scale);
+    int window_w = (int)(layout_root->rect.w);
+    int window_h = (int)(layout_root->rect.h);
     if (window_w < 800) window_w = 800;
     if (window_h < 520) window_h = 520;
     GLFWwindow* window = glfwCreateWindow(window_w, window_h, "vk_gui (Vulkan)", NULL, NULL);
@@ -187,7 +172,7 @@ int main(int argc, char** argv) {
         free_assets(&assets);
         return 1;
     }
-    AppContext app_ctx = { .scroll = scroll_ctx, .widgets = &widgets, .model = model, .ui_scale = combined_scale, .input_scale_x = dpi_scale_x, .input_scale_y = dpi_scale_y };
+    AppContext app_ctx = { .scroll = scroll_ctx, .widgets = &widgets, .model = model, .ui_scale = layout_scale, .input_scale_x = 1.0f, .input_scale_y = 1.0f };
     glfwSetWindowUserPointer(window, &app_ctx);
     glfwSetScrollCallback(window, on_scroll);
     glfwSetMouseButtonCallback(window, on_mouse_button);
@@ -209,7 +194,7 @@ int main(int argc, char** argv) {
         glfwPollEvents();
         update_widget_bindings(ui_root, model);
         populate_widgets_from_layout(layout_root, widgets.items, widgets.count);
-        scale_widget_padding(&widgets, app_ctx.ui_scale);
+        apply_widget_padding_scale(&widgets, app_ctx.ui_scale);
         scroll_apply_offsets(scroll_ctx, widgets.items, widgets.count);
         vk_renderer_draw_frame();
     }

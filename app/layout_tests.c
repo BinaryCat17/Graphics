@@ -1,4 +1,5 @@
 #include <assert.h>
+#include <math.h>
 #include <stdio.h>
 
 #include "ui_json.h"
@@ -72,10 +73,22 @@ static void test_table_layout(void) {
     free_fixture(&fx);
 }
 
+static void test_padding_scale_is_stable(void) {
+    Widget w = { .base_padding = 10.0f, .padding = 10.0f };
+    WidgetArray arr = { .items = &w, .count = 1 };
+    apply_widget_padding_scale(&arr, 2.0f);
+    assert(fabsf(w.padding - 20.0f) < 0.001f);
+    apply_widget_padding_scale(&arr, 2.0f);
+    assert(fabsf(w.padding - 20.0f) < 0.001f);
+    apply_widget_padding_scale(&arr, 0.5f);
+    assert(fabsf(w.padding - 5.0f) < 0.001f);
+}
+
 int main(void) {
     test_row_layout();
     test_column_layout_with_scroll();
     test_table_layout();
+    test_padding_scale_is_stable();
     printf("layout_tests passed\n");
     return 0;
 }
