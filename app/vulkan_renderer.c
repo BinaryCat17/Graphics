@@ -831,6 +831,9 @@ static void build_vertices_from_widgets(void) {
             float knob_x = draw_x + (w->rect.w - knob_w) * t;
             Color knob = color_mix(fill, color_scale(fill, 0.7f), 0.5f);
             append_rect(knob_x, draw_y, knob_w, w->rect.h, knob);
+            char buf[32];
+            snprintf(buf, sizeof(buf), "%3.0f%%", t * 100.0f);
+            append_text(buf, draw_x + w->padding, draw_y + w->padding, w->text_color);
             break; }
         case W_CHECKBOX: {
             float box = w->rect.h;
