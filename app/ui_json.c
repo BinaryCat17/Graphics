@@ -821,6 +821,14 @@ static void layout_node(LayoutNode* node, float origin_x, float origin_y) {
 
 void assign_layout(LayoutNode* root, float origin_x, float origin_y) { layout_node(root, origin_x, origin_y); }
 
+static void copy_base_rect(LayoutNode* node) {
+    if (!node) return;
+    node->base_rect = node->rect;
+    for (size_t i = 0; i < node->child_count; i++) copy_base_rect(&node->children[i]);
+}
+
+void capture_layout_base(LayoutNode* root) { copy_base_rect(root); }
+
 size_t count_layout_widgets(const LayoutNode* root) {
     if (!root) return 0;
     if (root->source && root->source->layout == UI_LAYOUT_NONE) return 1;
