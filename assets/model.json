@@ -19,6 +19,9 @@
     "slider17": 0.85,
     "slider18": 0.9,
     "slider19": 0.95,
-    "slider20": 1.0
+    "slider20": 1.0,
+    "featureEnabled": 1,
+    "featureState": "Включено",
+    "lastAction": "нет нажатий"
   }
 }

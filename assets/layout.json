@@ -1,4 +1,13 @@
 {
+  "widgets": {
+    "primaryButton": { "type": "button", "w": 280, "h": 32, "style": "primaryButton", "onClick": "lastAction", "padding": 8 },
+    "sliderBase": { "type": "hslider", "w": 320, "h": 18, "style": "sliderMain", "min": 0, "max": 1 },
+    "spacer": { "type": "spacer", "h": 10 },
+    "divider": { "type": "rect", "h": 2, "style": "divider" },
+    "mutedLabel": { "type": "label", "style": "mutedLabel", "padding": 2 },
+    "checkbox": { "type": "checkbox", "w": 22, "h": 22, "style": "checkbox" },
+    "progress": { "type": "progress", "h": 18, "style": "progressBar", "padding": 6 }
+  },
   "layout": {
     "type": "row",
     "x": 16,
@@ -19,26 +28,33 @@
             "spacing": 10,
             "scrollArea": "buttons",
             "children": [
-              { "type": "button", "id": "btn01", "w": 280, "h": 32, "text": "Button 01", "style": "primaryButton" },
-              { "type": "button", "id": "btn02", "w": 280, "h": 32, "text": "Button 02", "style": "primaryButton" },
-              { "type": "button", "id": "btn03", "w": 280, "h": 32, "text": "Button 03", "style": "primaryButton" },
-              { "type": "button", "id": "btn04", "w": 280, "h": 32, "text": "Button 04", "style": "primaryButton" },
-              { "type": "button", "id": "btn05", "w": 280, "h": 32, "text": "Button 05", "style": "primaryButton" },
-              { "type": "button", "id": "btn06", "w": 280, "h": 32, "text": "Button 06", "style": "primaryButton" },
-              { "type": "button", "id": "btn07", "w": 280, "h": 32, "text": "Button 07", "style": "primaryButton" },
-              { "type": "button", "id": "btn08", "w": 280, "h": 32, "text": "Button 08", "style": "primaryButton" },
-              { "type": "button", "id": "btn09", "w": 280, "h": 32, "text": "Button 09", "style": "primaryButton" },
-              { "type": "button", "id": "btn10", "w": 280, "h": 32, "text": "Button 10", "style": "primaryButton" },
-              { "type": "button", "id": "btn11", "w": 280, "h": 32, "text": "Button 11", "style": "primaryButton" },
-              { "type": "button", "id": "btn12", "w": 280, "h": 32, "text": "Button 12", "style": "primaryButton" },
-              { "type": "button", "id": "btn13", "w": 280, "h": 32, "text": "Button 13", "style": "primaryButton" },
-              { "type": "button", "id": "btn14", "w": 280, "h": 32, "text": "Button 14", "style": "primaryButton" },
-              { "type": "button", "id": "btn15", "w": 280, "h": 32, "text": "Button 15", "style": "primaryButton" },
-              { "type": "button", "id": "btn16", "w": 280, "h": 32, "text": "Button 16", "style": "primaryButton" },
-              { "type": "button", "id": "btn17", "w": 280, "h": 32, "text": "Button 17", "style": "primaryButton" },
-              { "type": "button", "id": "btn18", "w": 280, "h": 32, "text": "Button 18", "style": "primaryButton" },
-              { "type": "button", "id": "btn19", "w": 280, "h": 32, "text": "Button 19", "style": "primaryButton" },
-              { "type": "button", "id": "btn20", "w": 280, "h": 32, "text": "Button 20", "style": "primaryButton" }
+              { "use": "mutedLabel", "text": "Последнее действие:", "style": "mutedLabel" },
+              { "use": "mutedLabel", "textBinding": "lastAction", "style": "mutedLabel", "padding": 4 },
+              { "use": "divider", "w": 280 },
+              { "use": "checkbox", "id": "flag", "text": "Флажок", "valueBinding": "featureEnabled", "onClick": "featureState", "clickValue": "Включено", "style": "checkbox" },
+              { "use": "spacer" },
+              { "use": "mutedLabel", "text": "Действия", "style": "mutedLabel" },
+              { "use": "divider", "w": 280 },
+              { "use": "primaryButton", "id": "btn01", "text": "Button 01", "clickValue": "btn01" },
+              { "use": "primaryButton", "id": "btn02", "text": "Button 02", "clickValue": "btn02" },
+              { "use": "primaryButton", "id": "btn03", "text": "Button 03", "clickValue": "btn03" },
+              { "use": "primaryButton", "id": "btn04", "text": "Button 04", "clickValue": "btn04" },
+              { "use": "primaryButton", "id": "btn05", "text": "Button 05", "clickValue": "btn05" },
+              { "use": "primaryButton", "id": "btn06", "text": "Button 06", "clickValue": "btn06" },
+              { "use": "primaryButton", "id": "btn07", "text": "Button 07", "clickValue": "btn07" },
+              { "use": "primaryButton", "id": "btn08", "text": "Button 08", "clickValue": "btn08" },
+              { "use": "primaryButton", "id": "btn09", "text": "Button 09", "clickValue": "btn09" },
+              { "use": "primaryButton", "id": "btn10", "text": "Button 10", "clickValue": "btn10" },
+              { "use": "primaryButton", "id": "btn11", "text": "Button 11", "clickValue": "btn11" },
+              { "use": "primaryButton", "id": "btn12", "text": "Button 12", "clickValue": "btn12" },
+              { "use": "primaryButton", "id": "btn13", "text": "Button 13", "clickValue": "btn13" },
+              { "use": "primaryButton", "id": "btn14", "text": "Button 14", "clickValue": "btn14" },
+              { "use": "primaryButton", "id": "btn15", "text": "Button 15", "clickValue": "btn15" },
+              { "use": "primaryButton", "id": "btn16", "text": "Button 16", "clickValue": "btn16" },
+              { "use": "primaryButton", "id": "btn17", "text": "Button 17", "clickValue": "btn17" },
+              { "use": "primaryButton", "id": "btn18", "text": "Button 18", "clickValue": "btn18" },
+              { "use": "primaryButton", "id": "btn19", "text": "Button 19", "clickValue": "btn19" },
+              { "use": "primaryButton", "id": "btn20", "text": "Button 20", "clickValue": "btn20" }
             ]
           }
         ]
@@ -57,26 +73,50 @@
             "spacing": 14,
             "scrollArea": "sliders",
             "children": [
-              { "type": "hslider", "id": "s01", "w": 320, "h": 18, "valueBinding": "slider01", "min": 0, "max": 1, "style": "sliderMain" },
-              { "type": "hslider", "id": "s02", "w": 320, "h": 18, "valueBinding": "slider02", "min": 0, "max": 1, "style": "sliderMain" },
-              { "type": "hslider", "id": "s03", "w": 320, "h": 18, "valueBinding": "slider03", "min": 0, "max": 1, "style": "sliderMain" },
-              { "type": "hslider", "id": "s04", "w": 320, "h": 18, "valueBinding": "slider04", "min": 0, "max": 1, "style": "sliderMain" },
-              { "type": "hslider", "id": "s05", "w": 320, "h": 18, "valueBinding": "slider05", "min": 0, "max": 1, "style": "sliderMain" },
-              { "type": "hslider", "id": "s06", "w": 320, "h": 18, "valueBinding": "slider06", "min": 0, "max": 1, "style": "sliderMain" },
-              { "type": "hslider", "id": "s07", "w": 320, "h": 18, "valueBinding": "slider07", "min": 0, "max": 1, "style": "sliderMain" },
-              { "type": "hslider", "id": "s08", "w": 320, "h": 18, "valueBinding": "slider08", "min": 0, "max": 1, "style": "sliderMain" },
-              { "type": "hslider", "id": "s09", "w": 320, "h": 18, "valueBinding": "slider09", "min": 0, "max": 1, "style": "sliderMain" },
-              { "type": "hslider", "id": "s10", "w": 320, "h": 18, "valueBinding": "slider10", "min": 0, "max": 1, "style": "sliderMain" },
-              { "type": "hslider", "id": "s11", "w": 320, "h": 18, "valueBinding": "slider11", "min": 0, "max": 1, "style": "sliderMain" },
-              { "type": "hslider", "id": "s12", "w": 320, "h": 18, "valueBinding": "slider12", "min": 0, "max": 1, "style": "sliderMain" },
-              { "type": "hslider", "id": "s13", "w": 320, "h": 18, "valueBinding": "slider13", "min": 0, "max": 1, "style": "sliderMain" },
-              { "type": "hslider", "id": "s14", "w": 320, "h": 18, "valueBinding": "slider14", "min": 0, "max": 1, "style": "sliderMain" },
-              { "type": "hslider", "id": "s15", "w": 320, "h": 18, "valueBinding": "slider15", "min": 0, "max": 1, "style": "sliderMain" },
-              { "type": "hslider", "id": "s16", "w": 320, "h": 18, "valueBinding": "slider16", "min": 0, "max": 1, "style": "sliderMain" },
-              { "type": "hslider", "id": "s17", "w": 320, "h": 18, "valueBinding": "slider17", "min": 0, "max": 1, "style": "sliderMain" },
-              { "type": "hslider", "id": "s18", "w": 320, "h": 18, "valueBinding": "slider18", "min": 0, "max": 1, "style": "sliderMain" },
-              { "type": "hslider", "id": "s19", "w": 320, "h": 18, "valueBinding": "slider19", "min": 0, "max": 1, "style": "sliderMain" },
-              { "type": "hslider", "id": "s20", "w": 320, "h": 18, "valueBinding": "slider20", "min": 0, "max": 1, "style": "sliderMain" }
+              { "use": "sliderBase", "id": "s01", "valueBinding": "slider01" },
+              { "use": "sliderBase", "id": "s02", "valueBinding": "slider02" },
+              { "use": "sliderBase", "id": "s03", "valueBinding": "slider03" },
+              { "use": "sliderBase", "id": "s04", "valueBinding": "slider04" },
+              { "use": "sliderBase", "id": "s05", "valueBinding": "slider05" },
+              { "use": "sliderBase", "id": "s06", "valueBinding": "slider06" },
+              { "use": "sliderBase", "id": "s07", "valueBinding": "slider07" },
+              { "use": "sliderBase", "id": "s08", "valueBinding": "slider08" },
+              { "use": "sliderBase", "id": "s09", "valueBinding": "slider09" },
+              { "use": "sliderBase", "id": "s10", "valueBinding": "slider10" },
+              { "use": "sliderBase", "id": "s11", "valueBinding": "slider11" },
+              { "use": "sliderBase", "id": "s12", "valueBinding": "slider12" },
+              { "use": "sliderBase", "id": "s13", "valueBinding": "slider13" },
+              { "use": "sliderBase", "id": "s14", "valueBinding": "slider14" },
+              { "use": "sliderBase", "id": "s15", "valueBinding": "slider15" },
+              { "use": "sliderBase", "id": "s16", "valueBinding": "slider16" },
+              { "use": "sliderBase", "id": "s17", "valueBinding": "slider17" },
+              { "use": "sliderBase", "id": "s18", "valueBinding": "slider18" },
+              { "use": "sliderBase", "id": "s19", "valueBinding": "slider19" },
+              { "use": "sliderBase", "id": "s20", "valueBinding": "slider20" }
+            ]
+          }
+        ]
+      },
+      {
+        "type": "column",
+        "x": 740,
+        "y": 0,
+        "spacing": 12,
+        "children": [
+          { "type": "panel", "id": "inspector", "w": 260, "h": 520, "style": "panelSecondary" },
+          {
+            "type": "column",
+            "x": 12,
+            "y": 12,
+            "spacing": 10,
+            "children": [
+              { "use": "mutedLabel", "text": "Прогресс из slider10" },
+              { "use": "progress", "valueBinding": "slider10", "min": 0, "max": 1, "text": "Заполнение" },
+              { "use": "spacer" },
+              { "use": "mutedLabel", "text": "Состояние чекбокса" },
+              { "use": "mutedLabel", "textBinding": "featureState" },
+              { "use": "divider", "w": 220 },
+              { "use": "mutedLabel", "text": "Эти блоки собраны из примитивов" }
             ]
           }
         ]

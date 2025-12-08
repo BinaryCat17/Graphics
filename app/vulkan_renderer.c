@@ -68,6 +68,21 @@ static VkDescriptorSetLayout descriptor_layout = VK_NULL_HANDLE;
 static VkDescriptorPool descriptor_pool = VK_NULL_HANDLE;
 static VkDescriptorSet descriptor_set = VK_NULL_HANDLE;
 
+static Color color_scale(Color c, float scale) {
+    Color out = { c.r * scale, c.g * scale, c.b * scale, c.a };
+    if (out.r < 0.0f) out.r = 0.0f; if (out.g < 0.0f) out.g = 0.0f; if (out.b < 0.0f) out.b = 0.0f;
+    return out;
+}
+
+static Color color_mix(Color a, Color b, float t) {
+    Color out;
+    out.r = a.r + (b.r - a.r) * t;
+    out.g = a.g + (b.g - a.g) * t;
+    out.b = a.b + (b.b - a.b) * t;
+    out.a = a.a + (b.a - a.a) * t;
+    return out;
+}
+
 /* Utility: read file into memory */
 static char* read_file_text(const char* path, size_t * out_len) {
     FILE* f = fopen(path, "rb"); if (!f) { fprintf(stderr, "Failed open %s\n", path); return NULL; }
@@ -796,9 +811,53 @@ static void build_vertices_from_widgets(void) {
         const Widget* w = &g_widgets.items[i];
         float draw_x = w->rect.x;
         float draw_y = w->rect.y + w->scroll_offset;
-        append_rect(draw_x, draw_y, w->rect.w, w->rect.h, w->color);
-        if (w->text) {
-            append_text(w->text, draw_x + w->padding, draw_y + w->padding, w->text_color);
+        switch (w->type) {
+        case W_SPACER:
+            break;
+        case W_LABEL:
+            if (w->color.a > 0.01f) append_rect(draw_x, draw_y, w->rect.w, w->rect.h, w->color);
+            if (w->text) append_text(w->text, draw_x + w->padding, draw_y + w->padding, w->text_color);
+            break;
+        case W_HSLIDER: {
+            float t = (w->maxv > w->minv) ? (w->value - w->minv) / (w->maxv - w->minv) : 0.0f;
+            if (t < 0.0f) t = 0.0f; if (t > 1.0f) t = 1.0f;
+            float track_h = w->rect.h * 0.35f;
+            float track_y = draw_y + (w->rect.h - track_h) * 0.5f;
+            Color track = color_scale(w->color, 0.6f);
+            Color fill = color_scale(w->text_color.a > 0.0f ? w->text_color : w->color, 1.1f);
+            append_rect(draw_x, track_y, w->rect.w, track_h, track);
+            append_rect(draw_x, track_y, w->rect.w * t, track_h, fill);
+            float knob_w = w->rect.h * 0.6f;
+            float knob_x = draw_x + (w->rect.w - knob_w) * t;
+            Color knob = color_mix(fill, color_scale(fill, 0.7f), 0.5f);
+            append_rect(knob_x, draw_y, knob_w, w->rect.h, knob);
+            break; }
+        case W_CHECKBOX: {
+            float box = w->rect.h;
+            Color frame = w->color;
+            append_rect(draw_x, draw_y, box, box, frame);
+            Color inner = color_scale(frame, 0.2f);
+            append_rect(draw_x + 2.0f, draw_y + 2.0f, box - 4.0f, box - 4.0f, inner);
+            if (w->value > 0.5f) {
+                Color check = w->text_color.a > 0.0f ? w->text_color : color_scale(frame, 1.5f);
+                append_rect(draw_x + 4.0f, draw_y + 4.0f, box - 8.0f, box - 8.0f, check);
+            }
+            if (w->text) append_text(w->text, draw_x + box + w->padding, draw_y + w->padding, w->text_color);
+            break; }
+        case W_PROGRESS: {
+            append_rect(draw_x, draw_y, w->rect.w, w->rect.h, color_scale(w->color, 0.6f));
+            float t = (w->maxv > w->minv) ? (w->value - w->minv) / (w->maxv - w->minv) : 0.0f;
+            if (t < 0.0f) t = 0.0f; if (t > 1.0f) t = 1.0f;
+            append_rect(draw_x, draw_y, w->rect.w * t, w->rect.h, w->color);
+            if (w->text) append_text(w->text, draw_x + w->padding, draw_y + w->padding, w->text_color);
+            break; }
+        case W_RECT:
+        case W_PANEL:
+        case W_BUTTON:
+        default:
+            append_rect(draw_x, draw_y, w->rect.w, w->rect.h, w->color);
+            if (w->text) append_text(w->text, draw_x + w->padding, draw_y + w->padding, w->text_color);
+            break;
         }
     }
 }
