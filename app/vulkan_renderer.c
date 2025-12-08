@@ -18,7 +18,7 @@
 /* ---------- Vulkan helpers & global state ---------- */
 /* ---------- Vulkan helpers & global state ---------- */
 static GLFWwindow* g_window = NULL;
-static const Widget* g_widgets = NULL;
+static Widget* g_widgets = NULL;
 static VkInstance instance = VK_NULL_HANDLE;
 static VkPhysicalDevice physical = VK_NULL_HANDLE;
 static VkDevice device = VK_NULL_HANDLE;
@@ -28,6 +28,7 @@ static VkSurfaceKHR surface = VK_NULL_HANDLE;
 static VkSwapchainKHR swapchain = VK_NULL_HANDLE;
 static const char* g_vert_spv = NULL;
 static const char* g_frag_spv = NULL;
+static const char* g_font_path = NULL;
 static uint32_t swapchain_img_count = 0;
 static VkImage* swapchain_imgs = NULL;
 static VkImageView* swapchain_imgviews = NULL;
@@ -664,8 +665,9 @@ typedef struct { float u0, v0, u1, v1; float xoff, yoff; float w, h; float advan
 static Glyph glyphs[128];
 
 static void build_font_atlas(void) {
-    FILE* f = fopen("font.ttf", "rb");
-    if (!f) { fatal("font.ttf not found in cwd - place a TTF named font.ttf"); }
+    if (!g_font_path) fatal("Font path is null");
+    FILE* f = fopen(g_font_path, "rb");
+    if (!f) { fprintf(stderr, "Fatal: font not found at %s\n", g_font_path); fatal("font load"); }
     fseek(f, 0, SEEK_END); long sz = ftell(f); fseek(f, 0, SEEK_SET);
     ttf_buffer = malloc(sz); fread(ttf_buffer, 1, sz, f); fclose(f);
     stbtt_InitFont(&fontinfo, ttf_buffer, 0);
@@ -791,10 +793,11 @@ static void create_descriptor_pool_and_set(void) {
 static void build_vertices_from_widgets(void) {
     free(vtx_buf); vtx_buf = NULL; vtx_count = 0;
     for (const Widget* w = g_widgets; w; w = w->next) {
-        append_rect(w->rect.x, w->rect.y, w->rect.w, w->rect.h, w->color);
+        float draw_x = w->rect.x;
+        float draw_y = w->rect.y + w->scroll_offset;
+        append_rect(draw_x, draw_y, w->rect.w, w->rect.h, w->color);
         if (w->text) {
-            Color cc = { 1.0f,1.0f,1.0f,1.0f };
-            append_text(w->text, w->rect.x + 6.0f, w->rect.y + 6.0f, cc);
+            append_text(w->text, draw_x + 6.0f, draw_y + 6.0f, w->text_color);
         }
     }
 }
@@ -850,6 +853,7 @@ static void record_cmdbuffer(uint32_t idx) {
 
 /* present frame */
 static void draw_frame(void) {
+    build_vertices_from_widgets();
     if (swapchain == VK_NULL_HANDLE) return;
     uint32_t img_idx;
     VkResult acq = vkAcquireNextImageKHR(device, swapchain, UINT64_MAX, sem_img_avail, VK_NULL_HANDLE, &img_idx);
@@ -878,11 +882,12 @@ static void draw_frame(void) {
     if (present != VK_SUCCESS) fatal_vk("vkQueuePresentKHR", present);
 }
 
-bool vk_renderer_init(GLFWwindow* window, const char* vert_spv, const char* frag_spv, const Widget* widgets) {
+bool vk_renderer_init(GLFWwindow* window, const char* vert_spv, const char* frag_spv, const char* font_path, Widget* widgets) {
     g_window = window;
     g_widgets = widgets;
     g_vert_spv = vert_spv;
     g_frag_spv = frag_spv;
+    g_font_path = font_path;
 
     create_instance();
     res = glfwCreateWindowSurface(instance, g_window, NULL, &surface);
