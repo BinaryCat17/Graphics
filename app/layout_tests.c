@@ -15,7 +15,7 @@ typedef struct {
 static LayoutFixture build_widgets(const char* styles_json, const char* layout_json) {
     LayoutFixture fx = {0};
     fx.styles = styles_json ? parse_styles_json(styles_json) : NULL;
-    fx.root = parse_layout_json(layout_json, NULL, fx.styles);
+    fx.root = parse_layout_json(layout_json, NULL, fx.styles, NULL);
     assert(fx.root);
     fx.layout = build_layout_tree(fx.root);
     assert(fx.layout);

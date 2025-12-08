@@ -1,8 +1,11 @@
 #include "ui_json.h"
 
+#include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+
+#include "stb_truetype.h"
 
 typedef enum { JSMN_UNDEFINED = 0, JSMN_OBJECT = 1, JSMN_ARRAY = 2, JSMN_STRING = 3, JSMN_PRIMITIVE = 4 } jsmntype_t;
 typedef struct { jsmntype_t type; int start; int end; int size; } jsmntok_t;
@@ -94,6 +97,73 @@ static float parse_number(const char* json, const jsmntok_t* tok, float fallback
 
 static const Style DEFAULT_STYLE = { .name = NULL, .background = {0.6f, 0.6f, 0.6f, 1.0f}, .text = {1.0f, 1.0f, 1.0f, 1.0f}, .padding = 6.0f, .next = NULL };
 static const Style ROOT_STYLE = { .name = NULL, .background = {0.0f, 0.0f, 0.0f, 0.0f}, .text = {1.0f, 1.0f, 1.0f, 1.0f}, .padding = 0.0f, .next = NULL };
+
+static unsigned char* g_font_buffer = NULL;
+static stbtt_fontinfo g_font_info;
+static float g_font_scale = 0.0f;
+static int g_font_ascent = 0;
+static int g_font_descent = 0;
+static int g_font_ready = 0;
+
+static float fallback_line_height(void) {
+    float line = (float)(g_font_ascent - g_font_descent);
+    return line > 0.0f ? line : 18.0f;
+}
+
+static int ensure_font_metrics(const char* font_path) {
+    if (g_font_ready) return 1;
+    if (!font_path) return 0;
+
+    FILE* f = fopen(font_path, "rb");
+    if (!f) {
+        fprintf(stderr, "Warning: unable to open font at %s\n", font_path);
+        return 0;
+    }
+
+    fseek(f, 0, SEEK_END);
+    long sz = ftell(f);
+    fseek(f, 0, SEEK_SET);
+    if (sz <= 0) { fclose(f); return 0; }
+
+    g_font_buffer = (unsigned char*)malloc((size_t)sz);
+    if (!g_font_buffer) { fclose(f); return 0; }
+    fread(g_font_buffer, 1, (size_t)sz, f);
+    fclose(f);
+
+    if (!stbtt_InitFont(&g_font_info, g_font_buffer, 0)) {
+        fprintf(stderr, "Warning: failed to init font metrics\n");
+        free(g_font_buffer); g_font_buffer = NULL;
+        return 0;
+    }
+
+    g_font_scale = stbtt_ScaleForPixelHeight(&g_font_info, 32.0f);
+    int ascent = 0, descent = 0, gap = 0;
+    stbtt_GetFontVMetrics(&g_font_info, &ascent, &descent, &gap);
+    g_font_ascent = (int)roundf((float)ascent * g_font_scale);
+    g_font_descent = (int)roundf((float)descent * g_font_scale);
+    g_font_ready = 1;
+    return 1;
+}
+
+static void measure_text(const char* text, float* out_w, float* out_h) {
+    float width = 0.0f;
+    float height = fallback_line_height();
+
+    if (g_font_ready && text && *text) {
+        int prev = 0;
+        for (const char* c = text; *c; ++c) {
+            int ch = (unsigned char)(*c);
+            int advance = 0, lsb = 0;
+            stbtt_GetCodepointHMetrics(&g_font_info, ch, &advance, &lsb);
+            width += advance * g_font_scale;
+            if (prev) width += stbtt_GetCodepointKernAdvance(&g_font_info, prev, ch) * g_font_scale;
+            prev = ch;
+        }
+    }
+
+    if (out_w) *out_w = width;
+    if (out_h) *out_h = height;
+}
 
 typedef struct Prototype {
     char* name;
@@ -630,8 +700,10 @@ void update_widget_bindings(UiNode* root, const Model* model) {
     bind_model_values_to_nodes(root, model);
 }
 
-UiNode* parse_layout_json(const char* json, const Model* model, const Style* styles) {
+UiNode* parse_layout_json(const char* json, const Model* model, const Style* styles, const char* font_path) {
     if (!json) { fprintf(stderr, "Error: layout JSON text is null\n"); return NULL; }
+
+    ensure_font_metrics(font_path);
 
     Prototype* prototypes = NULL;
     UiNode* root = parse_layout_definitions(json, &prototypes);
@@ -751,8 +823,12 @@ static void measure_node(LayoutNode* node) {
             node->rect.w = node->source->has_w ? node->source->rect.w : 0.0f;
             node->rect.h = node->source->has_h ? node->source->rect.h : 0.0f;
         } else {
-            node->rect.w = node->source->has_w ? node->source->rect.w : padding * 2.0f;
-            node->rect.h = node->source->has_h ? node->source->rect.h : padding * 2.0f;
+            float text_w = 0.0f, text_h = fallback_line_height();
+            if (node->source->text) {
+                measure_text(node->source->text, &text_w, &text_h);
+            }
+            node->rect.w = node->source->has_w ? node->source->rect.w : text_w + padding * 2.0f;
+            node->rect.h = node->source->has_h ? node->source->rect.h : text_h + padding * 2.0f;
         }
     }
 
