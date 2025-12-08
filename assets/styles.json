@@ -1,13 +1,15 @@
 {
   "styles": {
-    "panelPrimary": { "color": [0.08, 0.08, 0.3, 1.0] },
-    "panelSecondary": { "color": [0.12, 0.12, 0.4, 1.0] },
-    "primaryButton": { "color": [0.2, 0.5, 0.9, 1.0], "textColor": [1.0, 1.0, 1.0, 1.0], "padding": 8 },
+    "panelPrimary": { "color": [0.07, 0.1, 0.16, 0.95], "textColor": [0.92, 0.95, 1.0, 1.0] },
+    "panelSecondary": { "color": [0.1, 0.14, 0.22, 0.95], "textColor": [0.92, 0.95, 1.0, 1.0] },
+    "primaryButton": { "color": [0.18, 0.46, 0.88, 1.0], "textColor": [1.0, 1.0, 1.0, 1.0], "padding": 10 },
     "dangerButton": { "color": [0.9, 0.3, 0.3, 1.0], "textColor": [1.0, 1.0, 1.0, 1.0] },
-    "sliderMain": { "color": [0.6, 0.6, 0.8, 1.0], "textColor": [0.9, 0.95, 1.0, 1.0] },
-    "divider": { "color": [0.25, 0.25, 0.45, 1.0], "padding": 1 },
-    "mutedLabel": { "color": [0.0, 0.0, 0.0, 0.0], "textColor": [0.85, 0.88, 0.95, 1.0], "padding": 2 },
-    "checkbox": { "color": [0.18, 0.25, 0.32, 1.0], "textColor": [0.2, 0.85, 0.45, 1.0], "padding": 6 },
-    "progressBar": { "color": [0.3, 0.7, 0.5, 1.0], "textColor": [0.08, 0.1, 0.12, 1.0], "padding": 6 }
+    "sliderMain": { "color": [0.26, 0.62, 0.8, 1.0], "textColor": [0.95, 0.98, 1.0, 1.0] },
+    "divider": { "color": [0.25, 0.32, 0.5, 0.9], "padding": 1 },
+    "mutedLabel": { "color": [0.03, 0.05, 0.08, 0.65], "textColor": [0.82, 0.86, 0.95, 1.0], "padding": 4 },
+    "checkbox": { "color": [0.16, 0.22, 0.3, 1.0], "textColor": [0.35, 0.9, 0.55, 1.0], "padding": 6 },
+    "progressBar": { "color": [0.3, 0.76, 0.58, 1.0], "textColor": [0.08, 0.1, 0.12, 1.0], "padding": 6 },
+    "infoCard": { "color": [0.13, 0.18, 0.26, 0.92], "textColor": [0.94, 0.97, 1.0, 1.0], "padding": 10 },
+    "chip": { "color": [0.18, 0.26, 0.36, 0.9], "textColor": [0.82, 0.9, 1.0, 1.0], "padding": 6 }
   }
 }

@@ -21,7 +21,8 @@
     "slider19": 0.95,
     "slider20": 1.0,
     "featureEnabled": 1,
-    "featureState": "Включено",
-    "lastAction": "нет нажатий"
+    "featureState": "On",
+    "lastAction": "no actions",
+    "sliderState": "s10: 50%"
   }
 }
