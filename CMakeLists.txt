@@ -60,6 +60,8 @@ if (NOT VULKAN_STUB)
 
     set(APP_SOURCES
             "app/main.c"
+            "app/assets.c" "app/assets.h"
+            "app/scroll.c" "app/scroll.h"
             "app/vulkan_renderer.c" "app/vulkan_renderer.h"
             "app/ui_json.c" "app/ui_json.h"
             "src/Graphics.c" "src/Graphics.h"
