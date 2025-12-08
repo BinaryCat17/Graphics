@@ -881,7 +881,7 @@ static void build_vertices_from_widgets(void) {
     for (size_t i = 0; i < g_widgets.count; ++i) {
         const Widget *widget = &g_widgets.items[i];
 
-        float effective_offset = widget->scroll_static ? 0.0f : widget->scroll_offset;
+        float effective_offset = widget->scroll_static ? 0.0f : -widget->scroll_offset;
         Rect widget_rect = { widget->rect.x, widget->rect.y + effective_offset, widget->rect.w, widget->rect.h };
         Rect inner_rect = widget_rect;
         if (widget->border_thickness > 0.0f) {
@@ -979,12 +979,13 @@ static void build_vertices_from_widgets(void) {
             Color track_color = widget->scrollbar_track_color;
             Rect scroll_track = { track_x, track_y, track_w, track_h };
             Rect clipped_track;
+            const int scrollbar_z = 1000000;
 
             if (apply_clip_rect(widget, &scroll_track, &clipped_track)) {
                 view_models[view_model_count++] = (ViewModel){
                     .id = widget->id,
                     .logical_box = { {clipped_track.x, clipped_track.y}, {clipped_track.w, clipped_track.h} },
-                    .z_index = (int)view_model_count,
+                    .z_index = scrollbar_z,
                     .color = track_color,
                 };
             }
@@ -992,10 +993,11 @@ static void build_vertices_from_widgets(void) {
             float thumb_ratio = widget->scroll_viewport / widget->scroll_content;
             float thumb_h = fmaxf(track_h * thumb_ratio, 12.0f);
             float max_offset = widget->scroll_content - widget->scroll_viewport;
-            float offset_t = (max_offset != 0.0f) ? (widget->scroll_offset / max_offset) : 0.0f;
-            if (offset_t < -1.0f) offset_t = -1.0f;
-            if (offset_t > 1.0f) offset_t = 1.0f;
-            float thumb_y = track_y + (track_h - thumb_h) * 0.5f - offset_t * (track_h - thumb_h);
+            float clamped_offset = widget->scroll_offset;
+            if (clamped_offset < 0.0f) clamped_offset = 0.0f;
+            if (clamped_offset > max_offset) clamped_offset = max_offset;
+            float offset_t = (max_offset != 0.0f) ? (clamped_offset / max_offset) : 0.0f;
+            float thumb_y = track_y + offset_t * (track_h - thumb_h);
             Color thumb_color = widget->scrollbar_thumb_color;
 
             Rect thumb_rect = { track_x, thumb_y, track_w, thumb_h };
@@ -1004,7 +1006,7 @@ static void build_vertices_from_widgets(void) {
                 view_models[view_model_count++] = (ViewModel){
                     .id = widget->id,
                     .logical_box = { {clipped_thumb.x, clipped_thumb.y}, {clipped_thumb.w, clipped_thumb.h} },
-                    .z_index = (int)view_model_count,
+                    .z_index = scrollbar_z + 1,
                     .color = thumb_color,
                 };
             }
@@ -1018,7 +1020,7 @@ static void build_vertices_from_widgets(void) {
             continue;
         }
 
-        float effective_offset = widget->scroll_static ? 0.0f : widget->scroll_offset;
+        float effective_offset = widget->scroll_static ? 0.0f : -widget->scroll_offset;
         float pen_x = widget->rect.x + widget->padding;
         float pen_y = widget->rect.y + effective_offset + widget->padding + (float)ascent;
 
