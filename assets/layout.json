@@ -6,7 +6,9 @@
     "divider": { "type": "rect", "h": 2, "style": "divider" },
     "mutedLabel": { "type": "label", "style": "mutedLabel", "padding": 2 },
     "checkbox": { "type": "checkbox", "w": 22, "h": 22, "style": "checkbox" },
-    "progress": { "type": "progress", "h": 18, "style": "progressBar", "padding": 6 }
+    "progress": { "type": "progress", "h": 18, "style": "progressBar", "padding": 6 },
+    "stateCard": { "type": "label", "style": "infoCard", "padding": 8 },
+    "chip": { "type": "label", "style": "chip", "padding": 6 }
   },
   "layout": {
     "type": "row",
@@ -31,7 +33,7 @@
               { "use": "mutedLabel", "text": "Последнее действие:", "style": "mutedLabel" },
               { "use": "mutedLabel", "textBinding": "lastAction", "style": "mutedLabel", "padding": 4 },
               { "use": "divider", "w": 280 },
-              { "use": "checkbox", "id": "flag", "text": "Флажок", "valueBinding": "featureEnabled", "onClick": "featureState", "clickValue": "Включено", "style": "checkbox" },
+              { "use": "checkbox", "id": "flag", "text": "Флажок", "valueBinding": "featureEnabled", "onClick": "featureState", "clickValue": "On", "style": "checkbox" },
               { "use": "spacer" },
               { "use": "mutedLabel", "text": "Действия", "style": "mutedLabel" },
               { "use": "divider", "w": 280 },
@@ -110,13 +112,20 @@
             "y": 12,
             "spacing": 10,
             "children": [
+              { "use": "mutedLabel", "text": "Монитор состояний" },
+              { "use": "divider", "w": 220 },
+              { "use": "mutedLabel", "text": "Последнее нажатие" },
+              { "use": "stateCard", "textBinding": "lastAction", "padding": 10 },
+              { "use": "mutedLabel", "text": "Чекбокс" },
+              { "use": "stateCard", "textBinding": "featureState", "padding": 10 },
+              { "use": "mutedLabel", "text": "Слайдер" },
+              { "use": "stateCard", "textBinding": "sliderState", "padding": 10 },
+              { "use": "divider", "w": 220 },
               { "use": "mutedLabel", "text": "Прогресс из slider10" },
               { "use": "progress", "valueBinding": "slider10", "min": 0, "max": 1, "text": "Заполнение" },
               { "use": "spacer" },
-              { "use": "mutedLabel", "text": "Состояние чекбокса" },
-              { "use": "mutedLabel", "textBinding": "featureState" },
-              { "use": "divider", "w": 220 },
-              { "use": "mutedLabel", "text": "Эти блоки собраны из примитивов" }
+              { "use": "mutedLabel", "text": "Эти блоки собраны из примитивов" },
+              { "use": "chip", "text": "Живой UI" }
             ]
           }
         ]
