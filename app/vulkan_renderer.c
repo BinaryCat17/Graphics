@@ -18,7 +18,7 @@
 /* ---------- Vulkan helpers & global state ---------- */
 /* ---------- Vulkan helpers & global state ---------- */
 static GLFWwindow* g_window = NULL;
-static const Widget* g_widgets = NULL;
+static Widget* g_widgets = NULL;
 static VkInstance instance = VK_NULL_HANDLE;
 static VkPhysicalDevice physical = VK_NULL_HANDLE;
 static VkDevice device = VK_NULL_HANDLE;
@@ -793,8 +793,7 @@ static void build_vertices_from_widgets(void) {
     for (const Widget* w = g_widgets; w; w = w->next) {
         append_rect(w->rect.x, w->rect.y, w->rect.w, w->rect.h, w->color);
         if (w->text) {
-            Color cc = { 1.0f,1.0f,1.0f,1.0f };
-            append_text(w->text, w->rect.x + 6.0f, w->rect.y + 6.0f, cc);
+            append_text(w->text, w->rect.x + 6.0f, w->rect.y + 6.0f, w->text_color);
         }
     }
 }
@@ -850,6 +849,7 @@ static void record_cmdbuffer(uint32_t idx) {
 
 /* present frame */
 static void draw_frame(void) {
+    build_vertices_from_widgets();
     if (swapchain == VK_NULL_HANDLE) return;
     uint32_t img_idx;
     VkResult acq = vkAcquireNextImageKHR(device, swapchain, UINT64_MAX, sem_img_avail, VK_NULL_HANDLE, &img_idx);
@@ -878,7 +878,7 @@ static void draw_frame(void) {
     if (present != VK_SUCCESS) fatal_vk("vkQueuePresentKHR", present);
 }
 
-bool vk_renderer_init(GLFWwindow* window, const char* vert_spv, const char* frag_spv, const Widget* widgets) {
+bool vk_renderer_init(GLFWwindow* window, const char* vert_spv, const char* frag_spv, Widget* widgets) {
     g_window = window;
     g_widgets = widgets;
     g_vert_spv = vert_spv;

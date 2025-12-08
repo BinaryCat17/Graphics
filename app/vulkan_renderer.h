@@ -6,7 +6,7 @@
 
 #include "ui_json.h"
 
-bool vk_renderer_init(GLFWwindow* window, const char* vert_spv, const char* frag_spv, const Widget* widgets);
+bool vk_renderer_init(GLFWwindow* window, const char* vert_spv, const char* frag_spv, Widget* widgets);
 void vk_renderer_draw_frame(void);
 void vk_renderer_cleanup(void);
 

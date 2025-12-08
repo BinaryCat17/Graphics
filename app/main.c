@@ -22,16 +22,25 @@ static void fatal(const char* msg) {
 }
 
 int main(int argc, char** argv) {
-    if (argc < 4) { fprintf(stderr, "Usage: %s ui.json shader.vert.spv shader.frag.spv\n", argv[0]); return 1; }
-    const char* json_path = argv[1];
-    const char* vert_spv = argv[2];
-    const char* frag_spv = argv[3];
+    if (argc < 6) { fprintf(stderr, "Usage: %s model.json layout.json styles.json shader.vert.spv shader.frag.spv\n", argv[0]); return 1; }
+    const char* model_path = argv[1];
+    const char* layout_path = argv[2];
+    const char* styles_path = argv[3];
+    const char* vert_spv = argv[4];
+    const char* frag_spv = argv[5];
 
-    size_t json_len = 0; char* json_text = read_file_text(json_path, &json_len);
-    if (!json_text) return 1;
-    Widget* widgets = parse_ui_json(json_text);
-    free(json_text);
-    if (!widgets) return 1;
+    size_t model_len = 0, layout_len = 0, styles_len = 0;
+    char* model_text = read_file_text(model_path, &model_len);
+    char* layout_text = read_file_text(layout_path, &layout_len);
+    char* styles_text = read_file_text(styles_path, &styles_len);
+    if (!model_text || !layout_text || !styles_text) { free(model_text); free(layout_text); free(styles_text); return 1; }
+
+    Model* model = parse_model_json(model_text, model_path);
+    Style* styles = parse_styles_json(styles_text);
+    Widget* widgets = parse_layout_json(layout_text, model, styles);
+    free(model_text); free(layout_text); free(styles_text);
+    if (!widgets) { free_model(model); free_styles(styles); return 1; }
+    update_widget_bindings(widgets, model);
 
     if (!glfwInit()) fatal("glfwInit");
     if (!glfwVulkanSupported()) fatal("glfw Vulkan not supported");
@@ -42,16 +51,22 @@ int main(int argc, char** argv) {
     if (!vk_renderer_init(window, vert_spv, frag_spv, widgets)) {
         glfwDestroyWindow(window);
         glfwTerminate();
+        free_model(model);
+        free_styles(styles);
         free_widgets(widgets);
         return 1;
     }
 
     while (!glfwWindowShouldClose(window)) {
         glfwPollEvents();
+        update_widget_bindings(widgets, model);
         vk_renderer_draw_frame();
     }
 
     vk_renderer_cleanup();
+    save_model(model);
+    free_model(model);
+    free_styles(styles);
     free_widgets(widgets);
     glfwDestroyWindow(window);
     glfwTerminate();

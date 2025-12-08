@@ -1,0 +1,17 @@
+{
+  "layout": {
+    "type": "column",
+    "x": 10,
+    "y": 10,
+    "spacing": 16,
+    "children": [
+      { "type": "panel", "id": "leftPanel", "w": 400, "h": 220, "style": "panelPrimary" },
+      { "type": "hslider", "id": "s1", "w": 300, "h": 18, "valueBinding": "sliderValue", "min": 0, "max": 1, "style": "sliderMain" },
+      { "type": "button", "id": "btn1", "w": 140, "h": 36, "textBinding": "primaryButtonText", "style": "primaryButton" }
+    ]
+  },
+  "floating": [
+    { "type": "panel", "id": "rightPanel", "x": 430, "y": 10, "w": 360, "h": 240, "style": "panelSecondary" },
+    { "type": "button", "id": "reset", "x": 450, "y": 500, "w": 120, "h": 34, "textBinding": "resetText", "style": "dangerButton" }
+  ]
+}

@@ -1,0 +1,7 @@
+{
+  "model": {
+    "primaryButtonText": "Click me",
+    "sliderValue": 0.5,
+    "resetText": "Reset"
+  }
+}
