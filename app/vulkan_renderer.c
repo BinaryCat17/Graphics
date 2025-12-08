@@ -688,6 +688,7 @@ static unsigned char* atlas = NULL;
 static int atlas_w = 512, atlas_h = 512;
 static float font_scale = 0.0f;
 static int ascent = 0;
+static int descent = 0;
 typedef struct { float u0, v0, u1, v1; float xoff, yoff; float w, h; float advance; } Glyph;
 static Glyph glyphs[128];
 
@@ -729,8 +730,10 @@ static void build_font_atlas(void) {
     atlas = malloc(atlas_w * atlas_h);
     memset(atlas, 0, atlas_w * atlas_h);
     font_scale = stbtt_ScaleForPixelHeight(&fontinfo, 32.0f);
-    stbtt_GetFontVMetrics(&fontinfo, &ascent, NULL, NULL);
-    ascent = (int)roundf(ascent * font_scale);
+    int raw_ascent = 0, raw_descent = 0;
+    stbtt_GetFontVMetrics(&fontinfo, &raw_ascent, &raw_descent, NULL);
+    ascent = (int)roundf(raw_ascent * font_scale);
+    descent = (int)roundf(raw_descent * font_scale);
 
     int x = 0, y = 0, rowh = 0;
     for (int c = 32; c < 128; c++) {
@@ -739,9 +742,8 @@ static void build_font_atlas(void) {
         if (x + aw >= atlas_w) { x = 0; y += rowh;  }
         if (y + ah >= atlas_h) { fprintf(stderr, "atlas too small\n"); break; }
         for (int yy = 0; yy < ah; yy++) {
-            int flipped_y = ah - 1 - yy;
             for (int xx = 0; xx < aw; xx++) {
-                atlas[(y + yy) * atlas_w + (x + xx)] = bitmap[flipped_y * aw + xx];
+                atlas[(y + yy) * atlas_w + (x + xx)] = bitmap[yy * aw + xx];
             }
         }
         stbtt_FreeBitmap(bitmap, NULL);
@@ -817,29 +819,92 @@ static void build_vertices_from_widgets(void) {
         return;
     }
 
-    ViewModel *view_models = calloc(g_widgets.count, sizeof(ViewModel));
+    size_t slider_extras = 0;
+    for (size_t i = 0; i < g_widgets.count; ++i) {
+        if (g_widgets.items[i].type == W_HSLIDER) {
+            slider_extras += 2;
+        }
+    }
+
+    size_t view_model_capacity = g_widgets.count + slider_extras;
+    ViewModel *view_models = calloc(view_model_capacity, sizeof(ViewModel));
     GlyphQuadArray glyph_quads = {0};
     if (!view_models) {
         return;
     }
 
-    int glyph_z_base = (int)g_widgets.count;
+    size_t view_model_count = 0;
     for (size_t i = 0; i < g_widgets.count; ++i) {
         const Widget *widget = &g_widgets.items[i];
-        view_models[i].id = widget->id;
-        view_models[i].logical_box.origin.x = widget->rect.x;
-        view_models[i].logical_box.origin.y = widget->rect.y + widget->scroll_offset;
-        view_models[i].logical_box.size.x = widget->rect.w;
-        view_models[i].logical_box.size.y = widget->rect.h;
-        view_models[i].z_index = (int)i;
-        view_models[i].color = widget->color;
+
+        if (widget->type == W_HSLIDER) {
+            float track_height = fmaxf(widget->rect.h * 0.35f, 6.0f);
+            float track_y = widget->rect.y + widget->scroll_offset + (widget->rect.h - track_height) * 0.5f;
+            float track_x = widget->rect.x;
+            float track_w = widget->rect.w;
+            float denom = widget->maxv - widget->minv;
+            float t = denom != 0.0f ? (widget->value - widget->minv) / denom : 0.0f;
+            if (t < 0.0f) t = 0.0f; else if (t > 1.0f) t = 1.0f;
+
+            int base_z = (int)view_model_count;
+
+            Color track_color = widget->color;
+            track_color.a *= 0.35f;
+            view_models[view_model_count++] = (ViewModel){
+                .id = widget->id,
+                .logical_box = { {track_x, track_y}, {track_w, track_height} },
+                .z_index = base_z,
+                .color = track_color,
+            };
+
+            float fill_w = track_w * t;
+            view_models[view_model_count++] = (ViewModel){
+                .id = widget->id,
+                .logical_box = { {track_x, track_y}, {fill_w, track_height} },
+                .z_index = base_z + 1,
+                .color = widget->color,
+            };
+
+            float knob_w = fmaxf(track_height, widget->rect.h * 0.3f);
+            float knob_x = track_x + fill_w - knob_w * 0.5f;
+            if (knob_x < track_x) knob_x = track_x;
+            float knob_max = track_x + track_w - knob_w;
+            if (knob_x > knob_max) knob_x = knob_max;
+            float knob_h = track_height * 1.5f;
+            float knob_y = track_y + (track_height - knob_h) * 0.5f;
+            Color knob_color = widget->text_color;
+            if (knob_color.a <= 0.0f) knob_color = (Color){1.0f, 1.0f, 1.0f, 1.0f};
+
+            view_models[view_model_count++] = (ViewModel){
+                .id = widget->id,
+                .logical_box = { {knob_x, knob_y}, {knob_w, knob_h} },
+                .z_index = base_z + 2,
+                .color = knob_color,
+            };
+            continue;
+        }
+
+        ViewModel vm = {0};
+        vm.id = widget->id;
+        vm.logical_box.origin.x = widget->rect.x;
+        vm.logical_box.origin.y = widget->rect.y + widget->scroll_offset;
+        vm.logical_box.size.x = widget->rect.w;
+        vm.logical_box.size.y = widget->rect.h;
+        vm.z_index = (int)view_model_count;
+        vm.color = widget->color;
+        view_models[view_model_count++] = vm;
+    }
+
+    int glyph_z_base = (int)view_model_count;
+    for (size_t i = 0; i < g_widgets.count; ++i) {
+        const Widget *widget = &g_widgets.items[i];
 
         if (!widget->text || !*widget->text) {
             continue;
         }
 
         float pen_x = widget->rect.x + widget->padding;
-        float pen_y = widget->rect.y + widget->scroll_offset + widget->padding + (float)ascent;
+        float pen_y = widget->rect.y + widget->scroll_offset + widget->rect.h - widget->padding - (float)descent;
 
         for (const char *c = widget->text; *c; ++c) {
             unsigned char ch = (unsigned char)*c;
@@ -884,11 +949,11 @@ static void build_vertices_from_widgets(void) {
     render_context_init(&context, &transformer, projection);
 
     Renderer renderer;
-    renderer_init(&renderer, &context, g_widgets.count);
+    renderer_init(&renderer, &context, view_model_count);
 
     UiVertexBuffer background_buffer;
-    ui_vertex_buffer_init(&background_buffer, g_widgets.count * 6);
-    renderer_fill_background_vertices(&renderer, view_models, g_widgets.count, &background_buffer);
+    ui_vertex_buffer_init(&background_buffer, view_model_count * 6);
+    renderer_fill_background_vertices(&renderer, view_models, view_model_count, &background_buffer);
 
     UiTextVertexBuffer text_buffer;
     ui_text_vertex_buffer_init(&text_buffer, glyph_quads.count * 6);

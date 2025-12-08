@@ -32,7 +32,12 @@ void coordinate_transformer_init(CoordinateTransformer *xfm, float dpi_scale, fl
 
 Vec2 coordinate_screen_to_logical(const CoordinateTransformer *xfm, Vec2 screen)
 {
-    Vec2 logical = {screen.x / xfm->dpi_scale, screen.y / xfm->dpi_scale};
+    float viewport_h = xfm->viewport_size.y;
+    if (viewport_h < 0.0f) viewport_h = 0.0f;
+    Vec2 logical = {
+        screen.x / xfm->dpi_scale,
+        (viewport_h - screen.y) / xfm->dpi_scale
+    };
     return logical;
 }
 

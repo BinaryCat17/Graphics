@@ -103,7 +103,7 @@ typedef struct {
 
 Model* parse_model_json(const char* json_text, const char* source_path);
 Style* parse_styles_json(const char* json_text);
-UiNode* parse_layout_json(const char* json_text, const Model* model, const Style* styles);
+UiNode* parse_layout_json(const char* json_text, const Model* model, const Style* styles, const char* font_path);
 
 void update_widget_bindings(UiNode* root, const Model* model);
 
