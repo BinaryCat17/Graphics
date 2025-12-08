@@ -403,6 +403,9 @@ static void parse_widget_object(Widget** list, const char* json, jsmntok_t* toks
 
     w = create_widget();
     if (!w) { free(type); free(style_name); return; }
+    /* default position inherits container offset even if x/y omitted */
+    w->rect.x = base_x;
+    w->rect.y = base_y;
 
     for (unsigned int k = start_idx + 1; k < tokc && toks[k].start >= obj->start && toks[k].end <= obj->end; k++) {
         if (toks[k].type != JSMN_STRING || k + 1 >= tokc) continue;
