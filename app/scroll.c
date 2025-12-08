@@ -226,7 +226,7 @@ void scroll_handle_event(ScrollContext* ctx, Widget* widgets, size_t widget_coun
     ScrollArea* target = find_area_at_point(ctx->areas, (float)mouse_x, (float)mouse_y);
     if (!target) return;
 
-    target->offset += (float)yoff * 24.0f;
+    target->offset -= (float)yoff * 24.0f;
     scroll_apply_offsets(ctx, widgets, widget_count);
 }
 
