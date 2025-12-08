@@ -15,6 +15,7 @@ typedef struct ScrollArea {
 struct ScrollContext {
     ScrollArea* areas;
     Widget* widgets;
+    size_t widget_count;
 };
 
 static void free_scroll_areas(ScrollArea* areas) {
@@ -85,12 +86,14 @@ static ScrollArea* find_area_at_point(ScrollArea* areas, float x, float y) {
     return NULL;
 }
 
-static void build_scroll_areas(ScrollContext* ctx, Widget* widgets) {
+static void build_scroll_areas(ScrollContext* ctx, Widget* widgets, size_t widget_count) {
     free_scroll_areas(ctx->areas);
     ctx->areas = NULL;
     ctx->widgets = widgets;
+    ctx->widget_count = widget_count;
 
-    for (Widget* w = widgets; w; w = w->next) {
+    for (size_t i = 0; i < widget_count; i++) {
+        Widget* w = &widgets[i];
         w->scroll_offset = 0.0f;
         if (!w->scroll_area) continue;
         ScrollArea* area = ensure_area(&ctx->areas, w->scroll_area);
@@ -100,19 +103,21 @@ static void build_scroll_areas(ScrollContext* ctx, Widget* widgets) {
     }
 }
 
-ScrollContext* scroll_init(Widget* widgets) {
+ScrollContext* scroll_init(Widget* widgets, size_t widget_count) {
     ScrollContext* ctx = (ScrollContext*)calloc(1, sizeof(ScrollContext));
     if (!ctx) return NULL;
 
-    build_scroll_areas(ctx, widgets);
-    scroll_apply_offsets(ctx, widgets);
+    build_scroll_areas(ctx, widgets, widget_count);
+    scroll_apply_offsets(ctx, widgets, widget_count);
     return ctx;
 }
 
-void scroll_apply_offsets(ScrollContext* ctx, Widget* widgets) {
+void scroll_apply_offsets(ScrollContext* ctx, Widget* widgets, size_t widget_count) {
     if (!ctx) return;
     ctx->widgets = widgets;
-    for (Widget* w = widgets; w; w = w->next) {
+    ctx->widget_count = widget_count;
+    for (size_t i = 0; i < widget_count; i++) {
+        Widget* w = &widgets[i];
         w->scroll_offset = 0.0f;
         if (!w->scroll_area) continue;
         ScrollArea* a = find_area(ctx->areas, w->scroll_area);
@@ -133,7 +138,7 @@ static void on_scroll(GLFWwindow* window, double xoff, double yoff) {
     if (!target) return;
 
     target->offset += (float)yoff * 24.0f;
-    scroll_apply_offsets(ctx, ctx->widgets);
+    scroll_apply_offsets(ctx, ctx->widgets, ctx->widget_count);
 }
 
 void scroll_set_callback(GLFWwindow* window, ScrollContext* ctx) {

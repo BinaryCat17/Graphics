@@ -18,7 +18,7 @@
 /* ---------- Vulkan helpers & global state ---------- */
 /* ---------- Vulkan helpers & global state ---------- */
 static GLFWwindow* g_window = NULL;
-static Widget* g_widgets = NULL;
+static WidgetArray g_widgets = {0};
 static VkInstance instance = VK_NULL_HANDLE;
 static VkPhysicalDevice physical = VK_NULL_HANDLE;
 static VkDevice device = VK_NULL_HANDLE;
@@ -792,12 +792,13 @@ static void create_descriptor_pool_and_set(void) {
 /* build vtxs from g_widgets each frame */
 static void build_vertices_from_widgets(void) {
     free(vtx_buf); vtx_buf = NULL; vtx_count = 0;
-    for (const Widget* w = g_widgets; w; w = w->next) {
+    for (size_t i = 0; i < g_widgets.count; i++) {
+        const Widget* w = &g_widgets.items[i];
         float draw_x = w->rect.x;
         float draw_y = w->rect.y + w->scroll_offset;
         append_rect(draw_x, draw_y, w->rect.w, w->rect.h, w->color);
         if (w->text) {
-            append_text(w->text, draw_x + 6.0f, draw_y + 6.0f, w->text_color);
+            append_text(w->text, draw_x + w->padding, draw_y + w->padding, w->text_color);
         }
     }
 }
@@ -882,7 +883,7 @@ static void draw_frame(void) {
     if (present != VK_SUCCESS) fatal_vk("vkQueuePresentKHR", present);
 }
 
-bool vk_renderer_init(GLFWwindow* window, const char* vert_spv, const char* frag_spv, const char* font_path, Widget* widgets) {
+bool vk_renderer_init(GLFWwindow* window, const char* vert_spv, const char* frag_spv, const char* font_path, WidgetArray widgets) {
     g_window = window;
     g_widgets = widgets;
     g_vert_spv = vert_spv;

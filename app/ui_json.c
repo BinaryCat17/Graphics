@@ -92,7 +92,8 @@ static float parse_number(const char* json, const jsmntok_t* tok, float fallback
     return v;
 }
 
-static Color default_color(void) { Color c = { 0.6f, 0.6f, 0.6f, 1.0f }; return c; }
+static const Style DEFAULT_STYLE = { .name = NULL, .background = {0.6f, 0.6f, 0.6f, 1.0f}, .text = {1.0f, 1.0f, 1.0f, 1.0f}, .padding = 6.0f, .next = NULL };
+static const Style ROOT_STYLE = { .name = NULL, .background = {0.0f, 0.0f, 0.0f, 0.0f}, .text = {1.0f, 1.0f, 1.0f, 1.0f}, .padding = 0.0f, .next = NULL };
 
 static ModelEntry* model_find_entry(Model* model, const char* key) {
     for (ModelEntry* e = model ? model->entries : NULL; e; e = e->next) {
@@ -124,7 +125,7 @@ float model_get_number(const Model* model, const char* key, float fallback) {
 
 const char* model_get_string(const Model* model, const char* key, const char* fallback) {
     for (const ModelEntry* e = model ? model->entries : NULL; e; e = e->next) {
-        if (strcmp(e->key, key) == 0 && e->is_string && e->string_value) return e->string_value;
+        if (strcmp(e->key, key) == 0 && e->is_string) return e->string_value;
     }
     return fallback;
 }
@@ -133,50 +134,66 @@ void model_set_number(Model* model, const char* key, float value) {
     if (!model || !key) return;
     ModelEntry* e = model_get_or_create(model, key);
     if (!e) return;
-    e->is_string = 0;
     e->number_value = value;
+    e->is_string = 0;
 }
 
 void model_set_string(Model* model, const char* key, const char* value) {
-    if (!model || !key) return;
+    if (!model || !key || !value) return;
     ModelEntry* e = model_get_or_create(model, key);
     if (!e) return;
-    e->is_string = 1;
     free(e->string_value);
-    e->string_value = value ? strdup(value) : NULL;
-}
-
-static void append_entry_to_json(FILE* f, const ModelEntry* e, int* first) {
-    if (!*first) fprintf(f, ",\n");
-    *first = 0;
-    if (e->is_string) fprintf(f, "    \"%s\": \"%s\"", e->key, e->string_value ? e->string_value : "");
-    else fprintf(f, "    \"%s\": %g", e->key, e->number_value);
+    e->string_value = strdup(value);
+    e->is_string = 1;
 }
 
 int save_model(const Model* model) {
-    if (!model || !model->source_path) return -1;
+    if (!model || !model->source_path) return 0;
     FILE* f = fopen(model->source_path, "wb");
-    if (!f) return -1;
-    fprintf(f, "{\n  \"model\": {\n");
+    if (!f) return 0;
+    fputs("{\n  \"model\": {\n", f);
     int first = 1;
-    for (const ModelEntry* e = model->entries; e; e = e->next) {
-        append_entry_to_json(f, e, &first);
+    for (ModelEntry* e = model->entries; e; e = e->next) {
+        if (!first) fputs(",\n", f);
+        first = 0;
+        fprintf(f, "    \"%s\": ", e->key);
+        if (e->is_string) fprintf(f, "\"%s\"", e->string_value ? e->string_value : "");
+        else fprintf(f, "%f", e->number_value);
     }
-    fprintf(f, "\n  }\n}\n");
+    fputs("\n  }\n}\n", f);
     fclose(f);
-    return 0;
+    return 1;
+}
+
+static Style* style_find(const Style* styles, const char* name) {
+    for (const Style* s = styles; s; s = s->next) {
+        if (strcmp(s->name, name) == 0) return (Style*)s;
+    }
+    return NULL;
+}
+
+static void read_color_array(Color* out, const char* json, const jsmntok_t* val, const jsmntok_t* toks, unsigned int tokc) {
+    if (!out || val->type != JSMN_ARRAY) return;
+    float cols[4] = { out->r, out->g, out->b, out->a };
+    int cc = 0;
+    for (unsigned int z = (unsigned int)(val - toks) + 1; z < tokc && toks[z].start >= val->start && toks[z].end <= val->end; z++) {
+        if (toks[z].type == JSMN_PRIMITIVE) {
+            cols[cc < 4 ? cc : 3] = parse_number(json, &toks[z], cols[cc < 4 ? cc : 3]);
+            cc++;
+        }
+    }
+    out->r = cols[0]; out->g = cols[1]; out->b = cols[2]; out->a = cols[3];
 }
 
 Model* parse_model_json(const char* json, const char* source_path) {
     if (!json) { fprintf(stderr, "Error: model JSON text is null\n"); return NULL; }
     Model* model = (Model*)calloc(1, sizeof(Model));
-    if (!model) { fprintf(stderr, "Error: failed to allocate Model\n"); return NULL; }
-    model->source_path = source_path ? strdup(source_path) : NULL;
-
+    if (!model) return NULL;
+    model->source_path = strdup(source_path ? source_path : "model.json");
     jsmn_parser p; jsmn_init(&p);
     size_t tokc = 1024;
     jsmntok_t* toks = (jsmntok_t*)malloc(sizeof(jsmntok_t) * tokc);
-    if (!toks) { fprintf(stderr, "Error: failed to allocate tokens for model JSON\n"); free(model); return NULL; }
+    if (!toks) { free(model); return NULL; }
     for (size_t i = 0; i < tokc; i++) { toks[i].start = toks[i].end = -1; toks[i].size = 0; toks[i].type = JSMN_UNDEFINED; }
     int parse_ret = jsmn_parse(&p, json, strlen(json), toks, tokc);
     if (parse_ret < 0) { fprintf(stderr, "Error: failed to parse model JSON (code %d)\n", parse_ret); free(model); free(toks); return NULL; }
@@ -206,26 +223,6 @@ Model* parse_model_json(const char* json, const char* source_path) {
     return model;
 }
 
-static Style* style_find(const Style* styles, const char* name) {
-    for (const Style* s = styles; s; s = s->next) {
-        if (strcmp(s->name, name) == 0) return (Style*)s;
-    }
-    return NULL;
-}
-
-static void read_color_array(Color* out, const char* json, const jsmntok_t* val, const jsmntok_t* toks, unsigned int tokc) {
-    if (!out || val->type != JSMN_ARRAY) return;
-    float cols[4] = { out->r, out->g, out->b, out->a };
-    int cc = 0;
-    for (unsigned int z = (unsigned int)(val - toks) + 1; z < tokc && toks[z].start >= val->start && toks[z].end <= val->end; z++) {
-        if (toks[z].type == JSMN_PRIMITIVE) {
-            cols[cc < 4 ? cc : 3] = parse_number(json, &toks[z], cols[cc < 4 ? cc : 3]);
-            cc++;
-        }
-    }
-    out->r = cols[0]; out->g = cols[1]; out->b = cols[2]; out->a = cols[3];
-}
-
 Style* parse_styles_json(const char* json) {
     if (!json) { fprintf(stderr, "Error: styles JSON text is null\n"); return NULL; }
     Style* styles = NULL;
@@ -246,21 +243,26 @@ Style* parse_styles_json(const char* json) {
                     Style* st = (Style*)calloc(1, sizeof(Style));
                     if (!st) { free(style_name); break; }
                     st->name = style_name;
-                    st->background = default_color();
-                    st->text = (Color){ 1.0f, 1.0f, 1.0f, 1.0f };
+                    st->background = DEFAULT_STYLE.background;
+                    st->text = DEFAULT_STYLE.text;
+                    st->padding = DEFAULT_STYLE.padding;
                     st->next = styles;
                     styles = st;
                     jsmntok_t* sobj = &toks[j + 1];
                     unsigned int k = j + 2;
                     while (k < p.toknext && toks[k].start >= sobj->start && toks[k].end <= sobj->end) {
                         if (tok_is_key(json, &toks[k], "color") && k + 1 < p.toknext) {
-                            st->background = st->background;
                             read_color_array(&st->background, json, &toks[k + 1], toks, p.toknext);
                             k += 2;
                             continue;
                         }
                         if (tok_is_key(json, &toks[k], "textColor") && k + 1 < p.toknext) {
                             read_color_array(&st->text, json, &toks[k + 1], toks, p.toknext);
+                            k += 2;
+                            continue;
+                        }
+                        if (tok_is_key(json, &toks[k], "padding") && k + 1 < p.toknext && toks[k + 1].type == JSMN_PRIMITIVE) {
+                            st->padding = parse_number(json, &toks[k + 1], st->padding);
                             k += 2;
                             continue;
                         }
@@ -277,73 +279,6 @@ Style* parse_styles_json(const char* json) {
     return styles;
 }
 
-typedef struct WidgetDef {
-    char* type;
-    char* style_name;
-    Rect rect;
-    int has_x, has_y, has_w, has_h;
-    float spacing;
-    int columns;
-    char* id;
-    char* text;
-    char* text_binding;
-    char* value_binding;
-    float minv, maxv, value;
-    int has_min, has_max, has_value;
-    char* scroll_area;
-    int scroll_static;
-    Color color;
-    Color text_color;
-    int has_color;
-    struct WidgetDef* children;
-    struct WidgetDef* next;
-} WidgetDef;
-
-static Widget* append_widget(Widget** list, Widget* w) {
-    if (!w) return NULL;
-    w->next = *list;
-    *list = w;
-    return w;
-}
-
-static WidgetDef* append_widget_def(WidgetDef** list, WidgetDef* d) {
-    if (!d) return NULL;
-    d->next = *list;
-    *list = d;
-    return d;
-}
-
-static Widget* create_widget(void) {
-    Widget* w = (Widget*)calloc(1, sizeof(Widget));
-    if (!w) return NULL;
-    w->scroll_offset = 0.0f;
-    w->scroll_static = 0;
-    return w;
-}
-
-static WidgetDef* create_widget_def(void) {
-    WidgetDef* d = (WidgetDef*)calloc(1, sizeof(WidgetDef));
-    if (!d) return NULL;
-    d->spacing = -1.0f;
-    return d;
-}
-
-static void free_widget_defs(WidgetDef* d) {
-    while (d) {
-        WidgetDef* n = d->next;
-        free_widget_defs(d->children);
-        free(d->type);
-        free(d->style_name);
-        free(d->id);
-        free(d->text);
-        free(d->text_binding);
-        free(d->value_binding);
-        free(d->scroll_area);
-        free(d);
-        d = n;
-    }
-}
-
 static unsigned int skip_container(const jsmntok_t* toks, unsigned int tokc, unsigned int idx) {
     if (idx >= tokc) return tokc;
     unsigned int i = idx + 1;
@@ -354,222 +289,423 @@ static unsigned int skip_container(const jsmntok_t* toks, unsigned int tokc, uns
     return i;
 }
 
-static WidgetDef* parse_widget_def(const char* json, jsmntok_t* toks, unsigned int tokc, unsigned int start_idx) {
-    WidgetDef* def = create_widget_def();
-    if (!def) return NULL;
+static UiNode* create_node(void) {
+    UiNode* node = (UiNode*)calloc(1, sizeof(UiNode));
+    if (!node) return NULL;
+    node->layout = UI_LAYOUT_NONE;
+    node->widget_type = W_PANEL;
+    node->spacing = -1.0f;
+    node->columns = 0;
+    node->style = &DEFAULT_STYLE;
+    node->color = DEFAULT_STYLE.background;
+    node->text_color = DEFAULT_STYLE.text;
+    node->has_min = node->has_max = node->has_value = 0;
+    node->minv = 0.0f; node->maxv = 1.0f; node->value = 0.0f;
+    node->has_color = 0;
+    node->has_text_color = 0;
+    return node;
+}
+
+static int append_child(UiNode* parent, UiNode* child) {
+    if (!parent || !child) return 0;
+    size_t new_count = parent->child_count + 1;
+    UiNode* arr = (UiNode*)realloc(parent->children, new_count * sizeof(UiNode));
+    if (!arr) return 0;
+    parent->children = arr;
+    parent->children[parent->child_count] = *child;
+    parent->child_count = new_count;
+    free(child);
+    return 1;
+}
+
+static UiNode* parse_ui_node(const char* json, jsmntok_t* toks, unsigned int tokc, unsigned int start_idx) {
+    UiNode* node = create_node();
+    if (!node) return NULL;
     jsmntok_t* obj = &toks[start_idx];
     for (unsigned int k = start_idx + 1; k < tokc && toks[k].start >= obj->start && toks[k].end <= obj->end; k++) {
         if (toks[k].type != JSMN_STRING || k + 1 >= tokc) continue;
         jsmntok_t* val = &toks[k + 1];
-        if (tok_is_key(json, &toks[k], "type") && val->type == JSMN_STRING) def->type = tok_copy(json, val);
-        else if (tok_is_key(json, &toks[k], "style") && val->type == JSMN_STRING) def->style_name = tok_copy(json, val);
-        else if (tok_is_key(json, &toks[k], "x")) { def->rect.x = parse_number(json, val, def->rect.x); def->has_x = 1; }
-        else if (tok_is_key(json, &toks[k], "y")) { def->rect.y = parse_number(json, val, def->rect.y); def->has_y = 1; }
-        else if (tok_is_key(json, &toks[k], "w")) { def->rect.w = parse_number(json, val, def->rect.w); def->has_w = 1; }
-        else if (tok_is_key(json, &toks[k], "h")) { def->rect.h = parse_number(json, val, def->rect.h); def->has_h = 1; }
-        else if (tok_is_key(json, &toks[k], "id") && val->type == JSMN_STRING) def->id = tok_copy(json, val);
-        else if (tok_is_key(json, &toks[k], "text") && val->type == JSMN_STRING) def->text = tok_copy(json, val);
-        else if (tok_is_key(json, &toks[k], "textBinding") && val->type == JSMN_STRING) def->text_binding = tok_copy(json, val);
-        else if (tok_is_key(json, &toks[k], "valueBinding") && val->type == JSMN_STRING) def->value_binding = tok_copy(json, val);
-        else if (tok_is_key(json, &toks[k], "min")) { def->minv = parse_number(json, val, def->minv); def->has_min = 1; }
-        else if (tok_is_key(json, &toks[k], "max")) { def->maxv = parse_number(json, val, def->maxv); def->has_max = 1; }
-        else if (tok_is_key(json, &toks[k], "value")) { def->value = parse_number(json, val, def->value); def->has_value = 1; }
-        else if (tok_is_key(json, &toks[k], "scrollArea") && val->type == JSMN_STRING) def->scroll_area = tok_copy(json, val);
+        if (tok_is_key(json, &toks[k], "type") && val->type == JSMN_STRING) node->type = tok_copy(json, val);
+        else if (tok_is_key(json, &toks[k], "style") && val->type == JSMN_STRING) node->style_name = tok_copy(json, val);
+        else if (tok_is_key(json, &toks[k], "x")) { node->rect.x = parse_number(json, val, node->rect.x); node->has_x = 1; }
+        else if (tok_is_key(json, &toks[k], "y")) { node->rect.y = parse_number(json, val, node->rect.y); node->has_y = 1; }
+        else if (tok_is_key(json, &toks[k], "w")) { node->rect.w = parse_number(json, val, node->rect.w); node->has_w = 1; }
+        else if (tok_is_key(json, &toks[k], "h")) { node->rect.h = parse_number(json, val, node->rect.h); node->has_h = 1; }
+        else if (tok_is_key(json, &toks[k], "id") && val->type == JSMN_STRING) node->id = tok_copy(json, val);
+        else if (tok_is_key(json, &toks[k], "text") && val->type == JSMN_STRING) node->text = tok_copy(json, val);
+        else if (tok_is_key(json, &toks[k], "textBinding") && val->type == JSMN_STRING) node->text_binding = tok_copy(json, val);
+        else if (tok_is_key(json, &toks[k], "valueBinding") && val->type == JSMN_STRING) node->value_binding = tok_copy(json, val);
+        else if (tok_is_key(json, &toks[k], "min")) { node->minv = parse_number(json, val, node->minv); node->has_min = 1; }
+        else if (tok_is_key(json, &toks[k], "max")) { node->maxv = parse_number(json, val, node->maxv); node->has_max = 1; }
+        else if (tok_is_key(json, &toks[k], "value")) { node->value = parse_number(json, val, node->value); node->has_value = 1; }
+        else if (tok_is_key(json, &toks[k], "scrollArea") && val->type == JSMN_STRING) node->scroll_area = tok_copy(json, val);
         else if (tok_is_key(json, &toks[k], "scrollStatic") && val->type == JSMN_PRIMITIVE) {
             int len = val->end - val->start;
-            if (len == 4 && strncmp(json + val->start, "true", 4) == 0) def->scroll_static = 1;
-            if (len == 5 && strncmp(json + val->start, "false", 5) == 0) def->scroll_static = 0;
+            if (len == 4 && strncmp(json + val->start, "true", 4) == 0) node->scroll_static = 1;
+            if (len == 5 && strncmp(json + val->start, "false", 5) == 0) node->scroll_static = 0;
         }
-        else if (tok_is_key(json, &toks[k], "spacing")) def->spacing = parse_number(json, val, def->spacing);
-        else if (tok_is_key(json, &toks[k], "columns")) def->columns = (int)parse_number(json, val, (float)def->columns);
+        else if (tok_is_key(json, &toks[k], "spacing")) node->spacing = parse_number(json, val, node->spacing);
+        else if (tok_is_key(json, &toks[k], "columns")) node->columns = (int)parse_number(json, val, (float)node->columns);
         else if (tok_is_key(json, &toks[k], "color")) {
-            def->color = def->color;
-            read_color_array(&def->color, json, val, toks, tokc);
-            def->has_color = 1;
+            node->color = node->color;
+            read_color_array(&node->color, json, val, toks, tokc);
+            node->has_color = 1;
+        }
+        else if (tok_is_key(json, &toks[k], "textColor")) {
+            read_color_array(&node->text_color, json, val, toks, tokc);
+            node->has_text_color = 1;
         }
         else if (tok_is_key(json, &toks[k], "children") && val->type == JSMN_ARRAY) {
             jsmntok_t* arr = val;
             for (unsigned int c = k + 2; c < tokc && toks[c].start >= arr->start && toks[c].end <= arr->end; ) {
                 if (toks[c].type == JSMN_OBJECT) {
-                    WidgetDef* child = parse_widget_def(json, toks, tokc, c);
-                    append_widget_def(&def->children, child);
+                    UiNode* child = parse_ui_node(json, toks, tokc, c);
+                    append_child(node, child);
                 }
                 c = skip_container(toks, tokc, c);
             }
+            k = skip_container(toks, tokc, (unsigned int)(val - toks)) - 1;
         }
     }
-    return def;
+    return node;
 }
 
-static int def_is_container(const WidgetDef* d) {
-    if (!d || !d->type) return 0;
-    return strcmp(d->type, "row") == 0 || strcmp(d->type, "column") == 0 || strcmp(d->type, "table") == 0;
+static LayoutType type_to_layout(const char* type) {
+    if (!type) return UI_LAYOUT_NONE;
+    if (strcmp(type, "row") == 0) return UI_LAYOUT_ROW;
+    if (strcmp(type, "column") == 0) return UI_LAYOUT_COLUMN;
+    if (strcmp(type, "table") == 0) return UI_LAYOUT_TABLE;
+    return UI_LAYOUT_NONE;
 }
 
-static WidgetType def_to_widget_type(const WidgetDef* d) {
-    if (!d || !d->type) return W_PANEL;
-    if (strcmp(d->type, "label") == 0) return W_LABEL;
-    if (strcmp(d->type, "button") == 0) return W_BUTTON;
-    if (strcmp(d->type, "hslider") == 0) return W_HSLIDER;
+static WidgetType type_to_widget_type(const char* type) {
+    if (!type) return W_PANEL;
+    if (strcmp(type, "label") == 0) return W_LABEL;
+    if (strcmp(type, "button") == 0) return W_BUTTON;
+    if (strcmp(type, "hslider") == 0) return W_HSLIDER;
     return W_PANEL;
 }
 
-static void resolve_styles_and_defaults(WidgetDef* defs, const Style* styles) {
-    for (WidgetDef* d = defs; d; d = d->next) {
-        if (!d->has_min) d->minv = 0.0f;
-        if (!d->has_max) d->maxv = 1.0f;
-        if (!d->has_value) d->value = 0.0f;
-        if (d->spacing < 0.0f) d->spacing = 8.0f;
-        d->text_color = (Color){ 1.0f, 1.0f, 1.0f, 1.0f };
-        if (!d->has_color) d->color = default_color();
-        if (d->style_name) {
-            const Style* st = style_find(styles, d->style_name);
-            if (st) {
-                d->color = st->background;
-                d->text_color = st->text;
-            }
-        }
-        resolve_styles_and_defaults(d->children, styles);
+static void resolve_styles_and_defaults(UiNode* node, const Style* styles) {
+    if (!node) return;
+    LayoutType inferred = type_to_layout(node->type);
+    if (inferred != UI_LAYOUT_NONE || node->layout == UI_LAYOUT_NONE) {
+        node->layout = inferred;
+    }
+    node->widget_type = type_to_widget_type(node->type);
+    if (node->layout == UI_LAYOUT_NONE && node->spacing < 0.0f) node->spacing = 0.0f;
+    if (node->layout != UI_LAYOUT_NONE && node->spacing < 0.0f) node->spacing = 8.0f;
+
+    const Style* st = node->style ? node->style : &DEFAULT_STYLE;
+    if (node->style_name) {
+        const Style* found = style_find(styles, node->style_name);
+        if (found) st = found;
+    }
+    node->style = st;
+    if (!node->has_color) node->color = st->background;
+    if (!node->has_text_color) node->text_color = st->text;
+
+    if (!node->has_min) node->minv = 0.0f;
+    if (!node->has_max) node->maxv = 1.0f;
+    if (!node->has_value) node->value = 0.0f;
+
+    for (size_t i = 0; i < node->child_count; i++) {
+        resolve_styles_and_defaults(&node->children[i], styles);
     }
 }
 
-static void bind_model_values_to_defs(WidgetDef* defs, const Model* model) {
-    if (!model) return;
-    for (WidgetDef* d = defs; d; d = d->next) {
-        if (d->text_binding) {
-            const char* v = model_get_string(model, d->text_binding, NULL);
-            if (v) {
-                free(d->text);
-                d->text = strdup(v);
-            }
+static void bind_model_values_to_nodes(UiNode* node, const Model* model) {
+    if (!node || !model) return;
+    if (node->text_binding) {
+        const char* v = model_get_string(model, node->text_binding, NULL);
+        if (v) {
+            free(node->text);
+            node->text = strdup(v);
         }
-        if (d->value_binding) {
-            d->value = model_get_number(model, d->value_binding, d->value);
-            d->has_value = 1;
-        }
-        bind_model_values_to_defs(d->children, model);
+    }
+    if (node->value_binding) {
+        node->value = model_get_number(model, node->value_binding, node->value);
+        node->has_value = 1;
+    }
+    for (size_t i = 0; i < node->child_count; i++) {
+        bind_model_values_to_nodes(&node->children[i], model);
     }
 }
 
-static Widget* materialize_layout(const WidgetDef* defs, Widget** out, float origin_x, float origin_y) {
-    for (const WidgetDef* d = defs; d; d = d->next) {
-        if (def_is_container(d)) {
-            float base_x = origin_x + (d->has_x ? d->rect.x : 0.0f);
-            float base_y = origin_y + (d->has_y ? d->rect.y : 0.0f);
-            float cursor_x = 0.0f, cursor_y = 0.0f;
-            int col_idx = 0;
-            for (WidgetDef* child = d->children; child; child = child->next) {
-                float child_base_x = base_x + cursor_x;
-                float child_base_y = base_y + cursor_y;
-                materialize_layout(child, out, child_base_x, child_base_y);
-                float adv_w = child->has_w ? child->rect.w : 100.0f;
-                float adv_h = child->has_h ? child->rect.h : 30.0f;
-                if (strcmp(d->type, "row") == 0) {
-                    cursor_x += adv_w + d->spacing;
-                } else if (strcmp(d->type, "table") == 0 && d->columns > 0) {
-                    col_idx++;
-                    if (col_idx >= d->columns) { col_idx = 0; cursor_x = 0.0f; cursor_y += adv_h + d->spacing; }
-                    else cursor_x += adv_w + d->spacing;
-                } else {
-                    cursor_y += adv_h + d->spacing;
-                }
-            }
-            continue;
-        }
+static UiNode* parse_layout_definitions(const char* json) {
+    UiNode* root = create_node();
+    if (!root) return NULL;
+    root->layout = UI_LAYOUT_ABSOLUTE;
+    root->style = &ROOT_STYLE;
+    root->spacing = 0.0f;
 
-        Widget* w = create_widget();
-        if (!w) continue;
-        w->type = def_to_widget_type(d);
-        w->rect.x = origin_x + (d->has_x ? d->rect.x : 0.0f);
-        w->rect.y = origin_y + (d->has_y ? d->rect.y : 0.0f);
-        if (d->has_w) w->rect.w = d->rect.w;
-        if (d->has_h) w->rect.h = d->rect.h;
-        w->color = d->color;
-        w->text_color = d->text_color;
-        w->minv = d->minv;
-        w->maxv = d->maxv;
-        w->value = d->value;
-        w->scroll_static = d->scroll_static;
-        if (d->id) w->id = strdup(d->id);
-        if (d->text) w->text = strdup(d->text);
-        if (d->text_binding) w->text_binding = strdup(d->text_binding);
-        if (d->value_binding) w->value_binding = strdup(d->value_binding);
-        if (d->scroll_area) w->scroll_area = strdup(d->scroll_area);
-        append_widget(out, w);
-    }
-    return *out;
-}
-
-static WidgetDef* parse_layout_definitions(const char* json) {
-    WidgetDef* defs = NULL;
     jsmn_parser p; jsmn_init(&p);
     size_t tokc = 4096;
     jsmntok_t* toks = (jsmntok_t*)malloc(sizeof(jsmntok_t) * tokc);
-    if (!toks) { fprintf(stderr, "Error: failed to allocate tokens for layout JSON\n"); return NULL; }
+    if (!toks) { fprintf(stderr, "Error: failed to allocate tokens for layout JSON\n"); free(root); return NULL; }
     for (size_t i = 0; i < tokc; i++) { toks[i].start = toks[i].end = -1; toks[i].size = 0; toks[i].type = JSMN_UNDEFINED; }
     int parse_ret = jsmn_parse(&p, json, strlen(json), toks, tokc);
-    if (parse_ret < 0) { fprintf(stderr, "Error: failed to parse layout JSON (code %d)\n", parse_ret); free(toks); return NULL; }
+    if (parse_ret < 0) { fprintf(stderr, "Error: failed to parse layout JSON (code %d)\n", parse_ret); free(toks); free(root); return NULL; }
 
     int sections_found = 0;
-    int defs_created = 0;
     for (unsigned int i = 0; i < p.toknext; i++) {
         if (tok_is_key(json, &toks[i], "layout") && i + 1 < p.toknext && toks[i + 1].type == JSMN_OBJECT) {
             sections_found++;
-            WidgetDef* def = parse_widget_def(json, toks, p.toknext, i + 1);
-            if (def) { append_widget_def(&defs, def); defs_created = 1; }
+            UiNode* def = parse_ui_node(json, toks, p.toknext, i + 1);
+            append_child(root, def);
         }
         if (tok_is_key(json, &toks[i], "floating") && i + 1 < p.toknext && toks[i + 1].type == JSMN_ARRAY) {
             sections_found++;
             jsmntok_t* arr = &toks[i + 1];
             for (unsigned int j = i + 2; j < p.toknext && toks[j].start >= arr->start && toks[j].end <= arr->end; ) {
                 if (toks[j].type == JSMN_OBJECT) {
-                    WidgetDef* def = parse_widget_def(json, toks, p.toknext, j);
-                    if (def) { append_widget_def(&defs, def); defs_created = 1; }
+                    UiNode* def = parse_ui_node(json, toks, p.toknext, j);
+                    append_child(root, def);
                 }
                 j = skip_container(toks, p.toknext, j);
             }
         }
     }
     if (sections_found == 0) fprintf(stderr, "Error: no 'layout' or 'floating' sections found in layout.json\n");
-    if (!defs_created) fprintf(stderr, "Error: no widgets could be constructed from layout.json\n");
     free(toks);
-    return defs;
+    return root;
 }
 
-static void bind_from_model(Widget* w, const Model* model) {
-    if (!w || !model) return;
-    if (w->text_binding) {
-        const char* v = model_get_string(model, w->text_binding, NULL);
-        if (v) {
-            free(w->text);
-            w->text = strdup(v);
-        }
-    }
-    if (w->value_binding) {
-        w->value = model_get_number(model, w->value_binding, w->value);
-    }
+void update_widget_bindings(UiNode* root, const Model* model) {
+    bind_model_values_to_nodes(root, model);
 }
 
-void update_widget_bindings(Widget* widgets, const Model* model) {
-    for (Widget* w = widgets; w; w = w->next) {
-        bind_from_model(w, model);
-    }
-}
-
-Widget* parse_layout_json(const char* json, const Model* model, const Style* styles) {
+UiNode* parse_layout_json(const char* json, const Model* model, const Style* styles) {
     if (!json) { fprintf(stderr, "Error: layout JSON text is null\n"); return NULL; }
 
-    WidgetDef* defs = parse_layout_definitions(json);
-    if (!defs) return NULL;
+    UiNode* root = parse_layout_definitions(json);
+    if (!root) return NULL;
 
-    resolve_styles_and_defaults(defs, styles);
-    bind_model_values_to_defs(defs, model);
+    resolve_styles_and_defaults(root, styles);
+    bind_model_values_to_nodes(root, model);
+    return root;
+}
 
-    Widget* widgets = NULL;
-    materialize_layout(defs, &widgets, 0.0f, 0.0f);
+static LayoutNode* build_layout_tree_recursive(const UiNode* node) {
+    if (!node) return NULL;
+    LayoutNode* l = (LayoutNode*)calloc(1, sizeof(LayoutNode));
+    if (!l) return NULL;
+    l->source = node;
+    l->child_count = node->child_count;
+    if (node->child_count > 0) {
+        l->children = (LayoutNode*)calloc(node->child_count, sizeof(LayoutNode));
+        if (!l->children) { free(l); return NULL; }
+        for (size_t i = 0; i < node->child_count; i++) {
+            LayoutNode* child = build_layout_tree_recursive(&node->children[i]);
+            if (child) {
+                l->children[i] = *child;
+                free(child);
+            }
+        }
+    }
+    return l;
+}
 
-    free_widget_defs(defs);
-    return widgets;
+LayoutNode* build_layout_tree(const UiNode* root) {
+    return build_layout_tree_recursive(root);
+}
+
+static void free_layout_node(LayoutNode* root) {
+    if (!root) return;
+    for (size_t i = 0; i < root->child_count; i++) {
+        free_layout_node(&root->children[i]);
+    }
+    free(root->children);
+}
+
+void free_layout_tree(LayoutNode* root) {
+    if (!root) return;
+    free_layout_node(root);
+    free(root);
+}
+
+static void measure_node(LayoutNode* node) {
+    if (!node || !node->source) return;
+    float padding = node->source->style ? node->source->style->padding : DEFAULT_STYLE.padding;
+    for (size_t i = 0; i < node->child_count; i++) measure_node(&node->children[i]);
+
+    if (node->source->layout == UI_LAYOUT_ROW) {
+        float content_w = 0.0f;
+        float content_h = 0.0f;
+        for (size_t i = 0; i < node->child_count; i++) {
+            LayoutNode* ch = &node->children[i];
+            content_w += ch->rect.w;
+            if (i + 1 < node->child_count) content_w += node->source->spacing;
+            if (ch->rect.h > content_h) content_h = ch->rect.h;
+        }
+        node->rect.w = content_w + padding * 2.0f;
+        node->rect.h = content_h + padding * 2.0f;
+    } else if (node->source->layout == UI_LAYOUT_COLUMN) {
+        float content_w = 0.0f;
+        float content_h = 0.0f;
+        for (size_t i = 0; i < node->child_count; i++) {
+            LayoutNode* ch = &node->children[i];
+            if (ch->rect.w > content_w) content_w = ch->rect.w;
+            content_h += ch->rect.h;
+            if (i + 1 < node->child_count) content_h += node->source->spacing;
+        }
+        node->rect.w = content_w + padding * 2.0f;
+        node->rect.h = content_h + padding * 2.0f;
+    } else if (node->source->layout == UI_LAYOUT_TABLE && node->source->columns > 0) {
+        int cols = node->source->columns;
+        int rows = (int)((node->child_count + (size_t)cols - 1) / (size_t)cols);
+        float* col_w = (float*)calloc((size_t)cols, sizeof(float));
+        float* row_h = (float*)calloc((size_t)rows, sizeof(float));
+        if (col_w && row_h) {
+            for (size_t i = 0; i < node->child_count; i++) {
+                int col = (int)(i % (size_t)cols);
+                int row = (int)(i / (size_t)cols);
+                LayoutNode* ch = &node->children[i];
+                if (ch->rect.w > col_w[col]) col_w[col] = ch->rect.w;
+                if (ch->rect.h > row_h[row]) row_h[row] = ch->rect.h;
+            }
+            float content_w = 0.0f;
+            float content_h = 0.0f;
+            for (int c = 0; c < cols; c++) {
+                content_w += col_w[c];
+                if (c + 1 < cols) content_w += node->source->spacing;
+            }
+            for (int r = 0; r < rows; r++) {
+                content_h += row_h[r];
+                if (r + 1 < rows) content_h += node->source->spacing;
+            }
+            node->rect.w = content_w + padding * 2.0f;
+            node->rect.h = content_h + padding * 2.0f;
+        }
+        free(col_w);
+        free(row_h);
+    } else if (node->child_count > 0) { /* absolute container */
+        float max_w = 0.0f, max_h = 0.0f;
+        for (size_t i = 0; i < node->child_count; i++) {
+            LayoutNode* ch = &node->children[i];
+            if (ch->rect.w > max_w) max_w = ch->rect.w;
+            if (ch->rect.h > max_h) max_h = ch->rect.h;
+        }
+        node->rect.w = max_w + padding * 2.0f;
+        node->rect.h = max_h + padding * 2.0f;
+    } else {
+        node->rect.w = node->source->has_w ? node->source->rect.w : padding * 2.0f;
+        node->rect.h = node->source->has_h ? node->source->rect.h : padding * 2.0f;
+    }
+
+    if (node->source->has_w) node->rect.w = node->source->rect.w;
+    if (node->source->has_h) node->rect.h = node->source->rect.h;
+}
+
+void measure_layout(LayoutNode* root) { measure_node(root); }
+
+static void layout_node(LayoutNode* node, float origin_x, float origin_y) {
+    if (!node || !node->source) return;
+    float padding = node->source->style ? node->source->style->padding : DEFAULT_STYLE.padding;
+    float base_x = origin_x + (node->source->has_x ? node->source->rect.x : 0.0f);
+    float base_y = origin_y + (node->source->has_y ? node->source->rect.y : 0.0f);
+    node->rect.x = base_x;
+    node->rect.y = base_y;
+
+    if (node->source->layout == UI_LAYOUT_ROW) {
+        float cursor_x = base_x + padding;
+        float cursor_y = base_y + padding;
+        for (size_t i = 0; i < node->child_count; i++) {
+            layout_node(&node->children[i], cursor_x, cursor_y);
+            cursor_x += node->children[i].rect.w + node->source->spacing;
+        }
+    } else if (node->source->layout == UI_LAYOUT_COLUMN) {
+        float cursor_x = base_x + padding;
+        float cursor_y = base_y + padding;
+        for (size_t i = 0; i < node->child_count; i++) {
+            layout_node(&node->children[i], cursor_x, cursor_y);
+            cursor_y += node->children[i].rect.h + node->source->spacing;
+        }
+    } else if (node->source->layout == UI_LAYOUT_TABLE && node->source->columns > 0) {
+        int cols = node->source->columns;
+        int rows = (int)((node->child_count + (size_t)cols - 1) / (size_t)cols);
+        float* col_w = (float*)calloc((size_t)cols, sizeof(float));
+        float* row_h = (float*)calloc((size_t)rows, sizeof(float));
+        if (col_w && row_h) {
+            for (size_t i = 0; i < node->child_count; i++) {
+                int col = (int)(i % (size_t)cols);
+                int row = (int)(i / (size_t)cols);
+                LayoutNode* ch = &node->children[i];
+                if (ch->rect.w > col_w[col]) col_w[col] = ch->rect.w;
+                if (ch->rect.h > row_h[row]) row_h[row] = ch->rect.h;
+            }
+            float y = base_y + padding;
+            size_t idx = 0;
+            for (int r = 0; r < rows; r++) {
+                float x = base_x + padding;
+                for (int c = 0; c < cols && idx < node->child_count; c++, idx++) {
+                    layout_node(&node->children[idx], x, y);
+                    x += col_w[c] + node->source->spacing;
+                }
+                y += row_h[r] + node->source->spacing;
+            }
+        }
+        free(col_w);
+        free(row_h);
+    } else if (node->child_count > 0) {
+        float offset_x = base_x + padding;
+        float offset_y = base_y + padding;
+        for (size_t i = 0; i < node->child_count; i++) {
+            layout_node(&node->children[i], offset_x, offset_y);
+        }
+    }
+}
+
+void assign_layout(LayoutNode* root, float origin_x, float origin_y) { layout_node(root, origin_x, origin_y); }
+
+size_t count_layout_widgets(const LayoutNode* root) {
+    if (!root) return 0;
+    if (root->source && root->source->layout == UI_LAYOUT_NONE) return 1;
+    size_t total = 0;
+    for (size_t i = 0; i < root->child_count; i++) total += count_layout_widgets(&root->children[i]);
+    return total;
+}
+
+static void populate_widgets_recursive(const LayoutNode* node, Widget* widgets, size_t widget_count, size_t* idx) {
+    if (!node || !widgets || !idx || *idx >= widget_count) return;
+    if (node->source && node->source->layout == UI_LAYOUT_NONE) {
+        Widget* w = &widgets[*idx];
+        (*idx)++;
+        w->type = node->source->widget_type;
+        w->rect = node->rect;
+        w->scroll_offset = 0.0f;
+        w->color = node->source->color;
+        w->text_color = node->source->text_color;
+        w->padding = node->source->style ? node->source->style->padding : DEFAULT_STYLE.padding;
+        w->text = node->source->text;
+        w->text_binding = node->source->text_binding;
+        w->value_binding = node->source->value_binding;
+        w->minv = node->source->minv;
+        w->maxv = node->source->maxv;
+        w->value = node->source->value;
+        w->id = node->source->id;
+        w->scroll_area = node->source->scroll_area;
+        w->scroll_static = node->source->scroll_static;
+        return;
+    }
+    for (size_t i = 0; i < node->child_count; i++) populate_widgets_recursive(&node->children[i], widgets, widget_count, idx);
+}
+
+void populate_widgets_from_layout(const LayoutNode* root, Widget* widgets, size_t widget_count) {
+    size_t idx = 0;
+    populate_widgets_recursive(root, widgets, widget_count, &idx);
+}
+
+WidgetArray materialize_widgets(const LayoutNode* root) {
+    WidgetArray arr = {0};
+    size_t count = count_layout_widgets(root);
+    if (count == 0) return arr;
+    Widget* widgets = (Widget*)calloc(count, sizeof(Widget));
+    if (!widgets) return arr;
+    populate_widgets_from_layout(root, widgets, count);
+    arr.items = widgets;
+    arr.count = count;
+    return arr;
 }
 
 void free_model(Model* model) {
@@ -595,15 +731,27 @@ void free_styles(Style* styles) {
     }
 }
 
-void free_widgets(Widget* widgets) {
-    while (widgets) {
-        Widget* n = widgets->next;
-        free(widgets->text);
-        free(widgets->text_binding);
-        free(widgets->value_binding);
-        free(widgets->id);
-        free(widgets->scroll_area);
-        free(widgets);
-        widgets = n;
+void free_widgets(WidgetArray widgets) {
+    free(widgets.items);
+}
+
+static void free_ui_node(UiNode* node) {
+    if (!node) return;
+    for (size_t i = 0; i < node->child_count; i++) {
+        free_ui_node(&node->children[i]);
     }
+    free(node->children);
+    free(node->type);
+    free(node->style_name);
+    free(node->id);
+    free(node->text);
+    free(node->text_binding);
+    free(node->value_binding);
+    free(node->scroll_area);
+}
+
+void free_ui_tree(UiNode* node) {
+    if (!node) return;
+    free_ui_node(node);
+    free(node);
 }
