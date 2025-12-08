@@ -919,7 +919,8 @@ static void build_vertices_from_widgets(void) {
         const Widget *widget = &g_widgets.items[i];
 
         float scroll_offset = widget->scroll_static ? 0.0f : widget->scroll_offset;
-        float effective_offset = -snap_to_pixel(scroll_offset);
+        float snapped_scroll_pixels = -snap_to_pixel(scroll_offset * g_transformer.dpi_scale);
+        float effective_offset = snapped_scroll_pixels / g_transformer.dpi_scale;
         Rect widget_rect = { widget->rect.x, widget->rect.y + effective_offset, widget->rect.w, widget->rect.h };
         Rect inner_rect = widget_rect;
         if (widget->border_thickness > 0.0f) {
@@ -1072,7 +1073,8 @@ static void build_vertices_from_widgets(void) {
         }
 
         float scroll_offset = widget->scroll_static ? 0.0f : widget->scroll_offset;
-        float effective_offset = -snap_to_pixel(scroll_offset);
+        float snapped_scroll_pixels = -snap_to_pixel(scroll_offset * g_transformer.dpi_scale);
+        float effective_offset = snapped_scroll_pixels / g_transformer.dpi_scale;
         float pen_x = widget->rect.x + widget->padding;
         float pen_y = widget->rect.y + effective_offset + widget->padding + (float)ascent;
 
@@ -1171,6 +1173,8 @@ static void build_vertices_from_widgets(void) {
         }
 
         vtx_count = cursor;
+    } else {
+        vtx_count = 0;
     }
 
     ui_text_vertex_buffer_dispose(&text_buffer);
