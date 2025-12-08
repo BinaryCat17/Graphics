@@ -11,7 +11,7 @@ layout(location = 2) out vec4 out_col;
 layout(push_constant) uniform Push { vec2 viewport; } pc;
 
 void main() {
-    vec2 ndc = vec2((in_pos.x / pc.viewport.x) * 2.0 - 1.0, -((in_pos.y / pc.viewport.y) * 2.0 - 1.0));
+    vec2 ndc = vec2((in_pos.x / pc.viewport.x) * 2.0 - 1.0, (in_pos.y / pc.viewport.y) * 2.0 - 1.0);
     gl_Position = vec4(ndc, 0.0, 1.0);
     out_uv = in_uv;
     out_use_tex = in_use_tex;
