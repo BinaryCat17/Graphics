@@ -839,7 +839,8 @@ static void populate_widgets_recursive(const LayoutNode* node, Widget* widgets, 
         w->scroll_offset = 0.0f;
         w->color = node->source->color;
         w->text_color = node->source->text_color;
-        w->padding = node->source->has_padding_override ? node->source->padding_override : (node->source->style ? node->source->style->padding : DEFAULT_STYLE.padding);
+        w->base_padding = node->source->has_padding_override ? node->source->padding_override : (node->source->style ? node->source->style->padding : DEFAULT_STYLE.padding);
+        w->padding = w->base_padding;
         w->text = node->source->text;
         w->text_binding = node->source->text_binding;
         w->value_binding = node->source->value_binding;
@@ -871,6 +872,13 @@ WidgetArray materialize_widgets(const LayoutNode* root) {
     arr.items = widgets;
     arr.count = count;
     return arr;
+}
+
+void apply_widget_padding_scale(WidgetArray* widgets, float scale) {
+    if (!widgets) return;
+    for (size_t i = 0; i < widgets->count; i++) {
+        widgets->items[i].padding = widgets->items[i].base_padding * scale;
+    }
 }
 
 void free_model(Model* model) {

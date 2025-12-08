@@ -23,6 +23,8 @@ typedef struct {
     WidgetArray* widgets;
     Model* model;
     float ui_scale;
+    float input_scale_x;
+    float input_scale_y;
 } AppContext;
 
 static void scale_layout(LayoutNode* node, float scale) {
@@ -33,13 +35,6 @@ static void scale_layout(LayoutNode* node, float scale) {
     node->rect.h *= scale;
     for (size_t i = 0; i < node->child_count; i++) {
         scale_layout(&node->children[i], scale);
-    }
-}
-
-static void scale_widget_padding(WidgetArray* widgets, float scale) {
-    if (!widgets) return;
-    for (size_t i = 0; i < widgets->count; i++) {
-        widgets->items[i].padding *= scale;
     }
 }
 
@@ -150,15 +145,16 @@ int main(int argc, char** argv) {
     if (ui_scale < 0.8f) ui_scale = 0.8f;
     if (ui_scale > 1.35f) ui_scale = 1.35f;
 
-    scale_layout(layout_root, ui_scale);
+    float layout_scale = ui_scale;
+    scale_layout(layout_root, layout_scale);
 
     WidgetArray widgets = materialize_widgets(layout_root);
-    scale_widget_padding(&widgets, ui_scale);
+    apply_widget_padding_scale(&widgets, layout_scale);
     update_widget_bindings(ui_root, model);
     populate_widgets_from_layout(layout_root, widgets.items, widgets.count);
 
-    int window_w = (int)(base_w * ui_scale);
-    int window_h = (int)(base_h * ui_scale);
+    int window_w = (int)(layout_root->rect.w);
+    int window_h = (int)(layout_root->rect.h);
     if (window_w < 800) window_w = 800;
     if (window_h < 520) window_h = 520;
     GLFWwindow* window = glfwCreateWindow(window_w, window_h, "vk_gui (Vulkan)", NULL, NULL);
@@ -176,7 +172,7 @@ int main(int argc, char** argv) {
         free_assets(&assets);
         return 1;
     }
-    AppContext app_ctx = { .scroll = scroll_ctx, .widgets = &widgets, .model = model, .ui_scale = ui_scale };
+    AppContext app_ctx = { .scroll = scroll_ctx, .widgets = &widgets, .model = model, .ui_scale = layout_scale, .input_scale_x = 1.0f, .input_scale_y = 1.0f };
     glfwSetWindowUserPointer(window, &app_ctx);
     glfwSetScrollCallback(window, on_scroll);
     glfwSetMouseButtonCallback(window, on_mouse_button);
@@ -198,7 +194,7 @@ int main(int argc, char** argv) {
         glfwPollEvents();
         update_widget_bindings(ui_root, model);
         populate_widgets_from_layout(layout_root, widgets.items, widgets.count);
-        scale_widget_padding(&widgets, app_ctx.ui_scale);
+        apply_widget_padding_scale(&widgets, app_ctx.ui_scale);
         scroll_apply_offsets(scroll_ctx, widgets.items, widgets.count);
         vk_renderer_draw_frame();
     }
