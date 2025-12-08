@@ -22,6 +22,9 @@ typedef struct {
     ScrollContext* scroll;
     WidgetArray* widgets;
     Model* model;
+    LayoutNode* layout_root;
+    float base_w;
+    float base_h;
     float ui_scale;
     float input_scale_x;
     float input_scale_y;
@@ -29,10 +32,10 @@ typedef struct {
 
 static void scale_layout(LayoutNode* node, float scale) {
     if (!node) return;
-    node->rect.x *= scale;
-    node->rect.y *= scale;
-    node->rect.w *= scale;
-    node->rect.h *= scale;
+    node->rect.x = node->base_rect.x * scale;
+    node->rect.y = node->base_rect.y * scale;
+    node->rect.w = node->base_rect.w * scale;
+    node->rect.h = node->base_rect.h * scale;
     for (size_t i = 0; i < node->child_count; i++) {
         scale_layout(&node->children[i], scale);
     }
@@ -42,6 +45,39 @@ static float clamp01(float v) {
     if (v < 0.0f) return 0.0f;
     if (v > 1.0f) return 1.0f;
     return v;
+}
+
+static float compute_ui_scale(float base_w, float base_h, float target_w, float target_h) {
+    if (base_w <= 0.0f || base_h <= 0.0f) return 1.0f;
+    float ui_scale = fminf(target_w / base_w, target_h / base_h);
+    if (ui_scale < 0.8f) ui_scale = 0.8f;
+    if (ui_scale > 1.35f) ui_scale = 1.35f;
+    return ui_scale;
+}
+
+static void update_input_scale(AppContext* ctx, GLFWwindow* window) {
+    if (!ctx || !window) return;
+    int win_w = 0, win_h = 0, fb_w = 0, fb_h = 0;
+    glfwGetWindowSize(window, &win_w, &win_h);
+    glfwGetFramebufferSize(window, &fb_w, &fb_h);
+    if (win_w <= 0 || win_h <= 0 || fb_w <= 0 || fb_h <= 0) {
+        ctx->input_scale_x = 1.0f;
+        ctx->input_scale_y = 1.0f;
+        return;
+    }
+    ctx->input_scale_x = (float)fb_w / (float)win_w;
+    ctx->input_scale_y = (float)fb_h / (float)win_h;
+}
+
+static void refresh_layout_for_scale(AppContext* ctx, float new_scale) {
+    if (!ctx || !ctx->layout_root || !ctx->widgets) return;
+    if (new_scale <= 0.0f) return;
+    float ratio = ctx->ui_scale > 0.0f ? new_scale / ctx->ui_scale : 1.0f;
+    ctx->ui_scale = new_scale;
+    scale_layout(ctx->layout_root, ctx->ui_scale);
+    populate_widgets_from_layout(ctx->layout_root, ctx->widgets->items, ctx->widgets->count);
+    apply_widget_padding_scale(ctx->widgets, ctx->ui_scale);
+    scroll_rebuild(ctx->scroll, ctx->widgets->items, ctx->widgets->count, ratio);
 }
 
 static void apply_slider_action(Widget* w, Model* model, double mx) {
@@ -95,6 +131,8 @@ static void on_mouse_button(GLFWwindow* window, int button, int action, int mods
     if (!ctx || !ctx->widgets) return;
     double mx = 0.0, my = 0.0;
     glfwGetCursorPos(window, &mx, &my);
+    mx *= ctx->input_scale_x;
+    my *= ctx->input_scale_y;
     for (size_t i = 0; i < ctx->widgets->count; i++) {
         Widget* w = &ctx->widgets->items[i];
         if ((w->type == W_BUTTON || w->type == W_CHECKBOX || w->type == W_HSLIDER) && point_in_widget(w, mx, my)) {
@@ -114,7 +152,18 @@ static void on_scroll(GLFWwindow* window, double xoff, double yoff) {
     if (!ctx || !ctx->widgets) return;
     double mx = 0.0, my = 0.0;
     glfwGetCursorPos(window, &mx, &my);
+    mx *= ctx->input_scale_x;
+    my *= ctx->input_scale_y;
     scroll_handle_event(ctx->scroll, ctx->widgets->items, ctx->widgets->count, mx, my, yoff);
+}
+
+static void on_framebuffer_size(GLFWwindow* window, int width, int height) {
+    if (width <= 0 || height <= 0) return;
+    AppContext* ctx = (AppContext*)glfwGetWindowUserPointer(window);
+    if (!ctx) return;
+    float new_scale = compute_ui_scale(ctx->base_w, ctx->base_h, (float)width, (float)height);
+    refresh_layout_for_scale(ctx, new_scale);
+    update_input_scale(ctx, window);
 }
 
 int main(int argc, char** argv) {
@@ -130,8 +179,9 @@ int main(int argc, char** argv) {
     if (!layout_root) { free_model(model); free_styles(styles); free_ui_tree(ui_root); free_assets(&assets); return 1; }
     measure_layout(layout_root);
     assign_layout(layout_root, 0.0f, 0.0f);
-    float base_w = layout_root->rect.w > 1.0f ? layout_root->rect.w : 1024.0f;
-    float base_h = layout_root->rect.h > 1.0f ? layout_root->rect.h : 640.0f;
+    capture_layout_base(layout_root);
+    float base_w = layout_root->base_rect.w > 1.0f ? layout_root->base_rect.w : 1024.0f;
+    float base_h = layout_root->base_rect.h > 1.0f ? layout_root->base_rect.h : 640.0f;
 
     if (!glfwInit()) fatal("glfwInit");
     if (!glfwVulkanSupported()) fatal("glfw Vulkan not supported");
@@ -141,9 +191,7 @@ int main(int argc, char** argv) {
     const GLFWvidmode* mode = monitor ? glfwGetVideoMode(monitor) : NULL;
     float target_w = mode ? mode->width * 0.9f : base_w;
     float target_h = mode ? mode->height * 0.9f : base_h;
-    float ui_scale = fminf(target_w / base_w, target_h / base_h);
-    if (ui_scale < 0.8f) ui_scale = 0.8f;
-    if (ui_scale > 1.35f) ui_scale = 1.35f;
+    float ui_scale = compute_ui_scale(base_w, base_h, target_w, target_h);
 
     float layout_scale = ui_scale;
     scale_layout(layout_root, layout_scale);
@@ -153,8 +201,8 @@ int main(int argc, char** argv) {
     update_widget_bindings(ui_root, model);
     populate_widgets_from_layout(layout_root, widgets.items, widgets.count);
 
-    int window_w = (int)(layout_root->rect.w);
-    int window_h = (int)(layout_root->rect.h);
+    int window_w = (int)fminf(layout_root->rect.w, target_w);
+    int window_h = (int)fminf(layout_root->rect.h, target_h);
     if (window_w < 800) window_w = 800;
     if (window_h < 520) window_h = 520;
     GLFWwindow* window = glfwCreateWindow(window_w, window_h, "vk_gui (Vulkan)", NULL, NULL);
@@ -172,10 +220,13 @@ int main(int argc, char** argv) {
         free_assets(&assets);
         return 1;
     }
-    AppContext app_ctx = { .scroll = scroll_ctx, .widgets = &widgets, .model = model, .ui_scale = layout_scale, .input_scale_x = 1.0f, .input_scale_y = 1.0f };
+    AppContext app_ctx = { .scroll = scroll_ctx, .widgets = &widgets, .model = model, .layout_root = layout_root, .base_w = base_w, .base_h = base_h, .ui_scale = layout_scale, .input_scale_x = 1.0f, .input_scale_y = 1.0f };
     glfwSetWindowUserPointer(window, &app_ctx);
+    glfwSetFramebufferSizeCallback(window, on_framebuffer_size);
     glfwSetScrollCallback(window, on_scroll);
     glfwSetMouseButtonCallback(window, on_mouse_button);
+
+    update_input_scale(&app_ctx, window);
 
     if (!vk_renderer_init(window, assets.vert_spv_path, assets.frag_spv_path, assets.font_path, widgets)) {
         glfwDestroyWindow(window);

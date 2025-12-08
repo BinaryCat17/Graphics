@@ -72,6 +72,7 @@ typedef struct UiNode {
 typedef struct LayoutNode {
     const UiNode* source;
     Rect rect;
+    Rect base_rect;
     struct LayoutNode* children;
     size_t child_count;
 } LayoutNode;
@@ -110,6 +111,7 @@ LayoutNode* build_layout_tree(const UiNode* root);
 void free_layout_tree(LayoutNode* root);
 void measure_layout(LayoutNode* root);
 void assign_layout(LayoutNode* root, float origin_x, float origin_y);
+void capture_layout_base(LayoutNode* root);
 size_t count_layout_widgets(const LayoutNode* root);
 void populate_widgets_from_layout(const LayoutNode* root, Widget* widgets, size_t widget_count);
 WidgetArray materialize_widgets(const LayoutNode* root);

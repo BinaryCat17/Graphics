@@ -138,6 +138,28 @@ void scroll_handle_event(ScrollContext* ctx, Widget* widgets, size_t widget_coun
     scroll_apply_offsets(ctx, widgets, widget_count);
 }
 
+void scroll_rebuild(ScrollContext* ctx, Widget* widgets, size_t widget_count, float offset_scale) {
+    if (!ctx) return;
+    ScrollArea* old = ctx->areas;
+    ctx->areas = NULL;
+    ctx->widgets = widgets;
+    ctx->widget_count = widget_count;
+
+    for (size_t i = 0; i < widget_count; i++) {
+        Widget* w = &widgets[i];
+        if (!w->scroll_area) continue;
+        ScrollArea* area = ensure_area(&ctx->areas, w->scroll_area);
+        if (!area) continue;
+        ScrollArea* prev = find_area(old, w->scroll_area);
+        if (prev) area->offset = prev->offset * offset_scale;
+        add_area_bounds(area, w);
+        if (w->scroll_static) area->has_static_anchor = 1;
+    }
+
+    free_scroll_areas(old);
+    scroll_apply_offsets(ctx, widgets, widget_count);
+}
+
 void scroll_free(ScrollContext* ctx) {
     if (!ctx) return;
     free_scroll_areas(ctx->areas);
