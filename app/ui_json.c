@@ -95,8 +95,8 @@ static float parse_number(const char* json, const jsmntok_t* tok, float fallback
     return v;
 }
 
-static const Style DEFAULT_STYLE = { .name = NULL, .background = {0.6f, 0.6f, 0.6f, 1.0f}, .text = {1.0f, 1.0f, 1.0f, 1.0f}, .padding = 6.0f, .next = NULL };
-static const Style ROOT_STYLE = { .name = NULL, .background = {0.0f, 0.0f, 0.0f, 0.0f}, .text = {1.0f, 1.0f, 1.0f, 1.0f}, .padding = 0.0f, .next = NULL };
+static const Style DEFAULT_STYLE = { .name = NULL, .background = {0.6f, 0.6f, 0.6f, 1.0f}, .text = {1.0f, 1.0f, 1.0f, 1.0f}, .border_color = {1.0f, 1.0f, 1.0f, 1.0f}, .padding = 6.0f, .border_thickness = 0.0f, .next = NULL };
+static const Style ROOT_STYLE = { .name = NULL, .background = {0.0f, 0.0f, 0.0f, 0.0f}, .text = {1.0f, 1.0f, 1.0f, 1.0f}, .border_color = {1.0f, 1.0f, 1.0f, 0.0f}, .padding = 0.0f, .border_thickness = 0.0f, .next = NULL };
 
 static unsigned char* g_font_buffer = NULL;
 static stbtt_fontinfo g_font_info;
@@ -335,7 +335,9 @@ Style* parse_styles_json(const char* json) {
                     st->name = style_name;
                     st->background = DEFAULT_STYLE.background;
                     st->text = DEFAULT_STYLE.text;
+                    st->border_color = DEFAULT_STYLE.border_color;
                     st->padding = DEFAULT_STYLE.padding;
+                    st->border_thickness = DEFAULT_STYLE.border_thickness;
                     st->next = styles;
                     styles = st;
                     jsmntok_t* sobj = &toks[j + 1];
@@ -351,11 +353,24 @@ Style* parse_styles_json(const char* json) {
                             k += 2;
                             continue;
                         }
+                        if (tok_is_key(json, &toks[k], "borderColor") && k + 1 < p.toknext) {
+                            read_color_array(&st->border_color, json, &toks[k + 1], toks, p.toknext);
+                            k += 2;
+                            continue;
+                        }
                         if (tok_is_key(json, &toks[k], "padding") && k + 1 < p.toknext && toks[k + 1].type == JSMN_PRIMITIVE) {
                             st->padding = parse_number(json, &toks[k + 1], st->padding);
                             k += 2;
                             continue;
                         }
+                        if (tok_is_key(json, &toks[k], "borderThickness") && k + 1 < p.toknext && toks[k + 1].type == JSMN_PRIMITIVE) {
+                            st->border_thickness = parse_number(json, &toks[k + 1], st->border_thickness);
+                            k += 2;
+                            continue;
+                        }
+                        char* key_name = tok_copy(json, &toks[k]);
+                        fprintf(stderr, "Error: unknown style field '%s' in style '%s'\n", key_name ? key_name : "<null>", st->name);
+                        free(key_name);
                         k++;
                     }
                     j += 2;
@@ -391,6 +406,10 @@ static UiNode* create_node(void) {
     node->style = &DEFAULT_STYLE;
     node->padding_override = 0.0f;
     node->has_padding_override = 0;
+    node->border_thickness = 0.0f;
+    node->has_border_thickness = 0;
+    node->has_border_color = 0;
+    node->border_color = DEFAULT_STYLE.border_color;
     node->color = DEFAULT_STYLE.background;
     node->text_color = DEFAULT_STYLE.text;
     node->has_min = node->has_max = node->has_value = 0;
@@ -448,10 +467,15 @@ static UiNode* parse_ui_node(const char* json, jsmntok_t* toks, unsigned int tok
         else if (tok_is_key(json, &toks[k], "spacing")) { node->spacing = parse_number(json, val, node->spacing); node->has_spacing = 1; }
         else if (tok_is_key(json, &toks[k], "columns")) { node->columns = (int)parse_number(json, val, (float)node->columns); node->has_columns = 1; }
         else if (tok_is_key(json, &toks[k], "padding")) { node->padding_override = parse_number(json, val, node->padding_override); node->has_padding_override = 1; }
+        else if (tok_is_key(json, &toks[k], "borderThickness")) { node->border_thickness = parse_number(json, val, node->border_thickness); node->has_border_thickness = 1; }
         else if (tok_is_key(json, &toks[k], "color")) {
             node->color = node->color;
             read_color_array(&node->color, json, val, toks, tokc);
             node->has_color = 1;
+        }
+        else if (tok_is_key(json, &toks[k], "borderColor")) {
+            read_color_array(&node->border_color, json, val, toks, tokc);
+            node->has_border_color = 1;
         }
         else if (tok_is_key(json, &toks[k], "textColor")) {
             read_color_array(&node->text_color, json, val, toks, tokc);
@@ -467,6 +491,11 @@ static UiNode* parse_ui_node(const char* json, jsmntok_t* toks, unsigned int tok
                 c = skip_container(toks, tokc, c);
             }
             k = skip_container(toks, tokc, (unsigned int)(val - toks)) - 1;
+        }
+        else {
+            char* key_name = tok_copy(json, &toks[k]);
+            fprintf(stderr, "Error: unknown layout field '%s'\n", key_name ? key_name : "<null>");
+            free(key_name);
         }
     }
     return node;
@@ -506,6 +535,8 @@ static void merge_node(UiNode* node, const UiNode* proto) {
     if (!node->has_columns && proto->has_columns) { node->columns = proto->columns; node->has_columns = 1; }
     if (node->style == &DEFAULT_STYLE && proto->style) node->style = proto->style;
     if (!node->has_padding_override && proto->has_padding_override) { node->padding_override = proto->padding_override; node->has_padding_override = 1; }
+    if (!node->has_border_thickness && proto->has_border_thickness) { node->border_thickness = proto->border_thickness; node->has_border_thickness = 1; }
+    if (!node->has_border_color && proto->has_border_color) { node->border_color = proto->border_color; node->has_border_color = 1; }
     if (!node->has_color && proto->has_color) { node->color = proto->color; node->has_color = 1; }
     if (!node->has_text_color && proto->has_text_color) { node->text_color = proto->text_color; node->has_text_color = 1; }
     if (!node->id && proto->id) node->id = strdup(proto->id);
@@ -627,6 +658,8 @@ static void resolve_styles_and_defaults(UiNode* node, const Style* styles) {
     node->style = st;
     if (!node->has_color) node->color = st->background;
     if (!node->has_text_color) node->text_color = st->text;
+    if (!node->has_border_color) node->border_color = st->border_color;
+    if (!node->has_border_thickness) node->border_thickness = st->border_thickness;
 
     if (!node->has_min) node->minv = 0.0f;
     if (!node->has_max) node->maxv = 1.0f;
@@ -778,7 +811,8 @@ void free_layout_tree(LayoutNode* root) {
 
 static void measure_node(LayoutNode* node) {
     if (!node || !node->source) return;
-    float padding = node->source->style ? node->source->style->padding : DEFAULT_STYLE.padding;
+    float padding = node->source->has_padding_override ? node->source->padding_override : (node->source->style ? node->source->style->padding : DEFAULT_STYLE.padding);
+    float border = node->source->border_thickness;
     for (size_t i = 0; i < node->child_count; i++) measure_node(&node->children[i]);
 
     if (node->source->layout == UI_LAYOUT_ROW) {
@@ -790,8 +824,8 @@ static void measure_node(LayoutNode* node) {
             if (i + 1 < node->child_count) content_w += node->source->spacing;
             if (ch->rect.h > content_h) content_h = ch->rect.h;
         }
-        node->rect.w = content_w + padding * 2.0f;
-        node->rect.h = content_h + padding * 2.0f;
+        node->rect.w = content_w + padding * 2.0f + border * 2.0f;
+        node->rect.h = content_h + padding * 2.0f + border * 2.0f;
         if (node->source->has_max_w && node->rect.w > node->source->max_w) node->rect.w = node->source->max_w;
     } else if (node->source->layout == UI_LAYOUT_COLUMN) {
         float content_w = 0.0f;
@@ -802,8 +836,8 @@ static void measure_node(LayoutNode* node) {
             content_h += ch->rect.h;
             if (i + 1 < node->child_count) content_h += node->source->spacing;
         }
-        node->rect.w = content_w + padding * 2.0f;
-        node->rect.h = content_h + padding * 2.0f;
+        node->rect.w = content_w + padding * 2.0f + border * 2.0f;
+        node->rect.h = content_h + padding * 2.0f + border * 2.0f;
         if (node->source->has_max_h && node->rect.h > node->source->max_h) node->rect.h = node->source->max_h;
     } else if (node->source->layout == UI_LAYOUT_TABLE && node->source->columns > 0) {
         int cols = node->source->columns;
@@ -828,8 +862,8 @@ static void measure_node(LayoutNode* node) {
                 content_h += row_h[r];
                 if (r + 1 < rows) content_h += node->source->spacing;
             }
-            node->rect.w = content_w + padding * 2.0f;
-            node->rect.h = content_h + padding * 2.0f;
+            node->rect.w = content_w + padding * 2.0f + border * 2.0f;
+            node->rect.h = content_h + padding * 2.0f + border * 2.0f;
         }
         free(col_w);
         free(row_h);
@@ -840,8 +874,8 @@ static void measure_node(LayoutNode* node) {
             if (ch->rect.w > max_w) max_w = ch->rect.w;
             if (ch->rect.h > max_h) max_h = ch->rect.h;
         }
-        node->rect.w = max_w + padding * 2.0f;
-        node->rect.h = max_h + padding * 2.0f;
+        node->rect.w = max_w + padding * 2.0f + border * 2.0f;
+        node->rect.h = max_h + padding * 2.0f + border * 2.0f;
     } else {
         if (node->source->widget_type == W_SPACER) {
             node->rect.w = node->source->has_w ? node->source->rect.w : 0.0f;
@@ -851,8 +885,8 @@ static void measure_node(LayoutNode* node) {
             if (node->source->text) {
                 measure_text(node->source->text, &text_w, &text_h);
             }
-            node->rect.w = node->source->has_w ? node->source->rect.w : text_w + padding * 2.0f;
-            node->rect.h = node->source->has_h ? node->source->rect.h : text_h + padding * 2.0f;
+            node->rect.w = node->source->has_w ? node->source->rect.w : text_w + padding * 2.0f + border * 2.0f;
+            node->rect.h = node->source->has_h ? node->source->rect.h : text_h + padding * 2.0f + border * 2.0f;
         }
     }
 
@@ -864,22 +898,23 @@ void measure_layout(LayoutNode* root) { measure_node(root); }
 
 static void layout_node(LayoutNode* node, float origin_x, float origin_y) {
     if (!node || !node->source) return;
-    float padding = node->source->style ? node->source->style->padding : DEFAULT_STYLE.padding;
+    float padding = node->source->has_padding_override ? node->source->padding_override : (node->source->style ? node->source->style->padding : DEFAULT_STYLE.padding);
+    float border = node->source->border_thickness;
     float base_x = origin_x + (node->source->has_x ? node->source->rect.x : 0.0f);
     float base_y = origin_y + (node->source->has_y ? node->source->rect.y : 0.0f);
     node->rect.x = base_x;
     node->rect.y = base_y;
 
     if (node->source->layout == UI_LAYOUT_ROW) {
-        float cursor_x = base_x + padding;
-        float cursor_y = base_y + padding;
+        float cursor_x = base_x + padding + border;
+        float cursor_y = base_y + padding + border;
         for (size_t i = 0; i < node->child_count; i++) {
             layout_node(&node->children[i], cursor_x, cursor_y);
             cursor_x += node->children[i].rect.w + node->source->spacing;
         }
     } else if (node->source->layout == UI_LAYOUT_COLUMN) {
-        float cursor_x = base_x + padding;
-        float cursor_y = base_y + padding;
+        float cursor_x = base_x + padding + border;
+        float cursor_y = base_y + padding + border;
         for (size_t i = 0; i < node->child_count; i++) {
             layout_node(&node->children[i], cursor_x, cursor_y);
             cursor_y += node->children[i].rect.h + node->source->spacing;
@@ -897,10 +932,10 @@ static void layout_node(LayoutNode* node, float origin_x, float origin_y) {
                 if (ch->rect.w > col_w[col]) col_w[col] = ch->rect.w;
                 if (ch->rect.h > row_h[row]) row_h[row] = ch->rect.h;
             }
-            float y = base_y + padding;
+            float y = base_y + padding + border;
             size_t idx = 0;
             for (int r = 0; r < rows; r++) {
-                float x = base_x + padding;
+                float x = base_x + padding + border;
                 for (int c = 0; c < cols && idx < node->child_count; c++, idx++) {
                     layout_node(&node->children[idx], x, y);
                     x += col_w[c] + node->source->spacing;
@@ -937,8 +972,9 @@ size_t count_layout_widgets(const LayoutNode* root) {
     return total;
 }
 
-static void populate_widgets_recursive(const LayoutNode* node, Widget* widgets, size_t widget_count, size_t* idx) {
+static void populate_widgets_recursive(const LayoutNode* node, Widget* widgets, size_t widget_count, size_t* idx, const char* inherited_scroll_area) {
     if (!node || !widgets || !idx || *idx >= widget_count) return;
+    const char* active_scroll_area = node->source && node->source->scroll_area ? node->source->scroll_area : inherited_scroll_area;
     if (node->source && node->source->layout == UI_LAYOUT_NONE) {
         Widget* w = &widgets[*idx];
         (*idx)++;
@@ -947,7 +983,10 @@ static void populate_widgets_recursive(const LayoutNode* node, Widget* widgets, 
         w->scroll_offset = 0.0f;
         w->color = node->source->color;
         w->text_color = node->source->text_color;
-        w->base_padding = node->source->has_padding_override ? node->source->padding_override : (node->source->style ? node->source->style->padding : DEFAULT_STYLE.padding);
+        w->base_border_thickness = node->source->border_thickness;
+        w->border_thickness = w->base_border_thickness;
+        w->border_color = node->source->border_color;
+        w->base_padding = (node->source->has_padding_override ? node->source->padding_override : (node->source->style ? node->source->style->padding : DEFAULT_STYLE.padding)) + w->base_border_thickness;
         w->padding = w->base_padding;
         w->text = node->source->text;
         w->text_binding = node->source->text_binding;
@@ -958,19 +997,20 @@ static void populate_widgets_recursive(const LayoutNode* node, Widget* widgets, 
         w->maxv = node->source->maxv;
         w->value = node->source->value;
         w->id = node->source->id;
-        w->scroll_area = node->source->scroll_area;
+        w->scroll_area = node->source->scroll_area ? node->source->scroll_area : active_scroll_area;
         w->scroll_static = node->source->scroll_static;
+        w->has_clip = 0;
         w->scroll_viewport = 0.0f;
         w->scroll_content = 0.0f;
         w->show_scrollbar = 0;
         return;
     }
-    for (size_t i = 0; i < node->child_count; i++) populate_widgets_recursive(&node->children[i], widgets, widget_count, idx);
+    for (size_t i = 0; i < node->child_count; i++) populate_widgets_recursive(&node->children[i], widgets, widget_count, idx, active_scroll_area);
 }
 
 void populate_widgets_from_layout(const LayoutNode* root, Widget* widgets, size_t widget_count) {
     size_t idx = 0;
-    populate_widgets_recursive(root, widgets, widget_count, &idx);
+    populate_widgets_recursive(root, widgets, widget_count, &idx, NULL);
 }
 
 WidgetArray materialize_widgets(const LayoutNode* root) {
@@ -989,6 +1029,7 @@ void apply_widget_padding_scale(WidgetArray* widgets, float scale) {
     if (!widgets) return;
     for (size_t i = 0; i < widgets->count; i++) {
         widgets->items[i].padding = widgets->items[i].base_padding * scale;
+        widgets->items[i].border_thickness = widgets->items[i].base_border_thickness * scale;
     }
 }
 
