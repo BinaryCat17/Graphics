@@ -1072,8 +1072,10 @@ static void build_vertices_from_widgets(void) {
 
             const Glyph *g = get_glyph(codepoint);
             if (!g) { c += adv; continue; }
-            float x0 = pen_x + g->xoff;
-            float y0 = pen_y + g->yoff;
+            float snapped_pen_x = floorf(pen_x + 0.5f);
+            float snapped_pen_y = floorf(pen_y + 0.5f);
+            float x0 = snapped_pen_x + g->xoff;
+            float y0 = snapped_pen_y + g->yoff;
             Rect glyph_rect = { x0, y0, g->w, g->h };
             Rect clipped_rect;
             if (!apply_clip_rect(widget, &glyph_rect, &clipped_rect)) { pen_x += g->advance; c += adv; continue; }
