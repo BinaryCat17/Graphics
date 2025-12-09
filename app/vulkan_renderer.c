@@ -1523,7 +1523,6 @@ static void draw_frame(void) {
             VkFence tracked_fence = owner->inflight_fence;
             if (tracked_fence && tracked_fence != fences[img_idx]) {
                 vkWaitForFences(device, 1, &tracked_fence, VK_TRUE, UINT64_MAX);
-                vkResetFences(device, 1, &tracked_fence);
             }
             owner->stage = FRAME_AVAILABLE;
             owner->inflight_fence = VK_NULL_HANDLE;
@@ -1537,7 +1536,6 @@ static void draw_frame(void) {
     if (frame->stage == FRAME_SUBMITTED && frame->inflight_fence) {
         if (frame->inflight_fence != fences[img_idx]) {
             vkWaitForFences(device, 1, &frame->inflight_fence, VK_TRUE, UINT64_MAX);
-            vkResetFences(device, 1, &frame->inflight_fence);
         }
         frame->stage = FRAME_AVAILABLE;
         frame->inflight_fence = VK_NULL_HANDLE;
