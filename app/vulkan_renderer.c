@@ -1427,6 +1427,18 @@ static bool build_vertices_from_widgets(FrameResources *frame) {
 
     size_t primitive_count = renderer.command_list.count;
 
+    int min_layer = 0;
+    int max_layer = 0;
+    if (primitive_count > 0) {
+        min_layer = renderer.command_list.commands[0].key.layer;
+        max_layer = min_layer;
+        for (size_t i = 1; i < renderer.command_list.count; ++i) {
+            int layer = renderer.command_list.commands[i].key.layer;
+            if (layer < min_layer) min_layer = layer;
+            if (layer > max_layer) max_layer = layer;
+        }
+    }
+
     Primitive *primitives = primitive_count > 0 ? calloc(primitive_count, sizeof(Primitive)) : NULL;
     bool success = primitive_count == 0 || primitives != NULL;
     size_t prim_idx = 0;
@@ -1458,9 +1470,11 @@ static bool build_vertices_from_widgets(FrameResources *frame) {
         size_t total_vertices = primitive_count * 6;
         if (ensure_vtx_capacity(&frame->cpu, total_vertices)) {
             size_t cursor = 0;
-            float step = primitive_count > 0 ? 1.0f / (float)(primitive_count + 1) : 1.0f;
+            float layer_span = (float)(max_layer - min_layer + 1);
+            float step = (primitive_count > 0 && layer_span > 0.0f) ? (1.0f / ((float)primitive_count + 1.0f)) / layer_span : 0.0f;
             for (size_t i = 0; i < primitive_count; ++i) {
-                float depth = step * (float)(primitive_count - i);
+                float layer_offset = (float)((int)primitives[i].z - min_layer);
+                float depth = 1.0f - (layer_offset + 0.5f) / layer_span - step * (float)i;
                 if (depth < 0.0f) depth = 0.0f;
                 if (depth > 1.0f) depth = 1.0f;
                 for (int v = 0; v < 6; ++v) {
