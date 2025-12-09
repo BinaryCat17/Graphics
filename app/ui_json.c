@@ -6,6 +6,7 @@
 #include <string.h>
 
 #include "stb_truetype.h"
+#include "scene_ui.h"
 
 typedef enum { JSMN_UNDEFINED = 0, JSMN_OBJECT = 1, JSMN_ARRAY = 2, JSMN_STRING = 3, JSMN_PRIMITIVE = 4 } jsmntype_t;
 typedef struct { jsmntype_t type; int start; int end; int size; } jsmntok_t;
@@ -847,7 +848,7 @@ void update_widget_bindings(UiNode* root, const Model* model) {
     bind_model_values_to_nodes(root, model);
 }
 
-UiNode* parse_layout_json(const char* json, const Model* model, const Style* styles, const char* font_path) {
+UiNode* parse_layout_json(const char* json, const Model* model, const Style* styles, const char* font_path, const Scene* scene) {
     if (!json) { fprintf(stderr, "Error: layout JSON text is null\n"); return NULL; }
 
     ensure_font_metrics(font_path);
@@ -855,6 +856,10 @@ UiNode* parse_layout_json(const char* json, const Model* model, const Style* sty
     Prototype* prototypes = NULL;
     UiNode* root = parse_layout_definitions(json, &prototypes);
     if (!root) return NULL;
+
+    if (scene) {
+        scene_ui_inject(root, scene);
+    }
 
     apply_prototypes(root, prototypes);
     resolve_styles_and_defaults(root, styles);

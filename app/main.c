@@ -14,6 +14,7 @@
 #include "scroll.h"
 #include "Graphics.h"
 #include "cad_scene_yaml.h"
+#include "scene_ui.h"
 
 static void fatal(const char* msg) {
     fprintf(stderr, "Fatal: %s\n", msg);
@@ -208,8 +209,11 @@ int main(int argc, char** argv) {
     }
 
     Model* model = parse_model_json(assets.model_text, assets.model_path);
+    if (model) {
+        scene_ui_bind_model(model, &scene, scene_path);
+    }
     Style* styles = parse_styles_json(assets.styles_text);
-    UiNode* ui_root = parse_layout_json(assets.layout_text, model, styles, assets.font_path);
+    UiNode* ui_root = parse_layout_json(assets.layout_text, model, styles, assets.font_path, &scene);
     if (!ui_root) { free_model(model); free_styles(styles); free_assets(&assets); return 1; }
     LayoutNode* layout_root = build_layout_tree(ui_root);
     if (!layout_root) { free_model(model); free_styles(styles); free_ui_tree(ui_root); free_assets(&assets); return 1; }

@@ -3,6 +3,7 @@
 
 #include <stddef.h>
 #include "Graphics.h"
+#include "cad_scene.h"
 
 typedef struct { float x, y, w, h; } Rect;
 typedef enum { W_PANEL, W_LABEL, W_BUTTON, W_HSLIDER, W_RECT, W_SPACER, W_CHECKBOX, W_PROGRESS } WidgetType;
@@ -134,7 +135,7 @@ typedef struct {
 
 Model* parse_model_json(const char* json_text, const char* source_path);
 Style* parse_styles_json(const char* json_text);
-UiNode* parse_layout_json(const char* json_text, const Model* model, const Style* styles, const char* font_path);
+UiNode* parse_layout_json(const char* json_text, const Model* model, const Style* styles, const char* font_path, const Scene* scene);
 
 void update_widget_bindings(UiNode* root, const Model* model);
 
