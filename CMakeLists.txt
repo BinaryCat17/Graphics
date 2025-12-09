@@ -67,10 +67,10 @@ if (NOT VULKAN_STUB)
             "app/vulkan_renderer.c" "app/vulkan_renderer.h"
             "app/ui_json.c" "app/ui_json.h"
             "src/Graphics.c" "src/Graphics.h"
-            "src/cad_scene.c" "src/cad_scene.h"
+            "src/cad_scene.c" "src/cad_scene.h" "src/cad_scene_yaml.c" "src/cad_scene_yaml.h"
     )
 else()
-    set(APP_SOURCES "app/main_stub.c" "src/cad_scene.c" "src/cad_scene.h")
+    set(APP_SOURCES "app/main_stub.c" "src/cad_scene.c" "src/cad_scene.h" "src/cad_scene_yaml.c" "src/cad_scene_yaml.h")
 endif()
 
 # Добавьте источник в исполняемый файл этого проекта.
@@ -107,3 +107,11 @@ add_executable(transform_tests
 target_link_libraries(transform_tests PRIVATE glfw m)
 target_include_directories(transform_tests PRIVATE src)
 add_test(NAME transform_tests COMMAND transform_tests)
+
+add_executable(scene_yaml_tests
+        app/scene_yaml_tests.c
+        src/cad_scene_yaml.c src/cad_scene_yaml.h
+        src/cad_scene.c src/cad_scene.h)
+target_link_libraries(scene_yaml_tests PRIVATE m)
+target_include_directories(scene_yaml_tests PRIVATE src)
+add_test(NAME scene_yaml_tests COMMAND scene_yaml_tests)

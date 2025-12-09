@@ -13,6 +13,7 @@
 #include "assets.h"
 #include "scroll.h"
 #include "Graphics.h"
+#include "cad_scene_yaml.h"
 
 static void fatal(const char* msg) {
     fprintf(stderr, "Fatal: %s\n", msg);
@@ -179,9 +180,32 @@ static void on_framebuffer_size(GLFWwindow* window, int width, int height) {
 }
 
 int main(int argc, char** argv) {
-    const char* assets_dir = argc >= 2 ? argv[1] : "assets";
+    const char* assets_dir = "assets";
+    const char* scene_path = NULL;
+    for (int i = 1; i < argc; ++i) {
+        if (strcmp(argv[i], "--assets") == 0 && i + 1 < argc) {
+            assets_dir = argv[++i];
+        } else if (strcmp(argv[i], "--scene") == 0 && i + 1 < argc) {
+            scene_path = argv[++i];
+        }
+    }
+    if (!scene_path) {
+        fprintf(stderr, "Usage: %s --scene <file> [--assets <dir>]\n", argv[0]);
+        return 1;
+    }
+
+    Scene scene;
+    SceneError scene_err = {0};
+    if (!parse_scene_yaml(scene_path, &scene, &scene_err)) {
+        fprintf(stderr, "Failed to load scene %s:%d:%d %s\n", scene_path, scene_err.line, scene_err.column, scene_err.message);
+        return 1;
+    }
+
     Assets assets;
-    if (!load_assets(assets_dir, &assets)) return 1;
+    if (!load_assets(assets_dir, &assets)) {
+        scene_dispose(&scene);
+        return 1;
+    }
 
     Model* model = parse_model_json(assets.model_text, assets.model_path);
     Style* styles = parse_styles_json(assets.styles_text);
@@ -252,6 +276,7 @@ int main(int argc, char** argv) {
         free_ui_tree(ui_root);
         free_layout_tree(layout_root);
         free_assets(&assets);
+        scene_dispose(&scene);
         return 1;
     }
 
@@ -273,6 +298,7 @@ int main(int argc, char** argv) {
     free_layout_tree(layout_root);
     scroll_free(scroll_ctx);
     free_assets(&assets);
+    scene_dispose(&scene);
     glfwDestroyWindow(window);
     glfwTerminate();
     return 0;

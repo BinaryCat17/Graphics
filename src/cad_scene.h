@@ -14,21 +14,6 @@ typedef struct Material {
     float poisson_ratio;
 } Material;
 
-/** Geometry primitive types supported by the scene format. */
-typedef enum GeometryPrimitiveType {
-    GEO_PRIM_BOX,
-    GEO_PRIM_CYLINDER,
-    GEO_PRIM_SPHERE,
-    GEO_PRIM_EXTRUDE,
-} GeometryPrimitiveType;
-
-/** Boolean operation types supported by geometry trees. */
-typedef enum GeometryBooleanType {
-    GEO_BOOL_UNION,
-    GEO_BOOL_DIFFERENCE,
-    GEO_BOOL_INTERSECTION,
-} GeometryBooleanType;
-
 typedef enum GeometryKind {
     GEO_PRIMITIVE,
     GEO_BOOLEAN,
@@ -36,6 +21,19 @@ typedef enum GeometryKind {
     GEO_STEP,
     GEO_KIND_NONE,
 } GeometryKind;
+
+typedef enum GeometryPrimitiveType {
+    GEO_PRIM_BOX,
+    GEO_PRIM_CYLINDER,
+    GEO_PRIM_SPHERE,
+    GEO_PRIM_EXTRUDE,
+} GeometryPrimitiveType;
+
+typedef enum GeometryBooleanType {
+    GEO_BOOL_UNION,
+    GEO_BOOL_DIFFERENCE,
+    GEO_BOOL_INTERSECTION,
+} GeometryBooleanType;
 
 typedef struct GeometryPrimitive {
     GeometryPrimitiveType type;
@@ -70,16 +68,11 @@ typedef struct GeometryNode {
     } data;
 } GeometryNode;
 
-typedef struct PartTransform {
-    float translate[3];
-    int has_translate;
-} PartTransform;
-
 typedef struct Part {
     char *id;
-    char *material_id;
+    Material *material;
     GeometryNode *geometry;
-    PartTransform transform;
+    float transform[16];
 } Part;
 
 typedef enum JointType {
@@ -88,38 +81,28 @@ typedef enum JointType {
     JOINT_FIXED,
 } JointType;
 
-typedef struct JointLimits {
-    int has_limits;
-    float lower;
-    float upper;
-    float velocity;
-    float accel;
-} JointLimits;
-
 typedef struct Joint {
     char *id;
-    char *parent;
-    char *child;
+    Part *parent;
+    Part *child;
     JointType type;
     float origin[3];
     float axis[3];
-    JointLimits limits;
 } Joint;
 
-typedef struct AssemblyChild {
-    char *joint;
-    char *child;
-} AssemblyChild;
+typedef struct AssemblyNode {
+    Part *part;
+    Joint *via_joint;
+    struct AssemblyNode *children;
+    size_t child_count;
+} AssemblyNode;
 
 typedef struct Assembly {
     char *id;
-    char *root;
-    AssemblyChild *children;
-    size_t child_count;
+    AssemblyNode root;
 } Assembly;
 
-typedef struct AnalysisLoad {
-    char *target;
+typedef struct LoadVector {
     float force[3];
     int has_force;
     float moment[3];
@@ -127,18 +110,18 @@ typedef struct AnalysisLoad {
     float point[3];
     int has_point;
     int fixed;
-} AnalysisLoad;
+} LoadVector;
 
-typedef struct AnalysisCase {
+typedef struct LoadCase {
     char *id;
-    char *type;
-    AnalysisLoad *loads;
+    Part **targets;
+    LoadVector *loads;
     size_t load_count;
-} AnalysisCase;
+} LoadCase;
 
 typedef struct MotionProfile {
     char *id;
-    char *joint;
+    Joint *joint;
     char *type;
     float start;
     float end;
@@ -169,7 +152,7 @@ typedef struct Scene {
     size_t joint_count;
     Assembly *assemblies;
     size_t assembly_count;
-    AnalysisCase *analysis;
+    LoadCase *analysis;
     size_t analysis_count;
     MotionProfile *motion_profiles;
     size_t motion_count;
@@ -180,9 +163,6 @@ typedef struct SceneError {
     int column;
     char message[128];
 } SceneError;
-
-/** Parse a YAML scene file into a structured representation. */
-int parse_scene_yaml(const char *path, Scene *out, SceneError *err);
 
 /** Release all memory owned by the scene. */
 void scene_dispose(Scene *scene);
