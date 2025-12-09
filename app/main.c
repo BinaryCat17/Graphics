@@ -229,8 +229,8 @@ int main(int argc, char** argv) {
 
     GLFWmonitor* monitor = glfwGetPrimaryMonitor();
     const GLFWvidmode* mode = monitor ? glfwGetVideoMode(monitor) : NULL;
-    float target_w = mode ? mode->width * 0.9f : base_w;
-    float target_h = mode ? mode->height * 0.9f : base_h;
+    float target_w = mode ? mode->width * 0.95f : base_w;
+    float target_h = mode ? mode->height * 0.95f : base_h;
     float ui_scale = compute_ui_scale(base_w, base_h, target_w, target_h);
 
     float layout_scale = ui_scale;
@@ -241,10 +241,12 @@ int main(int argc, char** argv) {
     update_widget_bindings(ui_root, model);
     populate_widgets_from_layout(layout_root, widgets.items, widgets.count);
 
-    int window_w = (int)fminf(layout_root->rect.w, target_w);
-    int window_h = (int)fminf(layout_root->rect.h, target_h);
-    if (window_w < 800) window_w = 800;
-    if (window_h < 520) window_h = 520;
+    float desired_w = layout_root->rect.w + 32.0f;
+    float desired_h = layout_root->rect.h + 32.0f;
+    int window_w = (int)lroundf(fminf(desired_w, target_w));
+    int window_h = (int)lroundf(fminf(desired_h, target_h));
+    if (window_w < 720) window_w = 720;
+    if (window_h < 560) window_h = 560;
     GLFWwindow* window = glfwCreateWindow(window_w, window_h, "vk_gui (Vulkan)", NULL, NULL);
     if (!window) fatal("glfwCreateWindow");
 
