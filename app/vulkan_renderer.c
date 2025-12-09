@@ -1440,8 +1440,6 @@ static bool build_vertices_from_widgets(FrameResources *frame) {
         }
     }
 
-    ui_text_vertex_buffer_dispose(&text_buffer);
-    ui_vertex_buffer_dispose(&background_buffer);
     renderer_dispose(&renderer);
     free(glyph_quads.items);
     free(primitives);
