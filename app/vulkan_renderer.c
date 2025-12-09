@@ -69,14 +69,36 @@ typedef struct {
     size_t order;
     Vtx vertices[6];
 } Primitive;
-static Vtx* vtx_buf = NULL;
-static size_t vtx_count = 0;
-static size_t vtx_capacity = 0;
+typedef enum {
+    FRAME_AVAILABLE,
+    FRAME_FILLING,
+    FRAME_SUBMITTED,
+} FrameStage;
+
+typedef struct {
+    UiVertex *background_vertices;
+    UiTextVertex *text_vertices;
+    Vtx *vertices;
+    size_t background_capacity;
+    size_t text_capacity;
+    size_t vertex_capacity;
+} FrameCpuArena;
+
+typedef struct {
+    FrameCpuArena cpu;
+    VkBuffer vertex_buffer;
+    VkDeviceMemory vertex_memory;
+    VkDeviceSize vertex_capacity;
+    size_t vertex_count;
+    FrameStage stage;
+    VkFence inflight_fence;
+} FrameResources;
+
+static FrameResources frame_resources[2] = {0};
+static uint32_t current_frame_cursor = 0;
+static int* image_frame_owner = NULL;
 
 /* GPU-side buffers (vertex) simple staging omitted: we'll create host-visible vertex buffer */
-static VkBuffer vertex_buffer = VK_NULL_HANDLE;
-static VkDeviceMemory vertex_memory = VK_NULL_HANDLE;
-static VkDeviceSize vertex_capacity = 0;
 static VkImage depth_image = VK_NULL_HANDLE;
 static VkDeviceMemory depth_memory = VK_NULL_HANDLE;
 static VkImageView depth_image_view = VK_NULL_HANDLE;
@@ -581,6 +603,15 @@ static void create_cmds_and_sync(void) {
         VkFenceCreateInfo fci = { .sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO, .flags = VK_FENCE_CREATE_SIGNALED_BIT };
         vkCreateFence(device, &fci, NULL, &fences[i]);
     }
+
+    free(image_frame_owner);
+    image_frame_owner = calloc(swapchain_img_count, sizeof(int));
+    if (image_frame_owner) {
+        for (uint32_t i = 0; i < swapchain_img_count; ++i) {
+            image_frame_owner[i] = -1;
+        }
+    }
+    current_frame_cursor = 0;
 }
 
 static void cleanup_swapchain(bool keep_swapchain_handle) {
@@ -603,6 +634,12 @@ static void cleanup_swapchain(bool keep_swapchain_handle) {
         free(fences);
         fences = NULL;
     }
+    for (size_t i = 0; i < 2; ++i) {
+        frame_resources[i].stage = FRAME_AVAILABLE;
+        frame_resources[i].inflight_fence = VK_NULL_HANDLE;
+    }
+    free(image_frame_owner);
+    image_frame_owner = NULL;
     if (swapchain_imgviews) {
         for (uint32_t i = 0; i < swapchain_img_count; i++) vkDestroyImageView(device, swapchain_imgviews[i], NULL);
         free(swapchain_imgviews);
@@ -641,9 +678,14 @@ static void destroy_device_resources(void) {
     if (font_image_view) { vkDestroyImageView(device, font_image_view, NULL); font_image_view = VK_NULL_HANDLE; }
     if (font_image) { vkDestroyImage(device, font_image, NULL); font_image = VK_NULL_HANDLE; }
     if (font_image_mem) { vkFreeMemory(device, font_image_mem, NULL); font_image_mem = VK_NULL_HANDLE; }
-    if (vertex_buffer) { vkDestroyBuffer(device, vertex_buffer, NULL); vertex_buffer = VK_NULL_HANDLE; }
-    if (vertex_memory) { vkFreeMemory(device, vertex_memory, NULL); vertex_memory = VK_NULL_HANDLE; }
-    vertex_capacity = 0;
+    for (size_t i = 0; i < 2; ++i) {
+        if (frame_resources[i].vertex_buffer) { vkDestroyBuffer(device, frame_resources[i].vertex_buffer, NULL); frame_resources[i].vertex_buffer = VK_NULL_HANDLE; }
+        if (frame_resources[i].vertex_memory) { vkFreeMemory(device, frame_resources[i].vertex_memory, NULL); frame_resources[i].vertex_memory = VK_NULL_HANDLE; }
+        frame_resources[i].vertex_capacity = 0;
+        frame_resources[i].vertex_count = 0;
+        frame_resources[i].stage = FRAME_AVAILABLE;
+        frame_resources[i].inflight_fence = VK_NULL_HANDLE;
+    }
     if (sem_img_avail) { vkDestroySemaphore(device, sem_img_avail, NULL); sem_img_avail = VK_NULL_HANDLE; }
     if (sem_render_done) { vkDestroySemaphore(device, sem_render_done, NULL); sem_render_done = VK_NULL_HANDLE; }
 }
@@ -711,23 +753,43 @@ static void end_single_time_commands(VkCommandBuffer cb) {
     vkQueueWaitIdle(queue);
     vkFreeCommandBuffers(device, cmdpool, 1, &cb);
 }
-static void create_vertex_buffer(size_t bytes) {
-    if (vertex_buffer != VK_NULL_HANDLE && vertex_capacity >= bytes) {
-        return;
+static bool create_vertex_buffer(FrameResources *frame, size_t bytes) {
+    if (frame->vertex_buffer != VK_NULL_HANDLE && frame->vertex_capacity >= bytes) {
+        return true;
     }
 
-    if (vertex_buffer) {
-        vkDestroyBuffer(device, vertex_buffer, NULL);
-        vertex_buffer = VK_NULL_HANDLE;
+    if (frame->vertex_buffer) {
+        vkDestroyBuffer(device, frame->vertex_buffer, NULL);
+        frame->vertex_buffer = VK_NULL_HANDLE;
     }
-    if (vertex_memory) {
-        vkFreeMemory(device, vertex_memory, NULL);
-        vertex_memory = VK_NULL_HANDLE;
-        vertex_capacity = 0;
+    if (frame->vertex_memory) {
+        vkFreeMemory(device, frame->vertex_memory, NULL);
+        frame->vertex_memory = VK_NULL_HANDLE;
+        frame->vertex_capacity = 0;
     }
 
-    create_buffer(bytes, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, &vertex_buffer, &vertex_memory);
-    vertex_capacity = bytes;
+    VkBuffer new_buffer = VK_NULL_HANDLE;
+    VkDeviceMemory new_memory = VK_NULL_HANDLE;
+    VkResult create = vkCreateBuffer(device, &(VkBufferCreateInfo){ .sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO, .size = bytes, .usage = VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, .sharingMode = VK_SHARING_MODE_EXCLUSIVE }, NULL, &new_buffer);
+    if (create != VK_SUCCESS) {
+        fprintf(stderr, "vkCreateBuffer failed for vertex buffer: %s\n", vk_result_name(create));
+        return false;
+    }
+
+    VkMemoryRequirements mr; vkGetBufferMemoryRequirements(device, new_buffer, &mr);
+    VkMemoryAllocateInfo mai = { .sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO, .allocationSize = mr.size, .memoryTypeIndex = find_mem_type(mr.memoryTypeBits, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT) };
+    VkResult alloc = vkAllocateMemory(device, &mai, NULL, &new_memory);
+    if (alloc != VK_SUCCESS) {
+        fprintf(stderr, "vkAllocateMemory failed for vertex buffer: %s\n", vk_result_name(alloc));
+        vkDestroyBuffer(device, new_buffer, NULL);
+        return false;
+    }
+
+    vkBindBufferMemory(device, new_buffer, new_memory, 0);
+    frame->vertex_buffer = new_buffer;
+    frame->vertex_memory = new_memory;
+    frame->vertex_capacity = bytes;
+    return true;
 }
 
 static void transition_image_layout(VkImage image, VkImageLayout oldLayout, VkImageLayout newLayout) {
@@ -758,44 +820,72 @@ static void copy_buffer_to_image(VkBuffer buffer, VkImage image, uint32_t width,
 }
 
 /* update vertex buffer host-side */
-static void upload_vertices(void) {
-    if (vtx_count == 0) {
-        if (vertex_buffer) {
-            vkDestroyBuffer(device, vertex_buffer, NULL);
-            vertex_buffer = VK_NULL_HANDLE;
-        }
-        if (vertex_memory) {
-            vkFreeMemory(device, vertex_memory, NULL);
-            vertex_memory = VK_NULL_HANDLE;
-        }
-        vertex_capacity = 0;
-        return;
+static bool ensure_cpu_vertex_capacity(FrameCpuArena *cpu, size_t background_vertices, size_t text_vertices, size_t final_vertices) {
+    UiVertex *new_background = cpu->background_vertices;
+    UiTextVertex *new_text = cpu->text_vertices;
+    Vtx *new_final = cpu->vertices;
+
+    if (background_vertices > cpu->background_capacity) {
+        size_t cap = cpu->background_capacity == 0 ? background_vertices : cpu->background_capacity * 2;
+        while (cap < background_vertices) cap *= 2;
+        new_background = realloc(cpu->background_vertices, cap * sizeof(UiVertex));
+        if (!new_background) return false;
+        cpu->background_capacity = cap;
     }
-    size_t bytes = vtx_count * sizeof(Vtx);
-    create_vertex_buffer(bytes);
-    void* dst = NULL; vkMapMemory(device, vertex_memory, 0, bytes, 0, &dst);
-    memcpy(dst, vtx_buf, bytes);
-    vkUnmapMemory(device, vertex_memory);
+
+    if (text_vertices > cpu->text_capacity) {
+        size_t cap = cpu->text_capacity == 0 ? text_vertices : cpu->text_capacity * 2;
+        while (cap < text_vertices) cap *= 2;
+        new_text = realloc(cpu->text_vertices, cap * sizeof(UiTextVertex));
+        if (!new_text) return false;
+        cpu->text_capacity = cap;
+    }
+
+    if (final_vertices > cpu->vertex_capacity) {
+        size_t cap = cpu->vertex_capacity == 0 ? final_vertices : cpu->vertex_capacity * 2;
+        while (cap < final_vertices) cap *= 2;
+        new_final = realloc(cpu->vertices, cap * sizeof(Vtx));
+        if (!new_final) return false;
+        cpu->vertex_capacity = cap;
+    }
+
+    cpu->background_vertices = new_background;
+    cpu->text_vertices = new_text;
+    cpu->vertices = new_final;
+    return true;
 }
 
-static bool ensure_vtx_capacity(size_t required)
+static bool ensure_vtx_capacity(FrameCpuArena *cpu, size_t required)
 {
-    if (required <= vtx_capacity) {
+    return ensure_cpu_vertex_capacity(cpu, cpu->background_capacity, cpu->text_capacity, required);
+}
+
+static bool upload_vertices(FrameResources *frame) {
+    if (frame->vertex_count == 0) {
+        if (frame->vertex_buffer) {
+            vkDestroyBuffer(device, frame->vertex_buffer, NULL);
+            frame->vertex_buffer = VK_NULL_HANDLE;
+        }
+        if (frame->vertex_memory) {
+            vkFreeMemory(device, frame->vertex_memory, NULL);
+            frame->vertex_memory = VK_NULL_HANDLE;
+        }
+        frame->vertex_capacity = 0;
         return true;
     }
 
-    size_t new_capacity = vtx_capacity == 0 ? required : vtx_capacity * 2;
-    while (new_capacity < required) {
-        new_capacity *= 2;
-    }
-
-    Vtx *expanded = realloc(vtx_buf, new_capacity * sizeof(Vtx));
-    if (!expanded) {
+    size_t bytes = frame->vertex_count * sizeof(Vtx);
+    if (!create_vertex_buffer(frame, bytes)) {
         return false;
     }
-
-    vtx_buf = expanded;
-    vtx_capacity = new_capacity;
+    void* dst = NULL;
+    VkResult map = vkMapMemory(device, frame->vertex_memory, 0, bytes, 0, &dst);
+    if (map != VK_SUCCESS) {
+        fprintf(stderr, "Failed to map vertex memory: %s\n", vk_result_name(map));
+        return false;
+    }
+    memcpy(dst, frame->cpu.vertices, bytes);
+    vkUnmapMemory(device, frame->vertex_memory);
     return true;
 }
 
@@ -1011,11 +1101,12 @@ static void create_descriptor_pool_and_set(void) {
 }
 
 /* build vtxs from g_widgets each frame */
-static void build_vertices_from_widgets(void) {
-    vtx_count = 0;
+static bool build_vertices_from_widgets(FrameResources *frame) {
+    if (!frame) return false;
+    frame->vertex_count = 0;
 
     if (g_widgets.count == 0 || swapchain_extent.width == 0 || swapchain_extent.height == 0) {
-        return;
+        return true;
     }
 
     size_t slider_extras = 0;
@@ -1030,7 +1121,7 @@ static void build_vertices_from_widgets(void) {
     GlyphQuadArray glyph_quads = {0};
     bool view_models_ok = view_models != NULL;
     if (!view_models) {
-        return;
+        return false;
     }
 
     size_t view_model_count = 0;
@@ -1179,7 +1270,7 @@ static void build_vertices_from_widgets(void) {
     if (!view_models_ok) {
         free(glyph_quads.items);
         free(view_models);
-        return;
+        return false;
     }
 
     for (size_t i = 0; i < g_widgets.count; ++i) {
@@ -1269,18 +1360,35 @@ static void build_vertices_from_widgets(void) {
 
     Renderer renderer;
     renderer_init(&renderer, &context, view_model_count);
+    size_t expected_background = view_model_count * 6;
+    size_t expected_text = glyph_quads.count * 6;
+    size_t expected_final = renderer.command_list.count * 6;
 
-    UiVertexBuffer background_buffer;
-    ui_vertex_buffer_init(&background_buffer, view_model_count * 6);
+    if (!ensure_cpu_vertex_capacity(&frame->cpu, expected_background, expected_text, expected_final)) {
+        renderer_dispose(&renderer);
+        free(glyph_quads.items);
+        free(view_models);
+        return false;
+    }
 
-    UiTextVertexBuffer text_buffer;
-    ui_text_vertex_buffer_init(&text_buffer, glyph_quads.count * 6);
+    UiVertexBuffer background_buffer = {
+        .vertices = frame->cpu.background_vertices,
+        .count = 0,
+        .capacity = frame->cpu.background_capacity,
+    };
+
+    UiTextVertexBuffer text_buffer = {
+        .vertices = frame->cpu.text_vertices,
+        .count = 0,
+        .capacity = frame->cpu.text_capacity,
+    };
 
     renderer_fill_vertices(&renderer, view_models, view_model_count, glyph_quads.items, glyph_quads.count, &background_buffer, &text_buffer);
 
     size_t primitive_count = renderer.command_list.count;
 
     Primitive *primitives = primitive_count > 0 ? calloc(primitive_count, sizeof(Primitive)) : NULL;
+    bool success = primitive_count == 0 || primitives != NULL;
     size_t prim_idx = 0;
     size_t background_quad_idx = 0;
     size_t text_quad_idx = 0;
@@ -1309,7 +1417,7 @@ static void build_vertices_from_widgets(void) {
         }
 
         size_t total_vertices = primitive_count * 6;
-        if (ensure_vtx_capacity(total_vertices)) {
+        if (ensure_vtx_capacity(&frame->cpu, total_vertices)) {
             size_t cursor = 0;
             float depth_step = (primitive_count > 1) ? (1.0f / (float)(primitive_count - 1)) : 0.0f;
             for (size_t i = 0; i < primitive_count; ++i) {
@@ -1317,15 +1425,19 @@ static void build_vertices_from_widgets(void) {
                 for (int v = 0; v < 6; ++v) {
                     Vtx vertex = primitives[i].vertices[v];
                     vertex.pz = depth;
-                    vtx_buf[cursor++] = vertex;
+                    frame->cpu.vertices[cursor++] = vertex;
                 }
             }
-            vtx_count = cursor;
+            frame->vertex_count = cursor;
         } else {
-            vtx_count = 0;
+            frame->vertex_count = 0;
+            success = false;
         }
     } else {
-        vtx_count = 0;
+        frame->vertex_count = 0;
+        if (primitive_count > 0) {
+            success = false;
+        }
     }
 
     ui_text_vertex_buffer_dispose(&text_buffer);
@@ -1334,6 +1446,8 @@ static void build_vertices_from_widgets(void) {
     free(glyph_quads.items);
     free(primitives);
     free(view_models);
+
+    return success;
 }
 
 static bool recover_device_loss(void) {
@@ -1357,11 +1471,16 @@ static bool recover_device_loss(void) {
     create_cmds_and_sync();
     create_font_texture();
     create_descriptor_pool_and_set();
-    build_vertices_from_widgets();
+    for (size_t i = 0; i < 2; ++i) {
+        frame_resources[i].stage = FRAME_AVAILABLE;
+        if (build_vertices_from_widgets(&frame_resources[i])) {
+            upload_vertices(&frame_resources[i]);
+        }
+    }
     return true;
 }
 
-static void record_cmdbuffer(uint32_t idx) {
+static void record_cmdbuffer(uint32_t idx, const FrameResources *frame) {
     VkCommandBuffer cb = cmdbuffers[idx];
     vkResetCommandBuffer(cb, 0);
     VkCommandBufferBeginInfo binfo = { .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO };
@@ -1377,11 +1496,11 @@ static void record_cmdbuffer(uint32_t idx) {
     ViewConstants pc = { .viewport = { (float)swapchain_extent.width, (float)swapchain_extent.height } };
     vkCmdPushConstants(cb, pipeline_layout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(ViewConstants), &pc);
     vkCmdBindDescriptorSets(cb, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_layout, 0, 1, &descriptor_set, 0, NULL);
-    if (vertex_buffer != VK_NULL_HANDLE && vtx_count > 0) {
+    if (frame && frame->vertex_buffer != VK_NULL_HANDLE && frame->vertex_count > 0) {
         VkDeviceSize offset = 0;
-        vkCmdBindVertexBuffers(cb, 0, 1, &vertex_buffer, &offset);
+        vkCmdBindVertexBuffers(cb, 0, 1, &frame->vertex_buffer, &offset);
         /* simple draw: vertices are triangles (every 3 vertices) */
-        vkCmdDraw(cb, (uint32_t)vtx_count, 1, 0, 0);
+        vkCmdDraw(cb, (uint32_t)frame->vertex_count, 1, 0, 0);
     }
 
     vkCmdEndRenderPass(cb);
@@ -1390,7 +1509,6 @@ static void record_cmdbuffer(uint32_t idx) {
 
 /* present frame */
 static void draw_frame(void) {
-    build_vertices_from_widgets();
     if (swapchain == VK_NULL_HANDLE) return;
     uint32_t img_idx;
     VkResult acq = vkAcquireNextImageKHR(device, swapchain, UINT64_MAX, sem_img_avail, VK_NULL_HANDLE, &img_idx);
@@ -1400,9 +1518,33 @@ static void draw_frame(void) {
     vkWaitForFences(device, 1, &fences[img_idx], VK_TRUE, UINT64_MAX);
     vkResetFences(device, 1, &fences[img_idx]);
 
+    if (image_frame_owner && image_frame_owner[img_idx] >= 0) {
+        int idx = image_frame_owner[img_idx];
+        if (idx >= 0 && idx < 2) {
+            frame_resources[idx].stage = FRAME_AVAILABLE;
+        }
+    }
+
+    FrameResources *frame = &frame_resources[current_frame_cursor % 2];
+    current_frame_cursor = (current_frame_cursor + 1) % 2;
+
+    if (frame->stage == FRAME_SUBMITTED && frame->inflight_fence && frame->inflight_fence != fences[img_idx]) {
+        vkWaitForFences(device, 1, &frame->inflight_fence, VK_TRUE, UINT64_MAX);
+        vkResetFences(device, 1, &frame->inflight_fence);
+        frame->stage = FRAME_AVAILABLE;
+    }
+    frame->stage = FRAME_FILLING;
+
+    bool built = build_vertices_from_widgets(frame);
+    if (!built) {
+        frame->vertex_count = 0;
+    }
+
     /* re-upload vertices & record */
-    upload_vertices();
-    record_cmdbuffer(img_idx);
+    if (!upload_vertices(frame)) {
+        frame->vertex_count = 0;
+    }
+    record_cmdbuffer(img_idx, frame);
 
     VkPipelineStageFlags waitStage = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
     VkSubmitInfo si = { .sType = VK_STRUCTURE_TYPE_SUBMIT_INFO, .waitSemaphoreCount = 1, .pWaitSemaphores = &sem_img_avail, .pWaitDstStageMask = &waitStage, .commandBufferCount = 1, .pCommandBuffers = &cmdbuffers[img_idx], .signalSemaphoreCount = 1, .pSignalSemaphores = &sem_render_done };
@@ -1412,6 +1554,12 @@ static void draw_frame(void) {
         return;
     }
     if (submit != VK_SUCCESS) fatal_vk("vkQueueSubmit", submit);
+
+    frame->stage = FRAME_SUBMITTED;
+    frame->inflight_fence = fences[img_idx];
+    if (image_frame_owner) {
+        image_frame_owner[img_idx] = (int)(frame - frame_resources);
+    }
     VkPresentInfoKHR pi = { .sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR, .waitSemaphoreCount = 1, .pWaitSemaphores = &sem_render_done, .swapchainCount = 1, .pSwapchains = &swapchain, .pImageIndices = &img_idx };
     VkResult present = vkQueuePresentKHR(queue, &pi);
     if (present == VK_ERROR_DEVICE_LOST) { if (!recover_device_loss()) fatal_vk("vkQueuePresentKHR", present); return; }
@@ -1432,6 +1580,13 @@ bool vk_renderer_init(GLFWwindow* window, const char* vert_spv, const char* frag
         coordinate_transformer_init(&g_transformer, 1.0f, 1.0f, (Vec2){0.0f, 0.0f});
     }
 
+    current_frame_cursor = 0;
+    for (size_t i = 0; i < 2; ++i) {
+        frame_resources[i].stage = FRAME_AVAILABLE;
+        frame_resources[i].inflight_fence = VK_NULL_HANDLE;
+        frame_resources[i].vertex_count = 0;
+    }
+
     create_instance();
     res = glfwCreateWindowSurface(instance, g_window, NULL, &surface);
     if (res != VK_SUCCESS) return false;
@@ -1447,7 +1602,11 @@ bool vk_renderer_init(GLFWwindow* window, const char* vert_spv, const char* frag
     build_font_atlas();
     create_font_texture();
     create_descriptor_pool_and_set();
-    build_vertices_from_widgets();
+    for (size_t i = 0; i < 2; ++i) {
+        frame_resources[i].stage = FRAME_AVAILABLE;
+        build_vertices_from_widgets(&frame_resources[i]);
+        upload_vertices(&frame_resources[i]);
+    }
     return true;
 }
 
@@ -1467,9 +1626,17 @@ void vk_renderer_cleanup(void) {
     atlas = NULL;
     free(ttf_buffer);
     ttf_buffer = NULL;
-    free(vtx_buf);
-    vtx_buf = NULL;
-    vtx_capacity = 0;
+    for (size_t i = 0; i < 2; ++i) {
+        free(frame_resources[i].cpu.background_vertices);
+        free(frame_resources[i].cpu.text_vertices);
+        free(frame_resources[i].cpu.vertices);
+        frame_resources[i].cpu.background_vertices = NULL;
+        frame_resources[i].cpu.text_vertices = NULL;
+        frame_resources[i].cpu.vertices = NULL;
+        frame_resources[i].cpu.background_capacity = 0;
+        frame_resources[i].cpu.text_capacity = 0;
+        frame_resources[i].cpu.vertex_capacity = 0;
+    }
     destroy_device_resources();
     if (device) { vkDestroyDevice(device, NULL); device = VK_NULL_HANDLE; }
     if (surface) { vkDestroySurfaceKHR(instance, surface, NULL); surface = VK_NULL_HANDLE; }
