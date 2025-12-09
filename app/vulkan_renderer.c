@@ -3,7 +3,6 @@
 
 #include "vulkan/vulkan.h"
 #include <math.h>
-#include <float.h>
 #include <stdbool.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -1420,16 +1419,11 @@ static bool build_vertices_from_widgets(FrameResources *frame) {
     size_t text_quad_idx = 0;
 
     if (primitives) {
-        float min_z = FLT_MAX;
-        float max_z = -FLT_MAX;
         for (size_t c = 0; c < renderer.command_list.count; ++c) {
             const RenderCommand *cmd = &renderer.command_list.commands[c];
             Primitive *p = &primitives[prim_idx++];
             p->order = cmd->key.ordinal;
             p->z = (float)cmd->key.layer;
-
-            if (p->z < min_z) min_z = p->z;
-            if (p->z > max_z) max_z = p->z;
 
             if (cmd->primitive == RENDER_PRIMITIVE_BACKGROUND) {
                 UiVertex *base = &background_buffer.vertices[background_quad_idx++ * 6];
@@ -1449,9 +1443,10 @@ static bool build_vertices_from_widgets(FrameResources *frame) {
         size_t total_vertices = primitive_count * 6;
         if (ensure_vtx_capacity(&frame->cpu, total_vertices)) {
             size_t cursor = 0;
-            float denom = (max_z > min_z) ? (max_z - min_z) : 1.0f;
+            float depth_step = primitive_count > 0 ? 1.0f / (float)primitive_count : 1.0f;
             for (size_t i = 0; i < primitive_count; ++i) {
-                float depth = (denom != 0.0f) ? (max_z - primitives[i].z) / denom : 0.0f;
+                float depth = 1.0f - ((float)(i + 1) * depth_step);
+                if (depth < 0.0f) depth = 0.0f;
                 for (int v = 0; v < 6; ++v) {
                     Vtx vertex = primitives[i].vertices[v];
                     vertex.pz = depth;
