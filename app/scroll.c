@@ -224,15 +224,11 @@ void scroll_apply_offsets(ScrollContext* ctx, Widget* widgets, size_t widget_cou
             w->show_scrollbar = w->scrollbar_enabled && overflow > 1.0f;
         }
         if (a->has_viewport) {
-            Rect clip = a->viewport;
-            if (w->has_clip) rect_intersect(&w->clip, &clip, &clip);
             w->has_clip = 1;
-            w->clip = clip;
+            w->clip = a->viewport;
         } else if (a->has_bounds) {
-            Rect clip = a->bounds;
-            if (w->has_clip) rect_intersect(&w->clip, &clip, &clip);
             w->has_clip = 1;
-            w->clip = clip;
+            w->clip = a->bounds;
         }
     }
 }
