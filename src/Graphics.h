@@ -55,13 +55,23 @@ typedef struct LayoutResult {
     LayoutBox device;
 } LayoutResult;
 
+typedef enum RenderPhase {
+    RENDER_PHASE_BACKGROUND = 0,
+    RENDER_PHASE_CONTENT = 1,
+    RENDER_PHASE_OVERLAY = 2,
+} RenderPhase;
+
 typedef struct GlyphQuad {
     Vec2 min;
     Vec2 max;
     Vec2 uv0;
     Vec2 uv1;
     Color color;
-    int z_index;
+    const char *widget_id;
+    size_t widget_order;
+    int layer;
+    RenderPhase phase;
+    size_t ordinal;
 } GlyphQuad;
 
 /**
@@ -72,7 +82,10 @@ typedef struct GlyphQuad {
 typedef struct ViewModel {
     const char *id;
     LayoutBox logical_box;
-    int z_index;
+    int layer;
+    RenderPhase phase;
+    size_t widget_order;
+    size_t ordinal;
     Color color;
 } ViewModel;
 
@@ -82,13 +95,15 @@ typedef enum RenderPrimitive {
 } RenderPrimitive;
 
 typedef struct RenderSortKey {
-    int z_index;
-    int primitive;
+    int layer;
+    size_t widget_order;
+    RenderPhase phase;
     size_t ordinal;
 } RenderSortKey;
 
 typedef struct RenderCommand {
     RenderPrimitive primitive;
+    RenderPhase phase;
     RenderSortKey key;
     union {
         struct {

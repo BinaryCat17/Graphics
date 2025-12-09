@@ -18,14 +18,15 @@
 #include "stb_truetype.h"
 
 enum {
+    LAYER_STRIDE = 16,
     Z_LAYER_BORDER = 0,
     Z_LAYER_FILL = 1,
-    Z_LAYER_SLIDER_TRACK = 1,
-    Z_LAYER_SLIDER_FILL = 2,
-    Z_LAYER_SLIDER_KNOB = 3,
-    Z_LAYER_SCROLLBAR_TRACK = 100,
-    Z_LAYER_SCROLLBAR_THUMB = 101,
-    Z_LAYER_TEXT = 200,
+    Z_LAYER_SLIDER_TRACK = 2,
+    Z_LAYER_SLIDER_FILL = 3,
+    Z_LAYER_SLIDER_KNOB = 4,
+    Z_LAYER_SCROLLBAR_TRACK = 5,
+    Z_LAYER_SCROLLBAR_THUMB = 6,
+    Z_LAYER_TEXT = 7,
 };
 
 /* ---------- Vulkan helpers & global state ---------- */
@@ -565,7 +566,14 @@ static void create_pipeline(const char* vert_spv, const char* frag_spv) {
     VkPipelineViewportStateCreateInfo vpci = { .sType = VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO, .viewportCount = 1, .pViewports = &vp, .scissorCount = 1, .pScissors = &sc };
     VkPipelineRasterizationStateCreateInfo rs = { .sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO, .polygonMode = VK_POLYGON_MODE_FILL, .cullMode = VK_CULL_MODE_NONE, .frontFace = VK_FRONT_FACE_CLOCKWISE, .lineWidth = 1.0f };
     VkPipelineMultisampleStateCreateInfo ms = { .sType = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO, .rasterizationSamples = VK_SAMPLE_COUNT_1_BIT };
-    VkPipelineDepthStencilStateCreateInfo ds = { .sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO, .depthTestEnable = VK_TRUE, .depthWriteEnable = VK_TRUE, .depthCompareOp = VK_COMPARE_OP_LESS_OR_EQUAL, .depthBoundsTestEnable = VK_FALSE, .stencilTestEnable = VK_FALSE };
+    VkPipelineDepthStencilStateCreateInfo ds = {
+        .sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO,
+        .depthTestEnable = VK_TRUE,
+        .depthWriteEnable = VK_TRUE,
+        .depthCompareOp = VK_COMPARE_OP_LESS_OR_EQUAL,
+        .depthBoundsTestEnable = VK_FALSE,
+        .stencilTestEnable = VK_FALSE
+    };
     VkPipelineColorBlendAttachmentState cbatt = { .blendEnable = swapchain_supports_blend, .srcColorBlendFactor = VK_BLEND_FACTOR_SRC_ALPHA, .dstColorBlendFactor = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA, .colorBlendOp = VK_BLEND_OP_ADD, .srcAlphaBlendFactor = VK_BLEND_FACTOR_ONE, .dstAlphaBlendFactor = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA, .alphaBlendOp = VK_BLEND_OP_ADD, .colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT };
     VkPipelineColorBlendStateCreateInfo cb = { .sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO, .attachmentCount = 1, .pAttachments = &cbatt };
     VkPushConstantRange pcr = { .stageFlags = VK_SHADER_STAGE_VERTEX_BIT, .offset = 0, .size = sizeof(float) * 2 };
@@ -1124,10 +1132,17 @@ static bool build_vertices_from_widgets(FrameResources *frame) {
         return false;
     }
 
+    size_t *widget_ordinals = g_widgets.count > 0 ? calloc(g_widgets.count, sizeof(size_t)) : NULL;
+    if (g_widgets.count > 0 && !widget_ordinals) {
+        free(view_models);
+        return false;
+    }
+
     size_t view_model_count = 0;
     for (size_t i = 0; i < g_widgets.count; ++i) {
         const Widget *widget = &g_widgets.items[i];
-        int base_z = widget->z_index;
+        int base_z = widget->z_index * LAYER_STRIDE;
+        int text_z = base_z + Z_LAYER_TEXT;
 
         float scroll_offset = widget->scroll_static ? 0.0f : widget->scroll_offset;
         float snapped_scroll_pixels = -snap_to_pixel(scroll_offset * g_transformer.dpi_scale);
@@ -1144,13 +1159,16 @@ static bool build_vertices_from_widgets(FrameResources *frame) {
             Rect clipped_border;
             if (apply_clip_rect(widget, &widget_rect, &clipped_border) &&
                 ensure_view_model_capacity(&view_models, &view_model_capacity, view_model_count + 1, &view_models_ok)) {
-                view_models[view_model_count++] = (ViewModel){
-                    .id = widget->id,
-                    .logical_box = { {clipped_border.x, clipped_border.y}, {clipped_border.w, clipped_border.h} },
-                    .z_index = base_z + Z_LAYER_BORDER,
-                    .color = widget->border_color,
-                };
-            }
+            view_models[view_model_count++] = (ViewModel){
+                .id = widget->id,
+                .logical_box = { {clipped_border.x, clipped_border.y}, {clipped_border.w, clipped_border.h} },
+                .layer = base_z + Z_LAYER_BORDER,
+                .phase = RENDER_PHASE_BACKGROUND,
+                .widget_order = i,
+                .ordinal = widget_ordinals[i]++,
+                .color = widget->border_color,
+            };
+        }
         }
 
         if (widget->type == W_HSLIDER) {
@@ -1171,7 +1189,10 @@ static bool build_vertices_from_widgets(FrameResources *frame) {
                 view_models[view_model_count++] = (ViewModel){
                     .id = widget->id,
                     .logical_box = { {clipped_track.x, clipped_track.y}, {clipped_track.w, clipped_track.h} },
-                    .z_index = base_z + Z_LAYER_SLIDER_TRACK,
+                    .layer = base_z + Z_LAYER_SLIDER_TRACK,
+                    .phase = RENDER_PHASE_BACKGROUND,
+                    .widget_order = i,
+                    .ordinal = widget_ordinals[i]++,
                     .color = track_color,
                 };
             }
@@ -1184,7 +1205,10 @@ static bool build_vertices_from_widgets(FrameResources *frame) {
                 view_models[view_model_count++] = (ViewModel){
                     .id = widget->id,
                     .logical_box = { {clipped_fill.x, clipped_fill.y}, {clipped_fill.w, clipped_fill.h} },
-                    .z_index = base_z + Z_LAYER_SLIDER_FILL,
+                    .layer = base_z + Z_LAYER_SLIDER_FILL,
+                    .phase = RENDER_PHASE_BACKGROUND,
+                    .widget_order = i,
+                    .ordinal = widget_ordinals[i]++,
                     .color = widget->color,
                 };
             }
@@ -1205,7 +1229,10 @@ static bool build_vertices_from_widgets(FrameResources *frame) {
                 view_models[view_model_count++] = (ViewModel){
                     .id = widget->id,
                     .logical_box = { {clipped_knob.x, clipped_knob.y}, {clipped_knob.w, clipped_knob.h} },
-                    .z_index = base_z + Z_LAYER_SLIDER_KNOB,
+                    .layer = base_z + Z_LAYER_SLIDER_KNOB,
+                    .phase = RENDER_PHASE_BACKGROUND,
+                    .widget_order = i,
+                    .ordinal = widget_ordinals[i]++,
                     .color = knob_color,
                 };
             }
@@ -1218,7 +1245,10 @@ static bool build_vertices_from_widgets(FrameResources *frame) {
             view_models[view_model_count++] = (ViewModel){
                 .id = widget->id,
                 .logical_box = { {clipped_fill.x, clipped_fill.y}, {clipped_fill.w, clipped_fill.h} },
-                .z_index = base_z + Z_LAYER_FILL,
+                .layer = base_z + Z_LAYER_FILL,
+                .phase = RENDER_PHASE_BACKGROUND,
+                .widget_order = i,
+                .ordinal = widget_ordinals[i]++,
                 .color = widget->color,
             };
         }
@@ -1232,14 +1262,15 @@ static bool build_vertices_from_widgets(FrameResources *frame) {
             Color track_color = widget->scrollbar_track_color;
             Rect scroll_track = { track_x, track_y, track_w, track_h };
             Rect clipped_track;
-            const int scrollbar_z = base_z + Z_LAYER_SCROLLBAR_TRACK;
-
             if (apply_clip_rect(widget, &scroll_track, &clipped_track) &&
                 ensure_view_model_capacity(&view_models, &view_model_capacity, view_model_count + 1, &view_models_ok)) {
                 view_models[view_model_count++] = (ViewModel){
                     .id = widget->id,
                     .logical_box = { {clipped_track.x, clipped_track.y}, {clipped_track.w, clipped_track.h} },
-                    .z_index = scrollbar_z,
+                    .layer = base_z + Z_LAYER_SCROLLBAR_TRACK,
+                    .phase = RENDER_PHASE_BACKGROUND,
+                    .widget_order = i,
+                    .ordinal = widget_ordinals[i]++,
                     .color = track_color,
                 };
             }
@@ -1261,7 +1292,10 @@ static bool build_vertices_from_widgets(FrameResources *frame) {
                 view_models[view_model_count++] = (ViewModel){
                     .id = widget->id,
                     .logical_box = { {clipped_thumb.x, clipped_thumb.y}, {clipped_thumb.w, clipped_thumb.h} },
-                    .z_index = base_z + Z_LAYER_SCROLLBAR_THUMB,
+                    .layer = base_z + Z_LAYER_SCROLLBAR_THUMB,
+                    .phase = RENDER_PHASE_BACKGROUND,
+                    .widget_order = i,
+                    .ordinal = widget_ordinals[i]++,
                     .color = thumb_color,
                 };
             }
@@ -1270,6 +1304,7 @@ static bool build_vertices_from_widgets(FrameResources *frame) {
     if (!view_models_ok) {
         free(glyph_quads.items);
         free(view_models);
+        free(widget_ordinals);
         return false;
     }
 
@@ -1280,7 +1315,7 @@ static bool build_vertices_from_widgets(FrameResources *frame) {
             continue;
         }
 
-        int text_z = widget->z_index + Z_LAYER_TEXT;
+        int text_z = widget->z_index * LAYER_STRIDE + Z_LAYER_TEXT;
 
         float scroll_offset = widget->scroll_static ? 0.0f : widget->scroll_offset;
         float snapped_scroll_pixels = -snap_to_pixel(scroll_offset * g_transformer.dpi_scale);
@@ -1338,7 +1373,11 @@ static bool build_vertices_from_widgets(FrameResources *frame) {
                 .uv0 = {u0, v0},
                 .uv1 = {u1, v1},
                 .color = widget->text_color,
-                .z_index = text_z,
+                .widget_id = widget->id,
+                .widget_order = i,
+                .layer = text_z,
+                .phase = RENDER_PHASE_OVERLAY,
+                .ordinal = widget_ordinals[i]++,
             };
 
             pen_x += g->advance;
@@ -1368,6 +1407,7 @@ static bool build_vertices_from_widgets(FrameResources *frame) {
         renderer_dispose(&renderer);
         free(glyph_quads.items);
         free(view_models);
+        free(widget_ordinals);
         return false;
     }
 
@@ -1387,6 +1427,18 @@ static bool build_vertices_from_widgets(FrameResources *frame) {
 
     size_t primitive_count = renderer.command_list.count;
 
+    int min_layer = 0;
+    int max_layer = 0;
+    if (primitive_count > 0) {
+        min_layer = renderer.command_list.commands[0].key.layer;
+        max_layer = min_layer;
+        for (size_t i = 1; i < renderer.command_list.count; ++i) {
+            int layer = renderer.command_list.commands[i].key.layer;
+            if (layer < min_layer) min_layer = layer;
+            if (layer > max_layer) max_layer = layer;
+        }
+    }
+
     Primitive *primitives = primitive_count > 0 ? calloc(primitive_count, sizeof(Primitive)) : NULL;
     bool success = primitive_count == 0 || primitives != NULL;
     size_t prim_idx = 0;
@@ -1398,17 +1450,16 @@ static bool build_vertices_from_widgets(FrameResources *frame) {
             const RenderCommand *cmd = &renderer.command_list.commands[c];
             Primitive *p = &primitives[prim_idx++];
             p->order = cmd->key.ordinal;
+            p->z = (float)cmd->key.layer;
 
             if (cmd->primitive == RENDER_PRIMITIVE_BACKGROUND) {
                 UiVertex *base = &background_buffer.vertices[background_quad_idx++ * 6];
-                p->z = base[0].position[2];
                 for (int i = 0; i < 6; ++i) {
                     UiVertex v = base[i];
                     p->vertices[i] = (Vtx){v.position[0], v.position[1], 0.0f, 0.0f, 0.0f, 0.0f, v.color.r, v.color.g, v.color.b, v.color.a};
                 }
             } else {
                 UiTextVertex *base = &text_buffer.vertices[text_quad_idx++ * 6];
-                p->z = base[0].position[2];
                 for (int i = 0; i < 6; ++i) {
                     UiTextVertex v = base[i];
                     p->vertices[i] = (Vtx){v.position[0], v.position[1], 0.0f, v.uv[0], v.uv[1], 1.0f, v.color.r, v.color.g, v.color.b, v.color.a};
@@ -1419,9 +1470,13 @@ static bool build_vertices_from_widgets(FrameResources *frame) {
         size_t total_vertices = primitive_count * 6;
         if (ensure_vtx_capacity(&frame->cpu, total_vertices)) {
             size_t cursor = 0;
-            float depth_step = (primitive_count > 1) ? (1.0f / (float)(primitive_count - 1)) : 0.0f;
+            float layer_span = (float)(max_layer - min_layer + 1);
+            float step = (primitive_count > 0 && layer_span > 0.0f) ? (1.0f / ((float)primitive_count + 1.0f)) / layer_span : 0.0f;
             for (size_t i = 0; i < primitive_count; ++i) {
-                float depth = (float)(primitive_count - 1 - i) * depth_step;
+                float layer_offset = (float)((int)primitives[i].z - min_layer);
+                float depth = 1.0f - (layer_offset + 0.5f) / layer_span - step * (float)i;
+                if (depth < 0.0f) depth = 0.0f;
+                if (depth > 1.0f) depth = 1.0f;
                 for (int v = 0; v < 6; ++v) {
                     Vtx vertex = primitives[i].vertices[v];
                     vertex.pz = depth;
@@ -1444,6 +1499,7 @@ static bool build_vertices_from_widgets(FrameResources *frame) {
     free(glyph_quads.items);
     free(primitives);
     free(view_models);
+    free(widget_ordinals);
 
     return success;
 }
