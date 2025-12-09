@@ -91,7 +91,6 @@ endif()
 
 target_link_libraries(Graphics PRIVATE glfw)
 target_link_libraries(Graphics PRIVATE Vulkan::Vulkan)
-target_link_libraries(Graphics PRIVATE m)
 target_include_directories(Graphics PRIVATE ${Stb_INCLUDE_DIR})
 
 add_executable(layout_tests

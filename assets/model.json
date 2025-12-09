@@ -1,8 +1,8 @@
 {
   "model": {
-    "sceneName": "Не загружено",
+    "sceneName": "Spur reducer",
     "sceneAuthor": "",
-    "scenePath": "",
-    "sceneStats": ""
+    "scenePath": "../../../assets/scenes/gear_reducer.yaml",
+    "sceneStats": "1 материалов · 4 деталей · 3 соединений"
   }
 }
