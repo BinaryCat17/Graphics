@@ -62,8 +62,8 @@ static VkFence* fences = NULL;
 
 typedef struct { float viewport[2]; } ViewConstants;
 
-/* Vertex format for GUI: pos.xy, uv.xy, use_tex, color.rgba */
-typedef struct { float px, py; float u, v; float use_tex; float r, g, b, a; } Vtx;
+/* Vertex format for GUI: pos.xyz, uv.xy, use_tex, color.rgba */
+typedef struct { float px, py, pz; float u, v; float use_tex; float r, g, b, a; } Vtx;
 typedef struct {
     float z;
     size_t order;
@@ -77,6 +77,10 @@ static size_t vtx_capacity = 0;
 static VkBuffer vertex_buffer = VK_NULL_HANDLE;
 static VkDeviceMemory vertex_memory = VK_NULL_HANDLE;
 static VkDeviceSize vertex_capacity = 0;
+static VkImage depth_image = VK_NULL_HANDLE;
+static VkDeviceMemory depth_memory = VK_NULL_HANDLE;
+static VkImageView depth_image_view = VK_NULL_HANDLE;
+static VkFormat depth_format = VK_FORMAT_UNDEFINED;
 
 /* Texture atlas for font */
 static VkImage font_image = VK_NULL_HANDLE;
@@ -87,6 +91,26 @@ static VkDescriptorSetLayout descriptor_layout = VK_NULL_HANDLE;
 static VkDescriptorPool descriptor_pool = VK_NULL_HANDLE;
 static VkDescriptorSet descriptor_set = VK_NULL_HANDLE;
 static CoordinateTransformer g_transformer = {0};
+
+static VkFormat choose_depth_format(void)
+{
+    VkFormat candidates[] = {
+        VK_FORMAT_D32_SFLOAT,
+        VK_FORMAT_D24_UNORM_S8_UINT,
+        VK_FORMAT_D16_UNORM,
+    };
+
+    for (size_t i = 0; i < sizeof(candidates)/sizeof(candidates[0]); ++i) {
+        VkFormat format = candidates[i];
+        VkFormatProperties props;
+        vkGetPhysicalDeviceFormatProperties(physical, format, &props);
+        if (props.optimalTilingFeatures & VK_FORMAT_FEATURE_DEPTH_STENCIL_ATTACHMENT_BIT) {
+            return format;
+        }
+    }
+
+    return VK_FORMAT_UNDEFINED;
+}
 
 /* Utility: read file into memory */
 static char* read_file_text(const char* path, size_t * out_len) {
@@ -391,12 +415,88 @@ static void create_swapchain_and_views(VkSwapchainKHR old_swapchain) {
     }
 }
 
+static void destroy_depth_resources(void) {
+    if (depth_image_view) {
+        vkDestroyImageView(device, depth_image_view, NULL);
+        depth_image_view = VK_NULL_HANDLE;
+    }
+    if (depth_image) {
+        vkDestroyImage(device, depth_image, NULL);
+        depth_image = VK_NULL_HANDLE;
+    }
+    if (depth_memory) {
+        vkFreeMemory(device, depth_memory, NULL);
+        depth_memory = VK_NULL_HANDLE;
+    }
+}
+
+static void create_depth_resources(void) {
+    destroy_depth_resources();
+
+    depth_format = choose_depth_format();
+    if (depth_format == VK_FORMAT_UNDEFINED) {
+        fatal("No supported depth format found");
+    }
+
+    VkImageCreateInfo image_info = {
+        .sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO,
+        .imageType = VK_IMAGE_TYPE_2D,
+        .format = depth_format,
+        .extent = { swapchain_extent.width, swapchain_extent.height, 1 },
+        .mipLevels = 1,
+        .arrayLayers = 1,
+        .samples = VK_SAMPLE_COUNT_1_BIT,
+        .tiling = VK_IMAGE_TILING_OPTIMAL,
+        .usage = VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT,
+        .sharingMode = VK_SHARING_MODE_EXCLUSIVE,
+        .initialLayout = VK_IMAGE_LAYOUT_UNDEFINED
+    };
+
+    res = vkCreateImage(device, &image_info, NULL, &depth_image);
+    if (res != VK_SUCCESS) fatal_vk("vkCreateImage (depth)", res);
+
+    VkMemoryRequirements mem_req;
+    vkGetImageMemoryRequirements(device, depth_image, &mem_req);
+    VkMemoryAllocateInfo alloc_info = { .sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO, .allocationSize = mem_req.size };
+    VkPhysicalDeviceMemoryProperties mem_props; vkGetPhysicalDeviceMemoryProperties(physical, &mem_props);
+    uint32_t mem_type = UINT32_MAX;
+    for (uint32_t i = 0; i < mem_props.memoryTypeCount; i++) {
+        if ((mem_req.memoryTypeBits & (1u << i)) && (mem_props.memoryTypes[i].propertyFlags & VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT)) {
+            mem_type = i; break; }
+    }
+    if (mem_type == UINT32_MAX) fatal("No suitable memory type for depth buffer");
+    alloc_info.memoryTypeIndex = mem_type;
+    res = vkAllocateMemory(device, &alloc_info, NULL, &depth_memory);
+    if (res != VK_SUCCESS) fatal_vk("vkAllocateMemory (depth)", res);
+    vkBindImageMemory(device, depth_image, depth_memory, 0);
+
+    VkImageViewCreateInfo view_info = {
+        .sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
+        .image = depth_image,
+        .viewType = VK_IMAGE_VIEW_TYPE_2D,
+        .format = depth_format,
+        .subresourceRange = { VK_IMAGE_ASPECT_DEPTH_BIT, 0, 1, 0, 1 }
+    };
+
+    res = vkCreateImageView(device, &view_info, NULL, &depth_image_view);
+    if (res != VK_SUCCESS) fatal_vk("vkCreateImageView (depth)", res);
+}
+
 /* render pass */
 static void create_render_pass(void) {
-    VkAttachmentDescription att = { .format = swapchain_format, .samples = VK_SAMPLE_COUNT_1_BIT, .loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR, .storeOp = VK_ATTACHMENT_STORE_OP_STORE, .stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE, .stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE, .initialLayout = VK_IMAGE_LAYOUT_UNDEFINED, .finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR };
-    VkAttachmentReference aref = { .attachment = 0, .layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL };
-    VkSubpassDescription sub = { .pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS, .colorAttachmentCount = 1, .pColorAttachments = &aref };
-    VkRenderPassCreateInfo rpci = { .sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO, .attachmentCount = 1, .pAttachments = &att, .subpassCount = 1, .pSubpasses = &sub };
+    if (depth_format == VK_FORMAT_UNDEFINED) {
+        depth_format = choose_depth_format();
+        if (depth_format == VK_FORMAT_UNDEFINED) fatal("No supported depth format found");
+    }
+
+    VkAttachmentDescription attachments[2] = {
+        { .format = swapchain_format, .samples = VK_SAMPLE_COUNT_1_BIT, .loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR, .storeOp = VK_ATTACHMENT_STORE_OP_STORE, .stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE, .stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE, .initialLayout = VK_IMAGE_LAYOUT_UNDEFINED, .finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR },
+        { .format = depth_format, .samples = VK_SAMPLE_COUNT_1_BIT, .loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR, .storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE, .stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE, .stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE, .initialLayout = VK_IMAGE_LAYOUT_UNDEFINED, .finalLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL }
+    };
+    VkAttachmentReference color_ref = { .attachment = 0, .layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL };
+    VkAttachmentReference depth_ref = { .attachment = 1, .layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL };
+    VkSubpassDescription sub = { .pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS, .colorAttachmentCount = 1, .pColorAttachments = &color_ref, .pDepthStencilAttachment = &depth_ref };
+    VkRenderPassCreateInfo rpci = { .sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO, .attachmentCount = 2, .pAttachments = attachments, .subpassCount = 1, .pSubpasses = &sub };
     res = vkCreateRenderPass(device, &rpci, NULL, &render_pass);
     if (res != VK_SUCCESS) fatal_vk("vkCreateRenderPass", res);
 }
@@ -428,7 +528,7 @@ static void create_pipeline(const char* vert_spv, const char* frag_spv) {
     /* vertex input binding */
     VkVertexInputBindingDescription bind = { .binding = 0, .stride = sizeof(Vtx), .inputRate = VK_VERTEX_INPUT_RATE_VERTEX };
     VkVertexInputAttributeDescription attr[4] = {
-        {.location = 0, .binding = 0, .format = VK_FORMAT_R32G32_SFLOAT, .offset = offsetof(Vtx,px) },
+        {.location = 0, .binding = 0, .format = VK_FORMAT_R32G32B32_SFLOAT, .offset = offsetof(Vtx,px) },
         {.location = 1, .binding = 0, .format = VK_FORMAT_R32G32_SFLOAT, .offset = offsetof(Vtx,u) },
         {.location = 2, .binding = 0, .format = VK_FORMAT_R32_SFLOAT, .offset = offsetof(Vtx,use_tex) },
         {.location = 3, .binding = 0, .format = VK_FORMAT_R32G32B32A32_SFLOAT, .offset = offsetof(Vtx,r) }
@@ -443,7 +543,7 @@ static void create_pipeline(const char* vert_spv, const char* frag_spv) {
     VkPipelineViewportStateCreateInfo vpci = { .sType = VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO, .viewportCount = 1, .pViewports = &vp, .scissorCount = 1, .pScissors = &sc };
     VkPipelineRasterizationStateCreateInfo rs = { .sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO, .polygonMode = VK_POLYGON_MODE_FILL, .cullMode = VK_CULL_MODE_NONE, .frontFace = VK_FRONT_FACE_CLOCKWISE, .lineWidth = 1.0f };
     VkPipelineMultisampleStateCreateInfo ms = { .sType = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO, .rasterizationSamples = VK_SAMPLE_COUNT_1_BIT };
-    VkPipelineDepthStencilStateCreateInfo ds = { .sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO, .depthTestEnable = VK_FALSE, .depthWriteEnable = VK_FALSE, .depthBoundsTestEnable = VK_FALSE, .stencilTestEnable = VK_FALSE };
+    VkPipelineDepthStencilStateCreateInfo ds = { .sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO, .depthTestEnable = VK_TRUE, .depthWriteEnable = VK_TRUE, .depthCompareOp = VK_COMPARE_OP_LESS_OR_EQUAL, .depthBoundsTestEnable = VK_FALSE, .stencilTestEnable = VK_FALSE };
     VkPipelineColorBlendAttachmentState cbatt = { .blendEnable = swapchain_supports_blend, .srcColorBlendFactor = VK_BLEND_FACTOR_SRC_ALPHA, .dstColorBlendFactor = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA, .colorBlendOp = VK_BLEND_OP_ADD, .srcAlphaBlendFactor = VK_BLEND_FACTOR_ONE, .dstAlphaBlendFactor = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA, .alphaBlendOp = VK_BLEND_OP_ADD, .colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT };
     VkPipelineColorBlendStateCreateInfo cb = { .sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO, .attachmentCount = 1, .pAttachments = &cbatt };
     VkPushConstantRange pcr = { .stageFlags = VK_SHADER_STAGE_VERTEX_BIT, .offset = 0, .size = sizeof(float) * 2 };
@@ -470,7 +570,8 @@ static void create_cmds_and_sync(void) {
 
     framebuffers = malloc(sizeof(VkFramebuffer) * swapchain_img_count);
     for (uint32_t i = 0; i < swapchain_img_count; i++) {
-        VkFramebufferCreateInfo fci = { .sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO, .renderPass = render_pass, .attachmentCount = 1, .pAttachments = &swapchain_imgviews[i], .width = swapchain_extent.width, .height = swapchain_extent.height, .layers = 1 };
+        VkImageView attachments[2] = { swapchain_imgviews[i], depth_image_view };
+        VkFramebufferCreateInfo fci = { .sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO, .renderPass = render_pass, .attachmentCount = 2, .pAttachments = attachments, .width = swapchain_extent.width, .height = swapchain_extent.height, .layers = 1 };
         res = vkCreateFramebuffer(device, &fci, NULL, &framebuffers[i]);
         if (res != VK_SUCCESS) fatal_vk("vkCreateFramebuffer", res);
     }
@@ -511,6 +612,7 @@ static void cleanup_swapchain(bool keep_swapchain_handle) {
         free(swapchain_imgs);
         swapchain_imgs = NULL;
     }
+    destroy_depth_resources();
     if (!keep_swapchain_handle && swapchain) {
         vkDestroySwapchainKHR(device, swapchain, NULL);
         swapchain = VK_NULL_HANDLE;
@@ -567,6 +669,7 @@ static void recreate_swapchain(void) {
         return;
     }
 
+    create_depth_resources();
     create_render_pass();
     create_pipeline(g_vert_spv, g_frag_spv);
     create_cmds_and_sync();
@@ -1200,7 +1303,7 @@ static void build_vertices_from_widgets(void) {
             p->order = order_counter++;
             for (int i = 0; i < 6; ++i) {
                 UiVertex v = base[i];
-                p->vertices[i] = (Vtx){v.position[0], v.position[1], 0.0f, 0.0f, 0.0f, v.color.r, v.color.g, v.color.b, v.color.a};
+                p->vertices[i] = (Vtx){v.position[0], v.position[1], 0.0f, 0.0f, 0.0f, 0.0f, v.color.r, v.color.g, v.color.b, v.color.a};
             }
         }
 
@@ -1211,7 +1314,7 @@ static void build_vertices_from_widgets(void) {
             p->order = order_counter++;
             for (int i = 0; i < 6; ++i) {
                 UiTextVertex v = base[i];
-                p->vertices[i] = (Vtx){v.position[0], v.position[1], v.uv[0], v.uv[1], 1.0f, v.color.r, v.color.g, v.color.b, v.color.a};
+                p->vertices[i] = (Vtx){v.position[0], v.position[1], 0.0f, v.uv[0], v.uv[1], 1.0f, v.color.r, v.color.g, v.color.b, v.color.a};
             }
         }
 
@@ -1220,9 +1323,13 @@ static void build_vertices_from_widgets(void) {
         size_t total_vertices = primitive_count * 6;
         if (ensure_vtx_capacity(total_vertices)) {
             size_t cursor = 0;
+            float depth_step = (primitive_count > 1) ? (1.0f / (float)(primitive_count - 1)) : 0.0f;
             for (size_t i = 0; i < primitive_count; ++i) {
+                float depth = (float)(primitive_count - 1 - i) * depth_step;
                 for (int v = 0; v < 6; ++v) {
-                    vtx_buf[cursor++] = primitives[i].vertices[v];
+                    Vtx vertex = primitives[i].vertices[v];
+                    vertex.pz = depth;
+                    vtx_buf[cursor++] = vertex;
                 }
             }
             vtx_count = cursor;
@@ -1255,6 +1362,7 @@ static bool recover_device_loss(void) {
     pick_physical_and_create_device();
     create_swapchain_and_views(VK_NULL_HANDLE);
     if (!swapchain) return false;
+    create_depth_resources();
     create_render_pass();
     create_descriptor_layout();
     create_pipeline(g_vert_spv, g_frag_spv);
@@ -1271,8 +1379,10 @@ static void record_cmdbuffer(uint32_t idx) {
     VkCommandBufferBeginInfo binfo = { .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO };
     vkBeginCommandBuffer(cb, &binfo);
 
-    VkClearValue clr = { .color = {{0.9f,0.9f,0.9f,1.0f}} };
-    VkRenderPassBeginInfo rpbi = { .sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO, .renderPass = render_pass, .framebuffer = framebuffers[idx], .renderArea = {.offset = {0,0}, .extent = swapchain_extent }, .clearValueCount = 1, .pClearValues = &clr };
+    VkClearValue clr[2];
+    clr[0].color = (VkClearColorValue){{0.9f,0.9f,0.9f,1.0f}};
+    clr[1].depthStencil = (VkClearDepthStencilValue){1.0f, 0};
+    VkRenderPassBeginInfo rpbi = { .sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO, .renderPass = render_pass, .framebuffer = framebuffers[idx], .renderArea = {.offset = {0,0}, .extent = swapchain_extent }, .clearValueCount = 2, .pClearValues = clr };
     vkCmdBeginRenderPass(cb, &rpbi, VK_SUBPASS_CONTENTS_INLINE);
 
     vkCmdBindPipeline(cb, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline);
@@ -1340,6 +1450,7 @@ bool vk_renderer_init(GLFWwindow* window, const char* vert_spv, const char* frag
 
     pick_physical_and_create_device();
     create_swapchain_and_views(VK_NULL_HANDLE);
+    create_depth_resources();
     create_render_pass();
     create_descriptor_layout();
     create_pipeline(g_vert_spv, g_frag_spv);
