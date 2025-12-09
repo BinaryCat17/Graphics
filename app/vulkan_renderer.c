@@ -1157,6 +1157,7 @@ static bool build_vertices_from_widgets(FrameResources *frame) {
                 .logical_box = { {clipped_border.x, clipped_border.y}, {clipped_border.w, clipped_border.h} },
                 .layer = base_z + Z_LAYER_BORDER,
                 .phase = RENDER_PHASE_BACKGROUND,
+                .widget_order = i,
                 .ordinal = widget_ordinals[i]++,
                 .color = widget->border_color,
             };
@@ -1183,6 +1184,7 @@ static bool build_vertices_from_widgets(FrameResources *frame) {
                     .logical_box = { {clipped_track.x, clipped_track.y}, {clipped_track.w, clipped_track.h} },
                     .layer = base_z + Z_LAYER_SLIDER_TRACK,
                     .phase = RENDER_PHASE_BACKGROUND,
+                    .widget_order = i,
                     .ordinal = widget_ordinals[i]++,
                     .color = track_color,
                 };
@@ -1198,6 +1200,7 @@ static bool build_vertices_from_widgets(FrameResources *frame) {
                     .logical_box = { {clipped_fill.x, clipped_fill.y}, {clipped_fill.w, clipped_fill.h} },
                     .layer = base_z + Z_LAYER_SLIDER_FILL,
                     .phase = RENDER_PHASE_BACKGROUND,
+                    .widget_order = i,
                     .ordinal = widget_ordinals[i]++,
                     .color = widget->color,
                 };
@@ -1221,6 +1224,7 @@ static bool build_vertices_from_widgets(FrameResources *frame) {
                     .logical_box = { {clipped_knob.x, clipped_knob.y}, {clipped_knob.w, clipped_knob.h} },
                     .layer = base_z + Z_LAYER_SLIDER_KNOB,
                     .phase = RENDER_PHASE_BACKGROUND,
+                    .widget_order = i,
                     .ordinal = widget_ordinals[i]++,
                     .color = knob_color,
                 };
@@ -1236,6 +1240,7 @@ static bool build_vertices_from_widgets(FrameResources *frame) {
                 .logical_box = { {clipped_fill.x, clipped_fill.y}, {clipped_fill.w, clipped_fill.h} },
                 .layer = base_z + Z_LAYER_FILL,
                 .phase = RENDER_PHASE_BACKGROUND,
+                .widget_order = i,
                 .ordinal = widget_ordinals[i]++,
                 .color = widget->color,
             };
@@ -1257,6 +1262,7 @@ static bool build_vertices_from_widgets(FrameResources *frame) {
                     .logical_box = { {clipped_track.x, clipped_track.y}, {clipped_track.w, clipped_track.h} },
                     .layer = base_z + Z_LAYER_SCROLLBAR_TRACK,
                     .phase = RENDER_PHASE_BACKGROUND,
+                    .widget_order = i,
                     .ordinal = widget_ordinals[i]++,
                     .color = track_color,
                 };
@@ -1281,6 +1287,7 @@ static bool build_vertices_from_widgets(FrameResources *frame) {
                     .logical_box = { {clipped_thumb.x, clipped_thumb.y}, {clipped_thumb.w, clipped_thumb.h} },
                     .layer = base_z + Z_LAYER_SCROLLBAR_THUMB,
                     .phase = RENDER_PHASE_BACKGROUND,
+                    .widget_order = i,
                     .ordinal = widget_ordinals[i]++,
                     .color = thumb_color,
                 };
@@ -1360,6 +1367,7 @@ static bool build_vertices_from_widgets(FrameResources *frame) {
                 .uv1 = {u1, v1},
                 .color = widget->text_color,
                 .widget_id = widget->id,
+                .widget_order = i,
                 .layer = text_z,
                 .phase = RENDER_PHASE_OVERLAY,
                 .ordinal = widget_ordinals[i]++,

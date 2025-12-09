@@ -68,6 +68,7 @@ typedef struct GlyphQuad {
     Vec2 uv1;
     Color color;
     const char *widget_id;
+    size_t widget_order;
     int layer;
     RenderPhase phase;
     size_t ordinal;
@@ -83,6 +84,7 @@ typedef struct ViewModel {
     LayoutBox logical_box;
     int layer;
     RenderPhase phase;
+    size_t widget_order;
     size_t ordinal;
     Color color;
 } ViewModel;
@@ -94,7 +96,7 @@ typedef enum RenderPrimitive {
 
 typedef struct RenderSortKey {
     int layer;
-    const char *widget_id;
+    size_t widget_order;
     RenderPhase phase;
     size_t ordinal;
 } RenderSortKey;

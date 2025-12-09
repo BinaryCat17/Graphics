@@ -1,7 +1,6 @@
 #include "Graphics.h"
 
 #include <stdlib.h>
-#include <string.h>
 #include <math.h>
 
 static void ensure_capacity(RenderCommandList *list, size_t required)
@@ -136,13 +135,8 @@ static int compare_sort_keys(const RenderSortKey *a, const RenderSortKey *b)
         return (a->layer > b->layer) - (a->layer < b->layer);
     }
 
-    if (a->widget_id != b->widget_id) {
-        if (!a->widget_id) return -1;
-        if (!b->widget_id) return 1;
-        int cmp = strcmp(a->widget_id, b->widget_id);
-        if (cmp != 0) {
-            return cmp;
-        }
+    if (a->widget_order != b->widget_order) {
+        return (a->widget_order > b->widget_order) - (a->widget_order < b->widget_order);
     }
 
     if (a->phase != b->phase) {
@@ -229,7 +223,7 @@ void renderer_build_commands(Renderer *renderer, const ViewModel *view_models, s
         RenderCommand command = (RenderCommand){0};
         command.primitive = RENDER_PRIMITIVE_BACKGROUND;
         command.phase = view_models[i].phase;
-        command.key = (RenderSortKey){view_models[i].layer, view_models[i].id, view_models[i].phase, view_models[i].ordinal};
+        command.key = (RenderSortKey){view_models[i].layer, view_models[i].widget_order, view_models[i].phase, view_models[i].ordinal};
         command.data.background.layout = layout;
         command.data.background.color = view_models[i].color;
         render_command_list_add(&renderer->command_list, &command);
@@ -239,7 +233,7 @@ void renderer_build_commands(Renderer *renderer, const ViewModel *view_models, s
         RenderCommand command = (RenderCommand){0};
         command.primitive = RENDER_PRIMITIVE_GLYPH;
         command.phase = glyphs[i].phase;
-        command.key = (RenderSortKey){glyphs[i].layer, glyphs[i].widget_id, glyphs[i].phase, glyphs[i].ordinal};
+        command.key = (RenderSortKey){glyphs[i].layer, glyphs[i].widget_order, glyphs[i].phase, glyphs[i].ordinal};
         command.data.glyph = glyphs[i];
         render_command_list_add(&renderer->command_list, &command);
     }
