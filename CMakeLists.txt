@@ -65,12 +65,12 @@ if (NOT VULKAN_STUB)
             "app/assets.c" "app/assets.h"
             "app/scroll.c" "app/scroll.h"
             "app/vulkan_renderer.c" "app/vulkan_renderer.h"
-            "app/ui_json.c" "app/ui_json.h"
+            "app/ui_json.c" "app/ui_json.h" "app/scene_ui.c" "app/scene_ui.h"
             "src/Graphics.c" "src/Graphics.h"
             "src/cad_scene.c" "src/cad_scene.h" "src/cad_scene_yaml.c" "src/cad_scene_yaml.h"
     )
 else()
-    set(APP_SOURCES "app/main_stub.c" "src/cad_scene.c" "src/cad_scene.h" "src/cad_scene_yaml.c" "src/cad_scene_yaml.h")
+    set(APP_SOURCES "app/main_stub.c" "src/cad_scene.c" "src/cad_scene.h" "src/cad_scene_yaml.c" "src/cad_scene_yaml.h" "app/scene_ui.c" "app/scene_ui.h" "app/ui_json.c" "app/ui_json.h")
 endif()
 
 # Добавьте источник в исполняемый файл этого проекта.
@@ -91,15 +91,26 @@ endif()
 
 target_link_libraries(Graphics PRIVATE glfw)
 target_link_libraries(Graphics PRIVATE Vulkan::Vulkan)
+target_link_libraries(Graphics PRIVATE m)
 target_include_directories(Graphics PRIVATE ${Stb_INCLUDE_DIR})
 
 add_executable(layout_tests
         app/layout_tests.c
         app/ui_json.c app/ui_json.h
+        app/scene_ui.c app/scene_ui.h
         app/scroll.c app/scroll.h)
 target_link_libraries(layout_tests PRIVATE glfw m)
 target_include_directories(layout_tests PRIVATE src ${Stb_INCLUDE_DIR})
 add_test(NAME layout_tests COMMAND layout_tests)
+
+add_executable(scene_ui_tests
+        app/scene_ui_tests.c
+        app/ui_json.c app/ui_json.h app/scene_ui.c app/scene_ui.h
+        app/scroll.c app/scroll.h
+        src/cad_scene.c src/cad_scene.h)
+target_link_libraries(scene_ui_tests PRIVATE glfw m)
+target_include_directories(scene_ui_tests PRIVATE src ${Stb_INCLUDE_DIR})
+add_test(NAME scene_ui_tests COMMAND scene_ui_tests)
 
 add_executable(transform_tests
         app/transform_tests.c
