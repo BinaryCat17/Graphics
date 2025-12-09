@@ -18,14 +18,15 @@
 #include "stb_truetype.h"
 
 enum {
+    LAYER_STRIDE = 16,
     Z_LAYER_BORDER = 0,
     Z_LAYER_FILL = 1,
-    Z_LAYER_SLIDER_TRACK = 1,
-    Z_LAYER_SLIDER_FILL = 2,
-    Z_LAYER_SLIDER_KNOB = 3,
-    Z_LAYER_SCROLLBAR_TRACK = 100,
-    Z_LAYER_SCROLLBAR_THUMB = 101,
-    Z_LAYER_TEXT = 200,
+    Z_LAYER_SLIDER_TRACK = 2,
+    Z_LAYER_SLIDER_FILL = 3,
+    Z_LAYER_SLIDER_KNOB = 4,
+    Z_LAYER_SCROLLBAR_TRACK = 5,
+    Z_LAYER_SCROLLBAR_THUMB = 6,
+    Z_LAYER_TEXT = 7,
 };
 
 /* ---------- Vulkan helpers & global state ---------- */
@@ -1133,7 +1134,7 @@ static bool build_vertices_from_widgets(FrameResources *frame) {
     size_t view_model_count = 0;
     for (size_t i = 0; i < g_widgets.count; ++i) {
         const Widget *widget = &g_widgets.items[i];
-        int base_z = widget->z_index;
+        int base_z = widget->z_index * LAYER_STRIDE;
         int text_z = base_z + Z_LAYER_TEXT;
 
         float scroll_offset = widget->scroll_static ? 0.0f : widget->scroll_offset;
@@ -1300,7 +1301,7 @@ static bool build_vertices_from_widgets(FrameResources *frame) {
             continue;
         }
 
-        int text_z = widget->z_index + Z_LAYER_TEXT;
+        int text_z = widget->z_index * LAYER_STRIDE + Z_LAYER_TEXT;
 
         float scroll_offset = widget->scroll_static ? 0.0f : widget->scroll_offset;
         float snapped_scroll_pixels = -snap_to_pixel(scroll_offset * g_transformer.dpi_scale);
