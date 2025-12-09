@@ -132,12 +132,21 @@ void render_command_list_add(RenderCommandList *list, const RenderCommand *comma
 
 static int compare_sort_keys(const RenderSortKey *a, const RenderSortKey *b)
 {
-    if (a->z_index != b->z_index) {
-        return (a->z_index > b->z_index) - (a->z_index < b->z_index);
+    if (a->layer != b->layer) {
+        return (a->layer > b->layer) - (a->layer < b->layer);
     }
 
-    if (a->primitive != b->primitive) {
-        return (a->primitive > b->primitive) - (a->primitive < b->primitive);
+    if (a->widget_id != b->widget_id) {
+        if (!a->widget_id) return -1;
+        if (!b->widget_id) return 1;
+        int cmp = strcmp(a->widget_id, b->widget_id);
+        if (cmp != 0) {
+            return cmp;
+        }
+    }
+
+    if (a->phase != b->phase) {
+        return (a->phase > b->phase) - (a->phase < b->phase);
     }
 
     if (a->ordinal != b->ordinal) {
@@ -215,21 +224,22 @@ void renderer_dispose(Renderer *renderer)
 void renderer_build_commands(Renderer *renderer, const ViewModel *view_models, size_t view_model_count, const GlyphQuad *glyphs, size_t glyph_count)
 {
     renderer->command_list.count = 0;
-    size_t ordinal = 0;
     for (size_t i = 0; i < view_model_count; ++i) {
         LayoutResult layout = layout_resolve(&view_models[i].logical_box, &renderer->context);
-        RenderCommand command = {0};
+        RenderCommand command = (RenderCommand){0};
         command.primitive = RENDER_PRIMITIVE_BACKGROUND;
-        command.key = (RenderSortKey){view_models[i].z_index, command.primitive, ordinal++};
+        command.phase = view_models[i].phase;
+        command.key = (RenderSortKey){view_models[i].layer, view_models[i].id, view_models[i].phase, view_models[i].ordinal};
         command.data.background.layout = layout;
         command.data.background.color = view_models[i].color;
         render_command_list_add(&renderer->command_list, &command);
     }
 
     for (size_t i = 0; i < glyph_count; ++i) {
-        RenderCommand command = {0};
+        RenderCommand command = (RenderCommand){0};
         command.primitive = RENDER_PRIMITIVE_GLYPH;
-        command.key = (RenderSortKey){glyphs[i].z_index, command.primitive, ordinal++};
+        command.phase = glyphs[i].phase;
+        command.key = (RenderSortKey){glyphs[i].layer, glyphs[i].widget_id, glyphs[i].phase, glyphs[i].ordinal};
         command.data.glyph = glyphs[i];
         render_command_list_add(&renderer->command_list, &command);
     }
@@ -294,7 +304,7 @@ static void emit_quad_vertices(const RenderContext *ctx, const RenderCommand *co
 {
     Vec2 min = command->data.background.layout.device.origin;
     Vec2 max = {min.x + command->data.background.layout.device.size.x, min.y + command->data.background.layout.device.size.y};
-    float z = (float)command->key.z_index;
+    float z = (float)command->key.layer;
 
     ui_vertex_buffer_reserve(vertex_buffer, vertex_buffer->count + 6);
     if (vertex_buffer->capacity < vertex_buffer->count + 6) {
@@ -415,7 +425,7 @@ static void emit_text_vertices(const RenderContext *ctx, const GlyphQuad *glyph,
 
     device_min = snapped_min;
     device_max = snapped_max;
-    float z = (float)glyph->z_index;
+    float z = (float)glyph->layer;
 
     ui_text_vertex_buffer_reserve(vertex_buffer, vertex_buffer->count + 6);
     if (vertex_buffer->capacity < vertex_buffer->count + 6) {

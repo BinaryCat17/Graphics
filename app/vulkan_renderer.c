@@ -1124,6 +1124,12 @@ static bool build_vertices_from_widgets(FrameResources *frame) {
         return false;
     }
 
+    size_t *widget_ordinals = g_widgets.count > 0 ? calloc(g_widgets.count, sizeof(size_t)) : NULL;
+    if (g_widgets.count > 0 && !widget_ordinals) {
+        free(view_models);
+        return false;
+    }
+
     size_t view_model_count = 0;
     for (size_t i = 0; i < g_widgets.count; ++i) {
         const Widget *widget = &g_widgets.items[i];
@@ -1147,7 +1153,9 @@ static bool build_vertices_from_widgets(FrameResources *frame) {
                 view_models[view_model_count++] = (ViewModel){
                     .id = widget->id,
                     .logical_box = { {clipped_border.x, clipped_border.y}, {clipped_border.w, clipped_border.h} },
-                    .z_index = base_z + Z_LAYER_BORDER,
+                    .layer = base_z,
+                    .phase = RENDER_PHASE_BACKGROUND,
+                    .ordinal = widget_ordinals[i]++,
                     .color = widget->border_color,
                 };
             }
@@ -1171,7 +1179,9 @@ static bool build_vertices_from_widgets(FrameResources *frame) {
                 view_models[view_model_count++] = (ViewModel){
                     .id = widget->id,
                     .logical_box = { {clipped_track.x, clipped_track.y}, {clipped_track.w, clipped_track.h} },
-                    .z_index = base_z + Z_LAYER_SLIDER_TRACK,
+                    .layer = base_z,
+                    .phase = RENDER_PHASE_BACKGROUND,
+                    .ordinal = widget_ordinals[i]++,
                     .color = track_color,
                 };
             }
@@ -1184,7 +1194,9 @@ static bool build_vertices_from_widgets(FrameResources *frame) {
                 view_models[view_model_count++] = (ViewModel){
                     .id = widget->id,
                     .logical_box = { {clipped_fill.x, clipped_fill.y}, {clipped_fill.w, clipped_fill.h} },
-                    .z_index = base_z + Z_LAYER_SLIDER_FILL,
+                    .layer = base_z,
+                    .phase = RENDER_PHASE_BACKGROUND,
+                    .ordinal = widget_ordinals[i]++,
                     .color = widget->color,
                 };
             }
@@ -1205,7 +1217,9 @@ static bool build_vertices_from_widgets(FrameResources *frame) {
                 view_models[view_model_count++] = (ViewModel){
                     .id = widget->id,
                     .logical_box = { {clipped_knob.x, clipped_knob.y}, {clipped_knob.w, clipped_knob.h} },
-                    .z_index = base_z + Z_LAYER_SLIDER_KNOB,
+                    .layer = base_z,
+                    .phase = RENDER_PHASE_BACKGROUND,
+                    .ordinal = widget_ordinals[i]++,
                     .color = knob_color,
                 };
             }
@@ -1218,7 +1232,9 @@ static bool build_vertices_from_widgets(FrameResources *frame) {
             view_models[view_model_count++] = (ViewModel){
                 .id = widget->id,
                 .logical_box = { {clipped_fill.x, clipped_fill.y}, {clipped_fill.w, clipped_fill.h} },
-                .z_index = base_z + Z_LAYER_FILL,
+                .layer = base_z,
+                .phase = RENDER_PHASE_BACKGROUND,
+                .ordinal = widget_ordinals[i]++,
                 .color = widget->color,
             };
         }
@@ -1232,14 +1248,14 @@ static bool build_vertices_from_widgets(FrameResources *frame) {
             Color track_color = widget->scrollbar_track_color;
             Rect scroll_track = { track_x, track_y, track_w, track_h };
             Rect clipped_track;
-            const int scrollbar_z = base_z + Z_LAYER_SCROLLBAR_TRACK;
-
             if (apply_clip_rect(widget, &scroll_track, &clipped_track) &&
                 ensure_view_model_capacity(&view_models, &view_model_capacity, view_model_count + 1, &view_models_ok)) {
                 view_models[view_model_count++] = (ViewModel){
                     .id = widget->id,
                     .logical_box = { {clipped_track.x, clipped_track.y}, {clipped_track.w, clipped_track.h} },
-                    .z_index = scrollbar_z,
+                    .layer = base_z,
+                    .phase = RENDER_PHASE_BACKGROUND,
+                    .ordinal = widget_ordinals[i]++,
                     .color = track_color,
                 };
             }
@@ -1261,7 +1277,9 @@ static bool build_vertices_from_widgets(FrameResources *frame) {
                 view_models[view_model_count++] = (ViewModel){
                     .id = widget->id,
                     .logical_box = { {clipped_thumb.x, clipped_thumb.y}, {clipped_thumb.w, clipped_thumb.h} },
-                    .z_index = base_z + Z_LAYER_SCROLLBAR_THUMB,
+                    .layer = base_z,
+                    .phase = RENDER_PHASE_BACKGROUND,
+                    .ordinal = widget_ordinals[i]++,
                     .color = thumb_color,
                 };
             }
@@ -1270,6 +1288,7 @@ static bool build_vertices_from_widgets(FrameResources *frame) {
     if (!view_models_ok) {
         free(glyph_quads.items);
         free(view_models);
+        free(widget_ordinals);
         return false;
     }
 
@@ -1280,7 +1299,7 @@ static bool build_vertices_from_widgets(FrameResources *frame) {
             continue;
         }
 
-        int text_z = widget->z_index + Z_LAYER_TEXT;
+        int base_z = widget->z_index;
 
         float scroll_offset = widget->scroll_static ? 0.0f : widget->scroll_offset;
         float snapped_scroll_pixels = -snap_to_pixel(scroll_offset * g_transformer.dpi_scale);
@@ -1338,7 +1357,10 @@ static bool build_vertices_from_widgets(FrameResources *frame) {
                 .uv0 = {u0, v0},
                 .uv1 = {u1, v1},
                 .color = widget->text_color,
-                .z_index = text_z,
+                .widget_id = widget->id,
+                .layer = base_z,
+                .phase = RENDER_PHASE_OVERLAY,
+                .ordinal = widget_ordinals[i]++,
             };
 
             pen_x += g->advance;
@@ -1368,6 +1390,7 @@ static bool build_vertices_from_widgets(FrameResources *frame) {
         renderer_dispose(&renderer);
         free(glyph_quads.items);
         free(view_models);
+        free(widget_ordinals);
         return false;
     }
 
@@ -1444,6 +1467,7 @@ static bool build_vertices_from_widgets(FrameResources *frame) {
     free(glyph_quads.items);
     free(primitives);
     free(view_models);
+    free(widget_ordinals);
 
     return success;
 }
