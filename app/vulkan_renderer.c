@@ -1460,7 +1460,7 @@ static bool build_vertices_from_widgets(FrameResources *frame) {
             size_t cursor = 0;
             float step = primitive_count > 0 ? 1.0f / (float)(primitive_count + 1) : 1.0f;
             for (size_t i = 0; i < primitive_count; ++i) {
-                float depth = 1.0f - step * (float)(primitive_count - i);
+                float depth = step * (float)(primitive_count - i);
                 if (depth < 0.0f) depth = 0.0f;
                 if (depth > 1.0f) depth = 1.0f;
                 for (int v = 0; v < 6; ++v) {
