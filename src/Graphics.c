@@ -4,7 +4,7 @@
 #include <string.h>
 #include <math.h>
 
-static void ensure_capacity(DrawList *list, size_t required)
+static void ensure_capacity(RenderCommandList *list, size_t required)
 {
     if (required <= list->capacity) {
         return;
@@ -15,7 +15,7 @@ static void ensure_capacity(DrawList *list, size_t required)
         new_capacity *= 2;
     }
 
-    DrawCommand *expanded = (DrawCommand *)realloc(list->commands, new_capacity * sizeof(DrawCommand));
+    RenderCommand *expanded = (RenderCommand *)realloc(list->commands, new_capacity * sizeof(RenderCommand));
     if (!expanded) {
         return;
     }
@@ -104,7 +104,7 @@ int layout_hit_test(const LayoutResult *layout, Vec2 logical_point)
            logical_point.y >= miny && logical_point.y <= maxy;
 }
 
-void draw_list_init(DrawList *list, size_t initial_capacity)
+void render_command_list_init(RenderCommandList *list, size_t initial_capacity)
 {
     list->count = 0;
     list->capacity = 0;
@@ -112,7 +112,7 @@ void draw_list_init(DrawList *list, size_t initial_capacity)
     ensure_capacity(list, initial_capacity);
 }
 
-void draw_list_dispose(DrawList *list)
+void render_command_list_dispose(RenderCommandList *list)
 {
     free(list->commands);
     list->commands = NULL;
@@ -120,7 +120,7 @@ void draw_list_dispose(DrawList *list)
     list->capacity = 0;
 }
 
-void draw_list_add(DrawList *list, const DrawCommand *command)
+void render_command_list_add(RenderCommandList *list, const RenderCommand *command)
 {
     ensure_capacity(list, list->count + 1);
     if (list->capacity < list->count + 1) {
@@ -130,46 +130,111 @@ void draw_list_add(DrawList *list, const DrawCommand *command)
     list->commands[list->count++] = *command;
 }
 
-static int compare_draw_commands(const void *lhs, const void *rhs)
+static int compare_sort_keys(const RenderSortKey *a, const RenderSortKey *b)
 {
-    const DrawCommand *a = (const DrawCommand *)lhs;
-    const DrawCommand *b = (const DrawCommand *)rhs;
-    return (a->z_index > b->z_index) - (a->z_index < b->z_index);
+    if (a->z_index != b->z_index) {
+        return (a->z_index > b->z_index) - (a->z_index < b->z_index);
+    }
+
+    if (a->primitive != b->primitive) {
+        return (a->primitive > b->primitive) - (a->primitive < b->primitive);
+    }
+
+    if (a->ordinal != b->ordinal) {
+        return (a->ordinal > b->ordinal) - (a->ordinal < b->ordinal);
+    }
+
+    return 0;
 }
 
-void draw_list_sort(DrawList *list)
+static void merge(RenderCommand *commands, RenderCommand *scratch, size_t left, size_t mid, size_t right)
+{
+    size_t i = left;
+    size_t j = mid;
+    size_t k = left;
+
+    while (i < mid && j < right) {
+        if (compare_sort_keys(&commands[i].key, &commands[j].key) <= 0) {
+            scratch[k++] = commands[i++];
+        } else {
+            scratch[k++] = commands[j++];
+        }
+    }
+
+    while (i < mid) {
+        scratch[k++] = commands[i++];
+    }
+
+    while (j < right) {
+        scratch[k++] = commands[j++];
+    }
+
+    for (size_t idx = left; idx < right; ++idx) {
+        commands[idx] = scratch[idx];
+    }
+}
+
+static void stable_sort(RenderCommand *commands, RenderCommand *scratch, size_t left, size_t right)
+{
+    if (right - left <= 1) {
+        return;
+    }
+
+    size_t mid = left + (right - left) / 2;
+    stable_sort(commands, scratch, left, mid);
+    stable_sort(commands, scratch, mid, right);
+    merge(commands, scratch, left, mid, right);
+}
+
+void render_command_list_sort(RenderCommandList *list)
 {
     if (list->count <= 1) {
         return;
     }
 
-    qsort(list->commands, list->count, sizeof(DrawCommand), compare_draw_commands);
+    RenderCommand *scratch = (RenderCommand *)malloc(list->count * sizeof(RenderCommand));
+    if (!scratch) {
+        return;
+    }
+
+    stable_sort(list->commands, scratch, 0, list->count);
+    free(scratch);
 }
 
 void renderer_init(Renderer *renderer, const RenderContext *context, size_t initial_capacity)
 {
     renderer->context = *context;
-    draw_list_init(&renderer->draw_list, initial_capacity);
+    render_command_list_init(&renderer->command_list, initial_capacity);
 }
 
 void renderer_dispose(Renderer *renderer)
 {
-    draw_list_dispose(&renderer->draw_list);
+    render_command_list_dispose(&renderer->command_list);
 }
 
-void renderer_build_draw_list(Renderer *renderer, const ViewModel *view_models, size_t view_model_count)
+void renderer_build_commands(Renderer *renderer, const ViewModel *view_models, size_t view_model_count, const GlyphQuad *glyphs, size_t glyph_count)
 {
-    renderer->draw_list.count = 0;
+    renderer->command_list.count = 0;
+    size_t ordinal = 0;
     for (size_t i = 0; i < view_model_count; ++i) {
         LayoutResult layout = layout_resolve(&view_models[i].logical_box, &renderer->context);
-        DrawCommand command = {0};
-        command.layout = layout;
-        command.z_index = view_models[i].z_index;
-        command.color = view_models[i].color;
-        draw_list_add(&renderer->draw_list, &command);
+        RenderCommand command = {0};
+        command.primitive = RENDER_PRIMITIVE_BACKGROUND;
+        command.key = (RenderSortKey){view_models[i].z_index, command.primitive, ordinal++};
+        command.data.background.layout = layout;
+        command.data.background.color = view_models[i].color;
+        render_command_list_add(&renderer->command_list, &command);
     }
 
-    draw_list_sort(&renderer->draw_list);
+    for (size_t i = 0; i < glyph_count; ++i) {
+        RenderCommand command = {0};
+        command.primitive = RENDER_PRIMITIVE_GLYPH;
+        command.key = (RenderSortKey){glyphs[i].z_index, command.primitive, ordinal++};
+        command.data.glyph = glyphs[i];
+        render_command_list_add(&renderer->command_list, &command);
+    }
+
+    render_command_list_sort(&renderer->command_list);
 }
 
 void ui_vertex_buffer_init(UiVertexBuffer *buffer, size_t initial_capacity)
@@ -208,6 +273,8 @@ void ui_vertex_buffer_reserve(UiVertexBuffer *buffer, size_t vertex_capacity)
     buffer->capacity = new_capacity;
 }
 
+static void emit_text_vertices(const RenderContext *ctx, const GlyphQuad *glyph, UiTextVertexBuffer *vertex_buffer);
+
 static void project_point(const RenderContext *ctx, Vec2 point, float z, float out_position[3])
 {
     const float v[4] = {point.x, point.y, z, 1.0f};
@@ -223,11 +290,11 @@ static void project_point(const RenderContext *ctx, Vec2 point, float z, float o
     out_position[2] = result[2];
 }
 
-static void emit_quad_vertices(const RenderContext *ctx, const DrawCommand *command, UiVertexBuffer *vertex_buffer)
+static void emit_quad_vertices(const RenderContext *ctx, const RenderCommand *command, UiVertexBuffer *vertex_buffer)
 {
-    Vec2 min = command->layout.device.origin;
-    Vec2 max = {min.x + command->layout.device.size.x, min.y + command->layout.device.size.y};
-    float z = (float)command->z_index;
+    Vec2 min = command->data.background.layout.device.origin;
+    Vec2 max = {min.x + command->data.background.layout.device.size.x, min.y + command->data.background.layout.device.size.y};
+    float z = (float)command->key.z_index;
 
     ui_vertex_buffer_reserve(vertex_buffer, vertex_buffer->count + 6);
     if (vertex_buffer->capacity < vertex_buffer->count + 6) {
@@ -241,7 +308,7 @@ static void emit_quad_vertices(const RenderContext *ctx, const DrawCommand *comm
     for (int i = 0; i < 6; ++i) {
         UiVertex v = {0};
         project_point(ctx, corners[indices[i]], z, v.position);
-        v.color = command->color;
+        v.color = command->data.background.color;
         quad[i] = v;
     }
 
@@ -249,13 +316,33 @@ static void emit_quad_vertices(const RenderContext *ctx, const DrawCommand *comm
     vertex_buffer->count += 6;
 }
 
-void renderer_fill_background_vertices(Renderer *renderer, const ViewModel *view_models, size_t view_model_count, UiVertexBuffer *vertex_buffer)
+void renderer_fill_vertices(Renderer *renderer, const ViewModel *view_models, size_t view_model_count, const GlyphQuad *glyphs, size_t glyph_count, UiVertexBuffer *background_buffer, UiTextVertexBuffer *text_buffer)
 {
-    renderer_build_draw_list(renderer, view_models, view_model_count);
-    vertex_buffer->count = 0;
+    renderer_build_commands(renderer, view_models, view_model_count, glyphs, glyph_count);
 
-    for (size_t i = 0; i < renderer->draw_list.count; ++i) {
-        emit_quad_vertices(&renderer->context, &renderer->draw_list.commands[i], vertex_buffer);
+    if (background_buffer) {
+        background_buffer->count = 0;
+    }
+    if (text_buffer) {
+        text_buffer->count = 0;
+    }
+
+    for (size_t i = 0; i < renderer->command_list.count; ++i) {
+        const RenderCommand *command = &renderer->command_list.commands[i];
+        switch (command->primitive) {
+            case RENDER_PRIMITIVE_BACKGROUND:
+                if (background_buffer) {
+                    emit_quad_vertices(&renderer->context, command, background_buffer);
+                }
+                break;
+            case RENDER_PRIMITIVE_GLYPH:
+                if (text_buffer) {
+                    emit_text_vertices(&renderer->context, &command->data.glyph, text_buffer);
+                }
+                break;
+            default:
+                break;
+        }
     }
 }
 
@@ -353,11 +440,13 @@ static void emit_text_vertices(const RenderContext *ctx, const GlyphQuad *glyph,
     vertex_buffer->count += 6;
 }
 
-void renderer_fill_text_vertices(const RenderContext *context, const GlyphQuad *glyphs, size_t glyph_count, UiTextVertexBuffer *vertex_buffer)
+void renderer_fill_background_vertices(Renderer *renderer, const ViewModel *view_models, size_t view_model_count, UiVertexBuffer *vertex_buffer)
 {
-    vertex_buffer->count = 0;
-    for (size_t i = 0; i < glyph_count; ++i) {
-        emit_text_vertices(context, &glyphs[i], vertex_buffer);
-    }
+    renderer_fill_vertices(renderer, view_models, view_model_count, NULL, 0, vertex_buffer, NULL);
+}
+
+void renderer_fill_text_vertices(Renderer *renderer, const GlyphQuad *glyphs, size_t glyph_count, UiTextVertexBuffer *vertex_buffer)
+{
+    renderer_fill_vertices(renderer, NULL, 0, glyphs, glyph_count, NULL, vertex_buffer);
 }
 
