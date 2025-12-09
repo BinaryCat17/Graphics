@@ -1134,6 +1134,7 @@ static bool build_vertices_from_widgets(FrameResources *frame) {
     for (size_t i = 0; i < g_widgets.count; ++i) {
         const Widget *widget = &g_widgets.items[i];
         int base_z = widget->z_index;
+        int text_z = base_z + Z_LAYER_TEXT;
 
         float scroll_offset = widget->scroll_static ? 0.0f : widget->scroll_offset;
         float snapped_scroll_pixels = -snap_to_pixel(scroll_offset * g_transformer.dpi_scale);
@@ -1150,15 +1151,15 @@ static bool build_vertices_from_widgets(FrameResources *frame) {
             Rect clipped_border;
             if (apply_clip_rect(widget, &widget_rect, &clipped_border) &&
                 ensure_view_model_capacity(&view_models, &view_model_capacity, view_model_count + 1, &view_models_ok)) {
-                view_models[view_model_count++] = (ViewModel){
-                    .id = widget->id,
-                    .logical_box = { {clipped_border.x, clipped_border.y}, {clipped_border.w, clipped_border.h} },
-                    .layer = base_z,
-                    .phase = RENDER_PHASE_BACKGROUND,
-                    .ordinal = widget_ordinals[i]++,
-                    .color = widget->border_color,
-                };
-            }
+            view_models[view_model_count++] = (ViewModel){
+                .id = widget->id,
+                .logical_box = { {clipped_border.x, clipped_border.y}, {clipped_border.w, clipped_border.h} },
+                .layer = base_z + Z_LAYER_BORDER,
+                .phase = RENDER_PHASE_BACKGROUND,
+                .ordinal = widget_ordinals[i]++,
+                .color = widget->border_color,
+            };
+        }
         }
 
         if (widget->type == W_HSLIDER) {
@@ -1179,7 +1180,7 @@ static bool build_vertices_from_widgets(FrameResources *frame) {
                 view_models[view_model_count++] = (ViewModel){
                     .id = widget->id,
                     .logical_box = { {clipped_track.x, clipped_track.y}, {clipped_track.w, clipped_track.h} },
-                    .layer = base_z,
+                    .layer = base_z + Z_LAYER_SLIDER_TRACK,
                     .phase = RENDER_PHASE_BACKGROUND,
                     .ordinal = widget_ordinals[i]++,
                     .color = track_color,
@@ -1194,7 +1195,7 @@ static bool build_vertices_from_widgets(FrameResources *frame) {
                 view_models[view_model_count++] = (ViewModel){
                     .id = widget->id,
                     .logical_box = { {clipped_fill.x, clipped_fill.y}, {clipped_fill.w, clipped_fill.h} },
-                    .layer = base_z,
+                    .layer = base_z + Z_LAYER_SLIDER_FILL,
                     .phase = RENDER_PHASE_BACKGROUND,
                     .ordinal = widget_ordinals[i]++,
                     .color = widget->color,
@@ -1217,7 +1218,7 @@ static bool build_vertices_from_widgets(FrameResources *frame) {
                 view_models[view_model_count++] = (ViewModel){
                     .id = widget->id,
                     .logical_box = { {clipped_knob.x, clipped_knob.y}, {clipped_knob.w, clipped_knob.h} },
-                    .layer = base_z,
+                    .layer = base_z + Z_LAYER_SLIDER_KNOB,
                     .phase = RENDER_PHASE_BACKGROUND,
                     .ordinal = widget_ordinals[i]++,
                     .color = knob_color,
@@ -1232,7 +1233,7 @@ static bool build_vertices_from_widgets(FrameResources *frame) {
             view_models[view_model_count++] = (ViewModel){
                 .id = widget->id,
                 .logical_box = { {clipped_fill.x, clipped_fill.y}, {clipped_fill.w, clipped_fill.h} },
-                .layer = base_z,
+                .layer = base_z + Z_LAYER_FILL,
                 .phase = RENDER_PHASE_BACKGROUND,
                 .ordinal = widget_ordinals[i]++,
                 .color = widget->color,
@@ -1253,7 +1254,7 @@ static bool build_vertices_from_widgets(FrameResources *frame) {
                 view_models[view_model_count++] = (ViewModel){
                     .id = widget->id,
                     .logical_box = { {clipped_track.x, clipped_track.y}, {clipped_track.w, clipped_track.h} },
-                    .layer = base_z,
+                    .layer = base_z + Z_LAYER_SCROLLBAR_TRACK,
                     .phase = RENDER_PHASE_BACKGROUND,
                     .ordinal = widget_ordinals[i]++,
                     .color = track_color,
@@ -1277,7 +1278,7 @@ static bool build_vertices_from_widgets(FrameResources *frame) {
                 view_models[view_model_count++] = (ViewModel){
                     .id = widget->id,
                     .logical_box = { {clipped_thumb.x, clipped_thumb.y}, {clipped_thumb.w, clipped_thumb.h} },
-                    .layer = base_z,
+                    .layer = base_z + Z_LAYER_SCROLLBAR_THUMB,
                     .phase = RENDER_PHASE_BACKGROUND,
                     .ordinal = widget_ordinals[i]++,
                     .color = thumb_color,
@@ -1299,7 +1300,7 @@ static bool build_vertices_from_widgets(FrameResources *frame) {
             continue;
         }
 
-        int base_z = widget->z_index;
+        int text_z = widget->z_index + Z_LAYER_TEXT;
 
         float scroll_offset = widget->scroll_static ? 0.0f : widget->scroll_offset;
         float snapped_scroll_pixels = -snap_to_pixel(scroll_offset * g_transformer.dpi_scale);
@@ -1358,7 +1359,7 @@ static bool build_vertices_from_widgets(FrameResources *frame) {
                 .uv1 = {u1, v1},
                 .color = widget->text_color,
                 .widget_id = widget->id,
-                .layer = base_z,
+                .layer = text_z,
                 .phase = RENDER_PHASE_OVERLAY,
                 .ordinal = widget_ordinals[i]++,
             };
