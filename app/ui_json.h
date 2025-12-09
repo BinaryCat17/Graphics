@@ -5,6 +5,8 @@
 #include "Graphics.h"
 #include "cad_scene.h"
 
+#define UI_Z_ORDER_SCALE 1000
+
 typedef struct { float x, y, w, h; } Rect;
 typedef enum { W_PANEL, W_LABEL, W_BUTTON, W_HSLIDER, W_RECT, W_SPACER, W_CHECKBOX, W_PROGRESS } WidgetType;
 
@@ -49,6 +51,8 @@ typedef struct UiNode {
     WidgetType widget_type;
     Rect rect;
     int has_x, has_y, has_w, has_h;
+    int z_index;
+    int has_z_index;
     float spacing;
     int has_spacing;
     int columns;
@@ -101,6 +105,7 @@ typedef struct Widget {
     WidgetType type;
     Rect rect;
     float scroll_offset;
+    int z_index;
     Color color;
     Color text_color;
     float base_padding;

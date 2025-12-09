@@ -17,6 +17,17 @@
 #define STB_TRUETYPE_IMPLEMENTATION
 #include "stb_truetype.h"
 
+enum {
+    Z_LAYER_BORDER = 0,
+    Z_LAYER_FILL = 1,
+    Z_LAYER_SLIDER_TRACK = 1,
+    Z_LAYER_SLIDER_FILL = 2,
+    Z_LAYER_SLIDER_KNOB = 3,
+    Z_LAYER_SCROLLBAR_TRACK = 100,
+    Z_LAYER_SCROLLBAR_THUMB = 101,
+    Z_LAYER_TEXT = 200,
+};
+
 /* ---------- Vulkan helpers & global state ---------- */
 /* ---------- Vulkan helpers & global state ---------- */
 static GLFWwindow* g_window = NULL;
@@ -53,6 +64,11 @@ typedef struct { float viewport[2]; } ViewConstants;
 
 /* Vertex format for GUI: pos.xy, uv.xy, use_tex, color.rgba */
 typedef struct { float px, py; float u, v; float use_tex; float r, g, b, a; } Vtx;
+typedef struct {
+    float z;
+    size_t order;
+    Vtx vertices[6];
+} Primitive;
 static Vtx* vtx_buf = NULL;
 static size_t vtx_count = 0;
 static size_t vtx_capacity = 0;
@@ -791,6 +807,15 @@ static bool ensure_view_model_capacity(ViewModel **view_models, size_t *capacity
     return true;
 }
 
+static int compare_primitives(const void *lhs, const void *rhs)
+{
+    const Primitive *a = (const Primitive *)lhs;
+    const Primitive *b = (const Primitive *)rhs;
+    if (a->z < b->z) return -1;
+    if (a->z > b->z) return 1;
+    return (a->order > b->order) - (a->order < b->order);
+}
+
 static void build_font_atlas(void) {
     if (!g_font_path) fatal("Font path is null");
     FILE* f = fopen(g_font_path, "rb");
@@ -917,6 +942,7 @@ static void build_vertices_from_widgets(void) {
     size_t view_model_count = 0;
     for (size_t i = 0; i < g_widgets.count; ++i) {
         const Widget *widget = &g_widgets.items[i];
+        int base_z = widget->z_index;
 
         float scroll_offset = widget->scroll_static ? 0.0f : widget->scroll_offset;
         float snapped_scroll_pixels = -snap_to_pixel(scroll_offset * g_transformer.dpi_scale);
@@ -936,7 +962,7 @@ static void build_vertices_from_widgets(void) {
                 view_models[view_model_count++] = (ViewModel){
                     .id = widget->id,
                     .logical_box = { {clipped_border.x, clipped_border.y}, {clipped_border.w, clipped_border.h} },
-                    .z_index = (int)view_model_count,
+                    .z_index = base_z + Z_LAYER_BORDER,
                     .color = widget->border_color,
                 };
             }
@@ -951,8 +977,6 @@ static void build_vertices_from_widgets(void) {
             float t = denom != 0.0f ? (widget->value - widget->minv) / denom : 0.0f;
             if (t < 0.0f) t = 0.0f; else if (t > 1.0f) t = 1.0f;
 
-            int base_z = (int)view_model_count;
-
             Color track_color = widget->color;
             track_color.a *= 0.35f;
             Rect track_rect = { track_x, track_y, track_w, track_height };
@@ -962,7 +986,7 @@ static void build_vertices_from_widgets(void) {
                 view_models[view_model_count++] = (ViewModel){
                     .id = widget->id,
                     .logical_box = { {clipped_track.x, clipped_track.y}, {clipped_track.w, clipped_track.h} },
-                    .z_index = base_z,
+                    .z_index = base_z + Z_LAYER_SLIDER_TRACK,
                     .color = track_color,
                 };
             }
@@ -975,7 +999,7 @@ static void build_vertices_from_widgets(void) {
                 view_models[view_model_count++] = (ViewModel){
                     .id = widget->id,
                     .logical_box = { {clipped_fill.x, clipped_fill.y}, {clipped_fill.w, clipped_fill.h} },
-                    .z_index = base_z + 1,
+                    .z_index = base_z + Z_LAYER_SLIDER_FILL,
                     .color = widget->color,
                 };
             }
@@ -996,7 +1020,7 @@ static void build_vertices_from_widgets(void) {
                 view_models[view_model_count++] = (ViewModel){
                     .id = widget->id,
                     .logical_box = { {clipped_knob.x, clipped_knob.y}, {clipped_knob.w, clipped_knob.h} },
-                    .z_index = base_z + 2,
+                    .z_index = base_z + Z_LAYER_SLIDER_KNOB,
                     .color = knob_color,
                 };
             }
@@ -1009,7 +1033,7 @@ static void build_vertices_from_widgets(void) {
             view_models[view_model_count++] = (ViewModel){
                 .id = widget->id,
                 .logical_box = { {clipped_fill.x, clipped_fill.y}, {clipped_fill.w, clipped_fill.h} },
-                .z_index = (int)view_model_count,
+                .z_index = base_z + Z_LAYER_FILL,
                 .color = widget->color,
             };
         }
@@ -1023,7 +1047,7 @@ static void build_vertices_from_widgets(void) {
             Color track_color = widget->scrollbar_track_color;
             Rect scroll_track = { track_x, track_y, track_w, track_h };
             Rect clipped_track;
-            const int scrollbar_z = 1000000;
+            const int scrollbar_z = base_z + Z_LAYER_SCROLLBAR_TRACK;
 
             if (apply_clip_rect(widget, &scroll_track, &clipped_track) &&
                 ensure_view_model_capacity(&view_models, &view_model_capacity, view_model_count + 1, &view_models_ok)) {
@@ -1052,7 +1076,7 @@ static void build_vertices_from_widgets(void) {
                 view_models[view_model_count++] = (ViewModel){
                     .id = widget->id,
                     .logical_box = { {clipped_thumb.x, clipped_thumb.y}, {clipped_thumb.w, clipped_thumb.h} },
-                    .z_index = scrollbar_z + 1,
+                    .z_index = base_z + Z_LAYER_SCROLLBAR_THUMB,
                     .color = thumb_color,
                 };
             }
@@ -1064,13 +1088,14 @@ static void build_vertices_from_widgets(void) {
         return;
     }
 
-    int glyph_z_base = (int)view_model_count;
     for (size_t i = 0; i < g_widgets.count; ++i) {
         const Widget *widget = &g_widgets.items[i];
 
         if (!widget->text || !*widget->text) {
             continue;
         }
+
+        int text_z = widget->z_index + Z_LAYER_TEXT;
 
         float scroll_offset = widget->scroll_static ? 0.0f : widget->scroll_offset;
         float snapped_scroll_pixels = -snap_to_pixel(scroll_offset * g_transformer.dpi_scale);
@@ -1128,7 +1153,7 @@ static void build_vertices_from_widgets(void) {
                 .uv0 = {u0, v0},
                 .uv1 = {u1, v1},
                 .color = widget->text_color,
-                .z_index = glyph_z_base + (int)glyph_quads.count,
+                .z_index = text_z,
             };
 
             pen_x += g->advance;
@@ -1159,20 +1184,51 @@ static void build_vertices_from_widgets(void) {
     ui_text_vertex_buffer_init(&text_buffer, glyph_quads.count * 6);
     renderer_fill_text_vertices(&context, glyph_quads.items, glyph_quads.count, &text_buffer);
 
-    size_t total_vertices = background_buffer.count + text_buffer.count;
-    if (total_vertices > 0 && ensure_vtx_capacity(total_vertices)) {
-        size_t cursor = 0;
-        for (size_t i = 0; i < background_buffer.count; ++i) {
-            UiVertex v = background_buffer.vertices[i];
-            vtx_buf[cursor++] = (Vtx){v.position[0], v.position[1], 0.0f, 0.0f, 0.0f, v.color.r, v.color.g, v.color.b, v.color.a};
+    size_t background_quads = background_buffer.count / 6;
+    size_t text_quads = text_buffer.count / 6;
+    size_t primitive_count = background_quads + text_quads;
+
+    Primitive *primitives = primitive_count > 0 ? calloc(primitive_count, sizeof(Primitive)) : NULL;
+    size_t prim_idx = 0;
+    size_t order_counter = 0;
+
+    if (primitives) {
+        for (size_t q = 0; q < background_quads; ++q) {
+            UiVertex *base = &background_buffer.vertices[q * 6];
+            Primitive *p = &primitives[prim_idx++];
+            p->z = base[0].position[2];
+            p->order = order_counter++;
+            for (int i = 0; i < 6; ++i) {
+                UiVertex v = base[i];
+                p->vertices[i] = (Vtx){v.position[0], v.position[1], 0.0f, 0.0f, 0.0f, v.color.r, v.color.g, v.color.b, v.color.a};
+            }
         }
 
-        for (size_t i = 0; i < text_buffer.count; ++i) {
-            UiTextVertex v = text_buffer.vertices[i];
-            vtx_buf[cursor++] = (Vtx){v.position[0], v.position[1], v.uv[0], v.uv[1], 1.0f, v.color.r, v.color.g, v.color.b, v.color.a};
+        for (size_t q = 0; q < text_quads; ++q) {
+            UiTextVertex *base = &text_buffer.vertices[q * 6];
+            Primitive *p = &primitives[prim_idx++];
+            p->z = base[0].position[2];
+            p->order = order_counter++;
+            for (int i = 0; i < 6; ++i) {
+                UiTextVertex v = base[i];
+                p->vertices[i] = (Vtx){v.position[0], v.position[1], v.uv[0], v.uv[1], 1.0f, v.color.r, v.color.g, v.color.b, v.color.a};
+            }
         }
 
-        vtx_count = cursor;
+        qsort(primitives, primitive_count, sizeof(Primitive), compare_primitives);
+
+        size_t total_vertices = primitive_count * 6;
+        if (ensure_vtx_capacity(total_vertices)) {
+            size_t cursor = 0;
+            for (size_t i = 0; i < primitive_count; ++i) {
+                for (int v = 0; v < 6; ++v) {
+                    vtx_buf[cursor++] = primitives[i].vertices[v];
+                }
+            }
+            vtx_count = cursor;
+        } else {
+            vtx_count = 0;
+        }
     } else {
         vtx_count = 0;
     }
@@ -1181,6 +1237,7 @@ static void build_vertices_from_widgets(void) {
     ui_vertex_buffer_dispose(&background_buffer);
     renderer_dispose(&renderer);
     free(glyph_quads.items);
+    free(primitives);
     free(view_models);
 }
 
