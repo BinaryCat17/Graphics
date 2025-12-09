@@ -117,6 +117,20 @@ static float clamp_scroll_offset(float offset, float max_offset) {
     return offset;
 }
 
+static int rect_intersect(const Rect* a, const Rect* b, Rect* out) {
+    if (!a || !b || !out) return 0;
+    float x0 = fmaxf(a->x, b->x);
+    float y0 = fmaxf(a->y, b->y);
+    float x1 = fminf(a->x + a->w, b->x + b->w);
+    float y1 = fminf(a->y + a->h, b->y + b->h);
+    if (x1 <= x0 || y1 <= y0) return 0;
+    out->x = x0;
+    out->y = y0;
+    out->w = x1 - x0;
+    out->h = y1 - y0;
+    return 1;
+}
+
 static int compute_scrollbar_geometry(const Widget* w, Rect* out_track, Rect* out_thumb, float* out_max_offset) {
     if (!w || !w->scrollbar_enabled || !w->show_scrollbar || w->scroll_viewport <= 0.0f) return 0;
     float max_offset = w->scroll_content - w->scroll_viewport;
@@ -210,11 +224,15 @@ void scroll_apply_offsets(ScrollContext* ctx, Widget* widgets, size_t widget_cou
             w->show_scrollbar = w->scrollbar_enabled && overflow > 1.0f;
         }
         if (a->has_viewport) {
+            Rect clip = a->viewport;
+            if (w->has_clip) rect_intersect(&w->clip, &clip, &clip);
             w->has_clip = 1;
-            w->clip = a->viewport;
+            w->clip = clip;
         } else if (a->has_bounds) {
+            Rect clip = a->bounds;
+            if (w->has_clip) rect_intersect(&w->clip, &clip, &clip);
             w->has_clip = 1;
-            w->clip = a->bounds;
+            w->clip = clip;
         }
     }
 }

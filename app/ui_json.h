@@ -97,6 +97,10 @@ typedef struct LayoutNode {
     const UiNode* source;
     Rect rect;
     Rect base_rect;
+    Rect local_rect;
+    Vec2 transform;
+    Rect clip;
+    int has_clip;
     struct LayoutNode* children;
     size_t child_count;
 } LayoutNode;
