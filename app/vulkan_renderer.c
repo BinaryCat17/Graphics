@@ -1522,6 +1522,7 @@ static void draw_frame(void) {
             FrameResources* owner = &frame_resources[idx];
             if (owner->inflight_fence == fences[img_idx]) {
                 owner->stage = FRAME_AVAILABLE;
+                owner->inflight_fence = VK_NULL_HANDLE;
                 image_frame_owner[img_idx] = -1;
             }
         }
@@ -1530,10 +1531,13 @@ static void draw_frame(void) {
     FrameResources *frame = &frame_resources[current_frame_cursor % 2];
     current_frame_cursor = (current_frame_cursor + 1) % 2;
 
-    if (frame->stage == FRAME_SUBMITTED && frame->inflight_fence && frame->inflight_fence != fences[img_idx]) {
-        vkWaitForFences(device, 1, &frame->inflight_fence, VK_TRUE, UINT64_MAX);
-        vkResetFences(device, 1, &frame->inflight_fence);
+    if (frame->stage == FRAME_SUBMITTED && frame->inflight_fence) {
+        if (frame->inflight_fence != fences[img_idx]) {
+            vkWaitForFences(device, 1, &frame->inflight_fence, VK_TRUE, UINT64_MAX);
+            vkResetFences(device, 1, &frame->inflight_fence);
+        }
         frame->stage = FRAME_AVAILABLE;
+        frame->inflight_fence = VK_NULL_HANDLE;
     }
     frame->stage = FRAME_FILLING;
 
