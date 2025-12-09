@@ -17,6 +17,17 @@
 #define STB_TRUETYPE_IMPLEMENTATION
 #include "stb_truetype.h"
 
+enum {
+    Z_LAYER_BORDER = 0,
+    Z_LAYER_FILL = 1,
+    Z_LAYER_SLIDER_TRACK = 1,
+    Z_LAYER_SLIDER_FILL = 2,
+    Z_LAYER_SLIDER_KNOB = 3,
+    Z_LAYER_SCROLLBAR_TRACK = 100,
+    Z_LAYER_SCROLLBAR_THUMB = 101,
+    Z_LAYER_TEXT = 200,
+};
+
 /* ---------- Vulkan helpers & global state ---------- */
 /* ---------- Vulkan helpers & global state ---------- */
 static GLFWwindow* g_window = NULL;
@@ -917,6 +928,7 @@ static void build_vertices_from_widgets(void) {
     size_t view_model_count = 0;
     for (size_t i = 0; i < g_widgets.count; ++i) {
         const Widget *widget = &g_widgets.items[i];
+        int base_z = widget->z_index;
 
         float scroll_offset = widget->scroll_static ? 0.0f : widget->scroll_offset;
         float snapped_scroll_pixels = -snap_to_pixel(scroll_offset * g_transformer.dpi_scale);
@@ -936,7 +948,7 @@ static void build_vertices_from_widgets(void) {
                 view_models[view_model_count++] = (ViewModel){
                     .id = widget->id,
                     .logical_box = { {clipped_border.x, clipped_border.y}, {clipped_border.w, clipped_border.h} },
-                    .z_index = (int)view_model_count,
+                    .z_index = base_z + Z_LAYER_BORDER,
                     .color = widget->border_color,
                 };
             }
@@ -951,8 +963,6 @@ static void build_vertices_from_widgets(void) {
             float t = denom != 0.0f ? (widget->value - widget->minv) / denom : 0.0f;
             if (t < 0.0f) t = 0.0f; else if (t > 1.0f) t = 1.0f;
 
-            int base_z = (int)view_model_count;
-
             Color track_color = widget->color;
             track_color.a *= 0.35f;
             Rect track_rect = { track_x, track_y, track_w, track_height };
@@ -962,7 +972,7 @@ static void build_vertices_from_widgets(void) {
                 view_models[view_model_count++] = (ViewModel){
                     .id = widget->id,
                     .logical_box = { {clipped_track.x, clipped_track.y}, {clipped_track.w, clipped_track.h} },
-                    .z_index = base_z,
+                    .z_index = base_z + Z_LAYER_SLIDER_TRACK,
                     .color = track_color,
                 };
             }
@@ -975,7 +985,7 @@ static void build_vertices_from_widgets(void) {
                 view_models[view_model_count++] = (ViewModel){
                     .id = widget->id,
                     .logical_box = { {clipped_fill.x, clipped_fill.y}, {clipped_fill.w, clipped_fill.h} },
-                    .z_index = base_z + 1,
+                    .z_index = base_z + Z_LAYER_SLIDER_FILL,
                     .color = widget->color,
                 };
             }
@@ -996,7 +1006,7 @@ static void build_vertices_from_widgets(void) {
                 view_models[view_model_count++] = (ViewModel){
                     .id = widget->id,
                     .logical_box = { {clipped_knob.x, clipped_knob.y}, {clipped_knob.w, clipped_knob.h} },
-                    .z_index = base_z + 2,
+                    .z_index = base_z + Z_LAYER_SLIDER_KNOB,
                     .color = knob_color,
                 };
             }
@@ -1009,7 +1019,7 @@ static void build_vertices_from_widgets(void) {
             view_models[view_model_count++] = (ViewModel){
                 .id = widget->id,
                 .logical_box = { {clipped_fill.x, clipped_fill.y}, {clipped_fill.w, clipped_fill.h} },
-                .z_index = (int)view_model_count,
+                .z_index = base_z + Z_LAYER_FILL,
                 .color = widget->color,
             };
         }
@@ -1023,7 +1033,7 @@ static void build_vertices_from_widgets(void) {
             Color track_color = widget->scrollbar_track_color;
             Rect scroll_track = { track_x, track_y, track_w, track_h };
             Rect clipped_track;
-            const int scrollbar_z = 1000000;
+            const int scrollbar_z = base_z + Z_LAYER_SCROLLBAR_TRACK;
 
             if (apply_clip_rect(widget, &scroll_track, &clipped_track) &&
                 ensure_view_model_capacity(&view_models, &view_model_capacity, view_model_count + 1, &view_models_ok)) {
@@ -1052,7 +1062,7 @@ static void build_vertices_from_widgets(void) {
                 view_models[view_model_count++] = (ViewModel){
                     .id = widget->id,
                     .logical_box = { {clipped_thumb.x, clipped_thumb.y}, {clipped_thumb.w, clipped_thumb.h} },
-                    .z_index = scrollbar_z + 1,
+                    .z_index = base_z + Z_LAYER_SCROLLBAR_THUMB,
                     .color = thumb_color,
                 };
             }
@@ -1064,13 +1074,14 @@ static void build_vertices_from_widgets(void) {
         return;
     }
 
-    int glyph_z_base = (int)view_model_count;
     for (size_t i = 0; i < g_widgets.count; ++i) {
         const Widget *widget = &g_widgets.items[i];
 
         if (!widget->text || !*widget->text) {
             continue;
         }
+
+        int text_z = widget->z_index + Z_LAYER_TEXT;
 
         float scroll_offset = widget->scroll_static ? 0.0f : widget->scroll_offset;
         float snapped_scroll_pixels = -snap_to_pixel(scroll_offset * g_transformer.dpi_scale);
@@ -1128,7 +1139,7 @@ static void build_vertices_from_widgets(void) {
                 .uv0 = {u0, v0},
                 .uv1 = {u1, v1},
                 .color = widget->text_color,
-                .z_index = glyph_z_base + (int)glyph_quads.count,
+                .z_index = text_z,
             };
 
             pen_x += g->advance;

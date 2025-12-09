@@ -424,6 +424,8 @@ static UiNode* create_node(void) {
     if (!node) return NULL;
     node->layout = UI_LAYOUT_NONE;
     node->widget_type = W_PANEL;
+    node->z_index = 0;
+    node->has_z_index = 0;
     node->spacing = -1.0f;
     node->has_spacing = 0;
     node->columns = 0;
@@ -478,6 +480,7 @@ static UiNode* parse_ui_node(const char* json, jsmntok_t* toks, unsigned int tok
         if (tok_is_key(json, &toks[k], "y")) { node->rect.y = parse_number(json, val, node->rect.y); node->has_y = 1; k += 2; continue; }
         if (tok_is_key(json, &toks[k], "w")) { node->rect.w = parse_number(json, val, node->rect.w); node->has_w = 1; k += 2; continue; }
         if (tok_is_key(json, &toks[k], "h")) { node->rect.h = parse_number(json, val, node->rect.h); node->has_h = 1; k += 2; continue; }
+        if (tok_is_key(json, &toks[k], "z")) { node->z_index = (int)parse_number(json, val, (float)node->z_index); node->has_z_index = 1; k += 2; continue; }
         if (tok_is_key(json, &toks[k], "id") && val->type == JSMN_STRING) { node->id = tok_copy(json, val); k += 2; continue; }
         if (tok_is_key(json, &toks[k], "use") && val->type == JSMN_STRING) { node->use = tok_copy(json, val); k += 2; continue; }
         if (tok_is_key(json, &toks[k], "text") && val->type == JSMN_STRING) { node->text = tok_copy(json, val); k += 2; continue; }
@@ -595,6 +598,7 @@ static void merge_node(UiNode* node, const UiNode* proto) {
     if (!node->has_y && proto->has_y) { node->rect.y = proto->rect.y; node->has_y = 1; }
     if (!node->has_w && proto->has_w) { node->rect.w = proto->rect.w; node->has_w = 1; }
     if (!node->has_h && proto->has_h) { node->rect.h = proto->rect.h; node->has_h = 1; }
+    if (!node->has_z_index && proto->has_z_index) { node->z_index = proto->z_index; node->has_z_index = 1; }
     if (!node->has_spacing && proto->has_spacing) { node->spacing = proto->spacing; node->has_spacing = 1; }
     if (!node->has_columns && proto->has_columns) { node->columns = proto->columns; node->has_columns = 1; }
     if (node->style == &DEFAULT_STYLE && proto->style) node->style = proto->style;
@@ -640,6 +644,7 @@ static UiNode* clone_node(const UiNode* src) {
     n->widget_type = src->widget_type;
     n->rect = src->rect;
     n->has_x = src->has_x; n->has_y = src->has_y; n->has_w = src->has_w; n->has_h = src->has_h;
+    n->z_index = src->z_index; n->has_z_index = src->has_z_index;
     n->spacing = src->spacing; n->has_spacing = src->has_spacing;
     n->columns = src->columns; n->has_columns = src->has_columns;
     n->style = src->style;
@@ -970,8 +975,10 @@ static void measure_node(LayoutNode* node) {
         float max_w = 0.0f, max_h = 0.0f;
         for (size_t i = 0; i < node->child_count; i++) {
             LayoutNode* ch = &node->children[i];
-            if (ch->rect.w > max_w) max_w = ch->rect.w;
-            if (ch->rect.h > max_h) max_h = ch->rect.h;
+            float right = ch->rect.x + ch->rect.w;
+            float bottom = ch->rect.y + ch->rect.h;
+            if (right > max_w) max_w = right;
+            if (bottom > max_h) max_h = bottom;
         }
         node->rect.w = max_w + padding * 2.0f + border * 2.0f;
         node->rect.h = max_h + padding * 2.0f + border * 2.0f;
@@ -1071,15 +1078,23 @@ size_t count_layout_widgets(const LayoutNode* root) {
     return total;
 }
 
-static void populate_widgets_recursive(const LayoutNode* node, Widget* widgets, size_t widget_count, size_t* idx, char* inherited_scroll_area) {
-    if (!node || !widgets || !idx || *idx >= widget_count) return;
+static int compute_z_index(const UiNode* source, size_t appearance_order) {
+    int explicit_z = (source && source->has_z_index) ? source->z_index : 0;
+    return explicit_z * UI_Z_ORDER_SCALE - (int)appearance_order;
+}
+
+static void populate_widgets_recursive(const LayoutNode* node, Widget* widgets, size_t widget_count, size_t* idx, size_t* order, char* inherited_scroll_area) {
+    if (!node || !widgets || !idx || *idx >= widget_count || !order) return;
     char* active_scroll_area = node->source && node->source->scroll_area ? node->source->scroll_area : inherited_scroll_area;
     if (node->source && (node->source->layout == UI_LAYOUT_NONE || node->source->scroll_static)) {
         Widget* w = &widgets[*idx];
         (*idx)++;
+        size_t appearance_order = *order;
+        (*order)++;
         w->type = node->source->widget_type;
         w->rect = node->rect;
         w->scroll_offset = 0.0f;
+        w->z_index = compute_z_index(node->source, appearance_order);
         w->color = node->source->color;
         w->text_color = node->source->text_color;
         w->base_border_thickness = node->source->border_thickness;
@@ -1111,12 +1126,13 @@ static void populate_widgets_recursive(const LayoutNode* node, Widget* widgets, 
         }
         if (node->source->layout == UI_LAYOUT_NONE) return;
     }
-    for (size_t i = 0; i < node->child_count; i++) populate_widgets_recursive(&node->children[i], widgets, widget_count, idx, active_scroll_area);
+    for (size_t i = 0; i < node->child_count; i++) populate_widgets_recursive(&node->children[i], widgets, widget_count, idx, order, active_scroll_area);
 }
 
 void populate_widgets_from_layout(const LayoutNode* root, Widget* widgets, size_t widget_count) {
     size_t idx = 0;
-    populate_widgets_recursive(root, widgets, widget_count, &idx, NULL);
+    size_t order = 0;
+    populate_widgets_recursive(root, widgets, widget_count, &idx, &order, NULL);
 }
 
 WidgetArray materialize_widgets(const LayoutNode* root) {
