@@ -1521,7 +1521,11 @@ static void draw_frame(void) {
     if (image_frame_owner && image_frame_owner[img_idx] >= 0) {
         int idx = image_frame_owner[img_idx];
         if (idx >= 0 && idx < 2) {
-            frame_resources[idx].stage = FRAME_AVAILABLE;
+            FrameResources* owner = &frame_resources[idx];
+            if (owner->inflight_fence == fences[img_idx]) {
+                owner->stage = FRAME_AVAILABLE;
+                image_frame_owner[img_idx] = -1;
+            }
         }
     }
 
@@ -1558,7 +1562,11 @@ static void draw_frame(void) {
     frame->stage = FRAME_SUBMITTED;
     frame->inflight_fence = fences[img_idx];
     if (image_frame_owner) {
-        image_frame_owner[img_idx] = (int)(frame - frame_resources);
+        int frame_idx = (int)(frame - frame_resources);
+        for (uint32_t i = 0; i < swapchain_img_count; ++i) {
+            if (image_frame_owner[i] == frame_idx) image_frame_owner[i] = -1;
+        }
+        image_frame_owner[img_idx] = frame_idx;
     }
     VkPresentInfoKHR pi = { .sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR, .waitSemaphoreCount = 1, .pWaitSemaphores = &sem_render_done, .swapchainCount = 1, .pSwapchains = &swapchain, .pImageIndices = &img_idx };
     VkResult present = vkQueuePresentKHR(queue, &pi);
