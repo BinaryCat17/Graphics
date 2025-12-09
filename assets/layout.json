@@ -12,9 +12,9 @@
   },
   "layout": {
     "type": "row",
-    "x": 16,
-    "y": 16,
-    "spacing": 16,
+    "x": 24,
+    "y": 24,
+    "spacing": 20,
     "children": [
       {
         "type": "column",
@@ -22,20 +22,21 @@
         "scrollStatic": true,
         "scrollbar": true,
         "scrollbarWidth": 12,
-        "maxHeight": 640,
-        "spacing": 12,
+        "w": 440,
+        "maxHeight": 720,
+        "spacing": 14,
         "children": [
           { "use": "sectionHeader", "text": "Загруженная сцена" },
-          { "use": "divider", "w": 360 },
+          { "use": "divider", "w": 400 },
           { "use": "muted", "text": "Путь", "style": "mutedLabel" },
-          { "use": "card", "textBinding": "scenePath" },
+          { "use": "card", "w": 400, "textBinding": "scenePath" },
           { "use": "muted", "text": "Название" },
-          { "use": "card", "textBinding": "sceneName" },
+          { "use": "card", "w": 400, "textBinding": "sceneName" },
           { "use": "muted", "text": "Автор" },
-          { "use": "card", "textBinding": "sceneAuthor" },
+          { "use": "card", "w": 400, "textBinding": "sceneAuthor" },
           { "use": "muted", "text": "Статистика" },
-          { "use": "card", "textBinding": "sceneStats" },
-          { "use": "divider", "w": 360 },
+          { "use": "card", "w": 400, "textBinding": "sceneStats" },
+          { "use": "divider", "w": 400 },
           { "use": "sectionHeader", "text": "Иерархия" },
           {
             "type": "column",
@@ -43,8 +44,8 @@
             "style": "panelSecondary",
             "scrollStatic": true,
             "scrollbar": true,
-            "maxHeight": 480,
-            "spacing": 4
+            "maxHeight": 540,
+            "spacing": 5
           }
         ]
       },
@@ -53,17 +54,18 @@
         "style": "panelSecondary",
         "scrollStatic": true,
         "scrollbar": true,
-        "maxHeight": 640,
-        "spacing": 10,
+        "w": 560,
+        "maxHeight": 720,
+        "spacing": 12,
         "children": [
           { "use": "sectionHeader", "text": "Материалы" },
-          { "type": "column", "id": "materialsList", "spacing": 4 },
-          { "use": "divider", "w": 340 },
+          { "type": "column", "id": "materialsList", "spacing": 6 },
+          { "use": "divider", "w": 500 },
           { "use": "sectionHeader", "text": "Соединения" },
-          { "type": "column", "id": "jointsList", "spacing": 4 },
-          { "use": "divider", "w": 340 },
+          { "type": "column", "id": "jointsList", "spacing": 6 },
+          { "use": "divider", "w": 500 },
           { "use": "sectionHeader", "text": "Сборки и анализ" },
-          { "type": "column", "id": "analysisList", "spacing": 4 }
+          { "type": "column", "id": "analysisList", "spacing": 6 }
         ]
       }
     ]
