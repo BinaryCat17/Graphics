@@ -55,6 +55,15 @@ typedef struct LayoutResult {
     LayoutBox device;
 } LayoutResult;
 
+typedef struct GlyphQuad {
+    Vec2 min;
+    Vec2 max;
+    Vec2 uv0;
+    Vec2 uv1;
+    Color color;
+    int z_index;
+} GlyphQuad;
+
 /**
  * Representation of an immutable view model that the renderer consumes.
  * Game logic should translate its state into these view models before
@@ -67,26 +76,39 @@ typedef struct ViewModel {
     Color color;
 } ViewModel;
 
-/** Drawing command produced after layout resolution. */
-typedef struct DrawCommand {
-    LayoutResult layout;
-    int z_index;
-    Color color;
-} DrawCommand;
+typedef enum RenderPrimitive {
+    RENDER_PRIMITIVE_BACKGROUND = 0,
+    RENDER_PRIMITIVE_GLYPH = 1,
+} RenderPrimitive;
 
-/**
- * Draw list with z-ordered commands.
- */
-typedef struct DrawList {
-    DrawCommand *commands;
+typedef struct RenderSortKey {
+    int z_index;
+    int primitive;
+    size_t ordinal;
+} RenderSortKey;
+
+typedef struct RenderCommand {
+    RenderPrimitive primitive;
+    RenderSortKey key;
+    union {
+        struct {
+            LayoutResult layout;
+            Color color;
+        } background;
+        GlyphQuad glyph;
+    } data;
+} RenderCommand;
+
+typedef struct RenderCommandList {
+    RenderCommand *commands;
     size_t count;
     size_t capacity;
-} DrawList;
+} RenderCommandList;
 
 /** Renderer that owns composition for a frame. */
 typedef struct Renderer {
     RenderContext context;
-    DrawList draw_list;
+    RenderCommandList command_list;
 } Renderer;
 
 typedef struct UiVertex {
@@ -112,15 +134,6 @@ typedef struct UiTextVertexBuffer {
     size_t capacity;
 } UiTextVertexBuffer;
 
-typedef struct GlyphQuad {
-    Vec2 min;
-    Vec2 max;
-    Vec2 uv0;
-    Vec2 uv1;
-    Color color;
-    int z_index;
-} GlyphQuad;
-
 void coordinate_transformer_init(CoordinateTransformer *xfm, float dpi_scale, float ui_scale, Vec2 viewport_size);
 Vec2 coordinate_screen_to_logical(const CoordinateTransformer *xfm, Vec2 screen);
 Vec2 coordinate_logical_to_screen(const CoordinateTransformer *xfm, Vec2 logical);
@@ -134,16 +147,17 @@ void render_context_init(RenderContext *ctx, const CoordinateTransformer *xfm, c
 LayoutResult layout_resolve(const LayoutBox *logical, const RenderContext *ctx);
 int layout_hit_test(const LayoutResult *layout, Vec2 logical_point);
 
-void draw_list_init(DrawList *list, size_t initial_capacity);
-void draw_list_dispose(DrawList *list);
-void draw_list_add(DrawList *list, const DrawCommand *command);
-void draw_list_sort(DrawList *list);
+void render_command_list_init(RenderCommandList *list, size_t initial_capacity);
+void render_command_list_dispose(RenderCommandList *list);
+void render_command_list_add(RenderCommandList *list, const RenderCommand *command);
+void render_command_list_sort(RenderCommandList *list);
 
 void renderer_init(Renderer *renderer, const RenderContext *context, size_t initial_capacity);
 void renderer_dispose(Renderer *renderer);
-void renderer_build_draw_list(Renderer *renderer, const ViewModel *view_models, size_t view_model_count);
+void renderer_build_commands(Renderer *renderer, const ViewModel *view_models, size_t view_model_count, const GlyphQuad *glyphs, size_t glyph_count);
+void renderer_fill_vertices(Renderer *renderer, const ViewModel *view_models, size_t view_model_count, const GlyphQuad *glyphs, size_t glyph_count, UiVertexBuffer *background_buffer, UiTextVertexBuffer *text_buffer);
 void renderer_fill_background_vertices(Renderer *renderer, const ViewModel *view_models, size_t view_model_count, UiVertexBuffer *vertex_buffer);
-void renderer_fill_text_vertices(const RenderContext *context, const GlyphQuad *glyphs, size_t glyph_count, UiTextVertexBuffer *vertex_buffer);
+void renderer_fill_text_vertices(Renderer *renderer, const GlyphQuad *glyphs, size_t glyph_count, UiTextVertexBuffer *vertex_buffer);
 
 void ui_vertex_buffer_init(UiVertexBuffer *buffer, size_t initial_capacity);
 void ui_vertex_buffer_dispose(UiVertexBuffer *buffer);

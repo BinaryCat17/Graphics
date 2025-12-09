@@ -910,15 +910,6 @@ static bool ensure_view_model_capacity(ViewModel **view_models, size_t *capacity
     return true;
 }
 
-static int compare_primitives(const void *lhs, const void *rhs)
-{
-    const Primitive *a = (const Primitive *)lhs;
-    const Primitive *b = (const Primitive *)rhs;
-    if (a->z < b->z) return -1;
-    if (a->z > b->z) return 1;
-    return (a->order > b->order) - (a->order < b->order);
-}
-
 static void build_font_atlas(void) {
     if (!g_font_path) fatal("Font path is null");
     FILE* f = fopen(g_font_path, "rb");
@@ -1281,44 +1272,41 @@ static void build_vertices_from_widgets(void) {
 
     UiVertexBuffer background_buffer;
     ui_vertex_buffer_init(&background_buffer, view_model_count * 6);
-    renderer_fill_background_vertices(&renderer, view_models, view_model_count, &background_buffer);
 
     UiTextVertexBuffer text_buffer;
     ui_text_vertex_buffer_init(&text_buffer, glyph_quads.count * 6);
-    renderer_fill_text_vertices(&context, glyph_quads.items, glyph_quads.count, &text_buffer);
 
-    size_t background_quads = background_buffer.count / 6;
-    size_t text_quads = text_buffer.count / 6;
-    size_t primitive_count = background_quads + text_quads;
+    renderer_fill_vertices(&renderer, view_models, view_model_count, glyph_quads.items, glyph_quads.count, &background_buffer, &text_buffer);
+
+    size_t primitive_count = renderer.command_list.count;
 
     Primitive *primitives = primitive_count > 0 ? calloc(primitive_count, sizeof(Primitive)) : NULL;
     size_t prim_idx = 0;
-    size_t order_counter = 0;
+    size_t background_quad_idx = 0;
+    size_t text_quad_idx = 0;
 
     if (primitives) {
-        for (size_t q = 0; q < background_quads; ++q) {
-            UiVertex *base = &background_buffer.vertices[q * 6];
+        for (size_t c = 0; c < renderer.command_list.count; ++c) {
+            const RenderCommand *cmd = &renderer.command_list.commands[c];
             Primitive *p = &primitives[prim_idx++];
-            p->z = base[0].position[2];
-            p->order = order_counter++;
-            for (int i = 0; i < 6; ++i) {
-                UiVertex v = base[i];
-                p->vertices[i] = (Vtx){v.position[0], v.position[1], 0.0f, 0.0f, 0.0f, 0.0f, v.color.r, v.color.g, v.color.b, v.color.a};
+            p->order = cmd->key.ordinal;
+
+            if (cmd->primitive == RENDER_PRIMITIVE_BACKGROUND) {
+                UiVertex *base = &background_buffer.vertices[background_quad_idx++ * 6];
+                p->z = base[0].position[2];
+                for (int i = 0; i < 6; ++i) {
+                    UiVertex v = base[i];
+                    p->vertices[i] = (Vtx){v.position[0], v.position[1], 0.0f, 0.0f, 0.0f, 0.0f, v.color.r, v.color.g, v.color.b, v.color.a};
+                }
+            } else {
+                UiTextVertex *base = &text_buffer.vertices[text_quad_idx++ * 6];
+                p->z = base[0].position[2];
+                for (int i = 0; i < 6; ++i) {
+                    UiTextVertex v = base[i];
+                    p->vertices[i] = (Vtx){v.position[0], v.position[1], 0.0f, v.uv[0], v.uv[1], 1.0f, v.color.r, v.color.g, v.color.b, v.color.a};
+                }
             }
         }
-
-        for (size_t q = 0; q < text_quads; ++q) {
-            UiTextVertex *base = &text_buffer.vertices[q * 6];
-            Primitive *p = &primitives[prim_idx++];
-            p->z = base[0].position[2];
-            p->order = order_counter++;
-            for (int i = 0; i < 6; ++i) {
-                UiTextVertex v = base[i];
-                p->vertices[i] = (Vtx){v.position[0], v.position[1], 0.0f, v.uv[0], v.uv[1], 1.0f, v.color.r, v.color.g, v.color.b, v.color.a};
-            }
-        }
-
-        qsort(primitives, primitive_count, sizeof(Primitive), compare_primitives);
 
         size_t total_vertices = primitive_count * 6;
         if (ensure_vtx_capacity(total_vertices)) {
