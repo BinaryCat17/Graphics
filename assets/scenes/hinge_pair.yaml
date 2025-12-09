@@ -1,0 +1,57 @@
+version: 1
+metadata:
+  name: "Hinge pair demo"
+units:
+  length: mm
+  angle: deg
+materials:
+  - id: alu6061
+    density: 2700
+    young_modulus: 6.9e10
+    poisson_ratio: 0.33
+parts:
+  - id: base
+    material: alu6061
+    geometry:
+      primitive:
+        type: box
+        size: [120, 60, 10]
+  - id: link
+    material: alu6061
+    geometry:
+      primitive:
+        type: box
+        size: [100, 20, 8]
+    transform:
+      translate: [60, 30, 10]
+joints:
+  - id: hinge
+    type: revolute
+    parent: base
+    child: link
+    origin: [60, 30, 10]
+    axis: [0, 0, 1]
+    limits:
+      lower: -45
+      upper: 45
+      velocity: 90
+assemblies:
+  - id: hinge_pair
+    root: base
+    children:
+      - joint: hinge
+        child: link
+analysis:
+  - id: static_pull
+    type: static
+    loads:
+      - target: link
+        force: [0, 50, 0]
+        point: [110, 30, 14]
+motion:
+  - id: oscillation
+    joint: hinge
+    profile:
+      type: sine
+      amplitude: 30
+      frequency: 1.5
