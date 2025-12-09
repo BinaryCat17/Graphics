@@ -966,8 +966,8 @@ static void apply_widget_clip_to_view_model(const Widget *widget, ViewModel *vm)
     if (!widget || !vm) return;
     if (!widget->has_clip) return;
     vm->has_clip = 1;
-    vm->clip.logical.origin = (Vec2){widget->clip.x, widget->clip.y};
-    vm->clip.logical.size = (Vec2){widget->clip.w, widget->clip.h};
+    vm->clip.origin = (Vec2){widget->clip.x, widget->clip.y};
+    vm->clip.size = (Vec2){widget->clip.w, widget->clip.h};
 }
 
 static void glyph_quad_array_reserve(GlyphQuadArray *arr, size_t required)
