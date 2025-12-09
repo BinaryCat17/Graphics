@@ -67,9 +67,10 @@ if (NOT VULKAN_STUB)
             "app/vulkan_renderer.c" "app/vulkan_renderer.h"
             "app/ui_json.c" "app/ui_json.h"
             "src/Graphics.c" "src/Graphics.h"
+            "src/cad_scene.c" "src/cad_scene.h"
     )
 else()
-    set(APP_SOURCES "app/main_stub.c")
+    set(APP_SOURCES "app/main_stub.c" "src/cad_scene.c" "src/cad_scene.h")
 endif()
 
 # Добавьте источник в исполняемый файл этого проекта.
@@ -96,13 +97,13 @@ add_executable(layout_tests
         app/layout_tests.c
         app/ui_json.c app/ui_json.h
         app/scroll.c app/scroll.h)
-target_link_libraries(layout_tests PRIVATE glfw)
-target_include_directories(layout_tests PRIVATE src)
+target_link_libraries(layout_tests PRIVATE glfw m)
+target_include_directories(layout_tests PRIVATE src ${Stb_INCLUDE_DIR})
 add_test(NAME layout_tests COMMAND layout_tests)
 
 add_executable(transform_tests
         app/transform_tests.c
         src/Graphics.c src/Graphics.h)
-target_link_libraries(transform_tests PRIVATE glfw)
+target_link_libraries(transform_tests PRIVATE glfw m)
 target_include_directories(transform_tests PRIVATE src)
 add_test(NAME transform_tests COMMAND transform_tests)
