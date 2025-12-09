@@ -1,0 +1,99 @@
+version: 1
+metadata:
+  name: "Spur reducer"
+units:
+  length: mm
+  angle: deg
+materials:
+  - id: steel_45
+    density: 7850
+    young_modulus: 2.05e11
+    poisson_ratio: 0.29
+parts:
+  - id: housing
+    material: steel_45
+    geometry:
+      boolean:
+        op: difference
+        left:
+          primitive:
+            type: box
+            size: [260, 180, 80]
+        right:
+          primitive:
+            type: box
+            size: [200, 120, 60]
+          transform:
+            translate: [30, 30, 10]
+  - id: input_shaft
+    material: steel_45
+    geometry:
+      primitive:
+        type: cylinder
+        radius: 12
+        height: 140
+    transform:
+      translate: [40, 90, 40]
+  - id: output_shaft
+    material: steel_45
+    geometry:
+      primitive:
+        type: cylinder
+        radius: 18
+        height: 160
+    transform:
+      translate: [220, 90, 40]
+  - id: gear_pair
+    material: steel_45
+    geometry:
+      sketch:
+        path: assets/sketches/spur_pair.dxf
+joints:
+  - id: j_input
+    type: revolute
+    parent: housing
+    child: input_shaft
+    origin: [40, 90, 40]
+    axis: [0, 0, 1]
+  - id: j_output
+    type: revolute
+    parent: housing
+    child: output_shaft
+    origin: [220, 90, 40]
+    axis: [0, 0, 1]
+  - id: j_gears
+    type: revolute
+    parent: input_shaft
+    child: gear_pair
+    origin: [120, 90, 40]
+    axis: [0, 0, 1]
+assemblies:
+  - id: reducer
+    root: housing
+    children:
+      - joint: j_input
+        child: input_shaft
+      - joint: j_output
+        child: output_shaft
+      - joint: j_gears
+        child: gear_pair
+analysis:
+  - id: mounting_check
+    type: static
+    loads:
+      - target: housing
+        fixed: true
+      - target: output_shaft
+        moment: [0, 0, 250]
+        point: [220, 90, 120]
+motion:
+  - id: steady_run
+    joint: j_input
+    profile:
+      type: trapezoid
+      start: 0
+      end: 3
+      v_max: 200
+    coupling:
+      driven_joint: j_output
+      ratio: -0.333
