@@ -83,9 +83,13 @@ static void add_area_bounds(ScrollArea* a, const Widget* w) {
         a->bounds.h = new_maxy - new_miny;
     }
 
-    if (w->scroll_static && !a->has_viewport) {
-        a->viewport = w->rect;
-        a->has_viewport = 1;
+    if (w->scroll_static) {
+        float new_area = w->rect.w * w->rect.h;
+        float old_area = a->has_viewport ? a->viewport.w * a->viewport.h : -1.0f;
+        if (!a->has_viewport || new_area > old_area) {
+            a->viewport = w->rect;
+            a->has_viewport = 1;
+        }
     }
 }
 
