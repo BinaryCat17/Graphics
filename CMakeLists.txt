@@ -75,6 +75,7 @@ if (NOT VULKAN_STUB)
             "services/scene_service.c" "services/scene_service.h"
             "services/ui_service.c" "services/ui_service.h" "services/service_events.h"
             "services/render_service.c" "services/render_service.h"
+            "services/service_registry.c" "services/service.h"
     )
 else()
     set(APP_SOURCES

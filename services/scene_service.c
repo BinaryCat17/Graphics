@@ -28,7 +28,10 @@ static void free_schemas(CoreContext* core) {
 }
 
 bool scene_service_load(AppServices* services, const char* assets_dir, const char* scene_path) {
-    if (!services || !assets_dir || !scene_path) return false;
+    if (!services || !assets_dir || !scene_path) {
+        fprintf(stderr, "Scene service load called with invalid arguments.\n");
+        return false;
+    }
 
     CoreContext* core = &services->core;
 
@@ -38,6 +41,15 @@ bool scene_service_load(AppServices* services, const char* assets_dir, const cha
     char* global_dir = join_path(assets_dir, "global_state");
     char* ui_schema_path = join_path(ui_dir, "schema.yaml");
     char* global_schema_path = join_path(global_dir, "schema.yaml");
+
+    if (!ui_dir || !global_dir || !ui_schema_path || !global_schema_path) {
+        fprintf(stderr, "Failed to allocate memory for schema paths.\n");
+        free(ui_dir);
+        free(global_dir);
+        free(ui_schema_path);
+        free(global_schema_path);
+        return false;
+    }
 
     if (ui_schema_path && module_schema_load(ui_schema_path, &core->ui_schema, &schema_err)) {
         module_schema_register(&services->state_manager, &core->ui_schema, NULL);
@@ -74,6 +86,7 @@ bool scene_service_load(AppServices* services, const char* assets_dir, const cha
     }
 
     if (!load_assets(assets_dir, &core->assets)) {
+        fprintf(stderr, "Failed to load assets from '%s'.\n", assets_dir);
         scene_service_unload(services);
         return false;
     }
@@ -113,3 +126,31 @@ void scene_service_unload(AppServices* services) {
     scene_dispose(&core->scene);
     free_schemas(core);
 }
+
+static bool scene_service_init(AppServices* services, const ServiceConfig* config) {
+    (void)services;
+    (void)config;
+    return true;
+}
+
+static bool scene_service_start(AppServices* services, const ServiceConfig* config) {
+    const char* assets_dir = config ? config->assets_dir : NULL;
+    const char* scene_path = config ? config->scene_path : NULL;
+    if (!assets_dir || !scene_path) return false;
+    return scene_service_load(services, assets_dir, scene_path);
+}
+
+static void scene_service_stop(AppServices* services) {
+    scene_service_unload(services);
+}
+
+static const ServiceDescriptor g_scene_service_descriptor = {
+    .name = "scene",
+    .init = scene_service_init,
+    .start = scene_service_start,
+    .stop = scene_service_stop,
+    .context = NULL,
+    .thread_handle = NULL,
+};
+
+const ServiceDescriptor* scene_service_descriptor(void) { return &g_scene_service_descriptor; }

@@ -1,8 +1,10 @@
 #include "render_service.h"
 
 #include <GLFW/glfw3.h>
+#include <stdio.h>
 #include "render/vulkan_renderer.h"
 #include "service_events.h"
+#include "runtime/runtime.h"
 
 typedef struct RenderServiceState {
     RenderRuntimeContext* render;
@@ -53,7 +55,10 @@ static void on_model_event(const StateEvent* event, void* user_data) {
 
 bool render_service_bind(RenderRuntimeContext* render, StateManager* state_manager, int assets_type_id, int ui_type_id,
                         int model_type_id) {
-    if (!render || !state_manager) return false;
+    if (!render || !state_manager) {
+        fprintf(stderr, "Render service bind received invalid arguments.\n");
+        return false;
+    }
     g_render_state.render = render;
     g_render_state.state_manager = state_manager;
 
@@ -86,3 +91,45 @@ void render_service_shutdown(RenderRuntimeContext* render) {
     vk_renderer_cleanup();
     g_render_state = (RenderServiceState){0};
 }
+
+static bool render_service_init(AppServices* services, const ServiceConfig* config) {
+    (void)config;
+    if (!services) return false;
+    return render_service_bind(&services->render, &services->state_manager, services->assets_type_id,
+                               services->ui_type_id, services->model_type_id);
+}
+
+static bool render_service_start(AppServices* services, const ServiceConfig* config) {
+    (void)config;
+    if (!services) {
+        fprintf(stderr, "Render service start received null services context.\n");
+        return false;
+    }
+    if (!runtime_init(services)) {
+        fprintf(stderr, "Render runtime initialization failed.\n");
+        return false;
+    }
+    state_manager_dispatch(&services->state_manager, 0);
+    render_loop(&services->render, &services->state_manager);
+    return true;
+}
+
+static void render_service_stop(AppServices* services) {
+    if (!services) {
+        fprintf(stderr, "Render service stop received null services context.\n");
+        return;
+    }
+    render_service_shutdown(&services->render);
+    runtime_shutdown(services);
+}
+
+static const ServiceDescriptor g_render_service_descriptor = {
+    .name = "render",
+    .init = render_service_init,
+    .start = render_service_start,
+    .stop = render_service_stop,
+    .context = NULL,
+    .thread_handle = NULL,
+};
+
+const ServiceDescriptor* render_service_descriptor(void) { return &g_render_service_descriptor; }

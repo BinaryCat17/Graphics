@@ -85,15 +85,24 @@ static void apply_click_action(Widget* w, Model* model) {
 }
 
 bool ui_build(UiContext* ui, const CoreContext* core) {
-    if (!ui || !core || !core->model) return false;
+    if (!ui || !core || !core->model) {
+        fprintf(stderr, "UI build received invalid context or missing model.\n");
+        return false;
+    }
 
     ui->styles = parse_styles_config(core->assets.styles_doc.root);
     ui->ui_root = parse_layout_config(core->assets.layout_doc.root, core->model, ui->styles, core->assets.font_path,
                                       &core->scene);
-    if (!ui->ui_root) return false;
+    if (!ui->ui_root) {
+        fprintf(stderr, "Failed to parse UI layout configuration.\n");
+        return false;
+    }
 
     ui->layout_root = build_layout_tree(ui->ui_root);
-    if (!ui->layout_root) return false;
+    if (!ui->layout_root) {
+        fprintf(stderr, "Failed to build UI layout tree.\n");
+        return false;
+    }
 
     ui->model = core->model;
 
@@ -108,7 +117,10 @@ bool ui_build(UiContext* ui, const CoreContext* core) {
 
 bool ui_prepare_runtime(UiContext* ui, const CoreContext* core, float ui_scale, StateManager* state_manager,
                        int ui_type_id) {
-    if (!ui || !ui->layout_root) return false;
+    if (!ui || !ui->layout_root) {
+        fprintf(stderr, "UI runtime preparation received invalid layout.\n");
+        return false;
+    }
     scale_layout(ui->layout_root, ui_scale);
 
     ui->widgets = materialize_widgets(ui->layout_root);
@@ -116,7 +128,10 @@ bool ui_prepare_runtime(UiContext* ui, const CoreContext* core, float ui_scale, 
     update_widget_bindings(ui->ui_root, ui->model);
     populate_widgets_from_layout(ui->layout_root, ui->widgets.items, ui->widgets.count);
     ui->scroll = scroll_init(ui->widgets.items, ui->widgets.count);
-    if (!ui->scroll) return false;
+    if (!ui->scroll) {
+        fprintf(stderr, "Failed to initialize scroll subsystem for UI.\n");
+        return false;
+    }
 
     ui->ui_scale = ui_scale;
     ui->state_manager = state_manager;
@@ -138,8 +153,11 @@ static void on_model_event(const StateEvent* event, void* user_data) {
 }
 
 bool ui_service_subscribe(UiContext* ui, StateManager* state_manager, int model_type_id) {
-    if (!ui || !state_manager || model_type_id < 0) return false;
-    return state_manager_subscribe(state_manager, model_type_id, "active", on_model_event, ui) == 0;
+    if (!ui || !state_manager || model_type_id < 0) {
+        fprintf(stderr, "UI service subscribe called with invalid arguments.\n");
+        return false;
+    }
+    return state_manager_subscribe(state_manager, model_type_id, "active", on_model_event, ui) != 0;
 }
 
 void ui_refresh_layout(UiContext* ui, float new_scale) {
@@ -220,3 +238,39 @@ void ui_context_dispose(UiContext* ui) {
         ui->scroll = NULL;
     }
 }
+
+static bool ui_service_init(AppServices* services, const ServiceConfig* config) {
+    (void)config;
+    if (!services) {
+        fprintf(stderr, "UI service init received null services context.\n");
+        return false;
+    }
+    ui_context_init(&services->ui);
+    return ui_service_subscribe(&services->ui, &services->state_manager, services->model_type_id);
+}
+
+static bool ui_service_start(AppServices* services, const ServiceConfig* config) {
+    (void)config;
+    if (!services) {
+        fprintf(stderr, "UI service start received null services context.\n");
+        return false;
+    }
+    if (!ui_build(&services->ui, &services->core)) {
+        fprintf(stderr, "UI service failed to build UI.\n");
+        return false;
+    }
+    return true;
+}
+
+static void ui_service_stop(AppServices* services) { ui_context_dispose(&services->ui); }
+
+static const ServiceDescriptor g_ui_service_descriptor = {
+    .name = "ui",
+    .init = ui_service_init,
+    .start = ui_service_start,
+    .stop = ui_service_stop,
+    .context = NULL,
+    .thread_handle = NULL,
+};
+
+const ServiceDescriptor* ui_service_descriptor(void) { return &g_ui_service_descriptor; }
