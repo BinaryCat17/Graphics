@@ -4,12 +4,12 @@
 #include <GLFW/glfw3.h>
 
 #include "Graphics.h"
-#include "assets.h"
+#include "assets/assets.h"
 #include "cad_scene.h"
 #include "state_manager.h"
 #include "module_yaml_loader.h"
-#include "scene_ui.h"
-#include "scroll.h"
+#include "ui/scene_ui.h"
+#include "ui/scroll.h"
 
 // Central structure passed between application layers.
 typedef struct AppServices {

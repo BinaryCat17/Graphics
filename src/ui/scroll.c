@@ -1,4 +1,4 @@
-#include "scroll.h"
+#include "ui/scroll.h"
 
 #include <stdlib.h>
 #include <string.h>

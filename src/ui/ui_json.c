@@ -1,4 +1,4 @@
-#include "ui_json.h"
+#include "ui/ui_json.h"
 
 #include <math.h>
 #include <stdio.h>
@@ -6,7 +6,7 @@
 #include <string.h>
 
 #include "stb_truetype.h"
-#include "scene_ui.h"
+#include "ui/scene_ui.h"
 
 typedef enum { JSMN_UNDEFINED = 0, JSMN_OBJECT = 1, JSMN_ARRAY = 2, JSMN_STRING = 3, JSMN_PRIMITIVE = 4 } jsmntype_t;
 typedef struct { jsmntype_t type; int start; int end; int size; } jsmntok_t;

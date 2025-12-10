@@ -3,7 +3,7 @@
 #include <GLFW/glfw3.h>
 
 #include "ui/ui_service.h"
-#include "vulkan_renderer.h"
+#include "render/vulkan_renderer.h"
 
 bool render_service_init(AppServices* services) {
     if (!services || !services->window) return false;
