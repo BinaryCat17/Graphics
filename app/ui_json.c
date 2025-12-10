@@ -111,6 +111,16 @@ static float fallback_line_height(void) {
     return line > 0.0f ? line : 18.0f;
 }
 
+static char* config_node_to_json(const ConfigNode* root) {
+    char* json = NULL;
+    if (!root) return NULL;
+    if (!config_emit_json(root, &json)) {
+        fprintf(stderr, "Error: failed to convert configuration to JSON text\n");
+        return NULL;
+    }
+    return json;
+}
+
 static unsigned int skip_container(const jsmntok_t* toks, unsigned int tokc, unsigned int idx);
 
 static int ensure_font_metrics(const char* font_path) {
@@ -299,7 +309,7 @@ static void read_color_array(Color* out, const char* json, const jsmntok_t* val,
     out->r = cols[0]; out->g = cols[1]; out->b = cols[2]; out->a = cols[3];
 }
 
-Model* parse_model_json(const char* json, const char* source_path) {
+static Model* parse_model_json_text(const char* json, const char* source_path) {
     if (!json) { fprintf(stderr, "Error: model JSON text is null\n"); return NULL; }
     Model* model = (Model*)calloc(1, sizeof(Model));
     if (!model) return NULL;
@@ -352,7 +362,7 @@ Model* parse_model_json(const char* json, const char* source_path) {
     return model;
 }
 
-Style* parse_styles_json(const char* json) {
+static Style* parse_styles_json_text(const char* json) {
     if (!json) { fprintf(stderr, "Error: styles JSON text is null\n"); return NULL; }
     Style* styles = NULL;
     jsmn_parser p; jsmn_init(&p);
@@ -889,7 +899,7 @@ void update_widget_bindings(UiNode* root, const Model* model) {
     bind_model_values_to_nodes(root, model);
 }
 
-UiNode* parse_layout_json(const char* json, const Model* model, const Style* styles, const char* font_path, const Scene* scene) {
+static UiNode* parse_layout_json_text(const char* json, const Model* model, const Style* styles, const char* font_path, const Scene* scene) {
     if (!json) { fprintf(stderr, "Error: layout JSON text is null\n"); return NULL; }
 
     ensure_font_metrics(font_path);
@@ -909,6 +919,30 @@ UiNode* parse_layout_json(const char* json, const Model* model, const Style* sty
     auto_assign_scroll_areas(root, &scroll_counter, NULL);
     free_prototypes(prototypes);
     return root;
+}
+
+Model* parse_model_config(const ConfigNode* root, const char* source_path) {
+    char* json = config_node_to_json(root);
+    if (!json) return NULL;
+    Model* model = parse_model_json_text(json, source_path);
+    free(json);
+    return model;
+}
+
+Style* parse_styles_config(const ConfigNode* root) {
+    char* json = config_node_to_json(root);
+    if (!json) return NULL;
+    Style* styles = parse_styles_json_text(json);
+    free(json);
+    return styles;
+}
+
+UiNode* parse_layout_config(const ConfigNode* root, const Model* model, const Style* styles, const char* font_path, const Scene* scene) {
+    char* json = config_node_to_json(root);
+    if (!json) return NULL;
+    UiNode* ui = parse_layout_json_text(json, model, styles, font_path, scene);
+    free(json);
+    return ui;
 }
 
 static LayoutNode* build_layout_tree_recursive(const UiNode* node) {

@@ -4,6 +4,7 @@
 #include <stddef.h>
 #include "Graphics.h"
 #include "cad_scene.h"
+#include "config_document.h"
 
 #define UI_Z_ORDER_SCALE 1000
 
@@ -144,9 +145,9 @@ typedef struct {
     size_t count;
 } WidgetArray;
 
-Model* parse_model_json(const char* json_text, const char* source_path);
-Style* parse_styles_json(const char* json_text);
-UiNode* parse_layout_json(const char* json_text, const Model* model, const Style* styles, const char* font_path, const Scene* scene);
+Model* parse_model_config(const ConfigNode* root, const char* source_path);
+Style* parse_styles_config(const ConfigNode* root);
+UiNode* parse_layout_config(const ConfigNode* root, const Model* model, const Style* styles, const char* font_path, const Scene* scene);
 
 void update_widget_bindings(UiNode* root, const Model* model);
 

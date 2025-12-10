@@ -5,6 +5,7 @@
 
 #include "ui_json.h"
 #include "scroll.h"
+#include "config_io.h"
 
 typedef struct {
     WidgetArray widgets;
@@ -15,8 +16,18 @@ typedef struct {
 
 static LayoutFixture build_widgets(const char* styles_json, const char* layout_json) {
     LayoutFixture fx = {0};
-    fx.styles = styles_json ? parse_styles_json(styles_json) : NULL;
-    fx.root = parse_layout_json(layout_json, NULL, fx.styles, NULL, NULL);
+    ConfigNode* styles_root = NULL;
+    ConfigNode* layout_root = NULL;
+    ConfigError err = {0};
+    if (styles_json) {
+        assert(parse_config_text(styles_json, CONFIG_FORMAT_JSON, &styles_root, &err));
+    }
+    err = (ConfigError){0};
+    assert(parse_config_text(layout_json, CONFIG_FORMAT_JSON, &layout_root, &err));
+    fx.styles = styles_root ? parse_styles_config(styles_root) : NULL;
+    fx.root = parse_layout_config(layout_root, NULL, fx.styles, NULL, NULL);
+    config_node_free(styles_root);
+    config_node_free(layout_root);
     assert(fx.root);
     fx.layout = build_layout_tree(fx.root);
     assert(fx.layout);

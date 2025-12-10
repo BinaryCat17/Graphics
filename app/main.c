@@ -220,7 +220,7 @@ int main(int argc, char** argv) {
     char* global_dir = join_path(assets_dir, "global_state");
     char* ui_schema_path = join_path(ui_dir, "schema.yaml");
     char* global_schema_path = join_path(global_dir, "schema.yaml");
-    SimpleYamlError schema_err = {0};
+    ConfigError schema_err = {0};
     if (ui_schema_path && module_schema_load(ui_schema_path, &ui_schema, &schema_err)) {
         module_schema_register(&state_manager, &ui_schema, NULL);
         char* ui_config = join_path(ui_dir, "config");
@@ -229,7 +229,7 @@ int main(int argc, char** argv) {
     } else {
         fprintf(stderr, "UI schema error %s:%d:%d %s\n", ui_schema_path ? ui_schema_path : "(null)", schema_err.line, schema_err.column, schema_err.message);
     }
-    schema_err = (SimpleYamlError){0};
+    schema_err = (ConfigError){0};
     if (global_schema_path && module_schema_load(global_schema_path, &global_schema, &schema_err)) {
         module_schema_register(&state_manager, &global_schema, NULL);
         char* global_config = join_path(global_dir, "config");
@@ -266,12 +266,12 @@ int main(int argc, char** argv) {
         return 1;
     }
 
-    Model* model = parse_model_json(assets.model_text, assets.model_path);
+    Model* model = parse_model_config(assets.model_doc.root, assets.model_path);
     if (model) {
         scene_ui_bind_model(model, &scene, scene_path);
     }
-    Style* styles = parse_styles_json(assets.styles_text);
-    UiNode* ui_root = parse_layout_json(assets.layout_text, model, styles, assets.font_path, &scene);
+    Style* styles = parse_styles_config(assets.styles_doc.root);
+    UiNode* ui_root = parse_layout_config(assets.layout_doc.root, model, styles, assets.font_path, &scene);
     if (!ui_root) { free_model(model); free_styles(styles); free_assets(&assets); return 1; }
     LayoutNode* layout_root = build_layout_tree(ui_root);
     if (!layout_root) { free_model(model); free_styles(styles); free_ui_tree(ui_root); free_assets(&assets); return 1; }
