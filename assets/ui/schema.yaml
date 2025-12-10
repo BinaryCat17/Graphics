@@ -1,0 +1,8 @@
+namespace: ui
+stores:
+  - name: model
+    chunk_capacity: 4
+  - name: layout
+    chunk_capacity: 4
+  - name: styles
+    chunk_capacity: 4
