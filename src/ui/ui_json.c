@@ -966,7 +966,7 @@ static void apply_prototypes(UiNode* node, const Prototype* prototypes) {
     }
 }
 
-static void resolve_styles_and_defaults(UiNode* node, const Style* styles) {
+static void resolve_styles_and_defaults(UiNode* node, const Style* styles, int* missing_styles) {
     if (!node) return;
     LayoutType inferred = type_to_layout(node->type);
     if (inferred != UI_LAYOUT_NONE || node->layout == UI_LAYOUT_NONE) {
@@ -982,7 +982,12 @@ static void resolve_styles_and_defaults(UiNode* node, const Style* styles) {
     const Style* st = node->style ? node->style : &DEFAULT_STYLE;
     if (node->style_name) {
         const Style* found = style_find(styles, node->style_name);
-        if (found) st = found;
+        if (found) {
+            st = found;
+        } else if (missing_styles) {
+            fprintf(stderr, "Error: style '%s' referenced but not defined in UI config\n", node->style_name);
+            *missing_styles = 1;
+        }
     }
     node->style = st;
     if (!node->has_color) node->color = st->background;
@@ -998,7 +1003,7 @@ static void resolve_styles_and_defaults(UiNode* node, const Style* styles) {
     if (!node->has_value) node->value = 0.0f;
 
     for (size_t i = 0; i < node->child_count; i++) {
-        resolve_styles_and_defaults(&node->children[i], styles);
+        resolve_styles_and_defaults(&node->children[i], styles, missing_styles);
     }
 }
 
@@ -1116,7 +1121,14 @@ static UiNode* parse_layout_json_text(const char* json, const Model* model, cons
     }
 
     apply_prototypes(root, prototypes);
-    resolve_styles_and_defaults(root, styles);
+    int missing_styles = 0;
+    resolve_styles_and_defaults(root, styles, &missing_styles);
+    if (missing_styles) {
+        fprintf(stderr, "Failed to resolve styles: remove or define the missing styles to continue.\n");
+        free_prototypes(prototypes);
+        free_ui_tree(root);
+        return NULL;
+    }
     bind_model_values_to_nodes(root, model);
     int scroll_counter = 0;
     auto_assign_scroll_areas(root, &scroll_counter, NULL);
