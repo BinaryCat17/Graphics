@@ -157,7 +157,7 @@ bool ui_service_subscribe(UiContext* ui, StateManager* state_manager, int model_
         fprintf(stderr, "UI service subscribe called with invalid arguments.\n");
         return false;
     }
-    return state_manager_subscribe(state_manager, model_type_id, "active", on_model_event, ui) == 0;
+    return state_manager_subscribe(state_manager, model_type_id, "active", on_model_event, ui) != 0;
 }
 
 void ui_refresh_layout(UiContext* ui, float new_scale) {
