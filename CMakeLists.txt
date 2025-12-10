@@ -65,6 +65,7 @@ if (NOT VULKAN_STUB)
     set(APP_SOURCES
             "app/main.c"
             "src/assets/assets.c" "src/assets/assets.h"
+            "src/render/renderer_backend.c" "src/render/renderer_backend.h"
             "src/render/vulkan_renderer.c" "src/render/vulkan_renderer.h"
             "src/ui/scroll.c" "src/ui/scroll.h" "src/ui/ui_json.c" "src/ui/ui_json.h" "src/ui/scene_ui.c" "src/ui/scene_ui.h"
             "src/core/coordinate_transform.c" "src/core/layout.c" "src/core/render_commands.c" "src/core/vertex_buffers.c" "src/core/memory_utils.c" "src/core/Graphics.h"

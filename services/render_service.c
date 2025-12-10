@@ -5,7 +5,6 @@
 #include <stdio.h>
 #include <threads.h>
 
-#include "render/vulkan_renderer.h"
 #include "render_runtime_service.h"
 #include "ui/ui_json.h"
 
@@ -27,9 +26,9 @@ static void render_service_run_loop(RenderServiceContext* service) {
     while (service->running && !glfwWindowShouldClose(context->render->window)) {
         state_manager_dispatch(context->state_manager, 0);
         glfwPollEvents();
-        if (context->renderer_ready && context->ui && context->model) {
+        if (context->renderer_ready && context->ui && context->model && context->backend && context->backend->draw) {
             ui_frame_update(context->ui);
-            vk_renderer_draw_frame();
+            context->backend->draw(context->backend);
         }
     }
 }

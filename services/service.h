@@ -10,6 +10,10 @@
 typedef struct ServiceConfig {
     const char* assets_dir;
     const char* scene_path;
+    const char* renderer_backend;
+    const char* render_log_sink;
+    const char* render_log_target;
+    bool render_log_enabled;
 } ServiceConfig;
 
 // Descriptor for a service module that can be registered and retrieved by name.

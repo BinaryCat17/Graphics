@@ -1,15 +1,8 @@
 #ifndef VULKAN_RENDERER_H
 #define VULKAN_RENDERER_H
 
-#include <stdbool.h>
-#include <GLFW/glfw3.h>
+#include "render/renderer_backend.h"
 
-#include "ui/ui_json.h"
-#include "core/Graphics.h"
-
-bool vk_renderer_init(GLFWwindow* window, const char* vert_spv, const char* frag_spv, const char* font_path, WidgetArray widgets, const CoordinateTransformer* transformer);
-void vk_renderer_update_transformer(const CoordinateTransformer* transformer);
-void vk_renderer_draw_frame(void);
-void vk_renderer_cleanup(void);
+RendererBackend* vulkan_renderer_backend(void);
 
 #endif // VULKAN_RENDERER_H

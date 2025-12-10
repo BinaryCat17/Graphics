@@ -8,6 +8,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <time.h>
 
 #define GLFW_INCLUDE_VULKAN
 #include <GLFW/glfw3.h>
@@ -16,50 +17,6 @@
 
 #define STB_TRUETYPE_IMPLEMENTATION
 #include "stb_truetype.h"
-
-enum {
-    LAYER_STRIDE = 16,
-    Z_LAYER_BORDER = 0,
-    Z_LAYER_FILL = 1,
-    Z_LAYER_SLIDER_TRACK = 2,
-    Z_LAYER_SLIDER_FILL = 3,
-    Z_LAYER_SLIDER_KNOB = 4,
-    Z_LAYER_SCROLLBAR_TRACK = 5,
-    Z_LAYER_SCROLLBAR_THUMB = 6,
-    Z_LAYER_TEXT = 7,
-};
-
-/* ---------- Vulkan helpers & global state ---------- */
-/* ---------- Vulkan helpers & global state ---------- */
-static GLFWwindow* g_window = NULL;
-static WidgetArray g_widgets = {0};
-static VkInstance instance = VK_NULL_HANDLE;
-static VkPhysicalDevice physical = VK_NULL_HANDLE;
-static VkDevice device = VK_NULL_HANDLE;
-static uint32_t graphics_family = (uint32_t)-1;
-static VkQueue queue = VK_NULL_HANDLE;
-static VkSurfaceKHR surface = VK_NULL_HANDLE;
-static VkSwapchainKHR swapchain = VK_NULL_HANDLE;
-static const char* g_vert_spv = NULL;
-static const char* g_frag_spv = NULL;
-static const char* g_font_path = NULL;
-static uint32_t swapchain_img_count = 0;
-static VkImage* swapchain_imgs = NULL;
-static VkImageView* swapchain_imgviews = NULL;
-static VkFormat swapchain_format;
-static VkExtent2D swapchain_extent;
-static VkBool32 swapchain_supports_blend = VK_FALSE;
-static VkRenderPass render_pass = VK_NULL_HANDLE;
-static VkPipelineLayout pipeline_layout = VK_NULL_HANDLE;
-static VkPipeline pipeline = VK_NULL_HANDLE;
-static VkCommandPool cmdpool = VK_NULL_HANDLE;
-static VkCommandBuffer* cmdbuffers = NULL;
-static VkFramebuffer* framebuffers = NULL;
-static VkResult res = VK_SUCCESS;
-
-static VkSemaphore sem_img_avail = VK_NULL_HANDLE;
-static VkSemaphore sem_render_done = VK_NULL_HANDLE;
-static VkFence* fences = NULL;
 
 typedef struct { float viewport[2]; } ViewConstants;
 
@@ -95,25 +52,113 @@ typedef struct {
     VkFence inflight_fence;
 } FrameResources;
 
-static FrameResources frame_resources[2] = {0};
-static uint32_t current_frame_cursor = 0;
-static int* image_frame_owner = NULL;
+typedef struct VulkanRendererState {
+    GLFWwindow* window;
+    WidgetArray widgets;
+    VkInstance instance;
+    VkPhysicalDevice physical;
+    VkDevice device;
+    uint32_t graphics_family;
+    VkQueue queue;
+    VkSurfaceKHR surface;
+    VkSwapchainKHR swapchain;
+    const char* vert_spv;
+    const char* frag_spv;
+    const char* font_path;
+    uint32_t swapchain_img_count;
+    VkImage* swapchain_imgs;
+    VkImageView* swapchain_imgviews;
+    VkFormat swapchain_format;
+    VkExtent2D swapchain_extent;
+    VkBool32 swapchain_supports_blend;
+    VkRenderPass render_pass;
+    VkPipelineLayout pipeline_layout;
+    VkPipeline pipeline;
+    VkCommandPool cmdpool;
+    VkCommandBuffer* cmdbuffers;
+    VkFramebuffer* framebuffers;
+    VkResult res;
+    VkSemaphore sem_img_avail;
+    VkSemaphore sem_render_done;
+    VkFence* fences;
+    FrameResources frame_resources[2];
+    uint32_t current_frame_cursor;
+    int* image_frame_owner;
+    VkImage depth_image;
+    VkDeviceMemory depth_memory;
+    VkImageView depth_image_view;
+    VkFormat depth_format;
+    VkImage font_image;
+    VkDeviceMemory font_image_mem;
+    VkImageView font_image_view;
+    VkSampler font_sampler;
+    VkDescriptorSetLayout descriptor_layout;
+    VkDescriptorPool descriptor_pool;
+    VkDescriptorSet descriptor_set;
+    CoordinateTransformer transformer;
+    RenderLogger* logger;
+} VulkanRendererState;
 
-/* GPU-side buffers (vertex) simple staging omitted: we'll create host-visible vertex buffer */
-static VkImage depth_image = VK_NULL_HANDLE;
-static VkDeviceMemory depth_memory = VK_NULL_HANDLE;
-static VkImageView depth_image_view = VK_NULL_HANDLE;
-static VkFormat depth_format = VK_FORMAT_UNDEFINED;
+static VulkanRendererState g_vk = {0};
+static RendererBackend g_vulkan_backend;
 
-/* Texture atlas for font */
-static VkImage font_image = VK_NULL_HANDLE;
-static VkDeviceMemory font_image_mem = VK_NULL_HANDLE;
-static VkImageView font_image_view = VK_NULL_HANDLE;
-static VkSampler font_sampler = VK_NULL_HANDLE;
-static VkDescriptorSetLayout descriptor_layout = VK_NULL_HANDLE;
-static VkDescriptorPool descriptor_pool = VK_NULL_HANDLE;
-static VkDescriptorSet descriptor_set = VK_NULL_HANDLE;
-static CoordinateTransformer g_transformer = {0};
+#define g_window (g_vk.window)
+#define g_widgets (g_vk.widgets)
+#define instance (g_vk.instance)
+#define physical (g_vk.physical)
+#define device (g_vk.device)
+#define graphics_family (g_vk.graphics_family)
+#define queue (g_vk.queue)
+#define surface (g_vk.surface)
+#define swapchain (g_vk.swapchain)
+#define g_vert_spv (g_vk.vert_spv)
+#define g_frag_spv (g_vk.frag_spv)
+#define g_font_path (g_vk.font_path)
+#define swapchain_img_count (g_vk.swapchain_img_count)
+#define swapchain_imgs (g_vk.swapchain_imgs)
+#define swapchain_imgviews (g_vk.swapchain_imgviews)
+#define swapchain_format (g_vk.swapchain_format)
+#define swapchain_extent (g_vk.swapchain_extent)
+#define swapchain_supports_blend (g_vk.swapchain_supports_blend)
+#define render_pass (g_vk.render_pass)
+#define pipeline_layout (g_vk.pipeline_layout)
+#define pipeline (g_vk.pipeline)
+#define cmdpool (g_vk.cmdpool)
+#define cmdbuffers (g_vk.cmdbuffers)
+#define framebuffers (g_vk.framebuffers)
+#define res (g_vk.res)
+#define sem_img_avail (g_vk.sem_img_avail)
+#define sem_render_done (g_vk.sem_render_done)
+#define fences (g_vk.fences)
+#define frame_resources (g_vk.frame_resources)
+#define current_frame_cursor (g_vk.current_frame_cursor)
+#define image_frame_owner (g_vk.image_frame_owner)
+#define depth_image (g_vk.depth_image)
+#define depth_memory (g_vk.depth_memory)
+#define depth_image_view (g_vk.depth_image_view)
+#define depth_format (g_vk.depth_format)
+#define font_image (g_vk.font_image)
+#define font_image_mem (g_vk.font_image_mem)
+#define font_image_view (g_vk.font_image_view)
+#define font_sampler (g_vk.font_sampler)
+#define descriptor_layout (g_vk.descriptor_layout)
+#define descriptor_pool (g_vk.descriptor_pool)
+#define descriptor_set (g_vk.descriptor_set)
+#define g_transformer (g_vk.transformer)
+#define g_logger (g_vk.logger)
+
+enum {
+    LAYER_STRIDE = 16,
+    Z_LAYER_BORDER = 0,
+    Z_LAYER_FILL = 1,
+    Z_LAYER_SLIDER_TRACK = 2,
+    Z_LAYER_SLIDER_FILL = 3,
+    Z_LAYER_SLIDER_KNOB = 4,
+    Z_LAYER_SCROLLBAR_TRACK = 5,
+    Z_LAYER_SCROLLBAR_THUMB = 6,
+    Z_LAYER_TEXT = 7,
+};
+
 
 static VkFormat choose_depth_format(void)
 {
@@ -238,6 +283,17 @@ static void fatal_vk(const char* msg, VkResult r) {
     exit(1);
 }
 
+static double vk_now_ms(void) {
+    struct timespec ts;
+    clock_gettime(CLOCK_MONOTONIC, &ts);
+    return (double)ts.tv_sec * 1000.0 + (double)ts.tv_nsec / 1000000.0;
+}
+
+static void vk_log_command(const char* command, const char* params, double start_ms) {
+    if (!g_logger) return;
+    render_logger_log(g_logger, command, params, vk_now_ms() - start_ms);
+}
+
 static void log_gpu_info(VkPhysicalDevice dev) {
     VkPhysicalDeviceProperties props;
     vkGetPhysicalDeviceProperties(dev, &props);
@@ -270,7 +326,9 @@ static void create_instance(void) {
     /* request glfw extensions */
     uint32_t extc = 0; const char** exts = glfwGetRequiredInstanceExtensions(&extc);
     ici.enabledExtensionCount = extc; ici.ppEnabledExtensionNames = exts;
+    double start = vk_now_ms();
     VkResult res = vkCreateInstance(&ici, NULL, &instance);
+    vk_log_command("vkCreateInstance", "application", start);
     if (res != VK_SUCCESS) fatal_vk("vkCreateInstance", res);
 }
 
@@ -425,7 +483,9 @@ static void create_swapchain_and_views(VkSwapchainKHR old_swapchain) {
     if (!(caps.supportedUsageFlags & usage)) fatal("swapchain color usage unsupported");
 
     VkSwapchainCreateInfoKHR sci = { .sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR, .surface = surface, .minImageCount = img_count, .imageFormat = swapchain_format, .imageColorSpace = chosen_fmt.colorSpace, .imageExtent = swapchain_extent, .imageArrayLayers = 1, .imageUsage = usage, .imageSharingMode = VK_SHARING_MODE_EXCLUSIVE, .preTransform = caps.currentTransform, .compositeAlpha = comp_alpha, .presentMode = VK_PRESENT_MODE_FIFO_KHR, .clipped = VK_TRUE, .oldSwapchain = old_swapchain };
+    double swapchain_start = vk_now_ms();
     res = vkCreateSwapchainKHR(device, &sci, NULL, &swapchain);
+    vk_log_command("vkCreateSwapchainKHR", "swapchain setup", swapchain_start);
     if (res != VK_SUCCESS) fatal_vk("vkCreateSwapchainKHR", res);
     vkGetSwapchainImagesKHR(device, swapchain, &swapchain_img_count, NULL);
     swapchain_imgs = malloc(sizeof(VkImage) * swapchain_img_count);
@@ -659,7 +719,9 @@ static void cleanup_swapchain(bool keep_swapchain_handle) {
     }
     destroy_depth_resources();
     if (!keep_swapchain_handle && swapchain) {
+        double destroy_start = vk_now_ms();
         vkDestroySwapchainKHR(device, swapchain, NULL);
+        vk_log_command("vkDestroySwapchainKHR", "cleanup", destroy_start);
         swapchain = VK_NULL_HANDLE;
     }
     if (pipeline) {
@@ -715,7 +777,11 @@ static void recreate_swapchain(void) {
 
     create_swapchain_and_views(old_swapchain);
     if (!swapchain) {
-        if (old_swapchain) vkDestroySwapchainKHR(device, old_swapchain, NULL);
+        if (old_swapchain) {
+            double destroy_start = vk_now_ms();
+            vkDestroySwapchainKHR(device, old_swapchain, NULL);
+            vk_log_command("vkDestroySwapchainKHR", "old swapchain", destroy_start);
+        }
         return;
     }
 
@@ -1636,7 +1702,9 @@ static void draw_frame(void) {
 
     VkPipelineStageFlags waitStage = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
     VkSubmitInfo si = { .sType = VK_STRUCTURE_TYPE_SUBMIT_INFO, .waitSemaphoreCount = 1, .pWaitSemaphores = &sem_img_avail, .pWaitDstStageMask = &waitStage, .commandBufferCount = 1, .pCommandBuffers = &cmdbuffers[img_idx], .signalSemaphoreCount = 1, .pSignalSemaphores = &sem_render_done };
+    double submit_start = vk_now_ms();
     VkResult submit = vkQueueSubmit(queue, 1, &si, fences[img_idx]);
+    vk_log_command("vkQueueSubmit", "draw", submit_start);
     if (submit == VK_ERROR_DEVICE_LOST) {
         if (!recover_device_loss()) fatal_vk("vkQueueSubmit", submit);
         return;
@@ -1653,21 +1721,27 @@ static void draw_frame(void) {
         image_frame_owner[img_idx] = frame_idx;
     }
     VkPresentInfoKHR pi = { .sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR, .waitSemaphoreCount = 1, .pWaitSemaphores = &sem_render_done, .swapchainCount = 1, .pSwapchains = &swapchain, .pImageIndices = &img_idx };
+    double present_start = vk_now_ms();
     VkResult present = vkQueuePresentKHR(queue, &pi);
+    vk_log_command("vkQueuePresentKHR", "present", present_start);
     if (present == VK_ERROR_DEVICE_LOST) { if (!recover_device_loss()) fatal_vk("vkQueuePresentKHR", present); return; }
     if (present == VK_ERROR_OUT_OF_DATE_KHR || present == VK_SUBOPTIMAL_KHR) { recreate_swapchain(); return; }
     if (present != VK_SUCCESS) fatal_vk("vkQueuePresentKHR", present);
 }
 
-bool vk_renderer_init(GLFWwindow* window, const char* vert_spv, const char* frag_spv, const char* font_path, WidgetArray widgets, const CoordinateTransformer* transformer) {
-    g_window = window;
-    g_widgets = widgets;
-    g_vert_spv = vert_spv;
-    g_frag_spv = frag_spv;
-    g_font_path = font_path;
+static bool vk_backend_init(RendererBackend* backend, const RenderBackendInit* init) {
+    if (!backend || !init) return false;
+    render_logger_init(&backend->logger, init->logger_config, backend->id);
+    g_logger = &backend->logger;
 
-    if (transformer) {
-        g_transformer = *transformer;
+    g_window = init->window;
+    g_widgets = init->widgets;
+    g_vert_spv = init->vert_spv;
+    g_frag_spv = init->frag_spv;
+    g_font_path = init->font_path;
+
+    if (init->transformer) {
+        g_transformer = *init->transformer;
     } else {
         coordinate_transformer_init(&g_transformer, 1.0f, 1.0f, (Vec2){0.0f, 0.0f});
     }
@@ -1702,17 +1776,19 @@ bool vk_renderer_init(GLFWwindow* window, const char* vert_spv, const char* frag
     return true;
 }
 
-void vk_renderer_update_transformer(const CoordinateTransformer* transformer) {
+static void vk_backend_update_transformer(RendererBackend* backend, const CoordinateTransformer* transformer) {
+    (void)backend;
     if (!transformer) return;
     g_transformer = *transformer;
     g_transformer.viewport_size = (Vec2){(float)swapchain_extent.width, (float)swapchain_extent.height};
 }
 
-void vk_renderer_draw_frame(void) {
+static void vk_backend_draw(RendererBackend* backend) {
+    (void)backend;
     draw_frame();
 }
 
-void vk_renderer_cleanup(void) {
+static void vk_backend_cleanup(RendererBackend* backend) {
     if (device) vkDeviceWaitIdle(device);
     free(atlas);
     atlas = NULL;
@@ -1733,5 +1809,17 @@ void vk_renderer_cleanup(void) {
     if (device) { vkDestroyDevice(device, NULL); device = VK_NULL_HANDLE; }
     if (surface) { vkDestroySurfaceKHR(instance, surface, NULL); surface = VK_NULL_HANDLE; }
     if (instance) { vkDestroyInstance(instance, NULL); instance = VK_NULL_HANDLE; }
+    render_logger_cleanup(g_logger);
+    g_logger = NULL;
+}
+
+RendererBackend* vulkan_renderer_backend(void) {
+    g_vulkan_backend.id = "vulkan";
+    g_vulkan_backend.state = &g_vk;
+    g_vulkan_backend.init = vk_backend_init;
+    g_vulkan_backend.update_transformer = vk_backend_update_transformer;
+    g_vulkan_backend.draw = vk_backend_draw;
+    g_vulkan_backend.cleanup = vk_backend_cleanup;
+    return &g_vulkan_backend;
 }
 

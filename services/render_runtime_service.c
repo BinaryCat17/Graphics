@@ -2,7 +2,9 @@
 
 #include <GLFW/glfw3.h>
 #include <stdio.h>
+#include <string.h>
 
+#include "render/renderer_backend.h"
 #include "render/vulkan_renderer.h"
 #include "runtime/runtime.h"
 #include "service_events.h"
@@ -18,16 +20,29 @@ static void render_runtime_service_reset(RenderRuntimeServiceContext* context, A
         .ui_type_id = services ? services->ui_type_id : -1,
         .model_type_id = services ? services->model_type_id : -1,
         .render_ready_type_id = services ? services->render_ready_type_id : -1,
+        .renderer_ready = false,
+        .render_ready = false,
+        .backend = context->backend,
+        .logger_config = context->logger_config,
     };
 }
 
 static void try_bootstrap_renderer(RenderRuntimeServiceContext* context) {
     if (!context || context->renderer_ready || !context->render_ready) return;
     if (!context->render || !context->render->window || !context->assets || !context->widgets.items) return;
+    if (!context->backend) return;
 
-    context->renderer_ready = vk_renderer_init(context->render->window, context->assets->vert_spv_path,
-                                               context->assets->frag_spv_path, context->assets->font_path,
-                                               context->widgets, &context->render->transformer);
+    RenderBackendInit init = {
+        .window = context->render->window,
+        .vert_spv = context->assets->vert_spv_path,
+        .frag_spv = context->assets->frag_spv_path,
+        .font_path = context->assets->font_path,
+        .widgets = context->widgets,
+        .transformer = &context->render->transformer,
+        .logger_config = &context->logger_config,
+    };
+
+    context->renderer_ready = context->backend->init(context->backend, &init);
 }
 
 static void on_assets_event(const StateEvent* event, void* user_data) {
@@ -98,7 +113,9 @@ RenderRuntimeServiceContext* render_runtime_service_context(const ServiceDescrip
 void render_runtime_service_update_transformer(RenderRuntimeServiceContext* context, RenderRuntimeContext* render) {
     if (!context || !render) return;
     if (!context->renderer_ready) return;
-    vk_renderer_update_transformer(&render->transformer);
+    if (context->backend && context->backend->update_transformer) {
+        context->backend->update_transformer(context->backend, &render->transformer);
+    }
 }
 
 bool render_runtime_service_prepare(RenderRuntimeServiceContext* context, AppServices* services) {
@@ -123,12 +140,31 @@ bool render_runtime_service_prepare(RenderRuntimeServiceContext* context, AppSer
 }
 
 static bool render_runtime_service_init(AppServices* services, const ServiceConfig* config) {
-    (void)config;
     if (!services) return false;
 
     static RenderRuntimeServiceContext g_context = {0};
     g_render_runtime_service_descriptor.context = &g_context;
     services->render_runtime_context = &g_context;
+
+    renderer_backend_register(vulkan_renderer_backend());
+    const char* backend_id = config ? config->renderer_backend : NULL;
+    g_context.backend = renderer_backend_get(backend_id);
+
+    RenderLogSinkType sink_type = RENDER_LOG_SINK_STDOUT;
+    if (config && config->render_log_sink) {
+        if (strcmp(config->render_log_sink, "file") == 0) {
+            sink_type = RENDER_LOG_SINK_FILE;
+        } else if (strcmp(config->render_log_sink, "ring") == 0) {
+            sink_type = RENDER_LOG_SINK_RING_BUFFER;
+        }
+    }
+
+    g_context.logger_config = (RenderLoggerConfig){
+        .sink_type = sink_type,
+        .sink_target = config ? config->render_log_target : NULL,
+        .ring_capacity = 0,
+        .enabled = config ? config->render_log_enabled : false,
+    };
 
     return render_runtime_service_bind(&g_context, services);
 }
@@ -145,7 +181,10 @@ static bool render_runtime_service_start(AppServices* services, const ServiceCon
 static void render_runtime_service_stop(AppServices* services) {
     if (!services || !services->render_runtime_context) return;
 
-    vk_renderer_cleanup();
+    RenderRuntimeServiceContext* context = services->render_runtime_context;
+    if (context->backend && context->backend->cleanup) {
+        context->backend->cleanup(context->backend);
+    }
     runtime_shutdown(services);
     render_runtime_service_reset(services->render_runtime_context, services);
 }

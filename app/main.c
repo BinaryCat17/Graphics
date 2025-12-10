@@ -1,4 +1,5 @@
 #define _POSIX_C_SOURCE 200809L
+#include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -14,11 +15,25 @@
 int main(int argc, char** argv) {
     const char* assets_dir = "assets";
     const char* scene_path = NULL;
+    const char* renderer_backend = "vulkan";
+    const char* render_log_sink = "stdout";
+    const char* render_log_target = NULL;
+    bool render_log_enabled = false;
     for (int i = 1; i < argc; ++i) {
         if (strcmp(argv[i], "--assets") == 0 && i + 1 < argc) {
             assets_dir = argv[++i];
         } else if (strcmp(argv[i], "--scene") == 0 && i + 1 < argc) {
             scene_path = argv[++i];
+        } else if (strcmp(argv[i], "--renderer") == 0 && i + 1 < argc) {
+            renderer_backend = argv[++i];
+        } else if (strcmp(argv[i], "--render-log") == 0) {
+            render_log_enabled = true;
+        } else if (strcmp(argv[i], "--render-log-sink") == 0 && i + 1 < argc) {
+            render_log_sink = argv[++i];
+            render_log_enabled = true;
+        } else if (strcmp(argv[i], "--render-log-target") == 0 && i + 1 < argc) {
+            render_log_target = argv[++i];
+            render_log_enabled = true;
         }
     }
     if (!scene_path) {
@@ -32,7 +47,12 @@ int main(int argc, char** argv) {
         return 1;
     }
 
-    ServiceConfig config = {.assets_dir = assets_dir, .scene_path = scene_path};
+    ServiceConfig config = {.assets_dir = assets_dir,
+                           .scene_path = scene_path,
+                           .renderer_backend = renderer_backend,
+                           .render_log_sink = render_log_sink,
+                           .render_log_target = render_log_target,
+                           .render_log_enabled = render_log_enabled};
 
     ServiceManager manager;
     service_manager_init(&manager);

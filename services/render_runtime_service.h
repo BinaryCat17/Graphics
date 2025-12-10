@@ -4,6 +4,7 @@
 #include <stdbool.h>
 
 #include "assets/assets.h"
+#include "render/renderer_backend.h"
 #include "render/render_context.h"
 #include "service.h"
 #include "state/state_manager.h"
@@ -23,6 +24,8 @@ typedef struct RenderRuntimeServiceContext {
     int render_ready_type_id;
     bool renderer_ready;
     bool render_ready;
+    RendererBackend* backend;
+    RenderLoggerConfig logger_config;
 } RenderRuntimeServiceContext;
 
 const ServiceDescriptor* render_runtime_service_descriptor(void);
