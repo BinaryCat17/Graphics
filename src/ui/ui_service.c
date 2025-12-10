@@ -1,5 +1,6 @@
 #include "ui_service.h"
 
+#include <GLFW/glfw3.h>
 #include <math.h>
 #include <stdio.h>
 #include <string.h>
