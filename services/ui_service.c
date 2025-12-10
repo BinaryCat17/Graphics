@@ -220,3 +220,29 @@ void ui_context_dispose(UiContext* ui) {
         ui->scroll = NULL;
     }
 }
+
+static bool ui_service_init(AppServices* services, const ServiceConfig* config) {
+    (void)config;
+    if (!services) return false;
+    ui_context_init(&services->ui);
+    return ui_service_subscribe(&services->ui, &services->state_manager, services->model_type_id);
+}
+
+static bool ui_service_start(AppServices* services, const ServiceConfig* config) {
+    (void)config;
+    if (!services) return false;
+    return ui_build(&services->ui, &services->core);
+}
+
+static void ui_service_stop(AppServices* services) { ui_context_dispose(&services->ui); }
+
+static const ServiceDescriptor g_ui_service_descriptor = {
+    .name = "ui",
+    .init = ui_service_init,
+    .start = ui_service_start,
+    .stop = ui_service_stop,
+    .context = NULL,
+    .thread_handle = NULL,
+};
+
+const ServiceDescriptor* ui_service_descriptor(void) { return &g_ui_service_descriptor; }

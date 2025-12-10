@@ -4,6 +4,7 @@
 #include <string.h>
 
 #include "runtime/runtime.h"
+#include "service.h"
 #include "render_service.h"
 #include "scene_service.h"
 #include "ui_service.h"
@@ -25,41 +26,47 @@ int main(int argc, char** argv) {
 
     AppServices services = {0};
     if (!app_services_init(&services)) return 1;
-    ui_context_init(&services.ui);
 
-    ui_service_subscribe(&services.ui, &services.state_manager, services.model_type_id);
-    render_service_bind(&services.render, &services.state_manager, services.assets_type_id, services.ui_type_id,
-                        services.model_type_id);
-
-    if (!scene_service_load(&services, assets_dir, scene_path)) {
+    if (!service_registry_register(scene_service_descriptor()) || !service_registry_register(ui_service_descriptor()) ||
+        !service_registry_register(render_service_descriptor())) {
         app_services_shutdown(&services);
         return 1;
     }
 
-    state_manager_dispatch(&services.state_manager, 0);
+    const char* requested_services[] = {"scene", "ui", "render"};
+    const size_t requested_count = sizeof(requested_services) / sizeof(requested_services[0]);
+    const ServiceDescriptor* descriptors[3] = {0};
 
-    if (!ui_build(&services.ui, &services.core)) {
-        ui_context_dispose(&services.ui);
-        scene_service_unload(&services);
-        app_services_shutdown(&services);
-        return 1;
-    }
-    if (!runtime_init(&services)) {
-        runtime_shutdown(&services);
-        ui_context_dispose(&services.ui);
-        scene_service_unload(&services);
-        app_services_shutdown(&services);
-        return 1;
+    for (size_t i = 0; i < requested_count; ++i) {
+        descriptors[i] = service_registry_get(requested_services[i]);
+        if (!descriptors[i]) {
+            fprintf(stderr, "Unknown service: %s\n", requested_services[i]);
+            app_services_shutdown(&services);
+            return 1;
+        }
     }
 
-    state_manager_dispatch(&services.state_manager, 0);
+    ServiceConfig config = {.assets_dir = assets_dir, .scene_path = scene_path};
 
-    render_loop(&services.render, &services.state_manager);
+    for (size_t i = 0; i < requested_count; ++i) {
+        if (descriptors[i]->init && !descriptors[i]->init(&services, &config)) {
+            app_services_shutdown(&services);
+            return 1;
+        }
+    }
 
-    render_service_shutdown(&services.render);
-    runtime_shutdown(&services);
-    ui_context_dispose(&services.ui);
-    scene_service_unload(&services);
+    size_t started_count = 0;
+    for (; started_count < requested_count; ++started_count) {
+        if (descriptors[started_count]->start && !descriptors[started_count]->start(&services, &config)) {
+            break;
+        }
+        state_manager_dispatch(&services.state_manager, 0);
+    }
+
+    for (size_t i = started_count; i-- > 0;) {
+        if (descriptors[i]->stop) descriptors[i]->stop(&services);
+    }
+
     app_services_shutdown(&services);
-    return 0;
+    return started_count == requested_count ? 0 : 1;
 }

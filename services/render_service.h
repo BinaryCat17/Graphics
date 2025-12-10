@@ -9,11 +9,13 @@
 #include "state/state_manager.h"
 #include "ui/ui_context.h"
 #include "ui/ui_json.h"
+#include "service.h"
 
 bool render_service_bind(RenderRuntimeContext* render, StateManager* state_manager, int assets_type_id, int ui_type_id,
                         int model_type_id);
 void render_service_update_transformer(RenderRuntimeContext* render);
 void render_loop(RenderRuntimeContext* render, StateManager* state_manager);
 void render_service_shutdown(RenderRuntimeContext* render);
+const ServiceDescriptor* render_service_descriptor(void);
 
 #endif // RENDER_SERVICE_H

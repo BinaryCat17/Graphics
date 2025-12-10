@@ -113,3 +113,31 @@ void scene_service_unload(AppServices* services) {
     scene_dispose(&core->scene);
     free_schemas(core);
 }
+
+static bool scene_service_init(AppServices* services, const ServiceConfig* config) {
+    (void)services;
+    (void)config;
+    return true;
+}
+
+static bool scene_service_start(AppServices* services, const ServiceConfig* config) {
+    const char* assets_dir = config ? config->assets_dir : NULL;
+    const char* scene_path = config ? config->scene_path : NULL;
+    if (!assets_dir || !scene_path) return false;
+    return scene_service_load(services, assets_dir, scene_path);
+}
+
+static void scene_service_stop(AppServices* services) {
+    scene_service_unload(services);
+}
+
+static const ServiceDescriptor g_scene_service_descriptor = {
+    .name = "scene",
+    .init = scene_service_init,
+    .start = scene_service_start,
+    .stop = scene_service_stop,
+    .context = NULL,
+    .thread_handle = NULL,
+};
+
+const ServiceDescriptor* scene_service_descriptor(void) { return &g_scene_service_descriptor; }
