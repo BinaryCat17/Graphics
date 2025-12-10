@@ -1,0 +1,6 @@
+store: environment
+key: runtime
+data:
+  appName: Graphics Viewer
+  locale: ru-RU
+  theme: midnight

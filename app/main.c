@@ -15,10 +15,26 @@
 #include "Graphics.h"
 #include "cad_scene_yaml.h"
 #include "scene_ui.h"
+#include "state_manager.h"
+#include "module_yaml_loader.h"
 
 static void fatal(const char* msg) {
     fprintf(stderr, "Fatal: %s\n", msg);
     exit(1);
+}
+
+static char* join_path(const char* dir, const char* leaf) {
+    size_t dir_len = strlen(dir);
+    while (dir_len > 0 && dir[dir_len - 1] == '/') dir_len--;
+    size_t leaf_len = strlen(leaf);
+    size_t total = dir_len + 1 + leaf_len + 1;
+    char* out = (char*)malloc(total);
+    if (!out) return NULL;
+    memcpy(out, dir, dir_len);
+    out[dir_len] = '/';
+    memcpy(out + dir_len + 1, leaf, leaf_len);
+    out[total - 1] = 0;
+    return out;
 }
 
 typedef struct {
@@ -195,16 +211,58 @@ int main(int argc, char** argv) {
         return 1;
     }
 
+    StateManager state_manager = {0};
+    state_manager_init(&state_manager, 8, 32);
+
+    ModuleSchema ui_schema = {0};
+    ModuleSchema global_schema = {0};
+    char* ui_dir = join_path(assets_dir, "ui");
+    char* global_dir = join_path(assets_dir, "global_state");
+    char* ui_schema_path = join_path(ui_dir, "schema.yaml");
+    char* global_schema_path = join_path(global_dir, "schema.yaml");
+    SimpleYamlError schema_err = {0};
+    if (ui_schema_path && module_schema_load(ui_schema_path, &ui_schema, &schema_err)) {
+        module_schema_register(&state_manager, &ui_schema, NULL);
+        char* ui_config = join_path(ui_dir, "config");
+        module_load_configs(&ui_schema, ui_config, &state_manager);
+        free(ui_config);
+    } else {
+        fprintf(stderr, "UI schema error %s:%d:%d %s\n", ui_schema_path ? ui_schema_path : "(null)", schema_err.line, schema_err.column, schema_err.message);
+    }
+    schema_err = (SimpleYamlError){0};
+    if (global_schema_path && module_schema_load(global_schema_path, &global_schema, &schema_err)) {
+        module_schema_register(&state_manager, &global_schema, NULL);
+        char* global_config = join_path(global_dir, "config");
+        module_load_configs(&global_schema, global_config, &state_manager);
+        free(global_config);
+    } else {
+        fprintf(stderr, "Global schema error %s:%d:%d %s\n", global_schema_path ? global_schema_path : "(null)", schema_err.line, schema_err.column, schema_err.message);
+    }
+
     Scene scene;
     SceneError scene_err = {0};
     if (!parse_scene_yaml(scene_path, &scene, &scene_err)) {
         fprintf(stderr, "Failed to load scene %s:%d:%d %s\n", scene_path, scene_err.line, scene_err.column, scene_err.message);
+        state_manager_dispose(&state_manager);
+        module_schema_free(&ui_schema);
+        module_schema_free(&global_schema);
+        free(ui_dir);
+        free(global_dir);
+        free(ui_schema_path);
+        free(global_schema_path);
         return 1;
     }
 
     Assets assets;
     if (!load_assets(assets_dir, &assets)) {
         scene_dispose(&scene);
+        state_manager_dispose(&state_manager);
+        module_schema_free(&ui_schema);
+        module_schema_free(&global_schema);
+        free(ui_dir);
+        free(global_dir);
+        free(ui_schema_path);
+        free(global_schema_path);
         return 1;
     }
 
@@ -305,6 +363,13 @@ int main(int argc, char** argv) {
     scroll_free(scroll_ctx);
     free_assets(&assets);
     scene_dispose(&scene);
+    module_schema_free(&ui_schema);
+    module_schema_free(&global_schema);
+    free(ui_dir);
+    free(global_dir);
+    free(ui_schema_path);
+    free(global_schema_path);
+    state_manager_dispose(&state_manager);
     glfwDestroyWindow(window);
     glfwTerminate();
     return 0;

@@ -1,0 +1,5 @@
+store: defaults
+key: ui
+data:
+  unitSystem: metric
+  snapping: coarse
