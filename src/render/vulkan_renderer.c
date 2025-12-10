@@ -14,6 +14,7 @@
 #include <GLFW/glfw3.h>
 
 #include "core/Graphics.h"
+#include "ui/ui_json.h"
 
 #define STB_TRUETYPE_IMPLEMENTATION
 #include "stb_truetype.h"
@@ -154,9 +155,9 @@ enum {
     Z_LAYER_SLIDER_TRACK = 2,
     Z_LAYER_SLIDER_FILL = 3,
     Z_LAYER_SLIDER_KNOB = 4,
-    Z_LAYER_SCROLLBAR_TRACK = 5,
-    Z_LAYER_SCROLLBAR_THUMB = 6,
-    Z_LAYER_TEXT = 7,
+    Z_LAYER_TEXT = 5,
+    Z_LAYER_SCROLLBAR_TRACK = 14,
+    Z_LAYER_SCROLLBAR_THUMB = 15,
 };
 
 
@@ -1221,6 +1222,7 @@ static bool build_vertices_from_widgets(FrameResources *frame) {
         const Widget *widget = &g_widgets.items[i];
         size_t widget_order = g_widgets.count - 1 - i;
         int base_z = widget->z_index * LAYER_STRIDE;
+        int scrollbar_z = (widget->z_index + UI_Z_ORDER_SCALE) * LAYER_STRIDE;
         int text_z = base_z + Z_LAYER_TEXT;
 
         float scroll_offset = widget->scroll_static ? 0.0f : widget->scroll_offset;
@@ -1351,7 +1353,7 @@ static bool build_vertices_from_widgets(FrameResources *frame) {
                 view_models[view_model_count++] = (ViewModel){
                     .id = widget->id,
                     .logical_box = { {clipped_track.x, clipped_track.y}, {clipped_track.w, clipped_track.h} },
-                    .layer = base_z + Z_LAYER_SCROLLBAR_TRACK,
+                    .layer = scrollbar_z + Z_LAYER_SCROLLBAR_TRACK,
                     .phase = RENDER_PHASE_BACKGROUND,
                     .widget_order = widget_order,
                     .ordinal = widget_ordinals[i]++,
@@ -1377,7 +1379,7 @@ static bool build_vertices_from_widgets(FrameResources *frame) {
                 view_models[view_model_count++] = (ViewModel){
                     .id = widget->id,
                     .logical_box = { {clipped_thumb.x, clipped_thumb.y}, {clipped_thumb.w, clipped_thumb.h} },
-                    .layer = base_z + Z_LAYER_SCROLLBAR_THUMB,
+                    .layer = scrollbar_z + Z_LAYER_SCROLLBAR_THUMB,
                     .phase = RENDER_PHASE_BACKGROUND,
                     .widget_order = widget_order,
                     .ordinal = widget_ordinals[i]++,
