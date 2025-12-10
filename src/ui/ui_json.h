@@ -140,7 +140,7 @@ typedef struct Widget {
     int show_scrollbar;
 } Widget;
 
-typedef struct {
+typedef struct WidgetArray {
     Widget* items;
     size_t count;
 } WidgetArray;

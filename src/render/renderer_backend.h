@@ -5,10 +5,11 @@
 #include <stddef.h>
 #include <stdio.h>
 
+#include "ui/ui_json.h"
+
 typedef struct GLFWwindow GLFWwindow;
 
 typedef struct CoordinateTransformer CoordinateTransformer;
-typedef struct WidgetArray WidgetArray;
 
 typedef enum RenderLogSinkType {
     RENDER_LOG_SINK_STDOUT,
