@@ -71,9 +71,10 @@ if (NOT VULKAN_STUB)
             "src/Graphics.c" "src/Graphics.h"
             "src/cad_scene.c" "src/cad_scene.h" "src/cad_scene_yaml.c" "src/cad_scene_yaml.h"
             "src/state_manager.c" "src/state_manager.h"
+            "src/simple_yaml.c" "src/simple_yaml.h" "src/module_yaml_loader.c" "src/module_yaml_loader.h"
     )
 else()
-    set(APP_SOURCES "app/main_stub.c" "src/cad_scene.c" "src/cad_scene.h" "src/cad_scene_yaml.c" "src/cad_scene_yaml.h" "src/state_manager.c" "src/state_manager.h" "app/scene_ui.c" "app/scene_ui.h" "app/ui_json.c" "app/ui_json.h")
+    set(APP_SOURCES "app/main_stub.c" "src/cad_scene.c" "src/cad_scene.h" "src/cad_scene_yaml.c" "src/cad_scene_yaml.h" "src/state_manager.c" "src/state_manager.h" "src/simple_yaml.c" "src/simple_yaml.h" "src/module_yaml_loader.c" "src/module_yaml_loader.h" "app/scene_ui.c" "app/scene_ui.h" "app/ui_json.c" "app/ui_json.h")
 endif()
 
 # Добавьте источник в исполняемый файл этого проекта.

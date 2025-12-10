@@ -4,6 +4,8 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "module_yaml_loader.h"
+
 static char* join_path(const char* dir, const char* leaf) {
     if (!dir || !leaf) return NULL;
     size_t dir_len = strlen(dir);
@@ -62,9 +64,9 @@ int load_assets(const char* assets_dir, Assets* out_assets) {
 
     memset(out_assets, 0, sizeof(*out_assets));
 
-    out_assets->model_path = join_path(assets_dir, "model.json");
-    out_assets->layout_path = join_path(assets_dir, "layout.json");
-    out_assets->styles_path = join_path(assets_dir, "styles.json");
+    out_assets->model_path = join_path(assets_dir, "ui/config/model.yaml");
+    out_assets->layout_path = join_path(assets_dir, "ui/config/layout.yaml");
+    out_assets->styles_path = join_path(assets_dir, "ui/config/styles.yaml");
     out_assets->vert_spv_path = join_path(assets_dir, "shaders/shader.vert.spv");
     out_assets->frag_spv_path = join_path(assets_dir, "shaders/shader.frag.spv");
     out_assets->font_path = join_path(assets_dir, "font.ttf");
@@ -76,15 +78,24 @@ int load_assets(const char* assets_dir, Assets* out_assets) {
         return 0;
     }
 
-    out_assets->model_text = read_file_text(out_assets->model_path);
-    out_assets->layout_text = read_file_text(out_assets->layout_path);
-    out_assets->styles_text = read_file_text(out_assets->styles_path);
-
-    if (!out_assets->model_text || !out_assets->layout_text || !out_assets->styles_text) {
+    SimpleYamlError err = {0};
+    if (!load_yaml_file_as_json(out_assets->model_path, &out_assets->model_text, &err)) {
+        fprintf(stderr, "Failed to load %s: %s\n", out_assets->model_path, err.message);
         free_assets(out_assets);
         return 0;
     }
-
+    err = (SimpleYamlError){0};
+    if (!load_yaml_file_as_json(out_assets->layout_path, &out_assets->layout_text, &err)) {
+        fprintf(stderr, "Failed to load %s: %s\n", out_assets->layout_path, err.message);
+        free_assets(out_assets);
+        return 0;
+    }
+    err = (SimpleYamlError){0};
+    if (!load_yaml_file_as_json(out_assets->styles_path, &out_assets->styles_text, &err)) {
+        fprintf(stderr, "Failed to load %s: %s\n", out_assets->styles_path, err.message);
+        free_assets(out_assets);
+        return 0;
+    }
     return 1;
 }
 

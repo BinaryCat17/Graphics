@@ -1,0 +1,8 @@
+store: model
+key: default
+data:
+  model:
+    sceneName: Spur reducer
+    sceneAuthor: ""
+    scenePath: ../../../assets/scenes/gear_reducer.yaml
+    sceneStats: "1 материалов · 4 деталей · 3 соединений"
