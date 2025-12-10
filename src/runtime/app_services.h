@@ -17,6 +17,7 @@ typedef struct AppServices {
     int assets_type_id;
     int model_type_id;
     int ui_type_id;
+    int render_ready_type_id;
 
     struct RenderRuntimeServiceContext* render_runtime_context;
 

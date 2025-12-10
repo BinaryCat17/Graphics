@@ -20,7 +20,9 @@ typedef struct RenderRuntimeServiceContext {
     int assets_type_id;
     int ui_type_id;
     int model_type_id;
+    int render_ready_type_id;
     bool renderer_ready;
+    bool render_ready;
 } RenderRuntimeServiceContext;
 
 const ServiceDescriptor* render_runtime_service_descriptor(void);

@@ -18,9 +18,11 @@ bool app_services_init(AppServices* services) {
         state_manager_register_type(&services->state_manager, STATE_COMPONENT_MODEL, sizeof(ModelComponent), 1);
     services->ui_type_id =
         state_manager_register_type(&services->state_manager, STATE_COMPONENT_UI, sizeof(UiRuntimeComponent), 1);
+    services->render_ready_type_id = state_manager_register_type(&services->state_manager, STATE_COMPONENT_RENDER_READY,
+                                                                sizeof(RenderReadyComponent), 1);
 
     return services->scene_type_id >= 0 && services->assets_type_id >= 0 && services->model_type_id >= 0 &&
-           services->ui_type_id >= 0;
+           services->ui_type_id >= 0 && services->render_ready_type_id >= 0;
 }
 
 void app_services_shutdown(AppServices* services) {
