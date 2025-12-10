@@ -1011,15 +1011,15 @@ static float snap_to_pixel(float value) {
     return floorf(value + 0.5f);
 }
 
-static int apply_clip_rect(const Widget* widget, const Rect* input, Rect* out) {
-    if (!widget || !input || !out) return 0;
+static int apply_clip_rect_to_bounds(const Rect *clip, const Rect *input, Rect *out) {
+    if (!input || !out) return 0;
     *out = *input;
-    if (!widget->has_clip) return 1;
+    if (!clip) return 1;
 
-    float clip_x0 = ceilf(widget->clip.x);
-    float clip_y0 = ceilf(widget->clip.y);
-    float clip_x1 = floorf(widget->clip.x + widget->clip.w);
-    float clip_y1 = floorf(widget->clip.y + widget->clip.h);
+    float clip_x0 = ceilf(clip->x);
+    float clip_y0 = ceilf(clip->y);
+    float clip_x1 = floorf(clip->x + clip->w);
+    float clip_y1 = floorf(clip->y + clip->h);
 
     float x0 = fmaxf(input->x, clip_x0);
     float y0 = fmaxf(input->y, clip_y0);
@@ -1031,6 +1031,10 @@ static int apply_clip_rect(const Widget* widget, const Rect* input, Rect* out) {
     out->w = x1 - x0;
     out->h = y1 - y0;
     return 1;
+}
+
+static int apply_clip_rect(const Widget* widget, const Rect* input, Rect* out) {
+    return apply_clip_rect_to_bounds(widget && widget->has_clip ? &widget->clip : NULL, input, out);
 }
 
 static void apply_widget_clip_to_view_model(const Widget *widget, ViewModel *vm) {
@@ -1203,7 +1207,8 @@ static bool build_vertices_from_widgets(FrameResources *frame) {
         }
     }
 
-    size_t view_model_capacity = g_widgets.count * 4 + slider_extras;
+    /* Each widget can contribute up to: 4 border segments + 1 fill + 2 scrollbar parts. */
+    size_t view_model_capacity = g_widgets.count * 8 + slider_extras;
     ViewModel *view_models = calloc(view_model_capacity, sizeof(ViewModel));
     GlyphQuadArray glyph_quads = {0};
     bool view_models_ok = view_models != NULL;
@@ -1231,26 +1236,56 @@ static bool build_vertices_from_widgets(FrameResources *frame) {
         Rect widget_rect = { widget->rect.x, widget->rect.y + effective_offset, widget->rect.w, widget->rect.h };
         Rect inner_rect = widget_rect;
         if (widget->border_thickness > 0.0f) {
-            inner_rect.x += widget->border_thickness;
-            inner_rect.y += widget->border_thickness;
-            inner_rect.w -= widget->border_thickness * 2.0f;
-            inner_rect.h -= widget->border_thickness * 2.0f;
+            float b = widget->border_thickness;
+            inner_rect.x += b;
+            inner_rect.y += b;
+            inner_rect.w -= b * 2.0f;
+            inner_rect.h -= b * 2.0f;
             if (inner_rect.w < 0.0f) inner_rect.w = 0.0f;
             if (inner_rect.h < 0.0f) inner_rect.h = 0.0f;
-            Rect clipped_border;
-            if (apply_clip_rect(widget, &widget_rect, &clipped_border) &&
-                ensure_view_model_capacity(&view_models, &view_model_capacity, view_model_count + 1, &view_models_ok)) {
-            view_models[view_model_count++] = (ViewModel){
-                .id = widget->id,
-                .logical_box = { {clipped_border.x, clipped_border.y}, {clipped_border.w, clipped_border.h} },
-                .layer = base_z + Z_LAYER_BORDER,
-                .phase = RENDER_PHASE_BACKGROUND,
-                .widget_order = widget_order,
-                .ordinal = widget_ordinals[i]++,
-                .color = widget->border_color,
+
+            Rect borders[4] = {
+                { widget_rect.x, widget_rect.y, widget_rect.w, b },
+                { widget_rect.x, widget_rect.y + widget_rect.h - b, widget_rect.w, b },
+                { widget_rect.x, widget_rect.y + b, b, widget_rect.h - b * 2.0f },
+                { widget_rect.x + widget_rect.w - b, widget_rect.y + b, b, widget_rect.h - b * 2.0f },
             };
-            apply_widget_clip_to_view_model(widget, &view_models[view_model_count - 1]);
-        }
+
+            Rect border_clip = {0};
+            const Rect *clip_bounds = NULL;
+            if (widget->has_clip) {
+                border_clip = (Rect){
+                    widget->clip.x - b,
+                    widget->clip.y - b,
+                    widget->clip.w + b * 2.0f,
+                    widget->clip.h + b * 2.0f,
+                };
+                clip_bounds = &border_clip;
+            }
+
+            for (size_t edge = 0; edge < 4; ++edge) {
+                if (borders[edge].w <= 0.0f || borders[edge].h <= 0.0f) continue;
+                Rect clipped_border;
+                if (apply_clip_rect_to_bounds(clip_bounds, &borders[edge], &clipped_border) &&
+                    ensure_view_model_capacity(&view_models, &view_model_capacity, view_model_count + 1, &view_models_ok)) {
+                    ViewModel vm = {
+                        .id = widget->id,
+                        .logical_box = { {clipped_border.x, clipped_border.y}, {clipped_border.w, clipped_border.h} },
+                        .layer = base_z + Z_LAYER_BORDER,
+                        .phase = RENDER_PHASE_BACKGROUND,
+                        .widget_order = widget_order,
+                        .ordinal = widget_ordinals[i]++,
+                        .color = widget->border_color,
+                    };
+                    if (clip_bounds) {
+                        vm.has_clip = 1;
+                        vm.clip = (LayoutBox){ {clip_bounds->x, clip_bounds->y}, {clip_bounds->w, clip_bounds->h} };
+                    } else {
+                        apply_widget_clip_to_view_model(widget, &vm);
+                    }
+                    view_models[view_model_count++] = vm;
+                }
+            }
         }
 
         if (widget->type == W_HSLIDER) {
