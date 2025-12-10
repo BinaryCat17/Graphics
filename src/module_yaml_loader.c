@@ -10,6 +10,8 @@
 #include <dirent.h>
 #endif
 
+static void assign_error(SimpleYamlError *err, int line, int column, const char *msg);
+
 static char *dup_string(const char *s)
 {
     if (!s) return NULL;
