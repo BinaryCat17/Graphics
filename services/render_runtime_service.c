@@ -17,11 +17,12 @@ static void render_runtime_service_reset(RenderRuntimeServiceContext* context, A
         .assets_type_id = services ? services->assets_type_id : -1,
         .ui_type_id = services ? services->ui_type_id : -1,
         .model_type_id = services ? services->model_type_id : -1,
+        .render_ready_type_id = services ? services->render_ready_type_id : -1,
     };
 }
 
 static void try_bootstrap_renderer(RenderRuntimeServiceContext* context) {
-    if (!context || context->renderer_ready) return;
+    if (!context || context->renderer_ready || !context->render_ready) return;
     if (!context->render || !context->render->window || !context->assets || !context->widgets.items) return;
 
     context->renderer_ready = vk_renderer_init(context->render->window, context->assets->vert_spv_path,
@@ -53,6 +54,19 @@ static void on_model_event(const StateEvent* event, void* user_data) {
     context->model = component->model;
 }
 
+static void on_render_ready_event(const StateEvent* event, void* user_data) {
+    RenderRuntimeServiceContext* context = (RenderRuntimeServiceContext*)user_data;
+    if (!context || !event || !event->payload) return;
+    const RenderReadyComponent* component = (const RenderReadyComponent*)event->payload;
+    context->render = component->render;
+    context->assets = component->assets;
+    context->ui = component->ui;
+    context->widgets = component->widgets;
+    context->model = component->model;
+    context->render_ready = component->ready;
+    try_bootstrap_renderer(context);
+}
+
 static bool render_runtime_service_bind(RenderRuntimeServiceContext* context, AppServices* services) {
     if (!context || !services) {
         fprintf(stderr, "Render runtime service bind received invalid arguments.\n");
@@ -68,6 +82,10 @@ static bool render_runtime_service_bind(RenderRuntimeServiceContext* context, Ap
     }
     if (context->model_type_id >= 0) {
         state_manager_subscribe(context->state_manager, context->model_type_id, "active", on_model_event, context);
+    }
+    if (context->render_ready_type_id >= 0) {
+        state_manager_subscribe(context->state_manager, context->render_ready_type_id, "active", on_render_ready_event,
+                                context);
     }
     return true;
 }
@@ -91,8 +109,16 @@ bool render_runtime_service_prepare(RenderRuntimeServiceContext* context, AppSer
         return false;
     }
 
+    RenderReadyComponent ready = {.render = &services->render,
+                                  .assets = &services->core.assets,
+                                  .ui = &services->ui,
+                                  .widgets = services->ui.widgets,
+                                  .model = services->core.model,
+                                  .ready = true};
+    state_manager_publish(&services->state_manager, STATE_EVENT_COMPONENT_ADDED, services->render_ready_type_id, "active",
+                          &ready, sizeof(ready));
+
     state_manager_dispatch(&services->state_manager, 0);
-    try_bootstrap_renderer(context);
     return true;
 }
 
