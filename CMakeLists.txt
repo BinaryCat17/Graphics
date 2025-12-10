@@ -67,7 +67,7 @@ if (NOT VULKAN_STUB)
             "src/assets/assets.c" "src/assets/assets.h"
             "src/render/renderer_backend.c" "src/render/renderer_backend.h"
             "src/render/vulkan_renderer.c" "src/render/vulkan_renderer.h"
-            "src/ui/scroll.c" "src/ui/scroll.h" "src/ui/ui_json.c" "src/ui/ui_json.h" "src/ui/scene_ui.c" "src/ui/scene_ui.h"
+            "src/ui/scroll.c" "src/ui/scroll.h" "src/ui/ui_config.c" "src/ui/ui_config.h" "src/ui/scene_ui.c" "src/ui/scene_ui.h"
             "src/core/coordinate_transform.c" "src/core/layout.c" "src/core/render_commands.c" "src/core/vertex_buffers.c" "src/core/memory_utils.c" "src/core/Graphics.h"
             "src/cad/cad_scene.c" "src/cad/cad_scene.h" "src/cad/cad_scene_yaml.c" "src/cad/cad_scene_yaml.h"
             "src/state/state_manager.c" "src/state/state_manager.h"
@@ -85,7 +85,7 @@ else()
             "src/cad/cad_scene.c" "src/cad/cad_scene.h" "src/cad/cad_scene_yaml.c" "src/cad/cad_scene_yaml.h"
             "src/state/state_manager.c" "src/state/state_manager.h"
             "src/config/simple_yaml.c" "src/config/simple_yaml.h" "src/config/module_yaml_loader.c" "src/config/module_yaml_loader.h" "src/config/config_document.c" "src/config/config_document.h" "src/config/config_io.c" "src/config/config_io.h"
-            "src/ui/scene_ui.c" "src/ui/scene_ui.h" "src/ui/ui_json.c" "src/ui/ui_json.h"
+            "src/ui/scene_ui.c" "src/ui/scene_ui.h" "src/ui/ui_config.c" "src/ui/ui_config.h"
     )
 endif()
 
@@ -115,7 +115,7 @@ target_include_directories(Graphics PRIVATE ${Stb_INCLUDE_DIR})
 
 add_executable(layout_tests
         tests/layout_tests.c
-        src/ui/ui_json.c src/ui/ui_json.h
+        src/ui/ui_config.c src/ui/ui_config.h
         src/ui/scene_ui.c src/ui/scene_ui.h
         src/ui/scroll.c src/ui/scroll.h
         src/config/config_document.c src/config/config_document.h src/config/config_io.c src/config/config_io.h
@@ -129,7 +129,7 @@ add_test(NAME layout_tests COMMAND layout_tests)
 
 add_executable(scene_ui_tests
         tests/scene_ui_tests.c
-        src/ui/ui_json.c src/ui/ui_json.h src/ui/scene_ui.c src/ui/scene_ui.h
+        src/ui/ui_config.c src/ui/ui_config.h src/ui/scene_ui.c src/ui/scene_ui.h
         src/ui/scroll.c src/ui/scroll.h
         src/cad/cad_scene.c src/cad/cad_scene.h
         src/config/config_document.c src/config/config_document.h src/config/config_io.c src/config/config_io.h

@@ -5,7 +5,7 @@
 #include <stddef.h>
 #include <stdio.h>
 
-#include "ui/ui_json.h"
+#include "ui/ui_config.h"
 
 typedef struct GLFWwindow GLFWwindow;
 

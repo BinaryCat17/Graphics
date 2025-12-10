@@ -3,7 +3,7 @@
 #include <string.h>
 #include <stdio.h>
 
-#include "ui/ui_json.h"
+#include "ui/ui_config.h"
 #include "ui/scroll.h"
 #include "config/config_io.h"
 
@@ -24,8 +24,8 @@ static LayoutFixture build_widgets(const char* styles_json, const char* layout_j
     }
     err = (ConfigError){0};
     assert(parse_config_text(layout_json, CONFIG_FORMAT_JSON, &layout_root, &err));
-    fx.styles = styles_root ? parse_styles_config(styles_root) : NULL;
-    fx.root = parse_layout_config(layout_root, NULL, fx.styles, NULL, NULL);
+    fx.styles = styles_root ? ui_config_load_styles(styles_root) : NULL;
+    fx.root = ui_config_load_layout(layout_root, NULL, fx.styles, NULL, NULL);
     config_node_free(styles_root);
     config_node_free(layout_root);
     assert(fx.root);

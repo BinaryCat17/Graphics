@@ -21,4 +21,4 @@ layout:
       style: primary
 ```
 
-With this structure, `parse_styles_config` reads the `styles.primary` map directly and `parse_layout_config` walks the `layout.children` sequence—no intermediate JSON text is produced.
+With this structure, `ui_config_load_styles` reads the `styles.primary` map directly and `ui_config_load_layout` walks the `layout.children` sequence—no intermediate JSON text is produced.

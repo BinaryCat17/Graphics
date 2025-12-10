@@ -5,7 +5,7 @@
 
 #include "ui/scene_ui.h"
 #include "config/config_io.h"
-#include "ui/ui_json.h"
+#include "ui/ui_config.h"
 
 static UiNode* find_by_id(UiNode* node, const char* id)
 {
@@ -71,8 +71,8 @@ static void test_tree_population(void)
     assert(parse_config_text(styles, CONFIG_FORMAT_JSON, &styles_root, &err));
     err = (ConfigError){0};
     assert(parse_config_text(layout, CONFIG_FORMAT_JSON, &config_layout_root, &err));
-    Style* parsed_styles = parse_styles_config(styles_root);
-    UiNode* root = parse_layout_config(config_layout_root, NULL, parsed_styles, NULL, &scene);
+    Style* parsed_styles = ui_config_load_styles(styles_root);
+    UiNode* root = ui_config_load_layout(config_layout_root, NULL, parsed_styles, NULL, &scene);
     config_node_free(styles_root);
     config_node_free(config_layout_root);
     assert(root);
@@ -122,9 +122,9 @@ static void test_yaml_layout_parsing(void)
     err = (ConfigError){0};
     assert(parse_config_text(layout_yaml, CONFIG_FORMAT_YAML, &layout_root, &err));
 
-    Style* parsed_styles = parse_styles_config(styles_root);
+    Style* parsed_styles = ui_config_load_styles(styles_root);
     assert(parsed_styles);
-    UiNode* root = parse_layout_config(layout_root, NULL, parsed_styles, NULL, NULL);
+    UiNode* root = ui_config_load_layout(layout_root, NULL, parsed_styles, NULL, NULL);
     assert(root);
     assert(root->child_count == 1);
     UiNode* child = &root->children[0];

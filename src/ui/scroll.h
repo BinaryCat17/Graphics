@@ -1,7 +1,7 @@
 #ifndef SCROLL_H
 #define SCROLL_H
 
-#include "ui/ui_json.h"
+#include "ui/ui_config.h"
 
 typedef struct ScrollContext ScrollContext;
 

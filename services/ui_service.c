@@ -90,14 +90,14 @@ bool ui_build(UiContext* ui, const CoreContext* core) {
         return false;
     }
 
-    ui->styles = parse_styles_config(core->assets.ui_doc.root);
+    ui->styles = ui_config_load_styles(core->assets.ui_doc.root);
     if (!ui->styles) {
         fprintf(stderr, "Failed to parse UI styles from %s.\n",
                 core->assets.ui_doc.source_path ? core->assets.ui_doc.source_path : "(unknown)");
         return false;
     }
 
-    ui->ui_root = parse_layout_config(core->assets.ui_doc.root, core->model, ui->styles, core->assets.font_path,
+    ui->ui_root = ui_config_load_layout(core->assets.ui_doc.root, core->model, ui->styles, core->assets.font_path,
                                       &core->scene);
     if (!ui->ui_root) {
         fprintf(stderr, "Failed to parse UI layout configuration.\n");

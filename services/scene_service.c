@@ -93,7 +93,7 @@ bool scene_service_load(AppServices* services, const ServiceConfig* config) {
         return false;
     }
 
-    core->model = parse_model_config(&core->assets.ui_doc);
+    core->model = ui_config_load_model(&core->assets.ui_doc);
     if (core->model) {
         scene_ui_bind_model(core->model, &core->scene, scene_path);
     }

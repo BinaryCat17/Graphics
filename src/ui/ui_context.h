@@ -5,7 +5,7 @@
 #include "state/state_manager.h"
 #include "ui/scene_ui.h"
 #include "ui/scroll.h"
-#include "ui/ui_json.h"
+#include "ui/ui_config.h"
 
 // Stores all UI-related state shared between build and runtime.
 typedef struct UiContext {

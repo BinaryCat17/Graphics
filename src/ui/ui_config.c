@@ -1,4 +1,4 @@
-#include "ui/ui_json.h"
+#include "ui/ui_config.h"
 
 #include <ctype.h>
 #include <math.h>
@@ -722,7 +722,7 @@ void update_widget_bindings(UiNode* root, const Model* model) {
     bind_model_values_to_nodes(root, model);
 }
 
-Model* parse_model_config(const ConfigDocument* doc) {
+Model* ui_config_load_model(const ConfigDocument* doc) {
     if (!doc || !doc->root) return NULL;
 
     const ConfigNode* store_node = config_node_get_scalar(doc->root, "store");
@@ -760,7 +760,7 @@ Model* parse_model_config(const ConfigDocument* doc) {
     return model;
 }
 
-Style* parse_styles_config(const ConfigNode* root) {
+Style* ui_config_load_styles(const ConfigNode* root) {
     const ConfigNode* data_node = config_node_get_map(root, "data");
     const ConfigNode* styles_node = data_node ? config_node_get_map(data_node, "styles") : config_node_get_map(root, "styles");
     if (!styles_node || styles_node->type != CONFIG_NODE_MAP) {
@@ -808,7 +808,7 @@ Style* parse_styles_config(const ConfigNode* root) {
     return styles;
 }
 
-UiNode* parse_layout_config(const ConfigNode* root, const Model* model, const Style* styles, const char* font_path, const Scene* scene) {
+UiNode* ui_config_load_layout(const ConfigNode* root, const Model* model, const Style* styles, const char* font_path, const Scene* scene) {
     if (!root) return NULL;
 
     const ConfigNode* data_node = config_node_get_map(root, "data");

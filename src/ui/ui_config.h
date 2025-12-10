@@ -1,5 +1,5 @@
-#ifndef UI_JSON_H
-#define UI_JSON_H
+#ifndef UI_CONFIG_H
+#define UI_CONFIG_H
 
 #include <stddef.h>
 #include "core/Graphics.h"
@@ -178,9 +178,9 @@ typedef struct WidgetArray {
     size_t count;
 } WidgetArray;
 
-Model* parse_model_config(const ConfigDocument* doc);
-Style* parse_styles_config(const ConfigNode* root);
-UiNode* parse_layout_config(const ConfigNode* root, const Model* model, const Style* styles, const char* font_path, const Scene* scene);
+Model* ui_config_load_model(const ConfigDocument* doc);
+Style* ui_config_load_styles(const ConfigNode* root);
+UiNode* ui_config_load_layout(const ConfigNode* root, const Model* model, const Style* styles, const char* font_path, const Scene* scene);
 
 void update_widget_bindings(UiNode* root, const Model* model);
 
@@ -205,4 +205,4 @@ void free_styles(Style* styles);
 void free_widgets(WidgetArray widgets);
 void free_ui_tree(UiNode* root);
 
-#endif // UI_JSON_H
+#endif // UI_CONFIG_H
