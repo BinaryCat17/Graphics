@@ -64,10 +64,9 @@ if (NOT VULKAN_STUB)
 
     set(APP_SOURCES
             "app/main.c"
-            "app/assets.c" "app/assets.h"
-            "app/scroll.c" "app/scroll.h"
-            "app/vulkan_renderer.c" "app/vulkan_renderer.h"
-            "app/ui_json.c" "app/ui_json.h" "app/scene_ui.c" "app/scene_ui.h"
+            "src/assets/assets.c" "src/assets/assets.h"
+            "src/render/vulkan_renderer.c" "src/render/vulkan_renderer.h"
+            "src/ui/scroll.c" "src/ui/scroll.h" "src/ui/ui_json.c" "src/ui/ui_json.h" "src/ui/scene_ui.c" "src/ui/scene_ui.h"
             "src/coordinate_transform.c" "src/layout.c" "src/render_commands.c" "src/vertex_buffers.c" "src/memory_utils.c" "src/Graphics.h"
             "src/cad_scene.c" "src/cad_scene.h" "src/cad_scene_yaml.c" "src/cad_scene_yaml.h"
             "src/state_manager.c" "src/state_manager.h"
@@ -78,12 +77,12 @@ if (NOT VULKAN_STUB)
             "src/render/render_service.c" "src/render/render_service.h"
     )
 else()
-    set(APP_SOURCES "app/main_stub.c" "src/cad_scene.c" "src/cad_scene.h" "src/cad_scene_yaml.c" "src/cad_scene_yaml.h" "src/state_manager.c" "src/state_manager.h" "src/simple_yaml.c" "src/simple_yaml.h" "src/module_yaml_loader.c" "src/module_yaml_loader.h" "src/config_document.c" "src/config_document.h" "src/config_io.c" "src/config_io.h" "app/scene_ui.c" "app/scene_ui.h" "app/ui_json.c" "app/ui_json.h")
+    set(APP_SOURCES "app/main_stub.c" "src/cad_scene.c" "src/cad_scene.h" "src/cad_scene_yaml.c" "src/cad_scene_yaml.h" "src/state_manager.c" "src/state_manager.h" "src/simple_yaml.c" "src/simple_yaml.h" "src/module_yaml_loader.c" "src/module_yaml_loader.h" "src/config_document.c" "src/config_document.h" "src/config_io.c" "src/config_io.h" "src/ui/scene_ui.c" "src/ui/scene_ui.h" "src/ui/ui_json.c" "src/ui/ui_json.h")
 endif()
 
 # Добавьте источник в исполняемый файл этого проекта.
 add_executable (Graphics ${APP_SOURCES})
-target_include_directories(Graphics PRIVATE "src/" "app/")
+target_include_directories(Graphics PRIVATE "src/")
 
 if (NOT VULKAN_STUB)
     add_dependencies(Graphics Shaders)
@@ -106,10 +105,10 @@ endif()
 target_include_directories(Graphics PRIVATE ${Stb_INCLUDE_DIR})
 
 add_executable(layout_tests
-        app/layout_tests.c
-        app/ui_json.c app/ui_json.h
-        app/scene_ui.c app/scene_ui.h
-        app/scroll.c app/scroll.h
+        tests/layout_tests.c
+        src/ui/ui_json.c src/ui/ui_json.h
+        src/ui/scene_ui.c src/ui/scene_ui.h
+        src/ui/scroll.c src/ui/scroll.h
         src/config_document.c src/config_document.h src/config_io.c src/config_io.h
         src/simple_yaml.c src/simple_yaml.h)
 target_link_libraries(layout_tests PRIVATE glfw Threads::Threads)
@@ -120,9 +119,9 @@ target_include_directories(layout_tests PRIVATE src ${Stb_INCLUDE_DIR})
 add_test(NAME layout_tests COMMAND layout_tests)
 
 add_executable(scene_ui_tests
-        app/scene_ui_tests.c
-        app/ui_json.c app/ui_json.h app/scene_ui.c app/scene_ui.h
-        app/scroll.c app/scroll.h
+        tests/scene_ui_tests.c
+        src/ui/ui_json.c src/ui/ui_json.h src/ui/scene_ui.c src/ui/scene_ui.h
+        src/ui/scroll.c src/ui/scroll.h
         src/cad_scene.c src/cad_scene.h
         src/config_document.c src/config_document.h src/config_io.c src/config_io.h
         src/simple_yaml.c src/simple_yaml.h)
@@ -134,7 +133,7 @@ target_include_directories(scene_ui_tests PRIVATE src ${Stb_INCLUDE_DIR})
 add_test(NAME scene_ui_tests COMMAND scene_ui_tests)
 
 add_executable(transform_tests
-        app/transform_tests.c
+        tests/transform_tests.c
         src/coordinate_transform.c src/layout.c src/render_commands.c src/vertex_buffers.c src/memory_utils.c src/Graphics.h)
 target_link_libraries(transform_tests PRIVATE glfw Threads::Threads)
 if (NOT MSVC)
@@ -144,7 +143,7 @@ target_include_directories(transform_tests PRIVATE src)
 add_test(NAME transform_tests COMMAND transform_tests)
 
 add_executable(render_commands_tests
-        app/render_commands_tests.c
+        tests/render_commands_tests.c
         src/coordinate_transform.c src/layout.c src/render_commands.c src/vertex_buffers.c src/memory_utils.c src/Graphics.h)
 target_link_libraries(render_commands_tests PRIVATE glfw Threads::Threads)
 if (NOT MSVC)
@@ -154,7 +153,7 @@ target_include_directories(render_commands_tests PRIVATE src)
 add_test(NAME render_commands_tests COMMAND render_commands_tests)
 
 add_executable(vertex_buffers_tests
-        app/vertex_buffers_tests.c
+        tests/vertex_buffers_tests.c
         src/coordinate_transform.c src/layout.c src/render_commands.c src/vertex_buffers.c src/memory_utils.c src/Graphics.h)
 target_link_libraries(vertex_buffers_tests PRIVATE glfw Threads::Threads)
 if (NOT MSVC)
@@ -164,7 +163,7 @@ target_include_directories(vertex_buffers_tests PRIVATE src)
 add_test(NAME vertex_buffers_tests COMMAND vertex_buffers_tests)
 
 add_executable(scene_yaml_tests
-        app/scene_yaml_tests.c
+        tests/scene_yaml_tests.c
         src/cad_scene_yaml.c src/cad_scene_yaml.h
         src/cad_scene.c src/cad_scene.h)
 target_link_libraries(scene_yaml_tests PRIVATE Threads::Threads)

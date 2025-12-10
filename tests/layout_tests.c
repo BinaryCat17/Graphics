@@ -3,8 +3,8 @@
 #include <string.h>
 #include <stdio.h>
 
-#include "ui_json.h"
-#include "scroll.h"
+#include "ui/ui_json.h"
+#include "ui/scroll.h"
 #include "config_io.h"
 
 typedef struct {

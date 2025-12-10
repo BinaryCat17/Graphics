@@ -4,7 +4,7 @@
 #include <stdbool.h>
 #include <GLFW/glfw3.h>
 
-#include "ui_json.h"
+#include "ui/ui_json.h"
 #include "Graphics.h"
 
 bool vk_renderer_init(GLFWwindow* window, const char* vert_spv, const char* frag_spv, const char* font_path, WidgetArray widgets, const CoordinateTransformer* transformer);

@@ -3,7 +3,7 @@
 #include <math.h>
 #include <stdio.h>
 
-#include "scroll.h"
+#include "ui/scroll.h"
 
 static float clamp01(float v) {
     if (v < 0.0f) return 0.0f;
