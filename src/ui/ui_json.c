@@ -1483,7 +1483,7 @@ static int compute_z_index(const UiNode* source, size_t appearance_order) {
     int explicit_z = (source && source->has_z_index) ? source->z_index : 0;
     int group = (source && source->has_z_group) ? source->z_group : 0;
     int composite = explicit_z + group * UI_Z_ORDER_SCALE;
-    return composite * UI_Z_ORDER_SCALE - (int)appearance_order;
+    return composite * UI_Z_ORDER_SCALE + (int)appearance_order;
 }
 
 static void populate_widgets_recursive(const LayoutNode* node, Widget* widgets, size_t widget_count, size_t* idx, size_t* order, char* inherited_scroll_area) {
