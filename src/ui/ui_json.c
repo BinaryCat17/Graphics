@@ -107,7 +107,20 @@ static int parse_bool(const char* json, const jsmntok_t* tok, int fallback) {
     return (int)parse_number(json, tok, (float)fallback);
 }
 
-static const Style DEFAULT_STYLE = { .name = NULL, .background = {0.6f, 0.6f, 0.6f, 1.0f}, .text = {1.0f, 1.0f, 1.0f, 1.0f}, .border_color = {1.0f, 1.0f, 1.0f, 1.0f}, .scrollbar_track_color = {0.6f, 0.6f, 0.6f, 0.4f}, .scrollbar_thumb_color = {1.0f, 1.0f, 1.0f, 0.7f}, .padding = 6.0f, .border_thickness = 0.0f, .scrollbar_width = 0.0f, .has_scrollbar_width = 0, .next = NULL };
+/* Default style mirrors the vivid palette defined in assets/ui/config/ui.yaml to avoid a grayscale fallback. */
+static const Style DEFAULT_STYLE = {
+    .name = NULL,
+    .background = {0.12f, 0.16f, 0.24f, 0.96f},
+    .text = {0.94f, 0.97f, 1.0f, 1.0f},
+    .border_color = {0.33f, 0.56f, 0.88f, 1.0f},
+    .scrollbar_track_color = {0.16f, 0.25f, 0.36f, 0.9f},
+    .scrollbar_thumb_color = {0.58f, 0.82f, 1.0f, 1.0f},
+    .padding = 10.0f,
+    .border_thickness = 2.0f,
+    .scrollbar_width = 10.0f,
+    .has_scrollbar_width = 1,
+    .next = NULL
+};
 static const Style ROOT_STYLE = { .name = NULL, .background = {0.0f, 0.0f, 0.0f, 0.0f}, .text = {1.0f, 1.0f, 1.0f, 1.0f}, .border_color = {1.0f, 1.0f, 1.0f, 0.0f}, .scrollbar_track_color = {0.6f, 0.6f, 0.6f, 0.4f}, .scrollbar_thumb_color = {1.0f, 1.0f, 1.0f, 0.7f}, .padding = 0.0f, .border_thickness = 0.0f, .scrollbar_width = 0.0f, .has_scrollbar_width = 0, .next = NULL };
 
 static unsigned char* g_font_buffer = NULL;
