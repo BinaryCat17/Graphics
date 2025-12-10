@@ -880,6 +880,7 @@ static LayoutNode* build_layout_tree_recursive(const UiNode* node) {
     LayoutNode* l = (LayoutNode*)calloc(1, sizeof(LayoutNode));
     if (!l) return NULL;
     l->source = node;
+    l->has_clip = 0;
     l->child_count = node->child_count;
     if (node->child_count > 0) {
         l->children = (LayoutNode*)calloc(node->child_count, sizeof(LayoutNode));
@@ -911,6 +912,20 @@ void free_layout_tree(LayoutNode* root) {
     if (!root) return;
     free_layout_node(root);
     free(root);
+}
+
+static int rect_intersect(const Rect* a, const Rect* b, Rect* out) {
+    if (!a || !b || !out) return 0;
+    float x0 = fmaxf(a->x, b->x);
+    float y0 = fmaxf(a->y, b->y);
+    float x1 = fminf(a->x + a->w, b->x + b->w);
+    float y1 = fminf(a->y + a->h, b->y + b->h);
+    if (x1 <= x0 || y1 <= y0) return 0;
+    out->x = x0;
+    out->y = y0;
+    out->w = x1 - x0;
+    out->h = y1 - y0;
+    return 1;
 }
 
 static void measure_node(LayoutNode* node) {
@@ -1009,7 +1024,7 @@ static void measure_node(LayoutNode* node) {
 
 void measure_layout(LayoutNode* root) { measure_node(root); }
 
-static void layout_node(LayoutNode* node, float origin_x, float origin_y) {
+static void layout_node(LayoutNode* node, float origin_x, float origin_y, const Rect* parent_clip, const Vec2* parent_transform) {
     if (!node || !node->source) return;
     float padding = node->source->has_padding_override ? node->source->padding_override : (node->source->style ? node->source->style->padding : DEFAULT_STYLE.padding);
     float border = node->source->border_thickness;
@@ -1017,19 +1032,25 @@ static void layout_node(LayoutNode* node, float origin_x, float origin_y) {
     float base_y = origin_y + (node->source->has_y ? node->source->rect.y : 0.0f);
     node->rect.x = base_x;
     node->rect.y = base_y;
+    node->local_rect = (Rect){0.0f, 0.0f, node->rect.w, node->rect.h};
+    node->transform = parent_transform ? (Vec2){parent_transform->x + base_x, parent_transform->y + base_y} : (Vec2){base_x, base_y};
+
+    Rect bounds = {base_x, base_y, node->rect.w, node->rect.h};
+    node->has_clip = parent_clip ? rect_intersect(parent_clip, &bounds, &node->clip) : 1;
+    if (!parent_clip) node->clip = bounds;
 
     if (node->source->layout == UI_LAYOUT_ROW) {
         float cursor_x = base_x + padding + border;
         float cursor_y = base_y + padding + border;
         for (size_t i = 0; i < node->child_count; i++) {
-            layout_node(&node->children[i], cursor_x, cursor_y);
+            layout_node(&node->children[i], cursor_x, cursor_y, node->has_clip ? &node->clip : parent_clip, &node->transform);
             cursor_x += node->children[i].rect.w + node->source->spacing;
         }
     } else if (node->source->layout == UI_LAYOUT_COLUMN) {
         float cursor_x = base_x + padding + border;
         float cursor_y = base_y + padding + border;
         for (size_t i = 0; i < node->child_count; i++) {
-            layout_node(&node->children[i], cursor_x, cursor_y);
+            layout_node(&node->children[i], cursor_x, cursor_y, node->has_clip ? &node->clip : parent_clip, &node->transform);
             cursor_y += node->children[i].rect.h + node->source->spacing;
         }
     } else if (node->source->layout == UI_LAYOUT_TABLE && node->source->columns > 0) {
@@ -1050,7 +1071,7 @@ static void layout_node(LayoutNode* node, float origin_x, float origin_y) {
             for (int r = 0; r < rows; r++) {
                 float x = base_x + padding + border;
                 for (int c = 0; c < cols && idx < node->child_count; c++, idx++) {
-                    layout_node(&node->children[idx], x, y);
+                    layout_node(&node->children[idx], x, y, node->has_clip ? &node->clip : parent_clip, &node->transform);
                     x += col_w[c] + node->source->spacing;
                 }
                 y += row_h[r] + node->source->spacing;
@@ -1062,12 +1083,15 @@ static void layout_node(LayoutNode* node, float origin_x, float origin_y) {
         float offset_x = base_x + padding;
         float offset_y = base_y + padding;
         for (size_t i = 0; i < node->child_count; i++) {
-            layout_node(&node->children[i], offset_x, offset_y);
+            layout_node(&node->children[i], offset_x, offset_y, node->has_clip ? &node->clip : parent_clip, &node->transform);
         }
     }
 }
 
-void assign_layout(LayoutNode* root, float origin_x, float origin_y) { layout_node(root, origin_x, origin_y); }
+void assign_layout(LayoutNode* root, float origin_x, float origin_y) {
+    Rect root_clip = {origin_x, origin_y, root ? root->rect.w : 0.0f, root ? root->rect.h : 0.0f};
+    layout_node(root, origin_x, origin_y, &root_clip, NULL);
+}
 
 static void copy_base_rect(LayoutNode* node) {
     if (!node) return;
@@ -1124,7 +1148,8 @@ static void populate_widgets_recursive(const LayoutNode* node, Widget* widgets, 
         w->id = node->source->id;
         w->scroll_area = node->source->scroll_area ? node->source->scroll_area : active_scroll_area;
         w->scroll_static = node->source->scroll_static;
-        w->has_clip = 0;
+        w->has_clip = node->has_clip;
+        if (node->has_clip) w->clip = node->clip;
         w->scroll_viewport = 0.0f;
         w->scroll_content = 0.0f;
         w->show_scrollbar = 0;

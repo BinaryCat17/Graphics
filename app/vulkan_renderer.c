@@ -962,6 +962,14 @@ static int apply_clip_rect(const Widget* widget, const Rect* input, Rect* out) {
     return 1;
 }
 
+static void apply_widget_clip_to_view_model(const Widget *widget, ViewModel *vm) {
+    if (!widget || !vm) return;
+    if (!widget->has_clip) return;
+    vm->has_clip = 1;
+    vm->clip.origin = (Vec2){widget->clip.x, widget->clip.y};
+    vm->clip.size = (Vec2){widget->clip.w, widget->clip.h};
+}
+
 static void glyph_quad_array_reserve(GlyphQuadArray *arr, size_t required)
 {
     if (required <= arr->capacity) {
@@ -1141,6 +1149,7 @@ static bool build_vertices_from_widgets(FrameResources *frame) {
     size_t view_model_count = 0;
     for (size_t i = 0; i < g_widgets.count; ++i) {
         const Widget *widget = &g_widgets.items[i];
+        size_t widget_order = g_widgets.count - 1 - i;
         int base_z = widget->z_index * LAYER_STRIDE;
         int text_z = base_z + Z_LAYER_TEXT;
 
@@ -1164,10 +1173,11 @@ static bool build_vertices_from_widgets(FrameResources *frame) {
                 .logical_box = { {clipped_border.x, clipped_border.y}, {clipped_border.w, clipped_border.h} },
                 .layer = base_z + Z_LAYER_BORDER,
                 .phase = RENDER_PHASE_BACKGROUND,
-                .widget_order = i,
+                .widget_order = widget_order,
                 .ordinal = widget_ordinals[i]++,
                 .color = widget->border_color,
             };
+            apply_widget_clip_to_view_model(widget, &view_models[view_model_count - 1]);
         }
         }
 
@@ -1191,10 +1201,11 @@ static bool build_vertices_from_widgets(FrameResources *frame) {
                     .logical_box = { {clipped_track.x, clipped_track.y}, {clipped_track.w, clipped_track.h} },
                     .layer = base_z + Z_LAYER_SLIDER_TRACK,
                     .phase = RENDER_PHASE_BACKGROUND,
-                    .widget_order = i,
+                    .widget_order = widget_order,
                     .ordinal = widget_ordinals[i]++,
                     .color = track_color,
                 };
+                apply_widget_clip_to_view_model(widget, &view_models[view_model_count - 1]);
             }
 
             float fill_w = track_w * t;
@@ -1207,10 +1218,11 @@ static bool build_vertices_from_widgets(FrameResources *frame) {
                     .logical_box = { {clipped_fill.x, clipped_fill.y}, {clipped_fill.w, clipped_fill.h} },
                     .layer = base_z + Z_LAYER_SLIDER_FILL,
                     .phase = RENDER_PHASE_BACKGROUND,
-                    .widget_order = i,
+                    .widget_order = widget_order,
                     .ordinal = widget_ordinals[i]++,
                     .color = widget->color,
                 };
+                apply_widget_clip_to_view_model(widget, &view_models[view_model_count - 1]);
             }
 
             float knob_w = fmaxf(track_height, inner_rect.h * 0.3f);
@@ -1231,10 +1243,11 @@ static bool build_vertices_from_widgets(FrameResources *frame) {
                     .logical_box = { {clipped_knob.x, clipped_knob.y}, {clipped_knob.w, clipped_knob.h} },
                     .layer = base_z + Z_LAYER_SLIDER_KNOB,
                     .phase = RENDER_PHASE_BACKGROUND,
-                    .widget_order = i,
+                    .widget_order = widget_order,
                     .ordinal = widget_ordinals[i]++,
                     .color = knob_color,
                 };
+                apply_widget_clip_to_view_model(widget, &view_models[view_model_count - 1]);
             }
             continue;
         }
@@ -1247,10 +1260,11 @@ static bool build_vertices_from_widgets(FrameResources *frame) {
                 .logical_box = { {clipped_fill.x, clipped_fill.y}, {clipped_fill.w, clipped_fill.h} },
                 .layer = base_z + Z_LAYER_FILL,
                 .phase = RENDER_PHASE_BACKGROUND,
-                .widget_order = i,
+                .widget_order = widget_order,
                 .ordinal = widget_ordinals[i]++,
                 .color = widget->color,
             };
+            apply_widget_clip_to_view_model(widget, &view_models[view_model_count - 1]);
         }
 
         if (widget->scrollbar_enabled && widget->show_scrollbar && widget->scroll_viewport > 0.0f &&
@@ -1269,10 +1283,11 @@ static bool build_vertices_from_widgets(FrameResources *frame) {
                     .logical_box = { {clipped_track.x, clipped_track.y}, {clipped_track.w, clipped_track.h} },
                     .layer = base_z + Z_LAYER_SCROLLBAR_TRACK,
                     .phase = RENDER_PHASE_BACKGROUND,
-                    .widget_order = i,
+                    .widget_order = widget_order,
                     .ordinal = widget_ordinals[i]++,
                     .color = track_color,
                 };
+                apply_widget_clip_to_view_model(widget, &view_models[view_model_count - 1]);
             }
 
             float thumb_ratio = widget->scroll_viewport / widget->scroll_content;
@@ -1294,10 +1309,11 @@ static bool build_vertices_from_widgets(FrameResources *frame) {
                     .logical_box = { {clipped_thumb.x, clipped_thumb.y}, {clipped_thumb.w, clipped_thumb.h} },
                     .layer = base_z + Z_LAYER_SCROLLBAR_THUMB,
                     .phase = RENDER_PHASE_BACKGROUND,
-                    .widget_order = i,
+                    .widget_order = widget_order,
                     .ordinal = widget_ordinals[i]++,
                     .color = thumb_color,
                 };
+                apply_widget_clip_to_view_model(widget, &view_models[view_model_count - 1]);
             }
         }
     }
@@ -1310,6 +1326,7 @@ static bool build_vertices_from_widgets(FrameResources *frame) {
 
     for (size_t i = 0; i < g_widgets.count; ++i) {
         const Widget *widget = &g_widgets.items[i];
+        size_t widget_order = g_widgets.count - 1 - i;
 
         if (!widget->text || !*widget->text) {
             continue;
@@ -1374,10 +1391,12 @@ static bool build_vertices_from_widgets(FrameResources *frame) {
                 .uv1 = {u1, v1},
                 .color = widget->text_color,
                 .widget_id = widget->id,
-                .widget_order = i,
+                .widget_order = widget_order,
                 .layer = text_z,
                 .phase = RENDER_PHASE_OVERLAY,
                 .ordinal = widget_ordinals[i]++,
+                .has_clip = widget->has_clip,
+                .clip = { {widget->clip.x, widget->clip.y}, {widget->clip.w, widget->clip.h} },
             };
 
             pen_x += g->advance;
