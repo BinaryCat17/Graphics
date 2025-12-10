@@ -4,6 +4,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <strings.h>
 
 #include "config_io.h"
 #include "simple_yaml.h"
@@ -22,12 +23,31 @@ static void assign_error(ConfigError *err, int line, int column, const char *msg
     err->message[sizeof(err->message) - 1] = 0;
 }
 
+static ConfigScalarType detect_scalar_type(const char *text)
+{
+    if (!text || !*text) return CONFIG_SCALAR_STRING;
+
+    const char *p = text;
+    while (isspace((unsigned char)*p)) p++;
+    if (*p == 0) return CONFIG_SCALAR_STRING;
+
+    if (strcasecmp(p, "true") == 0 || strcasecmp(p, "false") == 0) return CONFIG_SCALAR_BOOL;
+    if (strcasecmp(p, "null") == 0 || strcasecmp(p, "~") == 0) return CONFIG_SCALAR_NULL;
+
+    char *end = NULL;
+    (void)strtod(p, &end);
+    if (end && *end == '\0') return CONFIG_SCALAR_NUMBER;
+
+    return CONFIG_SCALAR_STRING;
+}
+
 static ConfigNode *config_node_new(ConfigNodeType type, int line)
 {
     ConfigNode *n = (ConfigNode *)calloc(1, sizeof(ConfigNode));
     if (!n) return NULL;
     n->type = type;
     n->line = line;
+    n->scalar_type = CONFIG_SCALAR_STRING;
     return n;
 }
 
@@ -75,7 +95,10 @@ static ConfigNode *copy_yaml_node(const SimpleYamlNode *node)
     ConfigNodeType type = map_simple_yaml_type(node->type);
     ConfigNode *out = config_node_new(type, node->line);
     if (!out) return NULL;
-    if (node->scalar) out->scalar = strdup(node->scalar);
+    if (node->scalar) {
+        out->scalar = strdup(node->scalar);
+        out->scalar_type = detect_scalar_type(out->scalar);
+    }
     if (node->type == SIMPLE_YAML_MAP) {
         for (size_t i = 0; i < node->pair_count; ++i) {
             ConfigNode *child = copy_yaml_node(node->pairs[i].value);
@@ -198,7 +221,10 @@ static ConfigNode *parse_json_value(const char *text, jsmntok_t *toks, size_t to
     ConfigNode *node = NULL;
     if (tok->type == JSMN_STRING || tok->type == JSMN_PRIMITIVE) {
         node = config_node_new(CONFIG_NODE_SCALAR, 0);
-        if (node) node->scalar = tok_copy(text, tok);
+        if (node) {
+            node->scalar = tok_copy(text, tok);
+            node->scalar_type = (tok->type == JSMN_STRING) ? CONFIG_SCALAR_STRING : detect_scalar_type(node->scalar);
+        }
         (*idx)++;
     } else if (tok->type == JSMN_OBJECT) {
         node = config_node_new(CONFIG_NODE_MAP, 0);
@@ -296,12 +322,16 @@ static int emit_json_internal(const ConfigNode *node, char **out)
     if (!node || !out) return 0;
     if (node->type == CONFIG_NODE_SCALAR) {
         if (!node->scalar) return 0;
-        size_t len = strlen(node->scalar) + 3;
-        char *buf = (char *)malloc(len);
-        if (!buf) return 0;
-        snprintf(buf, len, "\"%s\"", node->scalar);
-        *out = buf;
-        return 1;
+        if (node->scalar_type == CONFIG_SCALAR_STRING) {
+            size_t len = strlen(node->scalar) + 3;
+            char *buf = (char *)malloc(len);
+            if (!buf) return 0;
+            snprintf(buf, len, "\"%s\"", node->scalar);
+            *out = buf;
+            return 1;
+        }
+        *out = strdup(node->scalar);
+        return *out != NULL;
     }
     if (node->type == CONFIG_NODE_SEQUENCE) {
         char **items = (char **)calloc(node->item_count, sizeof(char *));

@@ -13,6 +13,13 @@ typedef enum ConfigNodeType {
     CONFIG_NODE_SEQUENCE,
 } ConfigNodeType;
 
+typedef enum ConfigScalarType {
+    CONFIG_SCALAR_STRING,
+    CONFIG_SCALAR_NUMBER,
+    CONFIG_SCALAR_BOOL,
+    CONFIG_SCALAR_NULL,
+} ConfigScalarType;
+
 typedef struct ConfigError {
     int line;
     int column;
@@ -30,6 +37,7 @@ struct ConfigNode {
     ConfigNodeType type;
     int line;
     char *scalar;
+    ConfigScalarType scalar_type;
     ConfigPair *pairs;
     size_t pair_count;
     size_t pair_capacity;
