@@ -59,10 +59,21 @@ static int config_sequence_append(ConfigNode *seq, ConfigNode *value)
     return 1;
 }
 
+static ConfigNodeType map_simple_yaml_type(SimpleYamlNodeType t)
+{
+    switch (t) {
+    case SIMPLE_YAML_SCALAR: return CONFIG_NODE_SCALAR;
+    case SIMPLE_YAML_MAP: return CONFIG_NODE_MAP;
+    case SIMPLE_YAML_SEQUENCE: return CONFIG_NODE_SEQUENCE;
+    default: return CONFIG_NODE_SCALAR;
+    }
+}
+
 static ConfigNode *copy_yaml_node(const SimpleYamlNode *node)
 {
     if (!node) return NULL;
-    ConfigNode *out = config_node_new((ConfigNodeType)node->type, node->line);
+    ConfigNodeType type = map_simple_yaml_type(node->type);
+    ConfigNode *out = config_node_new(type, node->line);
     if (!out) return NULL;
     if (node->scalar) out->scalar = strdup(node->scalar);
     if (node->type == SIMPLE_YAML_MAP) {
