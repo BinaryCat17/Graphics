@@ -97,7 +97,7 @@ static ScrollArea* find_area_at_point(ScrollArea* areas, float x, float y) {
     for (ScrollArea* a = areas; a; a = a->next) {
         if (!a->has_bounds) continue;
         Rect viewport = a->has_viewport ? a->viewport : a->bounds;
-        if (a->has_viewport && a->has_bounds) {
+        if (a->has_viewport && a->has_bounds && !a->has_static_anchor) {
             float viewport_area = viewport.w * viewport.h;
             float bounds_area = a->bounds.w * a->bounds.h;
             if (viewport_area < bounds_area * 0.5f) {
@@ -224,7 +224,7 @@ void scroll_apply_offsets(ScrollContext* ctx, Widget* widgets, size_t widget_cou
         ScrollArea* a = find_area(ctx->areas, w->scroll_area);
         if (!a) continue;
         Rect viewport = a->has_viewport ? a->viewport : a->bounds;
-        if (a->has_viewport && a->has_bounds) {
+        if (a->has_viewport && a->has_bounds && !a->has_static_anchor) {
             float viewport_area = viewport.w * viewport.h;
             float bounds_area = a->bounds.w * a->bounds.h;
             if (viewport_area < bounds_area * 0.5f) {

@@ -4,6 +4,8 @@
 #include <string.h>
 
 #include "scene_ui.h"
+#include "config_io.h"
+#include "ui_json.h"
 
 static UiNode* find_by_id(UiNode* node, const char* id)
 {
@@ -63,8 +65,16 @@ static void test_tree_population(void)
                          "\"layout\":{\"type\":\"column\",\"children\":[{\"type\":\"column\",\"id\":\"sceneHierarchy\"}]}}";
 
     Scene scene = make_sample_scene();
-    Style* parsed_styles = parse_styles_json(styles);
-    UiNode* root = parse_layout_json(layout, NULL, parsed_styles, NULL, &scene);
+    ConfigNode* styles_root = NULL;
+    ConfigNode* config_layout_root = NULL;
+    ConfigError err = {0};
+    assert(parse_config_text(styles, CONFIG_FORMAT_JSON, &styles_root, &err));
+    err = (ConfigError){0};
+    assert(parse_config_text(layout, CONFIG_FORMAT_JSON, &config_layout_root, &err));
+    Style* parsed_styles = parse_styles_config(styles_root);
+    UiNode* root = parse_layout_config(config_layout_root, NULL, parsed_styles, NULL, &scene);
+    config_node_free(styles_root);
+    config_node_free(config_layout_root);
     assert(root);
 
     UiNode* tree = find_by_id(root, "sceneHierarchy");

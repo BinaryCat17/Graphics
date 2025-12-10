@@ -1,6 +1,8 @@
 #ifndef ASSETS_H
 #define ASSETS_H
 
+#include "config_document.h"
+
 typedef struct Assets {
     char* model_path;
     char* layout_path;
@@ -9,9 +11,9 @@ typedef struct Assets {
     char* frag_spv_path;
     char* font_path;
 
-    char* model_text;
-    char* layout_text;
-    char* styles_text;
+    ConfigDocument model_doc;
+    ConfigDocument layout_doc;
+    ConfigDocument styles_doc;
 } Assets;
 
 int load_assets(const char* assets_dir, Assets* out_assets);

@@ -4,8 +4,6 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "module_yaml_loader.h"
-
 static char* join_path(const char* dir, const char* leaf) {
     if (!dir || !leaf) return NULL;
     size_t dir_len = strlen(dir);
@@ -21,29 +19,6 @@ static char* join_path(const char* dir, const char* leaf) {
     return out;
 }
 
-static char* read_file_text(const char* path) {
-    FILE* f = fopen(path, "rb");
-    if (!f) {
-        fprintf(stderr, "Failed open %s\n", path);
-        return NULL;
-    }
-
-    fseek(f, 0, SEEK_END);
-    long len = ftell(f);
-    fseek(f, 0, SEEK_SET);
-
-    char* b = (char*)malloc((size_t)len + 1);
-    if (!b) {
-        fclose(f);
-        return NULL;
-    }
-
-    fread(b, 1, (size_t)len, f);
-    b[len] = 0;
-    fclose(f);
-    return b;
-}
-
 static void free_paths(Assets* assets) {
     free(assets->model_path);
     free(assets->layout_path);
@@ -51,12 +26,6 @@ static void free_paths(Assets* assets) {
     free(assets->vert_spv_path);
     free(assets->frag_spv_path);
     free(assets->font_path);
-}
-
-static void free_texts(Assets* assets) {
-    free(assets->model_text);
-    free(assets->layout_text);
-    free(assets->styles_text);
 }
 
 int load_assets(const char* assets_dir, Assets* out_assets) {
@@ -78,20 +47,20 @@ int load_assets(const char* assets_dir, Assets* out_assets) {
         return 0;
     }
 
-    SimpleYamlError err = {0};
-    if (!load_yaml_file_as_json(out_assets->model_path, &out_assets->model_text, &err)) {
+    ConfigError err = {0};
+    if (!load_config_document(out_assets->model_path, CONFIG_FORMAT_YAML, &out_assets->model_doc, &err)) {
         fprintf(stderr, "Failed to load %s: %s\n", out_assets->model_path, err.message);
         free_assets(out_assets);
         return 0;
     }
-    err = (SimpleYamlError){0};
-    if (!load_yaml_file_as_json(out_assets->layout_path, &out_assets->layout_text, &err)) {
+    err = (ConfigError){0};
+    if (!load_config_document(out_assets->layout_path, CONFIG_FORMAT_YAML, &out_assets->layout_doc, &err)) {
         fprintf(stderr, "Failed to load %s: %s\n", out_assets->layout_path, err.message);
         free_assets(out_assets);
         return 0;
     }
-    err = (SimpleYamlError){0};
-    if (!load_yaml_file_as_json(out_assets->styles_path, &out_assets->styles_text, &err)) {
+    err = (ConfigError){0};
+    if (!load_config_document(out_assets->styles_path, CONFIG_FORMAT_YAML, &out_assets->styles_doc, &err)) {
         fprintf(stderr, "Failed to load %s: %s\n", out_assets->styles_path, err.message);
         free_assets(out_assets);
         return 0;
@@ -102,5 +71,7 @@ int load_assets(const char* assets_dir, Assets* out_assets) {
 void free_assets(Assets* assets) {
     if (!assets) return;
     free_paths(assets);
-    free_texts(assets);
+    config_document_free(&assets->model_doc);
+    config_document_free(&assets->layout_doc);
+    config_document_free(&assets->styles_doc);
 }
