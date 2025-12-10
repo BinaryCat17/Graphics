@@ -427,7 +427,7 @@ static void read_color_array(Color* out, const char* json, const jsmntok_t* val,
     float cols[4] = { out->r, out->g, out->b, out->a };
     int cc = 0;
     for (unsigned int z = (unsigned int)(val - toks) + 1; z < tokc && toks[z].start >= val->start && toks[z].end <= val->end; z++) {
-        if (toks[z].type == JSMN_PRIMITIVE) {
+        if (toks[z].type == JSMN_PRIMITIVE || toks[z].type == JSMN_STRING) {
             cols[cc < 4 ? cc : 3] = parse_number(json, &toks[z], cols[cc < 4 ? cc : 3]);
             cc++;
         }
