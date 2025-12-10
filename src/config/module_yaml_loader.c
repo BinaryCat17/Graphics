@@ -171,6 +171,17 @@ static int load_single_config(StateManager *manager, const ModuleSchema *schema,
     const ConfigNode *data_node = config_map_get(doc.root, "data");
     const char *store = (store_node && store_node->scalar) ? store_node->scalar : NULL;
     char *fallback_store = NULL;
+    if (!store && data_node && data_node->type == CONFIG_NODE_MAP) {
+        // If the document omits the explicit store name, try to infer it from the
+        // keys present under the data section to support unified UI config files.
+        for (size_t i = 0; i < schema->store_count; ++i) {
+            const char *candidate = schema->stores[i].name;
+            if (config_map_get(data_node, candidate)) {
+                store = candidate;
+                break;
+            }
+        }
+    }
     if (!store && schema->store_count == 1) {
         fallback_store = dup_string(schema->stores[0].name);
         store = fallback_store;
