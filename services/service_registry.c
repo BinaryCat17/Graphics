@@ -18,7 +18,14 @@ static int service_registered(const char* name) {
 }
 
 bool service_registry_register(const ServiceDescriptor* descriptor) {
-    if (!descriptor || !descriptor->name) return false;
+    if (!descriptor) {
+        fprintf(stderr, "Cannot register NULL service descriptor.\n");
+        return false;
+    }
+    if (!descriptor->name) {
+        fprintf(stderr, "Cannot register service with no name.\n");
+        return false;
+    }
     if (g_service_count >= MAX_REGISTERED_SERVICES) {
         fprintf(stderr, "Service registry is full, cannot register %s\n", descriptor->name);
         return false;

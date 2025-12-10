@@ -28,7 +28,10 @@ static void free_schemas(CoreContext* core) {
 }
 
 bool scene_service_load(AppServices* services, const char* assets_dir, const char* scene_path) {
-    if (!services || !assets_dir || !scene_path) return false;
+    if (!services || !assets_dir || !scene_path) {
+        fprintf(stderr, "Scene service load called with invalid arguments.\n");
+        return false;
+    }
 
     CoreContext* core = &services->core;
 
@@ -38,6 +41,15 @@ bool scene_service_load(AppServices* services, const char* assets_dir, const cha
     char* global_dir = join_path(assets_dir, "global_state");
     char* ui_schema_path = join_path(ui_dir, "schema.yaml");
     char* global_schema_path = join_path(global_dir, "schema.yaml");
+
+    if (!ui_dir || !global_dir || !ui_schema_path || !global_schema_path) {
+        fprintf(stderr, "Failed to allocate memory for schema paths.\n");
+        free(ui_dir);
+        free(global_dir);
+        free(ui_schema_path);
+        free(global_schema_path);
+        return false;
+    }
 
     if (ui_schema_path && module_schema_load(ui_schema_path, &core->ui_schema, &schema_err)) {
         module_schema_register(&services->state_manager, &core->ui_schema, NULL);
@@ -74,6 +86,7 @@ bool scene_service_load(AppServices* services, const char* assets_dir, const cha
     }
 
     if (!load_assets(assets_dir, &core->assets)) {
+        fprintf(stderr, "Failed to load assets from '%s'.\n", assets_dir);
         scene_service_unload(services);
         return false;
     }

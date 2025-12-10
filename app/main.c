@@ -25,10 +25,14 @@ int main(int argc, char** argv) {
     }
 
     AppServices services = {0};
-    if (!app_services_init(&services)) return 1;
+    if (!app_services_init(&services)) {
+        fprintf(stderr, "Failed to initialize application services.\n");
+        return 1;
+    }
 
     if (!service_registry_register(scene_service_descriptor()) || !service_registry_register(ui_service_descriptor()) ||
         !service_registry_register(render_service_descriptor())) {
+        fprintf(stderr, "Failed to register required services.\n");
         app_services_shutdown(&services);
         return 1;
     }
@@ -50,6 +54,7 @@ int main(int argc, char** argv) {
 
     for (size_t i = 0; i < requested_count; ++i) {
         if (descriptors[i]->init && !descriptors[i]->init(&services, &config)) {
+            fprintf(stderr, "Service '%s' failed to initialize.\n", descriptors[i]->name);
             app_services_shutdown(&services);
             return 1;
         }
@@ -58,6 +63,7 @@ int main(int argc, char** argv) {
     size_t started_count = 0;
     for (; started_count < requested_count; ++started_count) {
         if (descriptors[started_count]->start && !descriptors[started_count]->start(&services, &config)) {
+            fprintf(stderr, "Service '%s' failed to start.\n", descriptors[started_count]->name);
             break;
         }
         state_manager_dispatch(&services.state_manager, 0);
@@ -68,5 +74,11 @@ int main(int argc, char** argv) {
     }
 
     app_services_shutdown(&services);
-    return started_count == requested_count ? 0 : 1;
+
+    if (started_count != requested_count) {
+        fprintf(stderr, "Application exiting because not all services started successfully.\n");
+        return 1;
+    }
+
+    return 0;
 }
