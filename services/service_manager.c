@@ -2,7 +2,7 @@
 
 #include <stdio.h>
 #include <string.h>
-#include <pthread.h>
+#include <threads.h>
 
 static int find_service_index(const ServiceManager* manager, const char* name) {
     if (!manager || !name) return -1;
@@ -117,8 +117,8 @@ void service_manager_wait(ServiceManager* manager) {
     for (size_t i = 0; i < manager->start_order_count; ++i) {
         ServiceEntry* reg = &manager->services[manager->start_order[i]];
         if (reg->started && reg->descriptor && reg->descriptor->thread_handle) {
-            pthread_t* thread = (pthread_t*)reg->descriptor->thread_handle;
-            pthread_join(*thread, NULL);
+            thrd_t* thread = (thrd_t*)reg->descriptor->thread_handle;
+            thrd_join(*thread, NULL);
             reg->descriptor->thread_handle = NULL;
         }
     }

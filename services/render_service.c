@@ -1,9 +1,9 @@
 #include "render_service.h"
 
 #include <GLFW/glfw3.h>
-#include <pthread.h>
 #include <stdbool.h>
 #include <stdio.h>
+#include <threads.h>
 
 #include "render/vulkan_renderer.h"
 #include "render_runtime_service.h"
@@ -11,7 +11,7 @@
 
 typedef struct RenderServiceContext {
     RenderRuntimeServiceContext* runtime;
-    pthread_t thread;
+    thrd_t thread;
     bool running;
     bool thread_active;
 } RenderServiceContext;
@@ -33,12 +33,12 @@ static void render_service_run_loop(RenderServiceContext* service) {
     }
 }
 
-static void* render_service_thread(void* user_data) {
+static int render_service_thread(void* user_data) {
     RenderServiceContext* context = (RenderServiceContext*)user_data;
     render_service_run_loop(context);
     context->running = false;
     context->thread_active = false;
-    return NULL;
+    return 0;
 }
 
 static RenderServiceContext* render_service_context(void) {
@@ -68,7 +68,7 @@ static bool render_service_start(AppServices* services, const ServiceConfig* con
     }
 
     context->running = true;
-    context->thread_active = pthread_create(&context->thread, NULL, render_service_thread, context) == 0;
+    context->thread_active = thrd_create(&context->thread, render_service_thread, context) == thrd_success;
     if (!context->thread_active) {
         fprintf(stderr, "Failed to start render service loop thread.\n");
         context->running = false;
@@ -91,7 +91,7 @@ static void render_service_stop(AppServices* services) {
     }
 
     if (context->thread_active) {
-        pthread_join(context->thread, NULL);
+        thrd_join(context->thread, NULL);
         context->thread_active = false;
     }
 }

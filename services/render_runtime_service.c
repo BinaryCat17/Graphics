@@ -7,6 +7,8 @@
 #include "runtime/runtime.h"
 #include "service_events.h"
 
+static ServiceDescriptor g_render_runtime_service_descriptor;
+
 static void render_runtime_service_reset(RenderRuntimeServiceContext* context, AppServices* services) {
     if (!context) return;
     *context = (RenderRuntimeServiceContext){
