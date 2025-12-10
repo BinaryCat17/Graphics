@@ -53,10 +53,11 @@ typedef struct ConfigDocument {
 } ConfigDocument;
 
 const ConfigNode *config_map_get(const ConfigNode *map, const char *key);
+const ConfigNode *config_node_get_map(const ConfigNode *map, const char *key);
+const ConfigNode *config_node_get_sequence(const ConfigNode *map, const char *key);
+const ConfigNode *config_node_get_scalar(const ConfigNode *map, const char *key);
 void config_node_free(ConfigNode *node);
 void config_document_free(ConfigDocument *doc);
-
-int config_emit_json(const ConfigNode *node, char **out_json);
 
 int load_config_document(const char *path, ConfigFormat format, ConfigDocument *out_doc, ConfigError *err);
 

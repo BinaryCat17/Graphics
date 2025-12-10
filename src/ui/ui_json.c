@@ -4,107 +4,25 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <strings.h>
 
 #include "stb_truetype.h"
 #include "ui/scene_ui.h"
 
-typedef enum { JSMN_UNDEFINED = 0, JSMN_OBJECT = 1, JSMN_ARRAY = 2, JSMN_STRING = 3, JSMN_PRIMITIVE = 4 } jsmntype_t;
-typedef struct { jsmntype_t type; int start; int end; int size; } jsmntok_t;
-typedef struct { unsigned int pos; unsigned int toknext; int toksuper; } jsmn_parser;
-
-static void jsmn_init(jsmn_parser* p) { p->pos = 0; p->toknext = 0; p->toksuper = -1; }
-static int jsmn_alloc(jsmn_parser* p, jsmntok_t* toks, size_t nt) {
-    if (p->toknext >= nt) return -1;
-    toks[p->toknext].start = toks[p->toknext].end = -1;
-    toks[p->toknext].size = 0;
-    toks[p->toknext].type = JSMN_UNDEFINED;
-    return (int)p->toknext++;
-}
-static int jsmn_parse(jsmn_parser* p, const char* js, size_t len, jsmntok_t* toks, size_t nt) {
-    for (size_t i = p->pos; i < len; i++) {
-        char c = js[i];
-        switch (c) {
-        case '{': case '[': {
-            int tk = jsmn_alloc(p, toks, nt);
-            if (tk < 0) return -1;
-            toks[tk].type = (c == '{') ? JSMN_OBJECT : JSMN_ARRAY;
-            toks[tk].start = (int)i;
-            toks[tk].size = 0;
-            p->toksuper = tk;
-            break;
-        }
-        case '}': case ']': {
-            jsmntype_t want = (c == '}') ? JSMN_OBJECT : JSMN_ARRAY;
-            int found = -1;
-            for (int j = (int)p->toknext - 1; j >= 0; j--) {
-                if (toks[j].start != -1 && toks[j].end == -1 && toks[j].type == want) { found = j; break; }
-            }
-            if (found == -1) return -1;
-            toks[found].end = (int)i + 1;
-            p->toksuper = -1;
-            break;
-        }
-        case '"': {
-            int tk = jsmn_alloc(p, toks, nt);
-            if (tk < 0) return -1;
-            toks[tk].type = JSMN_STRING;
-            toks[tk].start = (int)i + 1;
-            i++;
-            while (i < len && js[i] != '"') i++;
-            if (i >= len) return -1;
-            toks[tk].end = (int)i;
-            break;
-        }
-        default:
-            if (c == ' ' || c == '\t' || c == '\r' || c == '\n' || c == ':' || c == ',') break;
-            {
-                int tk = jsmn_alloc(p, toks, nt);
-                if (tk < 0) return -1;
-                toks[tk].type = JSMN_PRIMITIVE;
-                toks[tk].start = (int)i;
-                while (i < len && js[i] != ',' && js[i] != ']' && js[i] != '}' && js[i] != '\n' && js[i] != '\r' && js[i] != '\t' && js[i] != ' ') i++;
-                toks[tk].end = (int)i;
-                i--;
-            }
-        }
-    }
-    p->pos = (unsigned int)len;
-    return 0;
-}
-
-static char* tok_copy(const char* js, const jsmntok_t* t) {
-    int n = t->end - t->start;
-    char* s = (char*)malloc((size_t)n + 1);
-    memcpy(s, js + t->start, (size_t)n);
-    s[n] = 0;
-    return s;
-}
-
-static int tok_is_key(const char* json, const jsmntok_t* tok, const char* key) {
-    if (tok->type != JSMN_STRING) return 0;
-    int len = tok->end - tok->start;
-    return (int)strlen(key) == len && strncmp(json + tok->start, key, (size_t)len) == 0;
-}
-
-static float parse_number(const char* json, const jsmntok_t* tok, float fallback) {
-    char* s = tok_copy(json, tok);
-    float v = fallback;
-    if (s) {
-        v = (float)atof(s);
-        free(s);
-    }
+static float parse_scalar_number(const ConfigNode* node, float fallback) {
+    if (!node || node->type != CONFIG_NODE_SCALAR || !node->scalar) return fallback;
+    if (node->scalar_type == CONFIG_SCALAR_BOOL) return (strcasecmp(node->scalar, "true") == 0) ? 1.0f : 0.0f;
+    char* end = NULL;
+    float v = (float)strtof(node->scalar, &end);
+    if (!end || end == node->scalar || *end != '\0') return fallback;
     return v;
 }
 
-static int parse_bool(const char* json, const jsmntok_t* tok, int fallback) {
-    if (!tok) return fallback;
-    if (tok->type == JSMN_PRIMITIVE) {
-        int len = tok->end - tok->start;
-        const char* v = json + tok->start;
-        if (len == 4 && strncmp(v, "true", 4) == 0) return 1;
-        if (len == 5 && strncmp(v, "false", 5) == 0) return 0;
-    }
-    return (int)parse_number(json, tok, (float)fallback);
+static int parse_scalar_bool(const ConfigNode* node, int fallback) {
+    if (!node || node->type != CONFIG_NODE_SCALAR || !node->scalar) return fallback;
+    if (node->scalar_type == CONFIG_SCALAR_BOOL) return strcasecmp(node->scalar, "true") == 0;
+    if (node->scalar_type == CONFIG_SCALAR_NUMBER) return parse_scalar_number(node, (float)fallback) != 0.0f;
+    return fallback;
 }
 
 /* Default style mirrors the vivid palette defined in assets/ui/config/ui.yaml to avoid a grayscale fallback. */
@@ -135,17 +53,10 @@ static float fallback_line_height(void) {
     return line > 0.0f ? line : 18.0f;
 }
 
-static char* config_node_to_json(const ConfigNode* root) {
-    char* json = NULL;
-    if (!root) return NULL;
-    if (!config_emit_json(root, &json)) {
-        fprintf(stderr, "Error: failed to convert configuration to JSON text\n");
-        return NULL;
-    }
-    return json;
+static const char* scalar_text(const ConfigNode* node) {
+    if (!node || node->type != CONFIG_NODE_SCALAR) return NULL;
+    return node->scalar;
 }
-
-static unsigned int skip_container(const jsmntok_t* toks, unsigned int tokc, unsigned int idx);
 
 static int ensure_font_metrics(const char* font_path) {
     if (g_font_ready) return 1;
@@ -353,44 +264,6 @@ static void config_map_clear(ConfigNode* map) {
 
 int save_model(const Model* model) {
     if (!model || !model->source_path) return 0;
-
-    if (model->source_doc && model->source_doc->root) {
-        ConfigNode* root = model->source_doc->root;
-        ConfigNode* data = ensure_map_entry(root, "data");
-        if (!data) return 0;
-        ConfigNode* model_node = ensure_map_entry(data, "model");
-        if (!model_node) return 0;
-        config_map_clear(model_node);
-
-        for (ModelEntry* e = model->entries; e; e = e->next) {
-            if (!e->key) continue;
-            ConfigScalarType st = e->is_string ? CONFIG_SCALAR_STRING : CONFIG_SCALAR_NUMBER;
-            char buf[64];
-            const char* sval = e->is_string ? e->string_value : NULL;
-            if (!e->is_string) {
-                snprintf(buf, sizeof(buf), "%g", e->number_value);
-                sval = buf;
-            }
-            ConfigNode* val_node = config_node_from_string(sval, st);
-            if (!val_node) return 0;
-            if (!config_map_set(model_node, e->key, val_node)) {
-                config_node_free(val_node);
-                return 0;
-            }
-        }
-
-        char* json = NULL;
-        if (!config_emit_json(root, &json)) return 0;
-        FILE* f = fopen(model->source_path, "wb");
-        if (!f) { free(json); return 0; }
-        fwrite(json, 1, strlen(json), f);
-        fputc('\n', f);
-        fclose(f);
-        free(json);
-        return 1;
-    }
-
-    /* Fallback to writing model-only YAML when no source document is available. */
     FILE* f = fopen(model->source_path, "wb");
     if (!f) return 0;
 
@@ -422,173 +295,17 @@ static Style* style_find(const Style* styles, const char* name) {
     return NULL;
 }
 
-static void read_color_array(Color* out, const char* json, const jsmntok_t* val, const jsmntok_t* toks, unsigned int tokc) {
-    if (!out || val->type != JSMN_ARRAY) return;
+static void read_color_node(Color* out, const ConfigNode* node) {
+    if (!out || !node) return;
+    if (node->type != CONFIG_NODE_SEQUENCE) return;
     float cols[4] = { out->r, out->g, out->b, out->a };
-    int cc = 0;
-    for (unsigned int z = (unsigned int)(val - toks) + 1; z < tokc && toks[z].start >= val->start && toks[z].end <= val->end; z++) {
-        if (toks[z].type == JSMN_PRIMITIVE || toks[z].type == JSMN_STRING) {
-            cols[cc < 4 ? cc : 3] = parse_number(json, &toks[z], cols[cc < 4 ? cc : 3]);
-            cc++;
-        }
+    size_t idx = 0;
+    for (size_t i = 0; i < node->item_count && idx < 4; i++) {
+        const ConfigNode* it = node->items[i];
+        cols[idx] = parse_scalar_number(it, cols[idx]);
+        idx++;
     }
     out->r = cols[0]; out->g = cols[1]; out->b = cols[2]; out->a = cols[3];
-}
-
-static Model* parse_model_json_text(const char* json, const char* source_path) {
-    if (!json) { fprintf(stderr, "Error: model JSON text is null\n"); return NULL; }
-    Model* model = (Model*)calloc(1, sizeof(Model));
-    if (!model) return NULL;
-    model->store = strdup("model");
-    model->key = strdup("default");
-    model->source_path = strdup(source_path ? source_path : "model.json");
-    jsmn_parser p; jsmn_init(&p);
-    size_t tokc = 1024;
-    jsmntok_t* toks = (jsmntok_t*)malloc(sizeof(jsmntok_t) * tokc);
-    if (!toks) { free_model(model); return NULL; }
-    for (size_t i = 0; i < tokc; i++) { toks[i].start = toks[i].end = -1; toks[i].size = 0; toks[i].type = JSMN_UNDEFINED; }
-    int parse_ret = jsmn_parse(&p, json, strlen(json), toks, tokc);
-    if (parse_ret < 0) {
-        fprintf(stderr, "Error: failed to parse model JSON (code %d)\n", parse_ret);
-        free_model(model);
-        free(toks);
-        return NULL;
-    }
-
-    for (unsigned int i = 0; i + 1 < p.toknext; i++) {
-        if (tok_is_key(json, &toks[i], "store") && toks[i + 1].type == JSMN_STRING) {
-            free(model->store);
-            model->store = tok_copy(json, &toks[i + 1]);
-        }
-        if (tok_is_key(json, &toks[i], "key") && toks[i + 1].type == JSMN_STRING) {
-            free(model->key);
-            model->key = tok_copy(json, &toks[i + 1]);
-        }
-        if (tok_is_key(json, &toks[i], "model") && toks[i + 1].type == JSMN_OBJECT) {
-            jsmntok_t* obj = &toks[i + 1];
-            for (unsigned int j = i + 2; j < p.toknext && toks[j].start >= obj->start && toks[j].end <= obj->end; j += 2) {
-                if (toks[j].type != JSMN_STRING || j + 1 >= p.toknext) continue;
-                char* key = tok_copy(json, &toks[j]);
-                jsmntok_t* val = &toks[j + 1];
-                if (val->type == JSMN_STRING) {
-                    char* sv = tok_copy(json, val);
-                    model_set_string(model, key, sv);
-                    free(sv);
-                }
-                else if (val->type == JSMN_PRIMITIVE) {
-                    float num = parse_number(json, val, 0.0f);
-                    model_set_number(model, key, num);
-                }
-                free(key);
-            }
-            break;
-        }
-    }
-    free(toks);
-    return model;
-}
-
-static Style* parse_styles_json_text(const char* json) {
-    if (!json) { fprintf(stderr, "Error: styles JSON text is null\n"); return NULL; }
-    Style* styles = NULL;
-    jsmn_parser p; jsmn_init(&p);
-    size_t tokc = 1024;
-    jsmntok_t* toks = (jsmntok_t*)malloc(sizeof(jsmntok_t) * tokc);
-    if (!toks) { fprintf(stderr, "Error: failed to allocate tokens for styles JSON\n"); return NULL; }
-    for (size_t i = 0; i < tokc; i++) { toks[i].start = toks[i].end = -1; toks[i].size = 0; toks[i].type = JSMN_UNDEFINED; }
-    int parse_ret = jsmn_parse(&p, json, strlen(json), toks, tokc);
-    if (parse_ret < 0) { fprintf(stderr, "Error: failed to parse styles JSON (code %d)\n", parse_ret); free(toks); return NULL; }
-
-    for (unsigned int i = 0; i + 1 < p.toknext; i++) {
-        if (tok_is_key(json, &toks[i], "styles") && toks[i + 1].type == JSMN_OBJECT) {
-            jsmntok_t* obj = &toks[i + 1];
-            for (unsigned int j = i + 2; j < p.toknext && toks[j].start >= obj->start && toks[j].end <= obj->end; ) {
-                if (toks[j].type == JSMN_STRING && j + 1 < p.toknext && toks[j + 1].type == JSMN_OBJECT) {
-                    char* style_name = tok_copy(json, &toks[j]);
-                    Style* st = (Style*)calloc(1, sizeof(Style));
-                    if (!st) { free(style_name); break; }
-                    st->name = style_name;
-                    st->background = DEFAULT_STYLE.background;
-                    st->text = DEFAULT_STYLE.text;
-                    st->border_color = DEFAULT_STYLE.border_color;
-                    st->padding = DEFAULT_STYLE.padding;
-                    st->border_thickness = DEFAULT_STYLE.border_thickness;
-                    st->scrollbar_track_color = DEFAULT_STYLE.scrollbar_track_color;
-                    st->scrollbar_thumb_color = DEFAULT_STYLE.scrollbar_thumb_color;
-                    st->scrollbar_width = DEFAULT_STYLE.scrollbar_width;
-                    st->has_scrollbar_width = DEFAULT_STYLE.has_scrollbar_width;
-                    st->next = styles;
-                    styles = st;
-                    jsmntok_t* sobj = &toks[j + 1];
-                    unsigned int k = j + 2;
-                    while (k < p.toknext && toks[k].start >= sobj->start && toks[k].end <= sobj->end) {
-                        if (toks[k].type != JSMN_STRING || k + 1 >= p.toknext) { k++; continue; }
-                        jsmntok_t* val = &toks[k + 1];
-                        if (tok_is_key(json, &toks[k], "color")) {
-                            read_color_array(&st->background, json, val, toks, p.toknext);
-                            k = skip_container(toks, p.toknext, (unsigned int)(val - toks));
-                            continue;
-                        }
-                        if (tok_is_key(json, &toks[k], "textColor")) {
-                            read_color_array(&st->text, json, val, toks, p.toknext);
-                            k = skip_container(toks, p.toknext, (unsigned int)(val - toks));
-                            continue;
-                        }
-                        if (tok_is_key(json, &toks[k], "borderColor")) {
-                            read_color_array(&st->border_color, json, val, toks, p.toknext);
-                            k = skip_container(toks, p.toknext, (unsigned int)(val - toks));
-                            continue;
-                        }
-                        if (tok_is_key(json, &toks[k], "padding") && val->type == JSMN_PRIMITIVE) {
-                            st->padding = parse_number(json, val, st->padding);
-                            k += 2;
-                            continue;
-                        }
-                        if (tok_is_key(json, &toks[k], "borderThickness") && val->type == JSMN_PRIMITIVE) {
-                            st->border_thickness = parse_number(json, val, st->border_thickness);
-                            k += 2;
-                            continue;
-                        }
-                        if (tok_is_key(json, &toks[k], "scrollbarTrackColor")) {
-                            read_color_array(&st->scrollbar_track_color, json, val, toks, p.toknext);
-                            k = skip_container(toks, p.toknext, (unsigned int)(val - toks));
-                            continue;
-                        }
-                        if (tok_is_key(json, &toks[k], "scrollbarThumbColor")) {
-                            read_color_array(&st->scrollbar_thumb_color, json, val, toks, p.toknext);
-                            k = skip_container(toks, p.toknext, (unsigned int)(val - toks));
-                            continue;
-                        }
-                        if (tok_is_key(json, &toks[k], "scrollbarWidth") && val->type == JSMN_PRIMITIVE) {
-                            st->scrollbar_width = parse_number(json, val, st->scrollbar_width);
-                            st->has_scrollbar_width = 1;
-                            k += 2;
-                            continue;
-                        }
-                        char* key_name = tok_copy(json, &toks[k]);
-                        fprintf(stderr, "Error: unknown style field '%s' in style '%s'\n", key_name ? key_name : "<null>", st->name);
-                        free(key_name);
-                        k = skip_container(toks, p.toknext, (unsigned int)(val - toks));
-                    }
-                    j += 2;
-                }
-                else j++;
-            }
-            break;
-        }
-    }
-    free(toks);
-    return styles;
-}
-
-static unsigned int skip_container(const jsmntok_t* toks, unsigned int tokc, unsigned int idx) {
-    if (idx >= tokc) return tokc;
-    unsigned int i = idx + 1;
-    while (i < tokc && toks[i].start >= toks[idx].start && toks[i].end <= toks[idx].end) {
-        if (toks[i].type == JSMN_OBJECT || toks[i].type == JSMN_ARRAY) i = skip_container(toks, tokc, i);
-        else i++;
-    }
-    return i;
 }
 
 static UiNode* create_node(void) {
@@ -656,129 +373,76 @@ static int append_child(UiNode* parent, UiNode* child) {
     return 1;
 }
 
-static UiNode* parse_ui_node(const char* json, jsmntok_t* toks, unsigned int tokc, unsigned int start_idx) {
+static UiNode* parse_ui_node_config(const ConfigNode* obj) {
     UiNode* node = create_node();
     if (!node) return NULL;
-    jsmntok_t* obj = &toks[start_idx];
-    for (unsigned int k = start_idx + 1; k < tokc && toks[k].start >= obj->start && toks[k].end <= obj->end; ) {
-        if (toks[k].type != JSMN_STRING || k + 1 >= tokc) { k++; continue; }
-        jsmntok_t* val = &toks[k + 1];
-        if (tok_is_key(json, &toks[k], "type") && val->type == JSMN_STRING) { node->type = tok_copy(json, val); k += 2; continue; }
-        if (tok_is_key(json, &toks[k], "style") && val->type == JSMN_STRING) { node->style_name = tok_copy(json, val); k += 2; continue; }
-        if (tok_is_key(json, &toks[k], "x")) { node->rect.x = parse_number(json, val, node->rect.x); node->has_x = 1; k += 2; continue; }
-        if (tok_is_key(json, &toks[k], "y")) { node->rect.y = parse_number(json, val, node->rect.y); node->has_y = 1; k += 2; continue; }
-        if (tok_is_key(json, &toks[k], "w")) { node->rect.w = parse_number(json, val, node->rect.w); node->has_w = 1; k += 2; continue; }
-        if (tok_is_key(json, &toks[k], "h")) { node->rect.h = parse_number(json, val, node->rect.h); node->has_h = 1; k += 2; continue; }
-        if (tok_is_key(json, &toks[k], "z")) { node->z_index = (int)parse_number(json, val, (float)node->z_index); node->has_z_index = 1; k += 2; continue; }
-        if (tok_is_key(json, &toks[k], "zGroup") || tok_is_key(json, &toks[k], "z_group")) { node->z_group = (int)parse_number(json, val, (float)node->z_group); node->has_z_group = 1; k += 2; continue; }
-        if (tok_is_key(json, &toks[k], "id") && val->type == JSMN_STRING) { node->id = tok_copy(json, val); k += 2; continue; }
-        if (tok_is_key(json, &toks[k], "use") && val->type == JSMN_STRING) { node->use = tok_copy(json, val); k += 2; continue; }
-        if (tok_is_key(json, &toks[k], "text") && val->type == JSMN_STRING) { node->text = tok_copy(json, val); k += 2; continue; }
-        if (tok_is_key(json, &toks[k], "textBinding") && val->type == JSMN_STRING) { node->text_binding = tok_copy(json, val); k += 2; continue; }
-        if (tok_is_key(json, &toks[k], "valueBinding") && val->type == JSMN_STRING) { node->value_binding = tok_copy(json, val); k += 2; continue; }
-        if (tok_is_key(json, &toks[k], "onClick") && val->type == JSMN_STRING) { node->click_binding = tok_copy(json, val); k += 2; continue; }
-        if (tok_is_key(json, &toks[k], "clickValue") && val->type == JSMN_STRING) { node->click_value = tok_copy(json, val); k += 2; continue; }
-        if (tok_is_key(json, &toks[k], "min")) { node->minv = parse_number(json, val, node->minv); node->has_min = 1; k += 2; continue; }
-        if (tok_is_key(json, &toks[k], "max")) { node->maxv = parse_number(json, val, node->maxv); node->has_max = 1; k += 2; continue; }
-        if (tok_is_key(json, &toks[k], "value")) { node->value = parse_number(json, val, node->value); node->has_value = 1; k += 2; continue; }
-        if (tok_is_key(json, &toks[k], "minWidth")) { node->min_w = parse_number(json, val, node->min_w); node->has_min_w = 1; k += 2; continue; }
-        if (tok_is_key(json, &toks[k], "minHeight")) { node->min_h = parse_number(json, val, node->min_h); node->has_min_h = 1; k += 2; continue; }
-        if (tok_is_key(json, &toks[k], "maxWidth")) { node->max_w = parse_number(json, val, node->max_w); node->has_max_w = 1; k += 2; continue; }
-        if (tok_is_key(json, &toks[k], "maxHeight")) { node->max_h = parse_number(json, val, node->max_h); node->has_max_h = 1; k += 2; continue; }
-        if (tok_is_key(json, &toks[k], "scrollArea") && val->type == JSMN_STRING) { node->scroll_area = tok_copy(json, val); k += 2; continue; }
-        if (tok_is_key(json, &toks[k], "scrollStatic") && val->type == JSMN_PRIMITIVE) {
-            int len = val->end - val->start;
-            if (len == 4 && strncmp(json + val->start, "true", 4) == 0) node->scroll_static = 1;
-            if (len == 5 && strncmp(json + val->start, "false", 5) == 0) node->scroll_static = 0;
-            k += 2;
+    if (!obj || obj->type != CONFIG_NODE_MAP) return node;
+
+    for (size_t i = 0; i < obj->pair_count; ++i) {
+        const ConfigPair* pair = &obj->pairs[i];
+        const char* key = pair->key;
+        const ConfigNode* val = pair->value;
+        if (!key || !val) continue;
+        const char* sval = scalar_text(val);
+        if (strcmp(key, "type") == 0 && sval) { node->type = strdup(sval); continue; }
+        if (strcmp(key, "style") == 0 && sval) { node->style_name = strdup(sval); continue; }
+        if (strcmp(key, "x") == 0) { node->rect.x = parse_scalar_number(val, node->rect.x); node->has_x = 1; continue; }
+        if (strcmp(key, "y") == 0) { node->rect.y = parse_scalar_number(val, node->rect.y); node->has_y = 1; continue; }
+        if (strcmp(key, "w") == 0) { node->rect.w = parse_scalar_number(val, node->rect.w); node->has_w = 1; continue; }
+        if (strcmp(key, "h") == 0) { node->rect.h = parse_scalar_number(val, node->rect.h); node->has_h = 1; continue; }
+        if (strcmp(key, "z") == 0) { node->z_index = (int)parse_scalar_number(val, (float)node->z_index); node->has_z_index = 1; continue; }
+        if (strcmp(key, "zGroup") == 0 || strcmp(key, "z_group") == 0) { node->z_group = (int)parse_scalar_number(val, (float)node->z_group); node->has_z_group = 1; continue; }
+        if (strcmp(key, "id") == 0 && sval) { node->id = strdup(sval); continue; }
+        if (strcmp(key, "use") == 0 && sval) { node->use = strdup(sval); continue; }
+        if (strcmp(key, "text") == 0 && sval) { node->text = strdup(sval); continue; }
+        if (strcmp(key, "textBinding") == 0 && sval) { node->text_binding = strdup(sval); continue; }
+        if (strcmp(key, "valueBinding") == 0 && sval) { node->value_binding = strdup(sval); continue; }
+        if (strcmp(key, "onClick") == 0 && sval) { node->click_binding = strdup(sval); continue; }
+        if (strcmp(key, "clickValue") == 0 && sval) { node->click_value = strdup(sval); continue; }
+        if (strcmp(key, "min") == 0) { node->minv = parse_scalar_number(val, node->minv); node->has_min = 1; continue; }
+        if (strcmp(key, "max") == 0) { node->maxv = parse_scalar_number(val, node->maxv); node->has_max = 1; continue; }
+        if (strcmp(key, "value") == 0) { node->value = parse_scalar_number(val, node->value); node->has_value = 1; continue; }
+        if (strcmp(key, "minWidth") == 0) { node->min_w = parse_scalar_number(val, node->min_w); node->has_min_w = 1; continue; }
+        if (strcmp(key, "minHeight") == 0) { node->min_h = parse_scalar_number(val, node->min_h); node->has_min_h = 1; continue; }
+        if (strcmp(key, "maxWidth") == 0) { node->max_w = parse_scalar_number(val, node->max_w); node->has_max_w = 1; continue; }
+        if (strcmp(key, "maxHeight") == 0) { node->max_h = parse_scalar_number(val, node->max_h); node->has_max_h = 1; continue; }
+        if (strcmp(key, "scrollArea") == 0 && sval) { node->scroll_area = strdup(sval); continue; }
+        if (strcmp(key, "scrollStatic") == 0) { node->scroll_static = parse_scalar_bool(val, node->scroll_static); continue; }
+        if (strcmp(key, "scrollbar") == 0) { node->scrollbar_enabled = parse_scalar_bool(val, node->scrollbar_enabled); continue; }
+        if (strcmp(key, "scrollbarWidth") == 0) { node->scrollbar_width = parse_scalar_number(val, node->scrollbar_width); node->has_scrollbar_width = 1; continue; }
+        if (strcmp(key, "spacing") == 0) { node->spacing = parse_scalar_number(val, node->spacing); node->has_spacing = 1; continue; }
+        if (strcmp(key, "columns") == 0) { node->columns = (int)parse_scalar_number(val, (float)node->columns); node->has_columns = 1; continue; }
+        if (strcmp(key, "padding") == 0) { node->padding_override = parse_scalar_number(val, node->padding_override); node->has_padding_override = 1; continue; }
+        if (strcmp(key, "borderThickness") == 0) { node->border_thickness = parse_scalar_number(val, node->border_thickness); node->has_border_thickness = 1; continue; }
+        if (strcmp(key, "color") == 0) { read_color_node(&node->color, val); node->has_color = 1; continue; }
+        if (strcmp(key, "borderColor") == 0) { read_color_node(&node->border_color, val); node->has_border_color = 1; continue; }
+        if (strcmp(key, "textColor") == 0) { read_color_node(&node->text_color, val); node->has_text_color = 1; continue; }
+        if (strcmp(key, "scrollbarTrackColor") == 0) { read_color_node(&node->scrollbar_track_color, val); node->has_scrollbar_track_color = 1; continue; }
+        if (strcmp(key, "scrollbarThumbColor") == 0) { read_color_node(&node->scrollbar_thumb_color, val); node->has_scrollbar_thumb_color = 1; continue; }
+        if (strcmp(key, "docking") == 0 && sval) { node->docking = strdup(sval); continue; }
+        if (strcmp(key, "resizable") == 0) { node->resizable = parse_scalar_bool(val, node->resizable); node->has_resizable = 1; continue; }
+        if (strcmp(key, "draggable") == 0) { node->draggable = parse_scalar_bool(val, node->draggable); node->has_draggable = 1; continue; }
+        if (strcmp(key, "modal") == 0) { node->modal = parse_scalar_bool(val, node->modal); node->has_modal = 1; continue; }
+        if (strcmp(key, "onFocus") == 0 && sval) { node->on_focus = strdup(sval); continue; }
+        if (strcmp(key, "floating") == 0 && val->type == CONFIG_NODE_MAP) {
+            const ConfigNode* fx = config_node_get_scalar(val, "x"); if (fx) { node->floating_rect.x = parse_scalar_number(fx, node->floating_rect.x); node->has_floating_rect = 1; }
+            const ConfigNode* fy = config_node_get_scalar(val, "y"); if (fy) { node->floating_rect.y = parse_scalar_number(fy, node->floating_rect.y); node->has_floating_rect = 1; }
+            const ConfigNode* fw = config_node_get_scalar(val, "w"); if (fw) { node->floating_rect.w = parse_scalar_number(fw, node->floating_rect.w); node->has_floating_rect = 1; }
+            const ConfigNode* fh = config_node_get_scalar(val, "h"); if (fh) { node->floating_rect.h = parse_scalar_number(fh, node->floating_rect.h); node->has_floating_rect = 1; }
+            const ConfigNode* fminw = config_node_get_scalar(val, "minWidth"); if (fminw) { node->floating_min_w = parse_scalar_number(fminw, node->floating_min_w); node->has_floating_min = 1; }
+            const ConfigNode* fminh = config_node_get_scalar(val, "minHeight"); if (fminh) { node->floating_min_h = parse_scalar_number(fminh, node->floating_min_h); node->has_floating_min = 1; }
+            const ConfigNode* fmaxw = config_node_get_scalar(val, "maxWidth"); if (fmaxw) { node->floating_max_w = parse_scalar_number(fmaxw, node->floating_max_w); node->has_floating_max = 1; }
+            const ConfigNode* fmaxh = config_node_get_scalar(val, "maxHeight"); if (fmaxh) { node->floating_max_h = parse_scalar_number(fmaxh, node->floating_max_h); node->has_floating_max = 1; }
             continue;
         }
-        if (tok_is_key(json, &toks[k], "scrollbar") && val->type == JSMN_PRIMITIVE) {
-            int len = val->end - val->start;
-            if (len == 4 && strncmp(json + val->start, "true", 4) == 0) node->scrollbar_enabled = 1;
-            if (len == 5 && strncmp(json + val->start, "false", 5) == 0) node->scrollbar_enabled = 0;
-            k += 2;
-            continue;
-        }
-        if (tok_is_key(json, &toks[k], "scrollbarWidth")) {
-            node->scrollbar_width = parse_number(json, val, node->scrollbar_width);
-            node->has_scrollbar_width = 1;
-            k += 2;
-            continue;
-        }
-        if (tok_is_key(json, &toks[k], "spacing")) { node->spacing = parse_number(json, val, node->spacing); node->has_spacing = 1; k += 2; continue; }
-        if (tok_is_key(json, &toks[k], "columns")) { node->columns = (int)parse_number(json, val, (float)node->columns); node->has_columns = 1; k += 2; continue; }
-        if (tok_is_key(json, &toks[k], "padding")) { node->padding_override = parse_number(json, val, node->padding_override); node->has_padding_override = 1; k += 2; continue; }
-        if (tok_is_key(json, &toks[k], "borderThickness")) { node->border_thickness = parse_number(json, val, node->border_thickness); node->has_border_thickness = 1; k += 2; continue; }
-        if (tok_is_key(json, &toks[k], "color")) {
-            read_color_array(&node->color, json, val, toks, tokc);
-            node->has_color = 1;
-            k = skip_container(toks, tokc, (unsigned int)(val - toks));
-            continue;
-        }
-        if (tok_is_key(json, &toks[k], "borderColor")) {
-            read_color_array(&node->border_color, json, val, toks, tokc);
-            node->has_border_color = 1;
-            k = skip_container(toks, tokc, (unsigned int)(val - toks));
-            continue;
-        }
-        if (tok_is_key(json, &toks[k], "textColor")) {
-            read_color_array(&node->text_color, json, val, toks, tokc);
-            node->has_text_color = 1;
-            k = skip_container(toks, tokc, (unsigned int)(val - toks));
-            continue;
-        }
-        if (tok_is_key(json, &toks[k], "scrollbarTrackColor")) {
-            read_color_array(&node->scrollbar_track_color, json, val, toks, tokc);
-            node->has_scrollbar_track_color = 1;
-            k = skip_container(toks, tokc, (unsigned int)(val - toks));
-            continue;
-        }
-        if (tok_is_key(json, &toks[k], "scrollbarThumbColor")) {
-            read_color_array(&node->scrollbar_thumb_color, json, val, toks, tokc);
-            node->has_scrollbar_thumb_color = 1;
-            k = skip_container(toks, tokc, (unsigned int)(val - toks));
-            continue;
-        }
-        if (tok_is_key(json, &toks[k], "docking") && val->type == JSMN_STRING) { node->docking = tok_copy(json, val); k += 2; continue; }
-        if (tok_is_key(json, &toks[k], "resizable")) { node->resizable = parse_bool(json, val, node->resizable); node->has_resizable = 1; k += 2; continue; }
-        if (tok_is_key(json, &toks[k], "draggable")) { node->draggable = parse_bool(json, val, node->draggable); node->has_draggable = 1; k += 2; continue; }
-        if (tok_is_key(json, &toks[k], "modal")) { node->modal = parse_bool(json, val, node->modal); node->has_modal = 1; k += 2; continue; }
-        if (tok_is_key(json, &toks[k], "onFocus") && val->type == JSMN_STRING) { node->on_focus = tok_copy(json, val); k += 2; continue; }
-        if (tok_is_key(json, &toks[k], "floating") && val->type == JSMN_OBJECT) {
-            jsmntok_t* obj = val;
-            for (unsigned int j = k + 2; j < tokc && toks[j].start >= obj->start && toks[j].end <= obj->end; ) {
-                if (toks[j].type != JSMN_STRING || j + 1 >= tokc) { j++; continue; }
-                jsmntok_t* fv = &toks[j + 1];
-                if (tok_is_key(json, &toks[j], "x")) { node->floating_rect.x = parse_number(json, fv, node->floating_rect.x); node->has_floating_rect = 1; j += 2; continue; }
-                if (tok_is_key(json, &toks[j], "y")) { node->floating_rect.y = parse_number(json, fv, node->floating_rect.y); node->has_floating_rect = 1; j += 2; continue; }
-                if (tok_is_key(json, &toks[j], "w")) { node->floating_rect.w = parse_number(json, fv, node->floating_rect.w); node->has_floating_rect = 1; j += 2; continue; }
-                if (tok_is_key(json, &toks[j], "h")) { node->floating_rect.h = parse_number(json, fv, node->floating_rect.h); node->has_floating_rect = 1; j += 2; continue; }
-                if (tok_is_key(json, &toks[j], "minWidth")) { node->floating_min_w = parse_number(json, fv, node->floating_min_w); node->has_floating_min = 1; j += 2; continue; }
-                if (tok_is_key(json, &toks[j], "minHeight")) { node->floating_min_h = parse_number(json, fv, node->floating_min_h); node->has_floating_min = 1; j += 2; continue; }
-                if (tok_is_key(json, &toks[j], "maxWidth")) { node->floating_max_w = parse_number(json, fv, node->floating_max_w); node->has_floating_max = 1; j += 2; continue; }
-                if (tok_is_key(json, &toks[j], "maxHeight")) { node->floating_max_h = parse_number(json, fv, node->floating_max_h); node->has_floating_max = 1; j += 2; continue; }
-                j = skip_container(toks, tokc, j);
+        if (strcmp(key, "children") == 0 && val->type == CONFIG_NODE_SEQUENCE) {
+            for (size_t c = 0; c < val->item_count; ++c) {
+                UiNode* child = parse_ui_node_config(val->items[c]);
+                append_child(node, child);
             }
-            k = skip_container(toks, tokc, k + 1);
             continue;
         }
-        if (tok_is_key(json, &toks[k], "children") && val->type == JSMN_ARRAY) {
-            jsmntok_t* arr = val;
-            for (unsigned int c = k + 2; c < tokc && toks[c].start >= arr->start && toks[c].end <= arr->end; ) {
-                if (toks[c].type == JSMN_OBJECT) {
-                    UiNode* child = parse_ui_node(json, toks, tokc, c);
-                    append_child(node, child);
-                }
-                c = skip_container(toks, tokc, c);
-            }
-            k = skip_container(toks, tokc, (unsigned int)(val - toks));
-            continue;
-        }
-        char* key_name = tok_copy(json, &toks[k]);
-        fprintf(stderr, "Error: unknown layout field '%s'\n", key_name ? key_name : "<null>");
-        free(key_name);
-        k = skip_container(toks, tokc, (unsigned int)(val - toks));
+        fprintf(stderr, "Error: unknown layout field '%s'\n", key);
     }
     return node;
 }
@@ -1040,207 +704,169 @@ static void bind_model_values_to_nodes(UiNode* node, const Model* model) {
     }
 }
 
-static UiNode* parse_layout_definitions(const char* json, Prototype** out_prototypes) {
-    UiNode* root = create_node();
-    if (!root) return NULL;
-    root->layout = UI_LAYOUT_ABSOLUTE;
-    root->style = &ROOT_STYLE;
-    root->spacing = 0.0f;
-
-    jsmn_parser p; jsmn_init(&p);
-    size_t tokc = 4096;
-    jsmntok_t* toks = (jsmntok_t*)malloc(sizeof(jsmntok_t) * tokc);
-    if (!toks) { fprintf(stderr, "Error: failed to allocate tokens for layout JSON\n"); free(root); return NULL; }
-    for (size_t i = 0; i < tokc; i++) { toks[i].start = toks[i].end = -1; toks[i].size = 0; toks[i].type = JSMN_UNDEFINED; }
-    int parse_ret = jsmn_parse(&p, json, strlen(json), toks, tokc);
-    if (parse_ret < 0) { fprintf(stderr, "Error: failed to parse layout JSON (code %d)\n", parse_ret); free(toks); free(root); return NULL; }
-
-    int sections_found = 0;
-    Prototype* prototypes = out_prototypes ? *out_prototypes : NULL;
-    for (unsigned int i = 0; i < p.toknext; i++) {
-        if (tok_is_key(json, &toks[i], "widgets") && i + 1 < p.toknext && toks[i + 1].type == JSMN_OBJECT) {
-            jsmntok_t* obj = &toks[i + 1];
-            for (unsigned int j = i + 2; j < p.toknext && toks[j].start >= obj->start && toks[j].end <= obj->end; ) {
-                if (toks[j].type == JSMN_STRING && j + 1 < p.toknext && toks[j + 1].type == JSMN_OBJECT) {
-                    char* name = tok_copy(json, &toks[j]);
-                    UiNode* def = parse_ui_node(json, toks, p.toknext, j + 1);
-                    Prototype* pnode = (Prototype*)calloc(1, sizeof(Prototype));
-                    if (pnode) {
-                        pnode->name = name;
-                        pnode->node = def;
-                        pnode->next = prototypes;
-                        prototypes = pnode;
-                    } else {
-                        free(name);
-                        free_ui_tree(def);
-                    }
-                    j = skip_container(toks, p.toknext, j + 1);
-                    continue;
-                }
-                j++;
-            }
-        }
-        if (tok_is_key(json, &toks[i], "layout") && i + 1 < p.toknext && toks[i + 1].type == JSMN_OBJECT) {
-            sections_found++;
-            UiNode* def = parse_ui_node(json, toks, p.toknext, i + 1);
-            append_child(root, def);
-        }
-        if (tok_is_key(json, &toks[i], "floating") && i + 1 < p.toknext && toks[i + 1].type == JSMN_ARRAY) {
-            sections_found++;
-            jsmntok_t* arr = &toks[i + 1];
-            for (unsigned int j = i + 2; j < p.toknext && toks[j].start >= arr->start && toks[j].end <= arr->end; ) {
-                if (toks[j].type == JSMN_OBJECT) {
-                    UiNode* def = parse_ui_node(json, toks, p.toknext, j);
-                    append_child(root, def);
-                }
-                j = skip_container(toks, p.toknext, j);
-            }
-        }
-    }
-    if (out_prototypes) *out_prototypes = prototypes;
-    if (sections_found == 0) fprintf(stderr, "Error: no 'layout' or 'floating' sections found in layout.json\n");
-    free(toks);
-    return root;
-}
-
 void update_widget_bindings(UiNode* root, const Model* model) {
     bind_model_values_to_nodes(root, model);
-}
-
-static UiNode* parse_layout_json_text(const char* json, const Model* model, const Style* styles, const char* font_path, const Scene* scene) {
-    if (!json) { fprintf(stderr, "Error: layout JSON text is null\n"); return NULL; }
-
-    ensure_font_metrics(font_path);
-
-    Prototype* prototypes = NULL;
-    UiNode* root = parse_layout_definitions(json, &prototypes);
-    if (!root) return NULL;
-
-    if (scene) {
-        scene_ui_inject(root, scene);
-    }
-
-    apply_prototypes(root, prototypes);
-    int missing_styles = 0;
-    resolve_styles_and_defaults(root, styles, &missing_styles);
-    if (missing_styles) {
-        fprintf(stderr, "Failed to resolve styles: remove or define the missing styles to continue.\n");
-        free_prototypes(prototypes);
-        free_ui_tree(root);
-        return NULL;
-    }
-    bind_model_values_to_nodes(root, model);
-    int scroll_counter = 0;
-    auto_assign_scroll_areas(root, &scroll_counter, NULL);
-    free_prototypes(prototypes);
-    return root;
 }
 
 Model* parse_model_config(const ConfigDocument* doc) {
     if (!doc || !doc->root) return NULL;
 
-    const ConfigNode* store_node = config_map_get(doc->root, "store");
-    const ConfigNode* key_node = config_map_get(doc->root, "key");
-    const ConfigNode* data_node = config_map_get(doc->root, "data");
-    const ConfigNode* model_node = data_node ? config_map_get(data_node, "model") : config_map_get(doc->root, "model");
+    const ConfigNode* store_node = config_node_get_scalar(doc->root, "store");
+    const ConfigNode* key_node = config_node_get_scalar(doc->root, "key");
+    const ConfigNode* data_node = config_node_get_map(doc->root, "data");
+    const ConfigNode* model_node = data_node ? config_node_get_map(data_node, "model") : config_node_get_map(doc->root, "model");
 
     if (!model_node) {
         fprintf(stderr, "Error: model section missing in UI config %s\n", doc->source_path ? doc->source_path : "(unknown)");
         return NULL;
     }
 
-    char* model_body = config_node_to_json(model_node);
-    const char* store = (store_node && store_node->scalar) ? store_node->scalar : "model";
-    const char* key = (key_node && key_node->scalar) ? key_node->scalar : "default";
+    Model* model = (Model*)calloc(1, sizeof(Model));
+    if (!model) return NULL;
 
-    if (!model_body) return NULL;
+    model->store = strdup(store_node && store_node->scalar ? store_node->scalar : "model");
+    model->key = strdup(key_node && key_node->scalar ? key_node->scalar : "default");
+    model->source_path = strdup(doc->source_path ? doc->source_path : "model.yaml");
 
-    size_t len = strlen(model_body) + strlen(store) + strlen(key) + 32;
-    char* json = (char*)malloc(len);
-    if (!json) {
-        free(model_body);
-        return NULL;
+    if (!model->store || !model->key || !model->source_path) { free_model(model); return NULL; }
+
+    for (size_t i = 0; i < model_node->pair_count; ++i) {
+        const ConfigPair* pair = &model_node->pairs[i];
+        if (!pair->key || !pair->value) continue;
+        const ConfigNode* val = pair->value;
+        if (val->type != CONFIG_NODE_SCALAR) continue;
+        if (val->scalar_type == CONFIG_SCALAR_STRING) {
+            model_set_string(model, pair->key, val->scalar ? val->scalar : "");
+        } else {
+            model_set_number(model, pair->key, parse_scalar_number(val, 0.0f));
+        }
     }
-    snprintf(json, len, "{\"store\":\"%s\",\"key\":\"%s\",\"model\":%s}", store, key, model_body);
-    free(model_body);
 
-    Model* model = parse_model_json_text(json, doc->source_path);
-    if (model) model->source_doc = doc;
-    free(json);
+    model->source_doc = doc;
     return model;
 }
 
 Style* parse_styles_config(const ConfigNode* root) {
-    const ConfigNode* data_node = config_map_get(root, "data");
-    const ConfigNode* styles_node = data_node ? config_map_get(data_node, "styles") : config_map_get(root, "styles");
-    if (!styles_node) {
+    const ConfigNode* data_node = config_node_get_map(root, "data");
+    const ConfigNode* styles_node = data_node ? config_node_get_map(data_node, "styles") : config_node_get_map(root, "styles");
+    if (!styles_node || styles_node->type != CONFIG_NODE_MAP) {
         fprintf(stderr, "Error: styles section missing in UI config\n");
         return NULL;
     }
 
-    char* styles_body = config_node_to_json(styles_node);
-    if (!styles_body) return NULL;
+    Style* styles = NULL;
+    for (size_t i = 0; i < styles_node->pair_count; ++i) {
+        const ConfigPair* pair = &styles_node->pairs[i];
+        const ConfigNode* val = pair->value;
+        if (!pair->key || !val || val->type != CONFIG_NODE_MAP) continue;
+        Style* st = (Style*)calloc(1, sizeof(Style));
+        if (!st) break;
+        st->name = strdup(pair->key);
+        st->background = DEFAULT_STYLE.background;
+        st->text = DEFAULT_STYLE.text;
+        st->border_color = DEFAULT_STYLE.border_color;
+        st->padding = DEFAULT_STYLE.padding;
+        st->border_thickness = DEFAULT_STYLE.border_thickness;
+        st->scrollbar_track_color = DEFAULT_STYLE.scrollbar_track_color;
+        st->scrollbar_thumb_color = DEFAULT_STYLE.scrollbar_thumb_color;
+        st->scrollbar_width = DEFAULT_STYLE.scrollbar_width;
+        st->has_scrollbar_width = DEFAULT_STYLE.has_scrollbar_width;
+        st->next = styles;
+        styles = st;
 
-    size_t len = strlen(styles_body) + 12;
-    char* json = (char*)malloc(len);
-    if (!json) {
-        free(styles_body);
-        return NULL;
+        for (size_t j = 0; j < val->pair_count; ++j) {
+            const ConfigPair* field = &val->pairs[j];
+            const char* fname = field->key;
+            const ConfigNode* fval = field->value;
+            if (!fname || !fval) continue;
+            if (strcmp(fname, "color") == 0) { read_color_node(&st->background, fval); continue; }
+            if (strcmp(fname, "textColor") == 0) { read_color_node(&st->text, fval); continue; }
+            if (strcmp(fname, "borderColor") == 0) { read_color_node(&st->border_color, fval); continue; }
+            if (strcmp(fname, "padding") == 0) { st->padding = parse_scalar_number(fval, st->padding); continue; }
+            if (strcmp(fname, "borderThickness") == 0) { st->border_thickness = parse_scalar_number(fval, st->border_thickness); continue; }
+            if (strcmp(fname, "scrollbarTrackColor") == 0) { read_color_node(&st->scrollbar_track_color, fval); continue; }
+            if (strcmp(fname, "scrollbarThumbColor") == 0) { read_color_node(&st->scrollbar_thumb_color, fval); continue; }
+            if (strcmp(fname, "scrollbarWidth") == 0) { st->scrollbar_width = parse_scalar_number(fval, st->scrollbar_width); st->has_scrollbar_width = 1; continue; }
+            fprintf(stderr, "Error: unknown style field '%s' in style '%s'\n", fname, st->name);
+        }
     }
-    snprintf(json, len, "{\"styles\":%s}", styles_body);
-    free(styles_body);
 
-    Style* styles = parse_styles_json_text(json);
-    free(json);
     return styles;
 }
 
 UiNode* parse_layout_config(const ConfigNode* root, const Model* model, const Style* styles, const char* font_path, const Scene* scene) {
     if (!root) return NULL;
 
-    const ConfigNode* data_node = config_map_get(root, "data");
-    const ConfigNode* layout_node = data_node ? config_map_get(data_node, "layout") : config_map_get(root, "layout");
-    const ConfigNode* widgets_node = data_node ? config_map_get(data_node, "widgets") : config_map_get(root, "widgets");
-    const ConfigNode* floating_node = data_node ? config_map_get(data_node, "floating") : config_map_get(root, "floating");
+    const ConfigNode* data_node = config_node_get_map(root, "data");
+    const ConfigNode* layout_node = data_node ? config_node_get_map(data_node, "layout") : config_node_get_map(root, "layout");
+    const ConfigNode* widgets_node = data_node ? config_node_get_map(data_node, "widgets") : config_node_get_map(root, "widgets");
+    const ConfigNode* floating_node = data_node ? config_node_get_sequence(data_node, "floating") : config_node_get_sequence(root, "floating");
 
     if (!layout_node && !widgets_node) {
         fprintf(stderr, "Error: layout or widgets section missing in UI config\n");
         return NULL;
     }
 
-    char* layout_body = layout_node ? config_node_to_json(layout_node) : NULL;
-    char* widgets_body = widgets_node ? config_node_to_json(widgets_node) : NULL;
-    char* floating_body = floating_node ? config_node_to_json(floating_node) : NULL;
+    ensure_font_metrics(font_path);
 
-    size_t len = 2; // braces
-    len += layout_body ? strlen(layout_body) + 10 : 0;
-    len += widgets_body ? strlen(widgets_body) + 12 : 0;
-    len += floating_body ? strlen(floating_body) + 13 : 0;
-
-    char* json = (char*)malloc(len);
-    if (!json) { free(layout_body); free(widgets_body); free(floating_body); return NULL; }
-
-    size_t pos = 0;
-    json[pos++] = '{';
-    int first = 1;
-    if (widgets_body) { pos += snprintf(json + pos, len - pos, "\"widgets\":%s", widgets_body); first = 0; }
-    if (layout_body) {
-        pos += snprintf(json + pos, len - pos, "%s\"layout\":%s", first ? "" : ",", layout_body);
-        first = 0;
+    Prototype* prototypes = NULL;
+    if (widgets_node) {
+        for (size_t i = 0; i < widgets_node->pair_count; ++i) {
+            const ConfigPair* pair = &widgets_node->pairs[i];
+            if (!pair->key || !pair->value) continue;
+            UiNode* def = parse_ui_node_config(pair->value);
+            Prototype* pnode = (Prototype*)calloc(1, sizeof(Prototype));
+            if (pnode) {
+                pnode->name = strdup(pair->key);
+                pnode->node = def;
+                pnode->next = prototypes;
+                prototypes = pnode;
+            } else {
+                free_ui_tree(def);
+            }
+        }
     }
-    if (floating_body) {
-        pos += snprintf(json + pos, len - pos, "%s\"floating\":%s", first ? "" : ",", floating_body);
+
+    UiNode* root_node = create_node();
+    if (!root_node) { free_prototypes(prototypes); return NULL; }
+    root_node->layout = UI_LAYOUT_ABSOLUTE;
+    root_node->style = &ROOT_STYLE;
+    root_node->spacing = 0.0f;
+
+    int sections_found = 0;
+    if (layout_node) {
+        UiNode* def = parse_ui_node_config(layout_node);
+        append_child(root_node, def);
+        sections_found++;
     }
-    json[pos++] = '}';
-    json[pos] = 0;
+    if (floating_node && floating_node->type == CONFIG_NODE_SEQUENCE) {
+        for (size_t i = 0; i < floating_node->item_count; ++i) {
+            UiNode* def = parse_ui_node_config(floating_node->items[i]);
+            append_child(root_node, def);
+        }
+        sections_found++;
+    }
 
-    free(layout_body);
-    free(widgets_body);
-    free(floating_body);
+    if (sections_found == 0) fprintf(stderr, "Error: no 'layout' or 'floating' sections found in layout config\n");
 
-    UiNode* ui = parse_layout_json_text(json, model, styles, font_path, scene);
-    free(json);
-    return ui;
+    if (scene) {
+        scene_ui_inject(root_node, scene);
+    }
+
+    apply_prototypes(root_node, prototypes);
+    int missing_styles = 0;
+    resolve_styles_and_defaults(root_node, styles, &missing_styles);
+    if (missing_styles) {
+        fprintf(stderr, "Failed to resolve styles: remove or define the missing styles to continue.\n");
+        free_prototypes(prototypes);
+        free_ui_tree(root_node);
+        return NULL;
+    }
+    bind_model_values_to_nodes(root_node, model);
+    int scroll_counter = 0;
+    auto_assign_scroll_areas(root_node, &scroll_counter, NULL);
+    free_prototypes(prototypes);
+    return root_node;
 }
 
 static LayoutNode* build_layout_tree_recursive(const UiNode* node) {
