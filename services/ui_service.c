@@ -264,8 +264,12 @@ static bool ui_service_start(AppServices* services, const ServiceConfig* config)
 
 static void ui_service_stop(AppServices* services) { ui_context_dispose(&services->ui); }
 
+static const char* g_ui_dependencies[] = {"scene"};
+
 static const ServiceDescriptor g_ui_service_descriptor = {
     .name = "ui",
+    .dependencies = g_ui_dependencies,
+    .dependency_count = sizeof(g_ui_dependencies) / sizeof(g_ui_dependencies[0]),
     .init = ui_service_init,
     .start = ui_service_start,
     .stop = ui_service_stop,

@@ -146,6 +146,8 @@ static void scene_service_stop(AppServices* services) {
 
 static const ServiceDescriptor g_scene_service_descriptor = {
     .name = "scene",
+    .dependencies = NULL,
+    .dependency_count = 0,
     .init = scene_service_init,
     .start = scene_service_start,
     .stop = scene_service_stop,
