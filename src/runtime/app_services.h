@@ -1,6 +1,8 @@
 #ifndef APP_SERVICES_H
 #define APP_SERVICES_H
 
+#include <stdbool.h>
+
 #include "core/context.h"
 #include "render/render_context.h"
 #include "state/state_manager.h"

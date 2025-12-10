@@ -2,7 +2,7 @@
 
 #include <GLFW/glfw3.h>
 #include "render/vulkan_renderer.h"
-#include "services/service_events.h"
+#include "service_events.h"
 
 typedef struct RenderServiceState {
     RenderRuntimeContext* render;

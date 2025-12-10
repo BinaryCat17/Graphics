@@ -6,7 +6,7 @@
 
 #include "cad/cad_scene_yaml.h"
 #include "config/module_yaml_loader.h"
-#include "services/service_events.h"
+#include "service_events.h"
 
 static char* join_path(const char* dir, const char* leaf) {
     size_t dir_len = strlen(dir);
