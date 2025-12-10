@@ -83,6 +83,19 @@ void render_runtime_service_update_transformer(RenderRuntimeServiceContext* cont
     vk_renderer_update_transformer(&render->transformer);
 }
 
+bool render_runtime_service_prepare(RenderRuntimeServiceContext* context, AppServices* services) {
+    if (!context || !services) return false;
+
+    if (!runtime_init(services)) {
+        fprintf(stderr, "Render runtime initialization failed.\\n");
+        return false;
+    }
+
+    state_manager_dispatch(&services->state_manager, 0);
+    try_bootstrap_renderer(context);
+    return true;
+}
+
 static bool render_runtime_service_init(AppServices* services, const ServiceConfig* config) {
     (void)config;
     if (!services) return false;
@@ -100,14 +113,6 @@ static bool render_runtime_service_start(AppServices* services, const ServiceCon
         fprintf(stderr, "Render runtime service start received null services context.\n");
         return false;
     }
-
-    if (!runtime_init(services)) {
-        fprintf(stderr, "Render runtime initialization failed.\n");
-        return false;
-    }
-
-    state_manager_dispatch(&services->state_manager, 0);
-    try_bootstrap_renderer(services->render_runtime_context);
     return true;
 }
 
