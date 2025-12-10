@@ -329,7 +329,7 @@ static int emit_json_internal(const ConfigNode *node, char **out)
     if (node->type == CONFIG_NODE_MAP) {
         char **pairs = (char **)calloc(node->pair_count, sizeof(char *));
         if (!pairs) return 0;
-        size_t total = 0;
+        size_t total = 2; // for '{' and '}'
         for (size_t i = 0; i < node->pair_count; ++i) {
             char *val_json = NULL;
             if (!emit_json_internal(node->pairs[i].value, &val_json)) { for (size_t j = 0; j < i; ++j) free(pairs[j]); free(pairs); return 0; }
@@ -339,7 +339,8 @@ static int emit_json_internal(const ConfigNode *node, char **out)
             pairs[i] = (char *)malloc(len);
             snprintf(pairs[i], len, "\"%s\":%s", node->pairs[i].key, val_json);
             free(val_json);
-            total += strlen(pairs[i]) + 1;
+            total += strlen(pairs[i]);
+            if (i + 1 < node->pair_count) total += 1; // comma
         }
         char *buf = (char *)malloc(total + 1);
         if (!buf) { for (size_t i = 0; i < node->pair_count; ++i) free(pairs[i]); free(pairs); return 0; }
