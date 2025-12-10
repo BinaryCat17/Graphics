@@ -23,6 +23,7 @@ typedef struct ServiceManager {
 void service_manager_init(ServiceManager* manager);
 bool service_manager_register(ServiceManager* manager, const ServiceDescriptor* descriptor);
 bool service_manager_start(ServiceManager* manager, AppServices* services, const ServiceConfig* config);
+void service_manager_wait(ServiceManager* manager);
 void service_manager_stop(ServiceManager* manager, AppServices* services);
 
 #endif // SERVICE_MANAGER_H
