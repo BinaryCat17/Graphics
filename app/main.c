@@ -15,6 +15,7 @@
 int main(int argc, char** argv) {
     const char* assets_dir = "assets";
     const char* scene_path = NULL;
+    const char* ui_config_path = NULL;
     const char* renderer_backend = "vulkan";
     const char* render_log_sink = "stdout";
     const char* render_log_target = NULL;
@@ -24,6 +25,8 @@ int main(int argc, char** argv) {
             assets_dir = argv[++i];
         } else if (strcmp(argv[i], "--scene") == 0 && i + 1 < argc) {
             scene_path = argv[++i];
+        } else if (strcmp(argv[i], "--ui") == 0 && i + 1 < argc) {
+            ui_config_path = argv[++i];
         } else if (strcmp(argv[i], "--renderer") == 0 && i + 1 < argc) {
             renderer_backend = argv[++i];
         } else if (strcmp(argv[i], "--render-log") == 0) {
@@ -37,7 +40,7 @@ int main(int argc, char** argv) {
         }
     }
     if (!scene_path) {
-        fprintf(stderr, "Usage: %s --scene <file> [--assets <dir>]\n", argv[0]);
+        fprintf(stderr, "Usage: %s --scene <file> [--assets <dir>] [--ui <ui.yaml>]\n", argv[0]);
         return 1;
     }
 
@@ -49,6 +52,7 @@ int main(int argc, char** argv) {
 
     ServiceConfig config = {.assets_dir = assets_dir,
                            .scene_path = scene_path,
+                           .ui_config_path = ui_config_path,
                            .renderer_backend = renderer_backend,
                            .render_log_sink = render_log_sink,
                            .render_log_target = render_log_target,

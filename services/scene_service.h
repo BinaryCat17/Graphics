@@ -6,7 +6,7 @@
 #include "runtime/app_services.h"
 #include "service.h"
 
-bool scene_service_load(AppServices* services, const char* assets_dir, const char* scene_path);
+bool scene_service_load(AppServices* services, const ServiceConfig* config);
 void scene_service_unload(AppServices* services);
 const ServiceDescriptor* scene_service_descriptor(void);
 

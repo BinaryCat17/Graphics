@@ -96,6 +96,17 @@ static float parse_number(const char* json, const jsmntok_t* tok, float fallback
     return v;
 }
 
+static int parse_bool(const char* json, const jsmntok_t* tok, int fallback) {
+    if (!tok) return fallback;
+    if (tok->type == JSMN_PRIMITIVE) {
+        int len = tok->end - tok->start;
+        const char* v = json + tok->start;
+        if (len == 4 && strncmp(v, "true", 4) == 0) return 1;
+        if (len == 5 && strncmp(v, "false", 5) == 0) return 0;
+    }
+    return (int)parse_number(json, tok, (float)fallback);
+}
+
 static const Style DEFAULT_STYLE = { .name = NULL, .background = {0.6f, 0.6f, 0.6f, 1.0f}, .text = {1.0f, 1.0f, 1.0f, 1.0f}, .border_color = {1.0f, 1.0f, 1.0f, 1.0f}, .scrollbar_track_color = {0.6f, 0.6f, 0.6f, 0.4f}, .scrollbar_thumb_color = {1.0f, 1.0f, 1.0f, 0.7f}, .padding = 6.0f, .border_thickness = 0.0f, .scrollbar_width = 0.0f, .has_scrollbar_width = 0, .next = NULL };
 static const Style ROOT_STYLE = { .name = NULL, .background = {0.0f, 0.0f, 0.0f, 0.0f}, .text = {1.0f, 1.0f, 1.0f, 1.0f}, .border_color = {1.0f, 1.0f, 1.0f, 0.0f}, .scrollbar_track_color = {0.6f, 0.6f, 0.6f, 0.4f}, .scrollbar_thumb_color = {1.0f, 1.0f, 1.0f, 0.7f}, .padding = 0.0f, .border_thickness = 0.0f, .scrollbar_width = 0.0f, .has_scrollbar_width = 0, .next = NULL };
 
@@ -250,21 +261,123 @@ void model_set_string(Model* model, const char* key, const char* value) {
     e->is_string = 1;
 }
 
-static void yaml_escape_string(FILE* f, const char* value) {
-    fputc('"', f);
-    for (const char* c = value ? value : ""; *c; ++c) {
-        if (*c == '"' || *c == '\\') fputc('\\', f);
-        if (*c == '\n') {
-            fputs("\\n", f);
-            continue;
+static ConfigNode* config_node_new_map(void) {
+    ConfigNode* n = (ConfigNode*)calloc(1, sizeof(ConfigNode));
+    if (!n) return NULL;
+    n->type = CONFIG_NODE_MAP;
+    n->scalar_type = CONFIG_SCALAR_STRING;
+    return n;
+}
+
+static ConfigNode* config_node_from_string(const char* value, ConfigScalarType type) {
+    ConfigNode* n = (ConfigNode*)calloc(1, sizeof(ConfigNode));
+    if (!n) return NULL;
+    n->type = CONFIG_NODE_SCALAR;
+    n->scalar_type = type;
+    if (value) n->scalar = strdup(value);
+    return n;
+}
+
+static int config_map_reserve(ConfigNode* map, size_t desired) {
+    if (!map || map->type != CONFIG_NODE_MAP) return 0;
+    if (desired <= map->pair_capacity) return 1;
+    size_t new_cap = map->pair_capacity == 0 ? 4 : map->pair_capacity;
+    while (new_cap < desired) new_cap *= 2;
+    ConfigPair* resized = (ConfigPair*)realloc(map->pairs, new_cap * sizeof(ConfigPair));
+    if (!resized) return 0;
+    map->pairs = resized;
+    map->pair_capacity = new_cap;
+    return 1;
+}
+
+static int config_map_set(ConfigNode* map, const char* key, ConfigNode* value) {
+    if (!map || map->type != CONFIG_NODE_MAP || !key) return 0;
+    for (size_t i = 0; i < map->pair_count; ++i) {
+        if (map->pairs[i].key && strcmp(map->pairs[i].key, key) == 0) {
+            config_node_free(map->pairs[i].value);
+            map->pairs[i].value = value;
+            return 1;
         }
-        fputc(*c, f);
     }
-    fputc('"', f);
+    if (!config_map_reserve(map, map->pair_count + 1)) return 0;
+    map->pairs[map->pair_count].key = strdup(key);
+    map->pairs[map->pair_count].value = value;
+    map->pair_count++;
+    return 1;
+}
+
+static ConfigNode* config_map_get_mut(ConfigNode* map, const char* key) {
+    if (!map || map->type != CONFIG_NODE_MAP || !key) return NULL;
+    for (size_t i = 0; i < map->pair_count; ++i) {
+        if (map->pairs[i].key && strcmp(map->pairs[i].key, key) == 0) return map->pairs[i].value;
+    }
+    return NULL;
+}
+
+static ConfigNode* ensure_map_entry(ConfigNode* map, const char* key) {
+    ConfigNode* existing = config_map_get_mut(map, key);
+    if (existing && existing->type == CONFIG_NODE_MAP) return existing;
+    ConfigNode* fresh = config_node_new_map();
+    if (!fresh) return NULL;
+    if (!config_map_set(map, key, fresh)) {
+        config_node_free(fresh);
+        return NULL;
+    }
+    return fresh;
+}
+
+static void config_map_clear(ConfigNode* map) {
+    if (!map || map->type != CONFIG_NODE_MAP) return;
+    for (size_t i = 0; i < map->pair_count; ++i) {
+        free(map->pairs[i].key);
+        config_node_free(map->pairs[i].value);
+    }
+    free(map->pairs);
+    map->pairs = NULL;
+    map->pair_count = 0;
+    map->pair_capacity = 0;
 }
 
 int save_model(const Model* model) {
     if (!model || !model->source_path) return 0;
+
+    if (model->source_doc && model->source_doc->root) {
+        ConfigNode* root = model->source_doc->root;
+        ConfigNode* data = ensure_map_entry(root, "data");
+        if (!data) return 0;
+        ConfigNode* model_node = ensure_map_entry(data, "model");
+        if (!model_node) return 0;
+        config_map_clear(model_node);
+
+        for (ModelEntry* e = model->entries; e; e = e->next) {
+            if (!e->key) continue;
+            ConfigScalarType st = e->is_string ? CONFIG_SCALAR_STRING : CONFIG_SCALAR_NUMBER;
+            char buf[64];
+            const char* sval = e->is_string ? e->string_value : NULL;
+            if (!e->is_string) {
+                snprintf(buf, sizeof(buf), "%g", e->number_value);
+                sval = buf;
+            }
+            ConfigNode* val_node = config_node_from_string(sval, st);
+            if (!val_node) return 0;
+            if (!config_map_set(model_node, e->key, val_node)) {
+                config_node_free(val_node);
+                return 0;
+            }
+        }
+
+        char* json = NULL;
+        if (!config_emit_json(root, &json)) return 0;
+        FILE* f = fopen(model->source_path, "wb");
+        if (!f) { free(json); return 0; }
+        fwrite(json, 1, strlen(json), f);
+        fputc('\n', f);
+        fclose(f);
+        free(json);
+        return 1;
+    }
+
+    /* Fallback to writing model-only YAML when no source document is available. */
     FILE* f = fopen(model->source_path, "wb");
     if (!f) return 0;
 
@@ -278,7 +391,7 @@ int save_model(const Model* model) {
     for (ModelEntry* e = model->entries; e; e = e->next) {
         fprintf(f, "    %s: ", e->key);
         if (e->is_string) {
-            yaml_escape_string(f, e->string_value ? e->string_value : "");
+            fprintf(f, "\"%s\"", e->string_value ? e->string_value : "");
         } else {
             fprintf(f, "%g", e->number_value);
         }
@@ -472,6 +585,8 @@ static UiNode* create_node(void) {
     node->widget_type = W_PANEL;
     node->z_index = 0;
     node->has_z_index = 0;
+    node->z_group = 0;
+    node->has_z_group = 0;
     node->spacing = -1.0f;
     node->has_spacing = 0;
     node->columns = 0;
@@ -494,10 +609,25 @@ static UiNode* create_node(void) {
     node->has_scrollbar_thumb_color = 0;
     node->has_min = node->has_max = node->has_value = 0;
     node->minv = 0.0f; node->maxv = 1.0f; node->value = 0.0f;
+    node->min_w = 0.0f; node->min_h = 0.0f;
+    node->has_min_w = node->has_min_h = 0;
     node->max_w = 0.0f; node->max_h = 0.0f;
     node->has_max_w = node->has_max_h = 0;
+    node->floating_rect = (Rect){0};
+    node->has_floating_rect = 0;
+    node->floating_min_w = node->floating_min_h = 0.0f;
+    node->floating_max_w = node->floating_max_h = 0.0f;
+    node->has_floating_min = node->has_floating_max = 0;
     node->has_color = 0;
     node->has_text_color = 0;
+    node->docking = NULL;
+    node->resizable = 0;
+    node->has_resizable = 0;
+    node->draggable = 0;
+    node->has_draggable = 0;
+    node->modal = 0;
+    node->has_modal = 0;
+    node->on_focus = NULL;
     return node;
 }
 
@@ -527,6 +657,7 @@ static UiNode* parse_ui_node(const char* json, jsmntok_t* toks, unsigned int tok
         if (tok_is_key(json, &toks[k], "w")) { node->rect.w = parse_number(json, val, node->rect.w); node->has_w = 1; k += 2; continue; }
         if (tok_is_key(json, &toks[k], "h")) { node->rect.h = parse_number(json, val, node->rect.h); node->has_h = 1; k += 2; continue; }
         if (tok_is_key(json, &toks[k], "z")) { node->z_index = (int)parse_number(json, val, (float)node->z_index); node->has_z_index = 1; k += 2; continue; }
+        if (tok_is_key(json, &toks[k], "zGroup") || tok_is_key(json, &toks[k], "z_group")) { node->z_group = (int)parse_number(json, val, (float)node->z_group); node->has_z_group = 1; k += 2; continue; }
         if (tok_is_key(json, &toks[k], "id") && val->type == JSMN_STRING) { node->id = tok_copy(json, val); k += 2; continue; }
         if (tok_is_key(json, &toks[k], "use") && val->type == JSMN_STRING) { node->use = tok_copy(json, val); k += 2; continue; }
         if (tok_is_key(json, &toks[k], "text") && val->type == JSMN_STRING) { node->text = tok_copy(json, val); k += 2; continue; }
@@ -537,6 +668,8 @@ static UiNode* parse_ui_node(const char* json, jsmntok_t* toks, unsigned int tok
         if (tok_is_key(json, &toks[k], "min")) { node->minv = parse_number(json, val, node->minv); node->has_min = 1; k += 2; continue; }
         if (tok_is_key(json, &toks[k], "max")) { node->maxv = parse_number(json, val, node->maxv); node->has_max = 1; k += 2; continue; }
         if (tok_is_key(json, &toks[k], "value")) { node->value = parse_number(json, val, node->value); node->has_value = 1; k += 2; continue; }
+        if (tok_is_key(json, &toks[k], "minWidth")) { node->min_w = parse_number(json, val, node->min_w); node->has_min_w = 1; k += 2; continue; }
+        if (tok_is_key(json, &toks[k], "minHeight")) { node->min_h = parse_number(json, val, node->min_h); node->has_min_h = 1; k += 2; continue; }
         if (tok_is_key(json, &toks[k], "maxWidth")) { node->max_w = parse_number(json, val, node->max_w); node->has_max_w = 1; k += 2; continue; }
         if (tok_is_key(json, &toks[k], "maxHeight")) { node->max_h = parse_number(json, val, node->max_h); node->has_max_h = 1; k += 2; continue; }
         if (tok_is_key(json, &toks[k], "scrollArea") && val->type == JSMN_STRING) { node->scroll_area = tok_copy(json, val); k += 2; continue; }
@@ -594,6 +727,29 @@ static UiNode* parse_ui_node(const char* json, jsmntok_t* toks, unsigned int tok
             k = skip_container(toks, tokc, (unsigned int)(val - toks));
             continue;
         }
+        if (tok_is_key(json, &toks[k], "docking") && val->type == JSMN_STRING) { node->docking = tok_copy(json, val); k += 2; continue; }
+        if (tok_is_key(json, &toks[k], "resizable")) { node->resizable = parse_bool(json, val, node->resizable); node->has_resizable = 1; k += 2; continue; }
+        if (tok_is_key(json, &toks[k], "draggable")) { node->draggable = parse_bool(json, val, node->draggable); node->has_draggable = 1; k += 2; continue; }
+        if (tok_is_key(json, &toks[k], "modal")) { node->modal = parse_bool(json, val, node->modal); node->has_modal = 1; k += 2; continue; }
+        if (tok_is_key(json, &toks[k], "onFocus") && val->type == JSMN_STRING) { node->on_focus = tok_copy(json, val); k += 2; continue; }
+        if (tok_is_key(json, &toks[k], "floating") && val->type == JSMN_OBJECT) {
+            jsmntok_t* obj = val;
+            for (unsigned int j = k + 2; j < tokc && toks[j].start >= obj->start && toks[j].end <= obj->end; ) {
+                if (toks[j].type != JSMN_STRING || j + 1 >= tokc) { j++; continue; }
+                jsmntok_t* fv = &toks[j + 1];
+                if (tok_is_key(json, &toks[j], "x")) { node->floating_rect.x = parse_number(json, fv, node->floating_rect.x); node->has_floating_rect = 1; j += 2; continue; }
+                if (tok_is_key(json, &toks[j], "y")) { node->floating_rect.y = parse_number(json, fv, node->floating_rect.y); node->has_floating_rect = 1; j += 2; continue; }
+                if (tok_is_key(json, &toks[j], "w")) { node->floating_rect.w = parse_number(json, fv, node->floating_rect.w); node->has_floating_rect = 1; j += 2; continue; }
+                if (tok_is_key(json, &toks[j], "h")) { node->floating_rect.h = parse_number(json, fv, node->floating_rect.h); node->has_floating_rect = 1; j += 2; continue; }
+                if (tok_is_key(json, &toks[j], "minWidth")) { node->floating_min_w = parse_number(json, fv, node->floating_min_w); node->has_floating_min = 1; j += 2; continue; }
+                if (tok_is_key(json, &toks[j], "minHeight")) { node->floating_min_h = parse_number(json, fv, node->floating_min_h); node->has_floating_min = 1; j += 2; continue; }
+                if (tok_is_key(json, &toks[j], "maxWidth")) { node->floating_max_w = parse_number(json, fv, node->floating_max_w); node->has_floating_max = 1; j += 2; continue; }
+                if (tok_is_key(json, &toks[j], "maxHeight")) { node->floating_max_h = parse_number(json, fv, node->floating_max_h); node->has_floating_max = 1; j += 2; continue; }
+                j = skip_container(toks, tokc, j);
+            }
+            k = skip_container(toks, tokc, k + 1);
+            continue;
+        }
         if (tok_is_key(json, &toks[k], "children") && val->type == JSMN_ARRAY) {
             jsmntok_t* arr = val;
             for (unsigned int c = k + 2; c < tokc && toks[c].start >= arr->start && toks[c].end <= arr->end; ) {
@@ -645,6 +801,7 @@ static void merge_node(UiNode* node, const UiNode* proto) {
     if (!node->has_w && proto->has_w) { node->rect.w = proto->rect.w; node->has_w = 1; }
     if (!node->has_h && proto->has_h) { node->rect.h = proto->rect.h; node->has_h = 1; }
     if (!node->has_z_index && proto->has_z_index) { node->z_index = proto->z_index; node->has_z_index = 1; }
+    if (!node->has_z_group && proto->has_z_group) { node->z_group = proto->z_group; node->has_z_group = 1; }
     if (!node->has_spacing && proto->has_spacing) { node->spacing = proto->spacing; node->has_spacing = 1; }
     if (!node->has_columns && proto->has_columns) { node->columns = proto->columns; node->has_columns = 1; }
     if (node->style == &DEFAULT_STYLE && proto->style) node->style = proto->style;
@@ -666,10 +823,28 @@ static void merge_node(UiNode* node, const UiNode* proto) {
     if (!node->has_min && proto->has_min) { node->minv = proto->minv; node->has_min = 1; }
     if (!node->has_max && proto->has_max) { node->maxv = proto->maxv; node->has_max = 1; }
     if (!node->has_value && proto->has_value) { node->value = proto->value; node->has_value = 1; }
+    if (!node->has_min_w && proto->has_min_w) { node->min_w = proto->min_w; node->has_min_w = 1; }
+    if (!node->has_min_h && proto->has_min_h) { node->min_h = proto->min_h; node->has_min_h = 1; }
     if (!node->has_max_w && proto->has_max_w) { node->max_w = proto->max_w; node->has_max_w = 1; }
     if (!node->has_max_h && proto->has_max_h) { node->max_h = proto->max_h; node->has_max_h = 1; }
+    if (!node->has_floating_rect && proto->has_floating_rect) { node->floating_rect = proto->floating_rect; node->has_floating_rect = 1; }
+    if (!node->has_floating_min && proto->has_floating_min) {
+        node->floating_min_w = proto->floating_min_w;
+        node->floating_min_h = proto->floating_min_h;
+        node->has_floating_min = 1;
+    }
+    if (!node->has_floating_max && proto->has_floating_max) {
+        node->floating_max_w = proto->floating_max_w;
+        node->floating_max_h = proto->floating_max_h;
+        node->has_floating_max = 1;
+    }
     if (!node->scroll_area && proto->scroll_area) node->scroll_area = strdup(proto->scroll_area);
     if (!node->scroll_static && proto->scroll_static) node->scroll_static = 1;
+    if (!node->docking && proto->docking) node->docking = strdup(proto->docking);
+    if (!node->has_resizable && proto->has_resizable) { node->resizable = proto->resizable; node->has_resizable = 1; }
+    if (!node->has_draggable && proto->has_draggable) { node->draggable = proto->draggable; node->has_draggable = 1; }
+    if (!node->has_modal && proto->has_modal) { node->modal = proto->modal; node->has_modal = 1; }
+    if (!node->on_focus && proto->on_focus) node->on_focus = strdup(proto->on_focus);
 
     if (node->child_count == 0 && proto->child_count > 0) {
         node->children = (UiNode*)calloc(proto->child_count, sizeof(UiNode));
@@ -691,6 +866,7 @@ static UiNode* clone_node(const UiNode* src) {
     n->rect = src->rect;
     n->has_x = src->has_x; n->has_y = src->has_y; n->has_w = src->has_w; n->has_h = src->has_h;
     n->z_index = src->z_index; n->has_z_index = src->has_z_index;
+    n->z_group = src->z_group; n->has_z_group = src->has_z_group;
     n->spacing = src->spacing; n->has_spacing = src->has_spacing;
     n->columns = src->columns; n->has_columns = src->has_columns;
     n->style = src->style;
@@ -714,10 +890,24 @@ static UiNode* clone_node(const UiNode* src) {
     n->click_value = src->click_value ? strdup(src->click_value) : NULL;
     n->minv = src->minv; n->maxv = src->maxv; n->value = src->value;
     n->has_min = src->has_min; n->has_max = src->has_max; n->has_value = src->has_value;
+    n->min_w = src->min_w; n->min_h = src->min_h;
+    n->has_min_w = src->has_min_w; n->has_min_h = src->has_min_h;
     n->max_w = src->max_w; n->max_h = src->max_h;
     n->has_max_w = src->has_max_w; n->has_max_h = src->has_max_h;
+    n->floating_rect = src->floating_rect; n->has_floating_rect = src->has_floating_rect;
+    n->floating_min_w = src->floating_min_w; n->floating_min_h = src->floating_min_h;
+    n->floating_max_w = src->floating_max_w; n->floating_max_h = src->floating_max_h;
+    n->has_floating_min = src->has_floating_min; n->has_floating_max = src->has_floating_max;
     n->scroll_area = src->scroll_area ? strdup(src->scroll_area) : NULL;
     n->scroll_static = src->scroll_static;
+    n->docking = src->docking ? strdup(src->docking) : NULL;
+    n->resizable = src->resizable;
+    n->has_resizable = src->has_resizable;
+    n->draggable = src->draggable;
+    n->has_draggable = src->has_draggable;
+    n->modal = src->modal;
+    n->has_modal = src->has_modal;
+    n->on_focus = src->on_focus ? strdup(src->on_focus) : NULL;
 
     if (src->child_count > 0) {
         n->children = (UiNode*)calloc(src->child_count, sizeof(UiNode));
@@ -921,25 +1111,108 @@ static UiNode* parse_layout_json_text(const char* json, const Model* model, cons
     return root;
 }
 
-Model* parse_model_config(const ConfigNode* root, const char* source_path) {
-    char* json = config_node_to_json(root);
-    if (!json) return NULL;
-    Model* model = parse_model_json_text(json, source_path);
+Model* parse_model_config(const ConfigDocument* doc) {
+    if (!doc || !doc->root) return NULL;
+
+    const ConfigNode* store_node = config_map_get(doc->root, "store");
+    const ConfigNode* key_node = config_map_get(doc->root, "key");
+    const ConfigNode* data_node = config_map_get(doc->root, "data");
+    const ConfigNode* model_node = data_node ? config_map_get(data_node, "model") : config_map_get(doc->root, "model");
+
+    if (!model_node) {
+        fprintf(stderr, "Error: model section missing in UI config %s\n", doc->source_path ? doc->source_path : "(unknown)");
+        return NULL;
+    }
+
+    char* model_body = config_node_to_json(model_node);
+    const char* store = (store_node && store_node->scalar) ? store_node->scalar : "model";
+    const char* key = (key_node && key_node->scalar) ? key_node->scalar : "default";
+
+    if (!model_body) return NULL;
+
+    size_t len = strlen(model_body) + strlen(store) + strlen(key) + 32;
+    char* json = (char*)malloc(len);
+    if (!json) {
+        free(model_body);
+        return NULL;
+    }
+    snprintf(json, len, "{\"store\":\"%s\",\"key\":\"%s\",\"model\":%s}", store, key, model_body);
+    free(model_body);
+
+    Model* model = parse_model_json_text(json, doc->source_path);
+    if (model) model->source_doc = doc;
     free(json);
     return model;
 }
 
 Style* parse_styles_config(const ConfigNode* root) {
-    char* json = config_node_to_json(root);
-    if (!json) return NULL;
+    const ConfigNode* data_node = config_map_get(root, "data");
+    const ConfigNode* styles_node = data_node ? config_map_get(data_node, "styles") : config_map_get(root, "styles");
+    if (!styles_node) {
+        fprintf(stderr, "Error: styles section missing in UI config\n");
+        return NULL;
+    }
+
+    char* styles_body = config_node_to_json(styles_node);
+    if (!styles_body) return NULL;
+
+    size_t len = strlen(styles_body) + 12;
+    char* json = (char*)malloc(len);
+    if (!json) {
+        free(styles_body);
+        return NULL;
+    }
+    snprintf(json, len, "{\"styles\":%s}", styles_body);
+    free(styles_body);
+
     Style* styles = parse_styles_json_text(json);
     free(json);
     return styles;
 }
 
 UiNode* parse_layout_config(const ConfigNode* root, const Model* model, const Style* styles, const char* font_path, const Scene* scene) {
-    char* json = config_node_to_json(root);
-    if (!json) return NULL;
+    if (!root) return NULL;
+
+    const ConfigNode* data_node = config_map_get(root, "data");
+    const ConfigNode* layout_node = data_node ? config_map_get(data_node, "layout") : config_map_get(root, "layout");
+    const ConfigNode* widgets_node = data_node ? config_map_get(data_node, "widgets") : config_map_get(root, "widgets");
+    const ConfigNode* floating_node = data_node ? config_map_get(data_node, "floating") : config_map_get(root, "floating");
+
+    if (!layout_node && !widgets_node) {
+        fprintf(stderr, "Error: layout or widgets section missing in UI config\n");
+        return NULL;
+    }
+
+    char* layout_body = layout_node ? config_node_to_json(layout_node) : NULL;
+    char* widgets_body = widgets_node ? config_node_to_json(widgets_node) : NULL;
+    char* floating_body = floating_node ? config_node_to_json(floating_node) : NULL;
+
+    size_t len = 2; // braces
+    len += layout_body ? strlen(layout_body) + 10 : 0;
+    len += widgets_body ? strlen(widgets_body) + 12 : 0;
+    len += floating_body ? strlen(floating_body) + 13 : 0;
+
+    char* json = (char*)malloc(len);
+    if (!json) { free(layout_body); free(widgets_body); free(floating_body); return NULL; }
+
+    size_t pos = 0;
+    json[pos++] = '{';
+    int first = 1;
+    if (widgets_body) { pos += snprintf(json + pos, len - pos, "\"widgets\":%s", widgets_body); first = 0; }
+    if (layout_body) {
+        pos += snprintf(json + pos, len - pos, "%s\"layout\":%s", first ? "" : ",", layout_body);
+        first = 0;
+    }
+    if (floating_body) {
+        pos += snprintf(json + pos, len - pos, "%s\"floating\":%s", first ? "" : ",", floating_body);
+    }
+    json[pos++] = '}';
+    json[pos] = 0;
+
+    free(layout_body);
+    free(widgets_body);
+    free(floating_body);
+
     UiNode* ui = parse_layout_json_text(json, model, styles, font_path, scene);
     free(json);
     return ui;
@@ -1088,8 +1361,26 @@ static void measure_node(LayoutNode* node) {
         }
     }
 
+    if (node->source->has_floating_rect) {
+        if (node->source->floating_rect.w > 0.0f) node->rect.w = node->source->floating_rect.w;
+        if (node->source->floating_rect.h > 0.0f) node->rect.h = node->source->floating_rect.h;
+    }
+
+    if (node->source->has_min_w && node->rect.w < node->source->min_w) node->rect.w = node->source->min_w;
+    if (node->source->has_min_h && node->rect.h < node->source->min_h) node->rect.h = node->source->min_h;
     if (node->source->has_w) node->rect.w = node->source->rect.w;
     if (node->source->has_h) node->rect.h = node->source->rect.h;
+    if (node->source->has_max_w && node->rect.w > node->source->max_w) node->rect.w = node->source->max_w;
+    if (node->source->has_max_h && node->rect.h > node->source->max_h) node->rect.h = node->source->max_h;
+
+    if (node->source->has_floating_min) {
+        if (node->rect.w < node->source->floating_min_w) node->rect.w = node->source->floating_min_w;
+        if (node->rect.h < node->source->floating_min_h) node->rect.h = node->source->floating_min_h;
+    }
+    if (node->source->has_floating_max) {
+        if (node->rect.w > node->source->floating_max_w) node->rect.w = node->source->floating_max_w;
+        if (node->rect.h > node->source->floating_max_h) node->rect.h = node->source->floating_max_h;
+    }
 }
 
 void measure_layout(LayoutNode* root) { measure_node(root); }
@@ -1098,8 +1389,17 @@ static void layout_node(LayoutNode* node, float origin_x, float origin_y, const 
     if (!node || !node->source) return;
     float padding = node->source->has_padding_override ? node->source->padding_override : (node->source->style ? node->source->style->padding : DEFAULT_STYLE.padding);
     float border = node->source->border_thickness;
-    float base_x = origin_x + (node->source->has_x ? node->source->rect.x : 0.0f);
-    float base_y = origin_y + (node->source->has_y ? node->source->rect.y : 0.0f);
+    float local_x = 0.0f;
+    float local_y = 0.0f;
+    if (node->source->has_floating_rect) {
+        local_x = node->source->floating_rect.x;
+        local_y = node->source->floating_rect.y;
+    } else {
+        if (node->source->has_x) local_x = node->source->rect.x;
+        if (node->source->has_y) local_y = node->source->rect.y;
+    }
+    float base_x = origin_x + local_x;
+    float base_y = origin_y + local_y;
     node->rect.x = base_x;
     node->rect.y = base_y;
     node->local_rect = (Rect){0.0f, 0.0f, node->rect.w, node->rect.h};
@@ -1181,7 +1481,9 @@ size_t count_layout_widgets(const LayoutNode* root) {
 
 static int compute_z_index(const UiNode* source, size_t appearance_order) {
     int explicit_z = (source && source->has_z_index) ? source->z_index : 0;
-    return explicit_z * UI_Z_ORDER_SCALE - (int)appearance_order;
+    int group = (source && source->has_z_group) ? source->z_group : 0;
+    int composite = explicit_z + group * UI_Z_ORDER_SCALE;
+    return composite * UI_Z_ORDER_SCALE - (int)appearance_order;
 }
 
 static void populate_widgets_recursive(const LayoutNode* node, Widget* widgets, size_t widget_count, size_t* idx, size_t* order, char* inherited_scroll_area) {
@@ -1196,6 +1498,8 @@ static void populate_widgets_recursive(const LayoutNode* node, Widget* widgets, 
         w->rect = node->rect;
         w->scroll_offset = 0.0f;
         w->z_index = compute_z_index(node->source, appearance_order);
+        w->base_z_index = w->z_index;
+        w->z_group = node->source->has_z_group ? node->source->z_group : 0;
         w->color = node->source->color;
         w->text_color = node->source->text_color;
         w->base_border_thickness = node->source->border_thickness;
@@ -1216,6 +1520,21 @@ static void populate_widgets_recursive(const LayoutNode* node, Widget* widgets, 
         w->maxv = node->source->maxv;
         w->value = node->source->value;
         w->id = node->source->id;
+        w->docking = node->source->docking;
+        w->resizable = node->source->resizable;
+        w->has_resizable = node->source->has_resizable;
+        w->draggable = node->source->draggable;
+        w->has_draggable = node->source->has_draggable;
+        w->modal = node->source->modal;
+        w->has_floating_rect = node->source->has_floating_rect;
+        w->floating_rect = node->source->floating_rect;
+        w->floating_min_w = node->source->floating_min_w;
+        w->floating_min_h = node->source->floating_min_h;
+        w->floating_max_w = node->source->floating_max_w;
+        w->floating_max_h = node->source->floating_max_h;
+        w->has_floating_min = node->source->has_floating_min;
+        w->has_floating_max = node->source->has_floating_max;
+        w->on_focus = node->source->on_focus;
         w->scroll_area = node->source->scroll_area ? node->source->scroll_area : active_scroll_area;
         w->scroll_static = node->source->scroll_static;
         w->has_clip = node->has_clip;
@@ -1302,6 +1621,8 @@ static void free_ui_node(UiNode* node) {
     free(node->click_binding);
     free(node->click_value);
     free(node->scroll_area);
+    free(node->docking);
+    free(node->on_focus);
 }
 
 void free_ui_tree(UiNode* node) {

@@ -32,6 +32,7 @@ typedef struct Model {
     char* store;
     char* key;
     char* source_path;
+    const ConfigDocument* source_doc;
 } Model;
 
 typedef struct Style {
@@ -53,9 +54,13 @@ typedef struct UiNode {
     LayoutType layout;
     WidgetType widget_type;
     Rect rect;
+    Rect floating_rect;
     int has_x, has_y, has_w, has_h;
+    int has_floating_rect;
     int z_index;
     int has_z_index;
+    int z_group;
+    int has_z_group;
     float spacing;
     int has_spacing;
     int columns;
@@ -81,8 +86,13 @@ typedef struct UiNode {
     char* click_value;
     float minv, maxv, value;
     int has_min, has_max, has_value;
+    float min_w, min_h;
+    int has_min_w, has_min_h;
     float max_w, max_h;
     int has_max_w, has_max_h;
+    float floating_min_w, floating_min_h;
+    float floating_max_w, floating_max_h;
+    int has_floating_min, has_floating_max;
     char* scroll_area;
     int scroll_static;
     int scrollbar_enabled;
@@ -92,6 +102,14 @@ typedef struct UiNode {
     Color scrollbar_thumb_color;
     int has_scrollbar_track_color;
     int has_scrollbar_thumb_color;
+    char* docking;
+    int resizable;
+    int has_resizable;
+    int draggable;
+    int has_draggable;
+    int modal;
+    int has_modal;
+    char* on_focus;
     struct UiNode* children;
     size_t child_count;
 } UiNode;
@@ -111,8 +129,11 @@ typedef struct LayoutNode {
 typedef struct Widget {
     WidgetType type;
     Rect rect;
+    Rect floating_rect;
     float scroll_offset;
     int z_index;
+    int base_z_index;
+    int z_group;
     Color color;
     Color text_color;
     float base_padding;
@@ -127,6 +148,18 @@ typedef struct Widget {
     char* click_value;
     float minv, maxv, value;
     char* id;
+    char* docking;
+    int resizable;
+    int draggable;
+    int modal;
+    int has_resizable;
+    int has_draggable;
+    int has_modal;
+    int has_floating_rect;
+    float floating_min_w, floating_min_h;
+    float floating_max_w, floating_max_h;
+    int has_floating_min, has_floating_max;
+    char* on_focus;
     char* scroll_area;
     int scroll_static;
     int scrollbar_enabled;
@@ -145,7 +178,7 @@ typedef struct WidgetArray {
     size_t count;
 } WidgetArray;
 
-Model* parse_model_config(const ConfigNode* root, const char* source_path);
+Model* parse_model_config(const ConfigDocument* doc);
 Style* parse_styles_config(const ConfigNode* root);
 UiNode* parse_layout_config(const ConfigNode* root, const Model* model, const Style* styles, const char* font_path, const Scene* scene);
 

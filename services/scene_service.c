@@ -27,12 +27,14 @@ static void free_schemas(CoreContext* core) {
     module_schema_free(&core->global_schema);
 }
 
-bool scene_service_load(AppServices* services, const char* assets_dir, const char* scene_path) {
-    if (!services || !assets_dir || !scene_path) {
+bool scene_service_load(AppServices* services, const ServiceConfig* config) {
+    if (!services || !config || !config->assets_dir || !config->scene_path) {
         fprintf(stderr, "Scene service load called with invalid arguments.\n");
         return false;
     }
 
+    const char* assets_dir = config->assets_dir;
+    const char* scene_path = config->scene_path;
     CoreContext* core = &services->core;
 
     ConfigError schema_err = {0};
@@ -85,13 +87,13 @@ bool scene_service_load(AppServices* services, const char* assets_dir, const cha
         return false;
     }
 
-    if (!load_assets(assets_dir, &core->assets)) {
+    if (!load_assets(assets_dir, config->ui_config_path, &core->assets)) {
         fprintf(stderr, "Failed to load assets from '%s'.\n", assets_dir);
         scene_service_unload(services);
         return false;
     }
 
-    core->model = parse_model_config(core->assets.model_doc.root, core->assets.model_path);
+    core->model = parse_model_config(&core->assets.ui_doc);
     if (core->model) {
         scene_ui_bind_model(core->model, &core->scene, scene_path);
     }
@@ -117,7 +119,6 @@ void scene_service_unload(AppServices* services) {
     CoreContext* core = &services->core;
 
     if (core->model) {
-        save_model(core->model);
         free_model(core->model);
         core->model = NULL;
     }
@@ -134,10 +135,7 @@ static bool scene_service_init(AppServices* services, const ServiceConfig* confi
 }
 
 static bool scene_service_start(AppServices* services, const ServiceConfig* config) {
-    const char* assets_dir = config ? config->assets_dir : NULL;
-    const char* scene_path = config ? config->scene_path : NULL;
-    if (!assets_dir || !scene_path) return false;
-    return scene_service_load(services, assets_dir, scene_path);
+    return scene_service_load(services, config);
 }
 
 static void scene_service_stop(AppServices* services) {
