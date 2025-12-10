@@ -231,6 +231,14 @@ void scroll_apply_offsets(ScrollContext* ctx, Widget* widgets, size_t widget_cou
                 viewport = a->bounds;
             }
         }
+        if (w->border_thickness > 0.0f) {
+            viewport.x += w->border_thickness;
+            viewport.y += w->border_thickness;
+            viewport.w -= w->border_thickness * 2.0f;
+            viewport.h -= w->border_thickness * 2.0f;
+            if (viewport.w < 0.0f) viewport.w = 0.0f;
+            if (viewport.h < 0.0f) viewport.h = 0.0f;
+        }
         float viewport_h = viewport.h;
         float content_h = a->has_bounds ? a->bounds.h : viewport_h;
         float overflow = content_h - viewport_h;
