@@ -68,7 +68,7 @@ if (NOT VULKAN_STUB)
             "app/scroll.c" "app/scroll.h"
             "app/vulkan_renderer.c" "app/vulkan_renderer.h"
             "app/ui_json.c" "app/ui_json.h" "app/scene_ui.c" "app/scene_ui.h"
-            "src/Graphics.c" "src/Graphics.h"
+            "src/coordinate_transform.c" "src/layout.c" "src/render_commands.c" "src/vertex_buffers.c" "src/memory_utils.c" "src/Graphics.h"
             "src/cad_scene.c" "src/cad_scene.h" "src/cad_scene_yaml.c" "src/cad_scene_yaml.h"
             "src/state_manager.c" "src/state_manager.h"
             "src/simple_yaml.c" "src/simple_yaml.h" "src/module_yaml_loader.c" "src/module_yaml_loader.h"
@@ -96,6 +96,7 @@ endif()
 target_link_libraries(Graphics PRIVATE glfw)
 target_link_libraries(Graphics PRIVATE Vulkan::Vulkan)
 target_link_libraries(Graphics PRIVATE Threads::Threads)
+target_link_libraries(Graphics PRIVATE m)
 target_include_directories(Graphics PRIVATE ${Stb_INCLUDE_DIR})
 
 add_executable(layout_tests
@@ -104,6 +105,7 @@ add_executable(layout_tests
         app/scene_ui.c app/scene_ui.h
         app/scroll.c app/scroll.h)
 target_link_libraries(layout_tests PRIVATE glfw Threads::Threads)
+target_link_libraries(layout_tests PRIVATE m)
 target_include_directories(layout_tests PRIVATE src ${Stb_INCLUDE_DIR})
 add_test(NAME layout_tests COMMAND layout_tests)
 
@@ -113,15 +115,33 @@ add_executable(scene_ui_tests
         app/scroll.c app/scroll.h
         src/cad_scene.c src/cad_scene.h)
 target_link_libraries(scene_ui_tests PRIVATE glfw Threads::Threads)
+target_link_libraries(scene_ui_tests PRIVATE m)
 target_include_directories(scene_ui_tests PRIVATE src ${Stb_INCLUDE_DIR})
 add_test(NAME scene_ui_tests COMMAND scene_ui_tests)
 
 add_executable(transform_tests
         app/transform_tests.c
-        src/Graphics.c src/Graphics.h)
+        src/coordinate_transform.c src/layout.c src/render_commands.c src/vertex_buffers.c src/memory_utils.c src/Graphics.h)
 target_link_libraries(transform_tests PRIVATE glfw Threads::Threads)
+target_link_libraries(transform_tests PRIVATE m)
 target_include_directories(transform_tests PRIVATE src)
 add_test(NAME transform_tests COMMAND transform_tests)
+
+add_executable(render_commands_tests
+        app/render_commands_tests.c
+        src/coordinate_transform.c src/layout.c src/render_commands.c src/vertex_buffers.c src/memory_utils.c src/Graphics.h)
+target_link_libraries(render_commands_tests PRIVATE glfw Threads::Threads)
+target_link_libraries(render_commands_tests PRIVATE m)
+target_include_directories(render_commands_tests PRIVATE src)
+add_test(NAME render_commands_tests COMMAND render_commands_tests)
+
+add_executable(vertex_buffers_tests
+        app/vertex_buffers_tests.c
+        src/coordinate_transform.c src/layout.c src/render_commands.c src/vertex_buffers.c src/memory_utils.c src/Graphics.h)
+target_link_libraries(vertex_buffers_tests PRIVATE glfw Threads::Threads)
+target_link_libraries(vertex_buffers_tests PRIVATE m)
+target_include_directories(vertex_buffers_tests PRIVATE src)
+add_test(NAME vertex_buffers_tests COMMAND vertex_buffers_tests)
 
 add_executable(scene_yaml_tests
         app/scene_yaml_tests.c
