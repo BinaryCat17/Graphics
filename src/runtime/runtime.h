@@ -7,6 +7,6 @@
 
 bool runtime_init(AppServices* services);
 void runtime_shutdown(AppServices* services);
-void runtime_update_transformer(AppServices* services);
+void runtime_update_transformer(RenderRuntimeContext* render, const UiContext* ui);
 
 #endif // RUNTIME_H

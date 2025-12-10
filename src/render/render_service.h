@@ -3,11 +3,15 @@
 
 #include <stdbool.h>
 
-#include "runtime/app_services.h"
+#include "Graphics.h"
+#include "assets/assets.h"
+#include "render/render_context.h"
+#include "ui/ui_context.h"
+#include "ui/widgets.h"
 
-bool render_service_init(AppServices* services);
-void render_service_update_transformer(AppServices* services);
-void render_loop(AppServices* services);
-void render_service_shutdown(AppServices* services);
+bool render_service_init(RenderRuntimeContext* render, const Assets* assets, WidgetArray widgets);
+void render_service_update_transformer(RenderRuntimeContext* render);
+void render_loop(RenderRuntimeContext* render, UiContext* ui, Model* model);
+void render_service_shutdown(RenderRuntimeContext* render);
 
 #endif // RENDER_SERVICE_H

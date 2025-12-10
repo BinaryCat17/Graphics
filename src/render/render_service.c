@@ -5,27 +5,27 @@
 #include "ui/ui_service.h"
 #include "render/vulkan_renderer.h"
 
-bool render_service_init(AppServices* services) {
-    if (!services || !services->window) return false;
-    return vk_renderer_init(services->window, services->assets.vert_spv_path, services->assets.frag_spv_path,
-                            services->assets.font_path, services->widgets, &services->transformer);
+bool render_service_init(RenderRuntimeContext* render, const Assets* assets, WidgetArray widgets) {
+    if (!render || !render->window || !assets) return false;
+    return vk_renderer_init(render->window, assets->vert_spv_path, assets->frag_spv_path, assets->font_path, widgets,
+                            &render->transformer);
 }
 
-void render_service_update_transformer(AppServices* services) {
-    if (!services) return;
-    vk_renderer_update_transformer(&services->transformer);
+void render_service_update_transformer(RenderRuntimeContext* render) {
+    if (!render) return;
+    vk_renderer_update_transformer(&render->transformer);
 }
 
-void render_loop(AppServices* services) {
-    if (!services) return;
-    while (!glfwWindowShouldClose(services->window)) {
+void render_loop(RenderRuntimeContext* render, UiContext* ui, Model* model) {
+    if (!render) return;
+    while (!glfwWindowShouldClose(render->window)) {
         glfwPollEvents();
-        ui_frame_update(services);
+        ui_frame_update(ui, model);
         vk_renderer_draw_frame();
     }
 }
 
-void render_service_shutdown(AppServices* services) {
-    (void)services;
+void render_service_shutdown(RenderRuntimeContext* render) {
+    (void)render;
     vk_renderer_cleanup();
 }
