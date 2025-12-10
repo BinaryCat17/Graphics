@@ -1203,7 +1203,8 @@ static bool build_vertices_from_widgets(FrameResources *frame) {
         }
     }
 
-    size_t view_model_capacity = g_widgets.count * 4 + slider_extras;
+    /* Each widget can contribute up to: 4 border segments + 1 fill + 2 scrollbar parts. */
+    size_t view_model_capacity = g_widgets.count * 8 + slider_extras;
     ViewModel *view_models = calloc(view_model_capacity, sizeof(ViewModel));
     GlyphQuadArray glyph_quads = {0};
     bool view_models_ok = view_models != NULL;
@@ -1231,26 +1232,38 @@ static bool build_vertices_from_widgets(FrameResources *frame) {
         Rect widget_rect = { widget->rect.x, widget->rect.y + effective_offset, widget->rect.w, widget->rect.h };
         Rect inner_rect = widget_rect;
         if (widget->border_thickness > 0.0f) {
-            inner_rect.x += widget->border_thickness;
-            inner_rect.y += widget->border_thickness;
-            inner_rect.w -= widget->border_thickness * 2.0f;
-            inner_rect.h -= widget->border_thickness * 2.0f;
+            float b = widget->border_thickness;
+            inner_rect.x += b;
+            inner_rect.y += b;
+            inner_rect.w -= b * 2.0f;
+            inner_rect.h -= b * 2.0f;
             if (inner_rect.w < 0.0f) inner_rect.w = 0.0f;
             if (inner_rect.h < 0.0f) inner_rect.h = 0.0f;
-            Rect clipped_border;
-            if (apply_clip_rect(widget, &widget_rect, &clipped_border) &&
-                ensure_view_model_capacity(&view_models, &view_model_capacity, view_model_count + 1, &view_models_ok)) {
-            view_models[view_model_count++] = (ViewModel){
-                .id = widget->id,
-                .logical_box = { {clipped_border.x, clipped_border.y}, {clipped_border.w, clipped_border.h} },
-                .layer = base_z + Z_LAYER_BORDER,
-                .phase = RENDER_PHASE_BACKGROUND,
-                .widget_order = widget_order,
-                .ordinal = widget_ordinals[i]++,
-                .color = widget->border_color,
+
+            Rect borders[4] = {
+                { widget_rect.x, widget_rect.y, widget_rect.w, b },
+                { widget_rect.x, widget_rect.y + widget_rect.h - b, widget_rect.w, b },
+                { widget_rect.x, widget_rect.y + b, b, widget_rect.h - b * 2.0f },
+                { widget_rect.x + widget_rect.w - b, widget_rect.y + b, b, widget_rect.h - b * 2.0f },
             };
-            apply_widget_clip_to_view_model(widget, &view_models[view_model_count - 1]);
-        }
+
+            for (size_t edge = 0; edge < 4; ++edge) {
+                if (borders[edge].w <= 0.0f || borders[edge].h <= 0.0f) continue;
+                Rect clipped_border;
+                if (apply_clip_rect(widget, &borders[edge], &clipped_border) &&
+                    ensure_view_model_capacity(&view_models, &view_model_capacity, view_model_count + 1, &view_models_ok)) {
+                    view_models[view_model_count++] = (ViewModel){
+                        .id = widget->id,
+                        .logical_box = { {clipped_border.x, clipped_border.y}, {clipped_border.w, clipped_border.h} },
+                        .layer = base_z + Z_LAYER_BORDER,
+                        .phase = RENDER_PHASE_BACKGROUND,
+                        .widget_order = widget_order,
+                        .ordinal = widget_ordinals[i]++,
+                        .color = widget->border_color,
+                    };
+                    apply_widget_clip_to_view_model(widget, &view_models[view_model_count - 1]);
+                }
+            }
         }
 
         if (widget->type == W_HSLIDER) {
