@@ -240,20 +240,41 @@ void model_set_string(Model* model, const char* key, const char* value) {
     e->is_string = 1;
 }
 
+static void yaml_escape_string(FILE* f, const char* value) {
+    fputc('"', f);
+    for (const char* c = value ? value : ""; *c; ++c) {
+        if (*c == '"' || *c == '\\') fputc('\\', f);
+        if (*c == '\n') {
+            fputs("\\n", f);
+            continue;
+        }
+        fputc(*c, f);
+    }
+    fputc('"', f);
+}
+
 int save_model(const Model* model) {
     if (!model || !model->source_path) return 0;
     FILE* f = fopen(model->source_path, "wb");
     if (!f) return 0;
-    fputs("{\n  \"model\": {\n", f);
-    int first = 1;
+
+    const char* store = model->store ? model->store : "model";
+    const char* key = model->key ? model->key : "default";
+
+    fprintf(f, "store: %s\n", store);
+    fprintf(f, "key: %s\n", key);
+    fputs("data:\n  model:\n", f);
+
     for (ModelEntry* e = model->entries; e; e = e->next) {
-        if (!first) fputs(",\n", f);
-        first = 0;
-        fprintf(f, "    \"%s\": ", e->key);
-        if (e->is_string) fprintf(f, "\"%s\"", e->string_value ? e->string_value : "");
-        else fprintf(f, "%f", e->number_value);
+        fprintf(f, "    %s: ", e->key);
+        if (e->is_string) {
+            yaml_escape_string(f, e->string_value ? e->string_value : "");
+        } else {
+            fprintf(f, "%g", e->number_value);
+        }
+        fputc('\n', f);
     }
-    fputs("\n  }\n}\n", f);
+
     fclose(f);
     return 1;
 }
@@ -282,16 +303,31 @@ Model* parse_model_json(const char* json, const char* source_path) {
     if (!json) { fprintf(stderr, "Error: model JSON text is null\n"); return NULL; }
     Model* model = (Model*)calloc(1, sizeof(Model));
     if (!model) return NULL;
+    model->store = strdup("model");
+    model->key = strdup("default");
     model->source_path = strdup(source_path ? source_path : "model.json");
     jsmn_parser p; jsmn_init(&p);
     size_t tokc = 1024;
     jsmntok_t* toks = (jsmntok_t*)malloc(sizeof(jsmntok_t) * tokc);
-    if (!toks) { free(model); return NULL; }
+    if (!toks) { free_model(model); return NULL; }
     for (size_t i = 0; i < tokc; i++) { toks[i].start = toks[i].end = -1; toks[i].size = 0; toks[i].type = JSMN_UNDEFINED; }
     int parse_ret = jsmn_parse(&p, json, strlen(json), toks, tokc);
-    if (parse_ret < 0) { fprintf(stderr, "Error: failed to parse model JSON (code %d)\n", parse_ret); free(model); free(toks); return NULL; }
+    if (parse_ret < 0) {
+        fprintf(stderr, "Error: failed to parse model JSON (code %d)\n", parse_ret);
+        free_model(model);
+        free(toks);
+        return NULL;
+    }
 
     for (unsigned int i = 0; i + 1 < p.toknext; i++) {
+        if (tok_is_key(json, &toks[i], "store") && toks[i + 1].type == JSMN_STRING) {
+            free(model->store);
+            model->store = tok_copy(json, &toks[i + 1]);
+        }
+        if (tok_is_key(json, &toks[i], "key") && toks[i + 1].type == JSMN_STRING) {
+            free(model->key);
+            model->key = tok_copy(json, &toks[i + 1]);
+        }
         if (tok_is_key(json, &toks[i], "model") && toks[i + 1].type == JSMN_OBJECT) {
             jsmntok_t* obj = &toks[i + 1];
             for (unsigned int j = i + 2; j < p.toknext && toks[j].start >= obj->start && toks[j].end <= obj->end; j += 2) {
@@ -1197,6 +1233,8 @@ void free_model(Model* model) {
         free(e);
         e = n;
     }
+    free(model->store);
+    free(model->key);
     free(model->source_path);
     free(model);
 }
