@@ -331,7 +331,7 @@ static void create_instance(void) {
     uint32_t extc = 0; const char** exts = glfwGetRequiredInstanceExtensions(&extc);
     ici.enabledExtensionCount = extc; ici.ppEnabledExtensionNames = exts;
     double start = vk_now_ms();
-    VkResult g_res = vkCreateInstance(&ici, NULL, &g_instance);
+    VkResult res = vkCreateInstance(&ici, NULL, &g_instance);
     vk_log_command("vkCreateInstance", "application", start);
     if (g_res != VK_SUCCESS) fatal_vk("vkCreateInstance", g_res);
 }
@@ -486,7 +486,7 @@ static void create_swapchain_and_views(VkSwapchainKHR old_swapchain) {
     VkImageUsageFlags usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
     if (!(caps.supportedUsageFlags & usage)) fatal("g_swapchain color usage unsupported");
 
-    VkSwapchainCreateInfoKHR sci = { .sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR, .g_surface = g_surface, .minImageCount = img_count, .imageFormat = g_swapchain_format, .imageColorSpace = chosen_fmt.colorSpace, .imageExtent = g_swapchain_extent, .imageArrayLayers = 1, .imageUsage = usage, .imageSharingMode = VK_SHARING_MODE_EXCLUSIVE, .preTransform = caps.currentTransform, .compositeAlpha = comp_alpha, .presentMode = VK_PRESENT_MODE_FIFO_KHR, .clipped = VK_TRUE, .oldSwapchain = old_swapchain };
+    VkSwapchainCreateInfoKHR sci = { .sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR, .surface = g_surface, .minImageCount = img_count, .imageFormat = g_swapchain_format, .imageColorSpace = chosen_fmt.colorSpace, .imageExtent = g_swapchain_extent, .imageArrayLayers = 1, .imageUsage = usage, .imageSharingMode = VK_SHARING_MODE_EXCLUSIVE, .preTransform = caps.currentTransform, .compositeAlpha = comp_alpha, .presentMode = VK_PRESENT_MODE_FIFO_KHR, .clipped = VK_TRUE, .oldSwapchain = old_swapchain };
     double swapchain_start = vk_now_ms();
     g_res = vkCreateSwapchainKHR(g_device, &sci, NULL, &g_swapchain);
     vk_log_command("vkCreateSwapchainKHR", "g_swapchain setup", swapchain_start);
