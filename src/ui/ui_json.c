@@ -1,17 +1,31 @@
 #include "ui/ui_json.h"
 
+#include <ctype.h>
 #include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <strings.h>
 
 #include "stb_truetype.h"
 #include "ui/scene_ui.h"
 
+static int ascii_strcasecmp(const char* a, const char* b) {
+    if (a == b) return 0;
+    if (!a) return -1;
+    if (!b) return 1;
+    while (*a && *b) {
+        int da = tolower((unsigned char)*a);
+        int db = tolower((unsigned char)*b);
+        if (da != db) return da - db;
+        ++a;
+        ++b;
+    }
+    return tolower((unsigned char)*a) - tolower((unsigned char)*b);
+}
+
 static float parse_scalar_number(const ConfigNode* node, float fallback) {
     if (!node || node->type != CONFIG_NODE_SCALAR || !node->scalar) return fallback;
-    if (node->scalar_type == CONFIG_SCALAR_BOOL) return (strcasecmp(node->scalar, "true") == 0) ? 1.0f : 0.0f;
+    if (node->scalar_type == CONFIG_SCALAR_BOOL) return (ascii_strcasecmp(node->scalar, "true") == 0) ? 1.0f : 0.0f;
     char* end = NULL;
     float v = (float)strtof(node->scalar, &end);
     if (!end || end == node->scalar || *end != '\0') return fallback;
@@ -20,7 +34,7 @@ static float parse_scalar_number(const ConfigNode* node, float fallback) {
 
 static int parse_scalar_bool(const ConfigNode* node, int fallback) {
     if (!node || node->type != CONFIG_NODE_SCALAR || !node->scalar) return fallback;
-    if (node->scalar_type == CONFIG_SCALAR_BOOL) return strcasecmp(node->scalar, "true") == 0;
+    if (node->scalar_type == CONFIG_SCALAR_BOOL) return ascii_strcasecmp(node->scalar, "true") == 0;
     if (node->scalar_type == CONFIG_SCALAR_NUMBER) return parse_scalar_number(node, (float)fallback) != 0.0f;
     return fallback;
 }
