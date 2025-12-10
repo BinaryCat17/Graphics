@@ -181,8 +181,26 @@ static int load_single_config(StateManager *manager, const ModuleSchema *schema,
                 break;
             }
         }
+        if (!store) {
+            // Heuristics for common UI config layouts where the section name does
+            // not exactly match the schema store name.
+            if (config_map_get(data_node, "layout") || config_map_get(data_node, "widgets") ||
+                config_map_get(data_node, "floating")) {
+                store = "layout";
+            } else if (config_map_get(data_node, "styles")) {
+                store = "styles";
+            } else if (config_map_get(data_node, "model")) {
+                store = "model";
+            }
+        }
     }
     if (!store && schema->store_count == 1) {
+        fallback_store = dup_string(schema->stores[0].name);
+        store = fallback_store;
+    }
+    if (!store && schema->store_count > 0) {
+        // As a last resort, pick the first store from the schema to keep the
+        // configuration usable instead of hard failing.
         fallback_store = dup_string(schema->stores[0].name);
         store = fallback_store;
     }
