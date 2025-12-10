@@ -4,9 +4,9 @@
 #include <string.h>
 
 #include "runtime/runtime.h"
-#include "services/render_service.h"
-#include "services/scene_service.h"
-#include "services/ui_service.h"
+#include "render_service.h"
+#include "scene_service.h"
+#include "ui_service.h"
 
 int main(int argc, char** argv) {
     const char* assets_dir = "assets";
