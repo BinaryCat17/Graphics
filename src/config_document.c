@@ -4,7 +4,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <strings.h>
 
 #include "config_io.h"
 #include "simple_yaml.h"
@@ -13,6 +12,21 @@ typedef struct {
     ConfigFormat format;
     int (*parse_text)(const char *text, ConfigNode **out_root, ConfigError *err);
 } ConfigFormatOps;
+
+static int ascii_strcasecmp(const char *a, const char *b)
+{
+    if (a == b) return 0;
+    if (!a) return -1;
+    if (!b) return 1;
+    while (*a && *b) {
+        int da = tolower((unsigned char)*a);
+        int db = tolower((unsigned char)*b);
+        if (da != db) return da - db;
+        ++a;
+        ++b;
+    }
+    return tolower((unsigned char)*a) - tolower((unsigned char)*b);
+}
 
 static void assign_error(ConfigError *err, int line, int column, const char *msg)
 {
@@ -31,8 +45,8 @@ static ConfigScalarType detect_scalar_type(const char *text)
     while (isspace((unsigned char)*p)) p++;
     if (*p == 0) return CONFIG_SCALAR_STRING;
 
-    if (strcasecmp(p, "true") == 0 || strcasecmp(p, "false") == 0) return CONFIG_SCALAR_BOOL;
-    if (strcasecmp(p, "null") == 0 || strcasecmp(p, "~") == 0) return CONFIG_SCALAR_NULL;
+    if (ascii_strcasecmp(p, "true") == 0 || ascii_strcasecmp(p, "false") == 0) return CONFIG_SCALAR_BOOL;
+    if (ascii_strcasecmp(p, "null") == 0 || ascii_strcasecmp(p, "~") == 0) return CONFIG_SCALAR_NULL;
 
     char *end = NULL;
     (void)strtod(p, &end);
