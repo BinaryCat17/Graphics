@@ -72,6 +72,10 @@ if (NOT VULKAN_STUB)
             "src/cad_scene.c" "src/cad_scene.h" "src/cad_scene_yaml.c" "src/cad_scene_yaml.h"
             "src/state_manager.c" "src/state_manager.h"
             "src/simple_yaml.c" "src/simple_yaml.h" "src/module_yaml_loader.c" "src/module_yaml_loader.h" "src/config_document.c" "src/config_document.h" "src/config_io.c" "src/config_io.h"
+            "src/runtime/runtime.c" "src/runtime/runtime.h" "src/runtime/app_services.h"
+            "src/scene/scene_service.c" "src/scene/scene_service.h"
+            "src/ui/ui_service.c" "src/ui/ui_service.h"
+            "src/render/render_service.c" "src/render/render_service.h"
     )
 else()
     set(APP_SOURCES "app/main_stub.c" "src/cad_scene.c" "src/cad_scene.h" "src/cad_scene_yaml.c" "src/cad_scene_yaml.h" "src/state_manager.c" "src/state_manager.h" "src/simple_yaml.c" "src/simple_yaml.h" "src/module_yaml_loader.c" "src/module_yaml_loader.h" "src/config_document.c" "src/config_document.h" "src/config_io.c" "src/config_io.h" "app/scene_ui.c" "app/scene_ui.h" "app/ui_json.c" "app/ui_json.h")
@@ -79,7 +83,7 @@ endif()
 
 # Добавьте источник в исполняемый файл этого проекта.
 add_executable (Graphics ${APP_SOURCES})
-target_include_directories(Graphics PRIVATE "src/")
+target_include_directories(Graphics PRIVATE "src/" "app/")
 
 if (NOT VULKAN_STUB)
     add_dependencies(Graphics Shaders)
