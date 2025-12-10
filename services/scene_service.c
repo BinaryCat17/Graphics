@@ -119,7 +119,6 @@ void scene_service_unload(AppServices* services) {
     CoreContext* core = &services->core;
 
     if (core->model) {
-        save_model(core->model);
         free_model(core->model);
         core->model = NULL;
     }
