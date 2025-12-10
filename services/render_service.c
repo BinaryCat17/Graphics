@@ -123,8 +123,12 @@ static void render_service_stop(AppServices* services) {
     runtime_shutdown(services);
 }
 
+static const char* g_render_dependencies[] = {"scene", "ui"};
+
 static const ServiceDescriptor g_render_service_descriptor = {
     .name = "render",
+    .dependencies = g_render_dependencies,
+    .dependency_count = sizeof(g_render_dependencies) / sizeof(g_render_dependencies[0]),
     .init = render_service_init,
     .start = render_service_start,
     .stop = render_service_stop,

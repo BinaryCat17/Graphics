@@ -7,6 +7,7 @@
 #include "service.h"
 #include "render_service.h"
 #include "scene_service.h"
+#include "service_manager.h"
 #include "ui_service.h"
 
 int main(int argc, char** argv) {
@@ -30,55 +31,27 @@ int main(int argc, char** argv) {
         return 1;
     }
 
-    if (!service_registry_register(scene_service_descriptor()) || !service_registry_register(ui_service_descriptor()) ||
-        !service_registry_register(render_service_descriptor())) {
+    ServiceConfig config = {.assets_dir = assets_dir, .scene_path = scene_path};
+
+    ServiceManager manager;
+    service_manager_init(&manager);
+
+    if (!service_manager_register(&manager, scene_service_descriptor()) ||
+        !service_manager_register(&manager, ui_service_descriptor()) ||
+        !service_manager_register(&manager, render_service_descriptor())) {
         fprintf(stderr, "Failed to register required services.\n");
         app_services_shutdown(&services);
         return 1;
     }
 
-    const char* requested_services[] = {"scene", "ui", "render"};
-    const size_t requested_count = sizeof(requested_services) / sizeof(requested_services[0]);
-    const ServiceDescriptor* descriptors[3] = {0};
-
-    for (size_t i = 0; i < requested_count; ++i) {
-        descriptors[i] = service_registry_get(requested_services[i]);
-        if (!descriptors[i]) {
-            fprintf(stderr, "Unknown service: %s\n", requested_services[i]);
-            app_services_shutdown(&services);
-            return 1;
-        }
-    }
-
-    ServiceConfig config = {.assets_dir = assets_dir, .scene_path = scene_path};
-
-    for (size_t i = 0; i < requested_count; ++i) {
-        if (descriptors[i]->init && !descriptors[i]->init(&services, &config)) {
-            fprintf(stderr, "Service '%s' failed to initialize.\n", descriptors[i]->name);
-            app_services_shutdown(&services);
-            return 1;
-        }
-    }
-
-    size_t started_count = 0;
-    for (; started_count < requested_count; ++started_count) {
-        if (descriptors[started_count]->start && !descriptors[started_count]->start(&services, &config)) {
-            fprintf(stderr, "Service '%s' failed to start.\n", descriptors[started_count]->name);
-            break;
-        }
-        state_manager_dispatch(&services.state_manager, 0);
-    }
-
-    for (size_t i = started_count; i-- > 0;) {
-        if (descriptors[i]->stop) descriptors[i]->stop(&services);
-    }
-
-    app_services_shutdown(&services);
-
-    if (started_count != requested_count) {
+    if (!service_manager_start(&manager, &services, &config)) {
         fprintf(stderr, "Application exiting because not all services started successfully.\n");
+        app_services_shutdown(&services);
         return 1;
     }
+
+    service_manager_stop(&manager, &services);
+    app_services_shutdown(&services);
 
     return 0;
 }
