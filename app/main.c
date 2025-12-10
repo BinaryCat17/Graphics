@@ -24,30 +24,32 @@ int main(int argc, char** argv) {
     }
 
     AppServices services = {0};
-    if (!scene_service_load(&services, assets_dir, scene_path)) return 1;
-    if (!ui_build(&services)) {
-        ui_service_dispose(&services);
-        scene_service_unload(&services);
+    ui_context_init(&services.ui);
+
+    if (!scene_service_load(&services.core, assets_dir, scene_path)) return 1;
+    if (!ui_build(&services.ui, &services.core)) {
+        ui_context_dispose(&services.ui);
+        scene_service_unload(&services.core);
         return 1;
     }
     if (!runtime_init(&services)) {
         runtime_shutdown(&services);
-        ui_service_dispose(&services);
-        scene_service_unload(&services);
+        ui_context_dispose(&services.ui);
+        scene_service_unload(&services.core);
         return 1;
     }
-    if (!render_service_init(&services)) {
+    if (!render_service_init(&services.render, &services.core.assets, services.ui.widgets)) {
         runtime_shutdown(&services);
-        ui_service_dispose(&services);
-        scene_service_unload(&services);
+        ui_context_dispose(&services.ui);
+        scene_service_unload(&services.core);
         return 1;
     }
 
-    render_loop(&services);
+    render_loop(&services.render, &services.ui, services.core.model);
 
-    render_service_shutdown(&services);
+    render_service_shutdown(&services.render);
     runtime_shutdown(&services);
-    ui_service_dispose(&services);
-    scene_service_unload(&services);
+    ui_context_dispose(&services.ui);
+    scene_service_unload(&services.core);
     return 0;
 }

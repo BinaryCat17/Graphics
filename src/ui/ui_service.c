@@ -1,7 +1,9 @@
 #include "ui_service.h"
 
+#include <GLFW/glfw3.h>
 #include <math.h>
 #include <stdio.h>
+#include <string.h>
 
 #include "ui/scroll.h"
 
@@ -11,9 +13,14 @@ static float clamp01(float v) {
     return v;
 }
 
-float ui_compute_scale(const AppServices* services, float target_w, float target_h) {
-    if (!services || services->base_w <= 0.0f || services->base_h <= 0.0f) return 1.0f;
-    float ui_scale = fminf(target_w / services->base_w, target_h / services->base_h);
+void ui_context_init(UiContext* ui) {
+    if (!ui) return;
+    memset(ui, 0, sizeof(UiContext));
+}
+
+float ui_compute_scale(const UiContext* ui, float target_w, float target_h) {
+    if (!ui || ui->base_w <= 0.0f || ui->base_h <= 0.0f) return 1.0f;
+    float ui_scale = fminf(target_w / ui->base_w, target_h / ui->base_h);
     if (ui_scale < 0.8f) ui_scale = 0.8f;
     if (ui_scale > 1.35f) ui_scale = 1.35f;
     return ui_scale;
@@ -42,7 +49,8 @@ static void apply_slider_action(Widget* w, Model* model, float mx) {
     }
     if (w->id) {
         char buf[64];
-        snprintf(buf, sizeof(buf), "%s: %.0f%%", w->id, clamp01((new_val - w->minv) / (denom != 0.0f ? denom : 1.0f)) * 100.0f);
+        snprintf(buf, sizeof(buf), "%s: %.0f%%", w->id,
+                 clamp01((new_val - w->minv) / (denom != 0.0f ? denom : 1.0f)) * 100.0f);
         model_set_string(model, "sliderState", buf);
     }
 }
@@ -75,108 +83,110 @@ static void apply_click_action(Widget* w, Model* model) {
     }
 }
 
-bool ui_build(AppServices* services) {
-    if (!services || !services->model) return false;
+bool ui_build(UiContext* ui, const CoreContext* core) {
+    if (!ui || !core || !core->model) return false;
 
-    services->styles = parse_styles_config(services->assets.styles_doc.root);
-    services->ui_root = parse_layout_config(services->assets.layout_doc.root, services->model, services->styles, services->assets.font_path, &services->scene);
-    if (!services->ui_root) return false;
+    ui->styles = parse_styles_config(core->assets.styles_doc.root);
+    ui->ui_root = parse_layout_config(core->assets.layout_doc.root, core->model, ui->styles, core->assets.font_path,
+                                      &core->scene);
+    if (!ui->ui_root) return false;
 
-    services->layout_root = build_layout_tree(services->ui_root);
-    if (!services->layout_root) return false;
+    ui->layout_root = build_layout_tree(ui->ui_root);
+    if (!ui->layout_root) return false;
 
-    measure_layout(services->layout_root);
-    assign_layout(services->layout_root, 0.0f, 0.0f);
-    capture_layout_base(services->layout_root);
-    services->base_w = services->layout_root->base_rect.w > 1.0f ? services->layout_root->base_rect.w : 1024.0f;
-    services->base_h = services->layout_root->base_rect.h > 1.0f ? services->layout_root->base_rect.h : 640.0f;
+    measure_layout(ui->layout_root);
+    assign_layout(ui->layout_root, 0.0f, 0.0f);
+    capture_layout_base(ui->layout_root);
+    ui->base_w = ui->layout_root->base_rect.w > 1.0f ? ui->layout_root->base_rect.w : 1024.0f;
+    ui->base_h = ui->layout_root->base_rect.h > 1.0f ? ui->layout_root->base_rect.h : 640.0f;
 
     return true;
 }
 
-bool ui_prepare_runtime(AppServices* services, float ui_scale) {
-    if (!services || !services->layout_root) return false;
-    scale_layout(services->layout_root, ui_scale);
+bool ui_prepare_runtime(UiContext* ui, const CoreContext* core, float ui_scale) {
+    if (!ui || !ui->layout_root) return false;
+    scale_layout(ui->layout_root, ui_scale);
 
-    services->widgets = materialize_widgets(services->layout_root);
-    apply_widget_padding_scale(&services->widgets, ui_scale);
-    update_widget_bindings(services->ui_root, services->model);
-    populate_widgets_from_layout(services->layout_root, services->widgets.items, services->widgets.count);
-    services->scroll = scroll_init(services->widgets.items, services->widgets.count);
-    if (!services->scroll) return false;
+    ui->widgets = materialize_widgets(ui->layout_root);
+    apply_widget_padding_scale(&ui->widgets, ui_scale);
+    update_widget_bindings(ui->ui_root, core->model);
+    populate_widgets_from_layout(ui->layout_root, ui->widgets.items, ui->widgets.count);
+    ui->scroll = scroll_init(ui->widgets.items, ui->widgets.count);
+    if (!ui->scroll) return false;
 
-    services->ui_scale = ui_scale;
+    ui->ui_scale = ui_scale;
     return true;
 }
 
-void ui_refresh_layout(AppServices* services, float new_scale) {
-    if (!services || !services->layout_root || !services->widgets.items) return;
+void ui_refresh_layout(UiContext* ui, float new_scale) {
+    if (!ui || !ui->layout_root || !ui->widgets.items) return;
     if (new_scale <= 0.0f) return;
-    float ratio = services->ui_scale > 0.0f ? new_scale / services->ui_scale : 1.0f;
-    services->ui_scale = new_scale;
-    scale_layout(services->layout_root, services->ui_scale);
-    populate_widgets_from_layout(services->layout_root, services->widgets.items, services->widgets.count);
-    apply_widget_padding_scale(&services->widgets, services->ui_scale);
-    scroll_rebuild(services->scroll, services->widgets.items, services->widgets.count, ratio);
+    float ratio = ui->ui_scale > 0.0f ? new_scale / ui->ui_scale : 1.0f;
+    ui->ui_scale = new_scale;
+    scale_layout(ui->layout_root, ui->ui_scale);
+    populate_widgets_from_layout(ui->layout_root, ui->widgets.items, ui->widgets.count);
+    apply_widget_padding_scale(&ui->widgets, ui->ui_scale);
+    scroll_rebuild(ui->scroll, ui->widgets.items, ui->widgets.count, ratio);
 }
 
-void ui_frame_update(AppServices* services) {
-    if (!services || !services->widgets.items) return;
-    update_widget_bindings(services->ui_root, services->model);
-    populate_widgets_from_layout(services->layout_root, services->widgets.items, services->widgets.count);
-    apply_widget_padding_scale(&services->widgets, services->ui_scale);
-    scroll_apply_offsets(services->scroll, services->widgets.items, services->widgets.count);
+void ui_frame_update(UiContext* ui, Model* model) {
+    if (!ui || !ui->widgets.items) return;
+    update_widget_bindings(ui->ui_root, model);
+    populate_widgets_from_layout(ui->layout_root, ui->widgets.items, ui->widgets.count);
+    apply_widget_padding_scale(&ui->widgets, ui->ui_scale);
+    scroll_apply_offsets(ui->scroll, ui->widgets.items, ui->widgets.count);
 }
 
-void ui_handle_mouse_button(AppServices* services, double mx, double my, int button, int action) {
-    if (!services || !services->widgets.items) return;
+void ui_handle_mouse_button(UiContext* ui, Model* model, double mx, double my, int button, int action) {
+    if (!ui || !ui->widgets.items) return;
     int pressed = (button == GLFW_MOUSE_BUTTON_LEFT && action == GLFW_PRESS);
-    if (scroll_handle_mouse_button(services->scroll, services->widgets.items, services->widgets.count, (float)mx, (float)my, pressed)) return;
+    if (scroll_handle_mouse_button(ui->scroll, ui->widgets.items, ui->widgets.count, (float)mx, (float)my, pressed))
+        return;
     if (button != GLFW_MOUSE_BUTTON_LEFT || action != GLFW_PRESS) return;
-    for (size_t i = 0; i < services->widgets.count; i++) {
-        Widget* w = &services->widgets.items[i];
+    for (size_t i = 0; i < ui->widgets.count; i++) {
+        Widget* w = &ui->widgets.items[i];
         if ((w->type == W_BUTTON || w->type == W_CHECKBOX || w->type == W_HSLIDER) && point_in_widget(w, mx, my)) {
             if (w->type == W_HSLIDER) {
-                apply_slider_action(w, services->model, (float)mx);
+                apply_slider_action(w, model, (float)mx);
             } else {
-                apply_click_action(w, services->model);
+                apply_click_action(w, model);
             }
             break;
         }
     }
 }
 
-void ui_handle_scroll(AppServices* services, double mx, double my, double yoff) {
-    if (!services || !services->widgets.items) return;
-    scroll_handle_event(services->scroll, services->widgets.items, services->widgets.count, (float)mx, (float)my, yoff);
+void ui_handle_scroll(UiContext* ui, double mx, double my, double yoff) {
+    if (!ui || !ui->widgets.items) return;
+    scroll_handle_event(ui->scroll, ui->widgets.items, ui->widgets.count, (float)mx, (float)my, yoff);
 }
 
-void ui_handle_cursor(AppServices* services, double x, double y) {
-    if (!services || !services->widgets.items) return;
-    scroll_handle_cursor(services->scroll, services->widgets.items, services->widgets.count, (float)x, (float)y);
+void ui_handle_cursor(UiContext* ui, double x, double y) {
+    if (!ui || !ui->widgets.items) return;
+    scroll_handle_cursor(ui->scroll, ui->widgets.items, ui->widgets.count, (float)x, (float)y);
 }
 
-void ui_service_dispose(AppServices* services) {
-    if (!services) return;
+void ui_context_dispose(UiContext* ui) {
+    if (!ui) return;
 
-    if (services->styles) {
-        free_styles(services->styles);
-        services->styles = NULL;
+    if (ui->styles) {
+        free_styles(ui->styles);
+        ui->styles = NULL;
     }
-    if (services->widgets.items) {
-        free_widgets(services->widgets);
-        services->widgets = (WidgetArray){0};
+    if (ui->widgets.items) {
+        free_widgets(ui->widgets);
+        ui->widgets = (WidgetArray){0};
     }
-    if (services->ui_root) {
-        free_ui_tree(services->ui_root);
-        services->ui_root = NULL;
+    if (ui->ui_root) {
+        free_ui_tree(ui->ui_root);
+        ui->ui_root = NULL;
     }
-    if (services->layout_root) {
-        free_layout_tree(services->layout_root);
-        services->layout_root = NULL;
+    if (ui->layout_root) {
+        free_layout_tree(ui->layout_root);
+        ui->layout_root = NULL;
     }
-    if (services->scroll) {
-        scroll_free(services->scroll);
-        services->scroll = NULL;
+    if (ui->scroll) {
+        scroll_free(ui->scroll);
+        ui->scroll = NULL;
     }
 }
