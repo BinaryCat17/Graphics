@@ -3,7 +3,7 @@
 #include <math.h>
 #include <stdio.h>
 
-#include "render_service.h"
+#include "render_runtime_service.h"
 #include "ui_service.h"
 
 static void on_mouse_button(GLFWwindow* window, int button, int action, int mods) {
@@ -39,8 +39,10 @@ static void on_cursor_pos(GLFWwindow* window, double x, double y) {
     ui_handle_cursor(&services->ui, logical.x, logical.y);
 }
 
-void runtime_update_transformer(RenderRuntimeContext* render, const UiContext* ui) {
-    if (!render || !render->window) return;
+void runtime_update_transformer(AppServices* services) {
+    if (!services) return;
+    RenderRuntimeContext* render = &services->render;
+    if (!render->window) return;
     int win_w = 0, win_h = 0, fb_w = 0, fb_h = 0;
     glfwGetWindowSize(render->window, &win_w, &win_h);
     glfwGetFramebufferSize(render->window, &fb_w, &fb_h);
@@ -49,9 +51,9 @@ void runtime_update_transformer(RenderRuntimeContext* render, const UiContext* u
     float dpi_scale = (dpi_scale_x + dpi_scale_y) * 0.5f;
     if (dpi_scale <= 0.0f) dpi_scale = 1.0f;
 
-    float ui_scale = ui ? ui->ui_scale : 1.0f;
+    float ui_scale = services->ui.ui_scale;
     coordinate_transformer_init(&render->transformer, dpi_scale, ui_scale, (Vec2){(float)fb_w, (float)fb_h});
-    render_service_update_transformer(render);
+    render_runtime_service_update_transformer(services->render_runtime_context, render);
 }
 
 static void on_framebuffer_size(GLFWwindow* window, int width, int height) {
@@ -60,7 +62,7 @@ static void on_framebuffer_size(GLFWwindow* window, int width, int height) {
     if (!services) return;
     float new_scale = ui_compute_scale(&services->ui, (float)width, (float)height);
     ui_refresh_layout(&services->ui, new_scale);
-    runtime_update_transformer(&services->render, &services->ui);
+    runtime_update_transformer(services);
 }
 
 bool runtime_init(AppServices* services) {
@@ -104,7 +106,7 @@ bool runtime_init(AppServices* services) {
     glfwSetMouseButtonCallback(services->render.window, on_mouse_button);
     glfwSetCursorPosCallback(services->render.window, on_cursor_pos);
 
-    runtime_update_transformer(&services->render, &services->ui);
+    runtime_update_transformer(services);
     return true;
 }
 

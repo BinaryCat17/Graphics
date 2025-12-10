@@ -1,134 +1,119 @@
 #include "render_service.h"
 
 #include <GLFW/glfw3.h>
+#include <stdbool.h>
 #include <stdio.h>
+#include <threads.h>
+
 #include "render/vulkan_renderer.h"
-#include "service_events.h"
-#include "runtime/runtime.h"
+#include "render_runtime_service.h"
+#include "ui/ui_json.h"
 
-typedef struct RenderServiceState {
-    RenderRuntimeContext* render;
-    const Assets* assets;
-    UiContext* ui;
-    WidgetArray widgets;
-    Model* model;
-    StateManager* state_manager;
-    int renderer_ready;
-} RenderServiceState;
+typedef struct RenderServiceContext {
+    RenderRuntimeServiceContext* runtime;
+    AppServices* services;
+    thrd_t thread;
+    bool running;
+    bool thread_active;
+} RenderServiceContext;
 
-static RenderServiceState g_render_state = {0};
+static ServiceDescriptor g_render_service_descriptor;
 
-static void try_bootstrap_renderer(void) {
-    if (g_render_state.renderer_ready) return;
-    if (!g_render_state.render || !g_render_state.render->window || !g_render_state.assets ||
-        !g_render_state.widgets.items) {
-        return;
-    }
-    g_render_state.renderer_ready = vk_renderer_init(g_render_state.render->window, g_render_state.assets->vert_spv_path,
-                                                     g_render_state.assets->frag_spv_path, g_render_state.assets->font_path,
-                                                     g_render_state.widgets, &g_render_state.render->transformer);
-}
+static void render_service_run_loop(RenderServiceContext* service) {
+    if (!service || !service->runtime) return;
+    RenderRuntimeServiceContext* context = service->runtime;
+    if (!context->render || !context->state_manager) return;
 
-static void on_assets_event(const StateEvent* event, void* user_data) {
-    (void)user_data;
-    if (!event || !event->payload) return;
-    const AssetsComponent* component = (const AssetsComponent*)event->payload;
-    g_render_state.assets = component->assets;
-    try_bootstrap_renderer();
-}
-
-static void on_ui_event(const StateEvent* event, void* user_data) {
-    (void)user_data;
-    if (!event || !event->payload) return;
-    const UiRuntimeComponent* component = (const UiRuntimeComponent*)event->payload;
-    g_render_state.ui = component->ui;
-    g_render_state.widgets = component->widgets;
-    try_bootstrap_renderer();
-}
-
-static void on_model_event(const StateEvent* event, void* user_data) {
-    (void)user_data;
-    if (!event || !event->payload) return;
-    const ModelComponent* component = (const ModelComponent*)event->payload;
-    g_render_state.model = component->model;
-}
-
-bool render_service_bind(RenderRuntimeContext* render, StateManager* state_manager, int assets_type_id, int ui_type_id,
-                        int model_type_id) {
-    if (!render || !state_manager) {
-        fprintf(stderr, "Render service bind received invalid arguments.\n");
-        return false;
-    }
-    g_render_state.render = render;
-    g_render_state.state_manager = state_manager;
-
-    if (assets_type_id >= 0)
-        state_manager_subscribe(state_manager, assets_type_id, "active", on_assets_event, NULL);
-    if (ui_type_id >= 0) state_manager_subscribe(state_manager, ui_type_id, "active", on_ui_event, NULL);
-    if (model_type_id >= 0) state_manager_subscribe(state_manager, model_type_id, "active", on_model_event, NULL);
-    return true;
-}
-
-void render_service_update_transformer(RenderRuntimeContext* render) {
-    if (!render) return;
-    vk_renderer_update_transformer(&render->transformer);
-}
-
-void render_loop(RenderRuntimeContext* render, StateManager* state_manager) {
-    if (!render || !state_manager) return;
-    while (!glfwWindowShouldClose(render->window)) {
-        state_manager_dispatch(state_manager, 0);
+    while (service->running && !glfwWindowShouldClose(context->render->window)) {
+        state_manager_dispatch(context->state_manager, 0);
         glfwPollEvents();
-        if (g_render_state.renderer_ready && g_render_state.ui && g_render_state.model) {
-            ui_frame_update(g_render_state.ui);
+        if (context->renderer_ready && context->ui && context->model) {
+            ui_frame_update(context->ui);
             vk_renderer_draw_frame();
         }
     }
 }
 
-void render_service_shutdown(RenderRuntimeContext* render) {
-    (void)render;
-    vk_renderer_cleanup();
-    g_render_state = (RenderServiceState){0};
+static int render_service_thread(void* user_data) {
+    RenderServiceContext* context = (RenderServiceContext*)user_data;
+    if (!context || !context->runtime || !context->services) {
+        return -1;
+    }
+
+    if (!render_runtime_service_prepare(context->runtime, context->services)) {
+        context->running = false;
+        context->thread_active = false;
+        return -1;
+    }
+
+    render_service_run_loop(context);
+    context->running = false;
+    context->thread_active = false;
+    return 0;
+}
+
+static RenderServiceContext* render_service_context(void) {
+    return (RenderServiceContext*)g_render_service_descriptor.context;
 }
 
 static bool render_service_init(AppServices* services, const ServiceConfig* config) {
     (void)config;
-    if (!services) return false;
-    return render_service_bind(&services->render, &services->state_manager, services->assets_type_id,
-                               services->ui_type_id, services->model_type_id);
+    if (!services || !services->render_runtime_context) {
+        fprintf(stderr, "Render service init received invalid runtime context.\n");
+        return false;
+    }
+    static RenderServiceContext g_context = {0};
+    g_context.runtime = services->render_runtime_context;
+    g_context.services = services;
+    g_context.running = false;
+    g_context.thread_active = false;
+    g_render_service_descriptor.context = &g_context;
+    return true;
 }
 
 static bool render_service_start(AppServices* services, const ServiceConfig* config) {
     (void)config;
-    if (!services) {
-        fprintf(stderr, "Render service start received null services context.\n");
+    RenderServiceContext* context = render_service_context();
+    if (!context || !services || !services->render_runtime_context) {
+        fprintf(stderr, "Render service start received invalid arguments.\n");
         return false;
     }
-    if (!runtime_init(services)) {
-        fprintf(stderr, "Render runtime initialization failed.\n");
+
+    context->running = true;
+    context->thread_active = thrd_create(&context->thread, render_service_thread, context) == thrd_success;
+    if (!context->thread_active) {
+        fprintf(stderr, "Failed to start render service loop thread.\n");
+        context->running = false;
         return false;
     }
-    state_manager_dispatch(&services->state_manager, 0);
-    render_loop(&services->render, &services->state_manager);
+    g_render_service_descriptor.thread_handle = &context->thread;
     return true;
 }
 
 static void render_service_stop(AppServices* services) {
-    if (!services) {
-        fprintf(stderr, "Render service stop received null services context.\n");
-        return;
+    (void)services;
+    RenderServiceContext* context = render_service_context();
+    if (!context) return;
+
+    if (!context->running && !context->thread_active) return;
+
+    context->running = false;
+    if (context->runtime && context->runtime->render && context->runtime->render->window) {
+        glfwSetWindowShouldClose(context->runtime->render->window, GLFW_TRUE);
     }
-    render_service_shutdown(&services->render);
-    runtime_shutdown(services);
+
+    if (context->thread_active) {
+        thrd_join(context->thread, NULL);
+        context->thread_active = false;
+    }
 }
 
-static const char* g_render_dependencies[] = {"scene", "ui"};
+static const char* g_render_service_dependencies[] = {"render-runtime"};
 
-static const ServiceDescriptor g_render_service_descriptor = {
+static ServiceDescriptor g_render_service_descriptor = {
     .name = "render",
-    .dependencies = g_render_dependencies,
-    .dependency_count = sizeof(g_render_dependencies) / sizeof(g_render_dependencies[0]),
+    .dependencies = g_render_service_dependencies,
+    .dependency_count = sizeof(g_render_service_dependencies) / sizeof(g_render_service_dependencies[0]),
     .init = render_service_init,
     .start = render_service_start,
     .stop = render_service_stop,
@@ -136,4 +121,6 @@ static const ServiceDescriptor g_render_service_descriptor = {
     .thread_handle = NULL,
 };
 
-const ServiceDescriptor* render_service_descriptor(void) { return &g_render_service_descriptor; }
+const ServiceDescriptor* render_service_descriptor(void) {
+    return &g_render_service_descriptor;
+}

@@ -1,0 +1,31 @@
+#ifndef RENDER_RUNTIME_SERVICE_H
+#define RENDER_RUNTIME_SERVICE_H
+
+#include <stdbool.h>
+
+#include "assets/assets.h"
+#include "render/render_context.h"
+#include "service.h"
+#include "state/state_manager.h"
+#include "ui/ui_context.h"
+#include "ui/ui_json.h"
+
+typedef struct RenderRuntimeServiceContext {
+    RenderRuntimeContext* render;
+    const Assets* assets;
+    UiContext* ui;
+    WidgetArray widgets;
+    Model* model;
+    StateManager* state_manager;
+    int assets_type_id;
+    int ui_type_id;
+    int model_type_id;
+    bool renderer_ready;
+} RenderRuntimeServiceContext;
+
+const ServiceDescriptor* render_runtime_service_descriptor(void);
+RenderRuntimeServiceContext* render_runtime_service_context(const ServiceDescriptor* descriptor);
+void render_runtime_service_update_transformer(RenderRuntimeServiceContext* context, RenderRuntimeContext* render);
+bool render_runtime_service_prepare(RenderRuntimeServiceContext* context, AppServices* services);
+
+#endif // RENDER_RUNTIME_SERVICE_H

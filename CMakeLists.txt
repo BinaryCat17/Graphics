@@ -74,6 +74,7 @@ if (NOT VULKAN_STUB)
             "src/runtime/runtime.c" "src/runtime/runtime.h" "src/runtime/app_services.h" "src/runtime/app_services.c"
             "services/scene_service.c" "services/scene_service.h"
             "services/ui_service.c" "services/ui_service.h" "services/service_events.h"
+            "services/render_runtime_service.c" "services/render_runtime_service.h"
             "services/render_service.c" "services/render_service.h"
             "services/service_manager.c" "services/service_manager.h" "services/service.h"
     )

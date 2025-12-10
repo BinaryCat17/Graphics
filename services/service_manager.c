@@ -2,6 +2,7 @@
 
 #include <stdio.h>
 #include <string.h>
+#include <threads.h>
 
 static int find_service_index(const ServiceManager* manager, const char* name) {
     if (!manager || !name) return -1;
@@ -109,4 +110,15 @@ bool service_manager_start(ServiceManager* manager, AppServices* services, const
         started++;
     }
     return true;
+}
+
+void service_manager_wait(ServiceManager* manager) {
+    if (!manager) return;
+    for (size_t i = 0; i < manager->start_order_count; ++i) {
+        ServiceEntry* reg = &manager->services[manager->start_order[i]];
+        if (reg->started && reg->descriptor && reg->descriptor->thread_handle) {
+            const thrd_t* thread = (const thrd_t*)reg->descriptor->thread_handle;
+            thrd_join(*thread, NULL);
+        }
+    }
 }

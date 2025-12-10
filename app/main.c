@@ -5,6 +5,7 @@
 
 #include "runtime/runtime.h"
 #include "service.h"
+#include "render_runtime_service.h"
 #include "render_service.h"
 #include "scene_service.h"
 #include "service_manager.h"
@@ -38,6 +39,7 @@ int main(int argc, char** argv) {
 
     if (!service_manager_register(&manager, scene_service_descriptor()) ||
         !service_manager_register(&manager, ui_service_descriptor()) ||
+        !service_manager_register(&manager, render_runtime_service_descriptor()) ||
         !service_manager_register(&manager, render_service_descriptor())) {
         fprintf(stderr, "Failed to register required services.\n");
         app_services_shutdown(&services);
@@ -49,6 +51,8 @@ int main(int argc, char** argv) {
         app_services_shutdown(&services);
         return 1;
     }
+
+    service_manager_wait(&manager);
 
     service_manager_stop(&manager, &services);
     app_services_shutdown(&services);
