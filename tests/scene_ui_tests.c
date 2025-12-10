@@ -5,7 +5,7 @@
 
 #include "ui/scene_ui.h"
 #include "config/config_io.h"
-#include "ui/ui_json.h"
+#include "ui/ui_config.h"
 
 static UiNode* find_by_id(UiNode* node, const char* id)
 {
@@ -71,8 +71,8 @@ static void test_tree_population(void)
     assert(parse_config_text(styles, CONFIG_FORMAT_JSON, &styles_root, &err));
     err = (ConfigError){0};
     assert(parse_config_text(layout, CONFIG_FORMAT_JSON, &config_layout_root, &err));
-    Style* parsed_styles = parse_styles_config(styles_root);
-    UiNode* root = parse_layout_config(config_layout_root, NULL, parsed_styles, NULL, &scene);
+    Style* parsed_styles = ui_config_load_styles(styles_root);
+    UiNode* root = ui_config_load_layout(config_layout_root, NULL, parsed_styles, NULL, &scene);
     config_node_free(styles_root);
     config_node_free(config_layout_root);
     assert(root);
@@ -99,9 +99,49 @@ static void test_tree_population(void)
     scene_dispose(&scene);
 }
 
+static void test_yaml_layout_parsing(void)
+{
+    const char* styles_yaml =
+        "styles:\n"
+        "  base:\n"
+        "    padding: 3\n"
+        "    textColor: [0.2, 0.3, 0.4, 1.0]\n";
+
+    const char* layout_yaml =
+        "layout:\n"
+        "  type: column\n"
+        "  children:\n"
+        "    - type: label\n"
+        "      text: Example\n"
+        "      style: base\n";
+
+    ConfigNode* styles_root = NULL;
+    ConfigNode* layout_root = NULL;
+    ConfigError err = {0};
+    assert(parse_config_text(styles_yaml, CONFIG_FORMAT_YAML, &styles_root, &err));
+    err = (ConfigError){0};
+    assert(parse_config_text(layout_yaml, CONFIG_FORMAT_YAML, &layout_root, &err));
+
+    Style* parsed_styles = ui_config_load_styles(styles_root);
+    assert(parsed_styles);
+    UiNode* root = ui_config_load_layout(layout_root, NULL, parsed_styles, NULL, NULL);
+    assert(root);
+    assert(root->child_count == 1);
+    UiNode* child = &root->children[0];
+    assert(child->type && strcmp(child->type, "label") == 0);
+    assert(child->text && strcmp(child->text, "Example") == 0);
+    assert(child->style_name && strcmp(child->style_name, "base") == 0);
+
+    free_ui_tree(root);
+    free_styles(parsed_styles);
+    config_node_free(styles_root);
+    config_node_free(layout_root);
+}
+
 int main(void)
 {
     test_tree_population();
+    test_yaml_layout_parsing();
     printf("scene_ui_tests passed\n");
     return 0;
 }

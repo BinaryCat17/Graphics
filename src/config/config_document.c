@@ -306,6 +306,27 @@ const ConfigNode *config_map_get(const ConfigNode *map, const char *key)
     return NULL;
 }
 
+static const ConfigNode *config_node_expect(const ConfigNode *node, ConfigNodeType type)
+{
+    if (!node || node->type != type) return NULL;
+    return node;
+}
+
+const ConfigNode *config_node_get_map(const ConfigNode *map, const char *key)
+{
+    return config_node_expect(config_map_get(map, key), CONFIG_NODE_MAP);
+}
+
+const ConfigNode *config_node_get_sequence(const ConfigNode *map, const char *key)
+{
+    return config_node_expect(config_map_get(map, key), CONFIG_NODE_SEQUENCE);
+}
+
+const ConfigNode *config_node_get_scalar(const ConfigNode *map, const char *key)
+{
+    return config_node_expect(config_map_get(map, key), CONFIG_NODE_SCALAR);
+}
+
 void config_node_free(ConfigNode *node)
 {
     if (!node) return;
@@ -329,84 +350,6 @@ void config_document_free(ConfigDocument *doc)
     config_node_free(doc->root);
     doc->root = NULL;
     doc->source_path = NULL;
-}
-
-static int emit_json_internal(const ConfigNode *node, char **out)
-{
-    if (!node || !out) return 0;
-    if (node->type == CONFIG_NODE_SCALAR) {
-        if (!node->scalar) return 0;
-        if (node->scalar_type == CONFIG_SCALAR_STRING) {
-            size_t len = strlen(node->scalar) + 3;
-            char *buf = (char *)malloc(len);
-            if (!buf) return 0;
-            snprintf(buf, len, "\"%s\"", node->scalar);
-            *out = buf;
-            return 1;
-        }
-        *out = strdup(node->scalar);
-        return *out != NULL;
-    }
-    if (node->type == CONFIG_NODE_SEQUENCE) {
-        char **items = (char **)calloc(node->item_count, sizeof(char *));
-        if (!items) return 0;
-        size_t total = 0;
-        for (size_t i = 0; i < node->item_count; ++i) {
-            if (!emit_json_internal(node->items[i], &items[i])) { for (size_t j = 0; j < i; ++j) free(items[j]); free(items); return 0; }
-            total += strlen(items[i]) + 1;
-        }
-        char *buf = (char *)malloc(total + 3);
-        if (!buf) { for (size_t i = 0; i < node->item_count; ++i) free(items[i]); free(items); return 0; }
-        buf[0] = '['; size_t pos = 1;
-        for (size_t i = 0; i < node->item_count; ++i) {
-            size_t len = strlen(items[i]);
-            memcpy(buf + pos, items[i], len);
-            pos += len;
-            if (i + 1 < node->item_count) buf[pos++] = ',';
-            free(items[i]);
-        }
-        buf[pos++] = ']'; buf[pos] = 0;
-        free(items);
-        *out = buf;
-        return 1;
-    }
-    if (node->type == CONFIG_NODE_MAP) {
-        char **pairs = (char **)calloc(node->pair_count, sizeof(char *));
-        if (!pairs) return 0;
-        size_t total = 2; // for '{' and '}'
-        for (size_t i = 0; i < node->pair_count; ++i) {
-            char *val_json = NULL;
-            if (!emit_json_internal(node->pairs[i].value, &val_json)) { for (size_t j = 0; j < i; ++j) free(pairs[j]); free(pairs); return 0; }
-            size_t key_len = strlen(node->pairs[i].key);
-            size_t val_len = strlen(val_json);
-            size_t len = key_len + val_len + 6;
-            pairs[i] = (char *)malloc(len);
-            snprintf(pairs[i], len, "\"%s\":%s", node->pairs[i].key, val_json);
-            free(val_json);
-            total += strlen(pairs[i]);
-            if (i + 1 < node->pair_count) total += 1; // comma
-        }
-        char *buf = (char *)malloc(total + 1);
-        if (!buf) { for (size_t i = 0; i < node->pair_count; ++i) free(pairs[i]); free(pairs); return 0; }
-        buf[0] = '{'; size_t pos = 1;
-        for (size_t i = 0; i < node->pair_count; ++i) {
-            size_t len = strlen(pairs[i]);
-            memcpy(buf + pos, pairs[i], len);
-            pos += len;
-            if (i + 1 < node->pair_count) buf[pos++] = ',';
-            free(pairs[i]);
-        }
-        buf[pos++] = '}'; buf[pos] = 0;
-        free(pairs);
-        *out = buf;
-        return 1;
-    }
-    return 0;
-}
-
-int config_emit_json(const ConfigNode *node, char **out_json)
-{
-    return emit_json_internal(node, out_json);
 }
 
 int load_config_document(const char *path, ConfigFormat format, ConfigDocument *out_doc, ConfigError *err)

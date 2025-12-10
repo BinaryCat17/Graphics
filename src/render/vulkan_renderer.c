@@ -14,7 +14,7 @@
 #include <GLFW/glfw3.h>
 
 #include "core/Graphics.h"
-#include "ui/ui_json.h"
+#include "ui/ui_config.h"
 
 #define STB_TRUETYPE_IMPLEMENTATION
 #include "stb_truetype.h"

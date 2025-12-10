@@ -6,7 +6,7 @@
 #include <threads.h>
 
 #include "render_runtime_service.h"
-#include "ui/ui_json.h"
+#include "ui/ui_config.h"
 
 typedef struct RenderServiceContext {
     RenderRuntimeServiceContext* runtime;

@@ -5,7 +5,7 @@
 #include "assets/assets.h"
 #include "cad/cad_scene.h"
 #include "config/module_yaml_loader.h"
-#include "ui/ui_json.h"
+#include "ui/ui_config.h"
 
 // Owns application-level state shared between systems.
 typedef struct CoreContext {
