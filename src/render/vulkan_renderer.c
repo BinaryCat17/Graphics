@@ -1015,10 +1015,10 @@ static int apply_clip_rect(const Widget* widget, const Rect* input, Rect* out) {
     *out = *input;
     if (!widget->has_clip) return 1;
 
-    float clip_x0 = roundf(widget->clip.x);
-    float clip_y0 = roundf(widget->clip.y);
-    float clip_x1 = roundf(widget->clip.x + widget->clip.w);
-    float clip_y1 = roundf(widget->clip.y + widget->clip.h);
+    float clip_x0 = ceilf(widget->clip.x);
+    float clip_y0 = ceilf(widget->clip.y);
+    float clip_x1 = floorf(widget->clip.x + widget->clip.w);
+    float clip_y1 = floorf(widget->clip.y + widget->clip.h);
 
     float x0 = fmaxf(input->x, clip_x0);
     float y0 = fmaxf(input->y, clip_y0);
