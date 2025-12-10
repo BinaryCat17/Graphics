@@ -4,7 +4,7 @@
 #include <string.h>
 
 #include "ui/scene_ui.h"
-#include "config_io.h"
+#include "config/config_io.h"
 #include "ui/ui_json.h"
 
 static UiNode* find_by_id(UiNode* node, const char* id)

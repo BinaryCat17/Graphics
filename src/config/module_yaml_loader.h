@@ -1,7 +1,7 @@
 #pragma once
 
 #include "config_document.h"
-#include "state_manager.h"
+#include "state/state_manager.h"
 
 typedef struct ModuleStoreSchema {
     char *name;

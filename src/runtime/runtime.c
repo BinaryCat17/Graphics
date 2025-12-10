@@ -3,8 +3,8 @@
 #include <math.h>
 #include <stdio.h>
 
-#include "render/render_service.h"
-#include "ui/ui_service.h"
+#include "render_service.h"
+#include "ui_service.h"
 
 static void on_mouse_button(GLFWwindow* window, int button, int action, int mods) {
     (void)mods;

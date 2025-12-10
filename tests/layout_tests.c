@@ -5,7 +5,7 @@
 
 #include "ui/ui_json.h"
 #include "ui/scroll.h"
-#include "config_io.h"
+#include "config/config_io.h"
 
 typedef struct {
     WidgetArray widgets;

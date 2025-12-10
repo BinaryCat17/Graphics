@@ -2,9 +2,9 @@
 #define UI_JSON_H
 
 #include <stddef.h>
-#include "Graphics.h"
-#include "cad_scene.h"
-#include "config_document.h"
+#include "core/Graphics.h"
+#include "cad/cad_scene.h"
+#include "config/config_document.h"
 
 #define UI_Z_ORDER_SCALE 1000
 

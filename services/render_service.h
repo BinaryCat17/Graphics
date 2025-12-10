@@ -3,7 +3,7 @@
 
 #include <stdbool.h>
 
-#include "Graphics.h"
+#include "core/Graphics.h"
 #include "assets/assets.h"
 #include "render/render_context.h"
 #include "ui/ui_context.h"

@@ -4,8 +4,8 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "cad_scene_yaml.h"
-#include "module_yaml_loader.h"
+#include "cad/cad_scene_yaml.h"
+#include "config/module_yaml_loader.h"
 
 static char* join_path(const char* dir, const char* leaf) {
     size_t dir_len = strlen(dir);

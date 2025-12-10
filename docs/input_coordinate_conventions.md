@@ -7,7 +7,7 @@ The UI uses a single coordinate convention: the origin is at the top-left corner
 - **Logical UI**: UI layout units after applying the current `ui_scale`.
 - **Screen**: device pixels after applying DPI scaling.
 
-Use `CoordinateTransformer` (from `Graphics.h`) to move between spaces:
+Use `CoordinateTransformer` (from `core/Graphics.h`) to move between spaces:
 - `world ↔ logical`: apply or remove UI scale.
 - `logical ↔ screen`: apply or remove DPI scaling.
 - Combined helpers cover `world ↔ screen` and `screen ↔ world`.

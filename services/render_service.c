@@ -2,7 +2,7 @@
 
 #include <GLFW/glfw3.h>
 
-#include "ui/ui_service.h"
+#include "services/ui_service.h"
 #include "render/vulkan_renderer.h"
 
 bool render_service_init(RenderRuntimeContext* render, const Assets* assets, WidgetArray widgets) {
