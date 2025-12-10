@@ -15,7 +15,7 @@ static void on_mouse_button(GLFWwindow* window, int button, int action, int mods
     Vec2 screen = {(float)(mx * services->render.transformer.dpi_scale),
                    (float)(my * services->render.transformer.dpi_scale)};
     Vec2 logical = coordinate_screen_to_logical(&services->render.transformer, screen);
-    ui_handle_mouse_button(&services->ui, services->core.model, logical.x, logical.y, button, action);
+    ui_handle_mouse_button(&services->ui, logical.x, logical.y, button, action);
 }
 
 static void on_scroll(GLFWwindow* window, double xoff, double yoff) {
@@ -82,7 +82,8 @@ bool runtime_init(AppServices* services) {
     float target_h = mode ? mode->height * 0.95f : services->ui.base_h;
     float ui_scale = ui_compute_scale(&services->ui, target_w, target_h);
 
-    if (!ui_prepare_runtime(&services->ui, &services->core, ui_scale)) return false;
+    if (!ui_prepare_runtime(&services->ui, &services->core, ui_scale, &services->state_manager, services->ui_type_id))
+        return false;
 
     float desired_w = services->ui.layout_root->rect.w + 32.0f;
     float desired_h = services->ui.layout_root->rect.h + 32.0f;

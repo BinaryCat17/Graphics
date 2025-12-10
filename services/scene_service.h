@@ -3,9 +3,9 @@
 
 #include <stdbool.h>
 
-#include "core/context.h"
+#include "runtime/app_services.h"
 
-bool scene_service_load(CoreContext* core, const char* assets_dir, const char* scene_path);
-void scene_service_unload(CoreContext* core);
+bool scene_service_load(AppServices* services, const char* assets_dir, const char* scene_path);
+void scene_service_unload(AppServices* services);
 
 #endif // SCENE_SERVICE_H

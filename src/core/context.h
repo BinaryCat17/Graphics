@@ -5,12 +5,10 @@
 #include "assets/assets.h"
 #include "cad/cad_scene.h"
 #include "config/module_yaml_loader.h"
-#include "state/state_manager.h"
 #include "ui/ui_json.h"
 
 // Owns application-level state shared between systems.
 typedef struct CoreContext {
-    StateManager state_manager;
     ModuleSchema ui_schema;
     ModuleSchema global_schema;
 

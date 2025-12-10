@@ -2,6 +2,7 @@
 #define UI_CONTEXT_H
 
 #include "core/layout.h"
+#include "state/state_manager.h"
 #include "ui/scene_ui.h"
 #include "ui/scroll.h"
 #include "ui/ui_json.h"
@@ -13,6 +14,9 @@ typedef struct UiContext {
     LayoutNode* layout_root;
     WidgetArray widgets;
     ScrollContext* scroll;
+    Model* model;
+    StateManager* state_manager;
+    int ui_type_id;
 
     float base_w;
     float base_h;

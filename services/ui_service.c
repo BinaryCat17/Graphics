@@ -5,6 +5,7 @@
 #include <stdio.h>
 #include <string.h>
 
+#include "service_events.h"
 #include "ui/scroll.h"
 
 static float clamp01(float v) {
@@ -94,6 +95,8 @@ bool ui_build(UiContext* ui, const CoreContext* core) {
     ui->layout_root = build_layout_tree(ui->ui_root);
     if (!ui->layout_root) return false;
 
+    ui->model = core->model;
+
     measure_layout(ui->layout_root);
     assign_layout(ui->layout_root, 0.0f, 0.0f);
     capture_layout_base(ui->layout_root);
@@ -103,19 +106,40 @@ bool ui_build(UiContext* ui, const CoreContext* core) {
     return true;
 }
 
-bool ui_prepare_runtime(UiContext* ui, const CoreContext* core, float ui_scale) {
+bool ui_prepare_runtime(UiContext* ui, const CoreContext* core, float ui_scale, StateManager* state_manager,
+                       int ui_type_id) {
     if (!ui || !ui->layout_root) return false;
     scale_layout(ui->layout_root, ui_scale);
 
     ui->widgets = materialize_widgets(ui->layout_root);
     apply_widget_padding_scale(&ui->widgets, ui_scale);
-    update_widget_bindings(ui->ui_root, core->model);
+    update_widget_bindings(ui->ui_root, ui->model);
     populate_widgets_from_layout(ui->layout_root, ui->widgets.items, ui->widgets.count);
     ui->scroll = scroll_init(ui->widgets.items, ui->widgets.count);
     if (!ui->scroll) return false;
 
     ui->ui_scale = ui_scale;
+    ui->state_manager = state_manager;
+    ui->ui_type_id = ui_type_id;
+
+    if (state_manager && ui_type_id >= 0) {
+        UiRuntimeComponent component = {.ui = ui, .widgets = ui->widgets};
+        state_manager_publish(state_manager, STATE_EVENT_COMPONENT_ADDED, ui_type_id, "active", &component,
+                              sizeof(component));
+    }
     return true;
+}
+
+static void on_model_event(const StateEvent* event, void* user_data) {
+    UiContext* ui = (UiContext*)user_data;
+    if (!ui || !event || !event->payload) return;
+    const ModelComponent* component = (const ModelComponent*)event->payload;
+    ui->model = component->model;
+}
+
+bool ui_service_subscribe(UiContext* ui, StateManager* state_manager, int model_type_id) {
+    if (!ui || !state_manager || model_type_id < 0) return false;
+    return state_manager_subscribe(state_manager, model_type_id, "active", on_model_event, ui) == 0;
 }
 
 void ui_refresh_layout(UiContext* ui, float new_scale) {
@@ -129,16 +153,22 @@ void ui_refresh_layout(UiContext* ui, float new_scale) {
     scroll_rebuild(ui->scroll, ui->widgets.items, ui->widgets.count, ratio);
 }
 
-void ui_frame_update(UiContext* ui, Model* model) {
-    if (!ui || !ui->widgets.items) return;
-    update_widget_bindings(ui->ui_root, model);
+void ui_frame_update(UiContext* ui) {
+    if (!ui || !ui->widgets.items || !ui->model) return;
+    update_widget_bindings(ui->ui_root, ui->model);
     populate_widgets_from_layout(ui->layout_root, ui->widgets.items, ui->widgets.count);
     apply_widget_padding_scale(&ui->widgets, ui->ui_scale);
     scroll_apply_offsets(ui->scroll, ui->widgets.items, ui->widgets.count);
+
+    if (ui->state_manager && ui->ui_type_id >= 0) {
+        UiRuntimeComponent component = {.ui = ui, .widgets = ui->widgets};
+        state_manager_publish(ui->state_manager, STATE_EVENT_COMPONENT_UPDATED, ui->ui_type_id, "active", &component,
+                              sizeof(component));
+    }
 }
 
-void ui_handle_mouse_button(UiContext* ui, Model* model, double mx, double my, int button, int action) {
-    if (!ui || !ui->widgets.items) return;
+void ui_handle_mouse_button(UiContext* ui, double mx, double my, int button, int action) {
+    if (!ui || !ui->widgets.items || !ui->model) return;
     int pressed = (button == GLFW_MOUSE_BUTTON_LEFT && action == GLFW_PRESS);
     if (scroll_handle_mouse_button(ui->scroll, ui->widgets.items, ui->widgets.count, (float)mx, (float)my, pressed))
         return;
@@ -147,9 +177,9 @@ void ui_handle_mouse_button(UiContext* ui, Model* model, double mx, double my, i
         Widget* w = &ui->widgets.items[i];
         if ((w->type == W_BUTTON || w->type == W_CHECKBOX || w->type == W_HSLIDER) && point_in_widget(w, mx, my)) {
             if (w->type == W_HSLIDER) {
-                apply_slider_action(w, model, (float)mx);
+                apply_slider_action(w, ui->model, (float)mx);
             } else {
-                apply_click_action(w, model);
+                apply_click_action(w, ui->model);
             }
             break;
         }

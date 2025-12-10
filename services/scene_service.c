@@ -6,6 +6,7 @@
 
 #include "cad/cad_scene_yaml.h"
 #include "config/module_yaml_loader.h"
+#include "service_events.h"
 
 static char* join_path(const char* dir, const char* leaf) {
     size_t dir_len = strlen(dir);
@@ -26,11 +27,12 @@ static void free_schemas(CoreContext* core) {
     module_schema_free(&core->global_schema);
 }
 
-bool scene_service_load(CoreContext* core, const char* assets_dir, const char* scene_path) {
-    if (!core || !assets_dir || !scene_path) return false;
+bool scene_service_load(AppServices* services, const char* assets_dir, const char* scene_path) {
+    if (!services || !assets_dir || !scene_path) return false;
+
+    CoreContext* core = &services->core;
 
     ConfigError schema_err = {0};
-    state_manager_init(&core->state_manager, 8, 32);
 
     char* ui_dir = join_path(assets_dir, "ui");
     char* global_dir = join_path(assets_dir, "global_state");
@@ -38,9 +40,9 @@ bool scene_service_load(CoreContext* core, const char* assets_dir, const char* s
     char* global_schema_path = join_path(global_dir, "schema.yaml");
 
     if (ui_schema_path && module_schema_load(ui_schema_path, &core->ui_schema, &schema_err)) {
-        module_schema_register(&core->state_manager, &core->ui_schema, NULL);
+        module_schema_register(&services->state_manager, &core->ui_schema, NULL);
         char* ui_config = join_path(ui_dir, "config");
-        module_load_configs(&core->ui_schema, ui_config, &core->state_manager);
+        module_load_configs(&core->ui_schema, ui_config, &services->state_manager);
         free(ui_config);
     } else {
         fprintf(stderr, "UI schema error %s:%d:%d %s\n", ui_schema_path ? ui_schema_path : "(null)", schema_err.line,
@@ -49,9 +51,9 @@ bool scene_service_load(CoreContext* core, const char* assets_dir, const char* s
 
     schema_err = (ConfigError){0};
     if (global_schema_path && module_schema_load(global_schema_path, &core->global_schema, &schema_err)) {
-        module_schema_register(&core->state_manager, &core->global_schema, NULL);
+        module_schema_register(&services->state_manager, &core->global_schema, NULL);
         char* global_config = join_path(global_dir, "config");
-        module_load_configs(&core->global_schema, global_config, &core->state_manager);
+        module_load_configs(&core->global_schema, global_config, &services->state_manager);
         free(global_config);
     } else {
         fprintf(stderr, "Global schema error %s:%d:%d %s\n", global_schema_path ? global_schema_path : "(null)",
@@ -67,12 +69,12 @@ bool scene_service_load(CoreContext* core, const char* assets_dir, const char* s
     if (!parse_scene_yaml(scene_path, &core->scene, &scene_err)) {
         fprintf(stderr, "Failed to load scene %s:%d:%d %s\n", scene_path, scene_err.line, scene_err.column,
                 scene_err.message);
-        scene_service_unload(core);
+        scene_service_unload(services);
         return false;
     }
 
     if (!load_assets(assets_dir, &core->assets)) {
-        scene_service_unload(core);
+        scene_service_unload(services);
         return false;
     }
 
@@ -81,11 +83,25 @@ bool scene_service_load(CoreContext* core, const char* assets_dir, const char* s
         scene_ui_bind_model(core->model, &core->scene, scene_path);
     }
 
+    SceneComponent scene_component = {.scene = &core->scene, .path = scene_path};
+    state_manager_publish(&services->state_manager, STATE_EVENT_COMPONENT_ADDED, services->scene_type_id, "active",
+                          &scene_component, sizeof(scene_component));
+
+    AssetsComponent assets_component = {.assets = &core->assets};
+    state_manager_publish(&services->state_manager, STATE_EVENT_COMPONENT_ADDED, services->assets_type_id, "active",
+                          &assets_component, sizeof(assets_component));
+
+    ModelComponent model_component = {.model = core->model};
+    state_manager_publish(&services->state_manager, STATE_EVENT_COMPONENT_ADDED, services->model_type_id, "active",
+                          &model_component, sizeof(model_component));
+
     return true;
 }
 
-void scene_service_unload(CoreContext* core) {
-    if (!core) return;
+void scene_service_unload(AppServices* services) {
+    if (!services) return;
+
+    CoreContext* core = &services->core;
 
     if (core->model) {
         save_model(core->model);
@@ -96,5 +112,4 @@ void scene_service_unload(CoreContext* core) {
     free_assets(&core->assets);
     scene_dispose(&core->scene);
     free_schemas(core);
-    state_manager_dispose(&core->state_manager);
 }
