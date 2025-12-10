@@ -2,7 +2,7 @@
 #include <math.h>
 #include <stdio.h>
 
-#include "Graphics.h"
+#include "core/Graphics.h"
 
 static int nearly_equal(float a, float b) {
     return fabsf(a - b) < 0.0001f;

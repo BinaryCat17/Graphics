@@ -3,7 +3,7 @@
 
 #include <GLFW/glfw3.h>
 
-#include "coordinate_transform.h"
+#include "core/coordinate_transform.h"
 
 // Window and transformer state used by the rendering subsystem.
 typedef struct RenderRuntimeContext {

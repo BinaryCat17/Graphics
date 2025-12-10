@@ -1,7 +1,7 @@
 #ifndef SCENE_UI_H
 #define SCENE_UI_H
 
-#include "cad_scene.h"
+#include "cad/cad_scene.h"
 #include "ui/ui_json.h"
 
 /**

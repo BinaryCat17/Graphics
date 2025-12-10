@@ -1,7 +1,7 @@
 #ifndef ASSETS_H
 #define ASSETS_H
 
-#include "config_document.h"
+#include "config/config_document.h"
 
 typedef struct Assets {
     char* model_path;

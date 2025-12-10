@@ -1,7 +1,7 @@
 #include <assert.h>
 #include <stdio.h>
 
-#include "Graphics.h"
+#include "core/Graphics.h"
 
 static Renderer create_renderer(void)
 {

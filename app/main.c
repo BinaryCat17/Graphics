@@ -3,10 +3,10 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "render/render_service.h"
 #include "runtime/runtime.h"
-#include "scene/scene_service.h"
-#include "ui/ui_service.h"
+#include "services/render_service.h"
+#include "services/scene_service.h"
+#include "services/ui_service.h"
 
 int main(int argc, char** argv) {
     const char* assets_dir = "assets";

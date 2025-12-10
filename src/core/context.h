@@ -1,11 +1,11 @@
 #ifndef CORE_CONTEXT_H
 #define CORE_CONTEXT_H
 
-#include "Graphics.h"
+#include "core/Graphics.h"
 #include "assets/assets.h"
-#include "cad_scene.h"
-#include "module_yaml_loader.h"
-#include "state_manager.h"
+#include "cad/cad_scene.h"
+#include "config/module_yaml_loader.h"
+#include "state/state_manager.h"
 #include "ui/ui_json.h"
 
 // Owns application-level state shared between systems.
