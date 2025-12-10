@@ -1112,9 +1112,33 @@ static UiNode* parse_layout_json_text(const char* json, const Model* model, cons
 }
 
 Model* parse_model_config(const ConfigDocument* doc) {
-    if (!doc) return NULL;
-    char* json = config_node_to_json(doc->root);
-    if (!json) return NULL;
+    if (!doc || !doc->root) return NULL;
+
+    const ConfigNode* store_node = config_map_get(doc->root, "store");
+    const ConfigNode* key_node = config_map_get(doc->root, "key");
+    const ConfigNode* data_node = config_map_get(doc->root, "data");
+    const ConfigNode* model_node = data_node ? config_map_get(data_node, "model") : config_map_get(doc->root, "model");
+
+    if (!model_node) {
+        fprintf(stderr, "Error: model section missing in UI config %s\n", doc->source_path ? doc->source_path : "(unknown)");
+        return NULL;
+    }
+
+    char* model_body = config_node_to_json(model_node);
+    const char* store = (store_node && store_node->scalar) ? store_node->scalar : "model";
+    const char* key = (key_node && key_node->scalar) ? key_node->scalar : "default";
+
+    if (!model_body) return NULL;
+
+    size_t len = strlen(model_body) + strlen(store) + strlen(key) + 32;
+    char* json = (char*)malloc(len);
+    if (!json) {
+        free(model_body);
+        return NULL;
+    }
+    snprintf(json, len, "{\"store\":\"%s\",\"key\":\"%s\",\"model\":%s}", store, key, model_body);
+    free(model_body);
+
     Model* model = parse_model_json_text(json, doc->source_path);
     if (model) model->source_doc = doc;
     free(json);
@@ -1122,16 +1146,73 @@ Model* parse_model_config(const ConfigDocument* doc) {
 }
 
 Style* parse_styles_config(const ConfigNode* root) {
-    char* json = config_node_to_json(root);
-    if (!json) return NULL;
+    const ConfigNode* data_node = config_map_get(root, "data");
+    const ConfigNode* styles_node = data_node ? config_map_get(data_node, "styles") : config_map_get(root, "styles");
+    if (!styles_node) {
+        fprintf(stderr, "Error: styles section missing in UI config\n");
+        return NULL;
+    }
+
+    char* styles_body = config_node_to_json(styles_node);
+    if (!styles_body) return NULL;
+
+    size_t len = strlen(styles_body) + 12;
+    char* json = (char*)malloc(len);
+    if (!json) {
+        free(styles_body);
+        return NULL;
+    }
+    snprintf(json, len, "{\"styles\":%s}", styles_body);
+    free(styles_body);
+
     Style* styles = parse_styles_json_text(json);
     free(json);
     return styles;
 }
 
 UiNode* parse_layout_config(const ConfigNode* root, const Model* model, const Style* styles, const char* font_path, const Scene* scene) {
-    char* json = config_node_to_json(root);
-    if (!json) return NULL;
+    if (!root) return NULL;
+
+    const ConfigNode* data_node = config_map_get(root, "data");
+    const ConfigNode* layout_node = data_node ? config_map_get(data_node, "layout") : config_map_get(root, "layout");
+    const ConfigNode* widgets_node = data_node ? config_map_get(data_node, "widgets") : config_map_get(root, "widgets");
+    const ConfigNode* floating_node = data_node ? config_map_get(data_node, "floating") : config_map_get(root, "floating");
+
+    if (!layout_node && !widgets_node) {
+        fprintf(stderr, "Error: layout or widgets section missing in UI config\n");
+        return NULL;
+    }
+
+    char* layout_body = layout_node ? config_node_to_json(layout_node) : NULL;
+    char* widgets_body = widgets_node ? config_node_to_json(widgets_node) : NULL;
+    char* floating_body = floating_node ? config_node_to_json(floating_node) : NULL;
+
+    size_t len = 2; // braces
+    len += layout_body ? strlen(layout_body) + 10 : 0;
+    len += widgets_body ? strlen(widgets_body) + 12 : 0;
+    len += floating_body ? strlen(floating_body) + 13 : 0;
+
+    char* json = (char*)malloc(len);
+    if (!json) { free(layout_body); free(widgets_body); free(floating_body); return NULL; }
+
+    size_t pos = 0;
+    json[pos++] = '{';
+    int first = 1;
+    if (widgets_body) { pos += snprintf(json + pos, len - pos, "\"widgets\":%s", widgets_body); first = 0; }
+    if (layout_body) {
+        pos += snprintf(json + pos, len - pos, "%s\"layout\":%s", first ? "" : ",", layout_body);
+        first = 0;
+    }
+    if (floating_body) {
+        pos += snprintf(json + pos, len - pos, "%s\"floating\":%s", first ? "" : ",", floating_body);
+    }
+    json[pos++] = '}';
+    json[pos] = 0;
+
+    free(layout_body);
+    free(widgets_body);
+    free(floating_body);
+
     UiNode* ui = parse_layout_json_text(json, model, styles, font_path, scene);
     free(json);
     return ui;
