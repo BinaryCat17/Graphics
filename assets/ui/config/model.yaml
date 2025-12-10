@@ -1,7 +1,8 @@
 store: model
 key: default
 data:
-  sceneStats: "1 материалов · 4 деталей · 3 соединений"
-  scenePath: "../../../assets/scenes/gear_reducer.yaml"
-  sceneAuthor: ""
-  sceneName: "Spur reducer"
+  model:
+    sceneStats: "1 материалов · 4 деталей · 3 соединений"
+    scenePath: "../../../assets/scenes/gear_reducer.yaml"
+    sceneAuthor: ""
+    sceneName: "Spur reducer"
