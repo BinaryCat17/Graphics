@@ -148,6 +148,8 @@ static int compute_scrollbar_geometry(const Widget* w, Rect* out_track, Rect* ou
     if (max_offset <= 1.0f) return 0;
     Rect widget_rect = { w->rect.x, w->rect.y + (w->scroll_static ? 0.0f : w->scroll_offset), w->rect.w, w->rect.h };
     Rect inner_rect = widget_rect;
+    float inner_padding = w->padding - w->border_thickness;
+    if (inner_padding < 0.0f) inner_padding = 0.0f;
     if (w->border_thickness > 0.0f) {
         inner_rect.x += w->border_thickness;
         inner_rect.y += w->border_thickness;
@@ -156,11 +158,19 @@ static int compute_scrollbar_geometry(const Widget* w, Rect* out_track, Rect* ou
         if (inner_rect.w < 0.0f) inner_rect.w = 0.0f;
         if (inner_rect.h < 0.0f) inner_rect.h = 0.0f;
     }
+    if (inner_padding > 0.0f) {
+        inner_rect.x += inner_padding;
+        inner_rect.y += inner_padding;
+        inner_rect.w -= inner_padding * 2.0f;
+        inner_rect.h -= inner_padding * 2.0f;
+        if (inner_rect.w < 0.0f) inner_rect.w = 0.0f;
+        if (inner_rect.h < 0.0f) inner_rect.h = 0.0f;
+    }
     float track_w = w->scrollbar_width > 0.0f ? w->scrollbar_width : fmaxf(4.0f, inner_rect.w * 0.02f);
-    float track_h = inner_rect.h - w->padding * 2.0f;
+    float track_h = inner_rect.h;
     if (track_h <= 0.0f) return 0;
-    float track_x = inner_rect.x + inner_rect.w - track_w - w->padding * 0.5f;
-    float track_y = inner_rect.y + w->padding;
+    float track_x = inner_rect.x + inner_rect.w - track_w - inner_padding * 0.5f;
+    float track_y = inner_rect.y;
     float thumb_ratio = w->scroll_viewport / w->scroll_content;
     float thumb_h = fmaxf(track_h * thumb_ratio, 12.0f);
     float clamped_offset = clamp_scroll_offset(w->scroll_offset, max_offset);
@@ -231,11 +241,21 @@ void scroll_apply_offsets(ScrollContext* ctx, Widget* widgets, size_t widget_cou
                 viewport = a->bounds;
             }
         }
+        float inner_padding = w->padding - w->border_thickness;
+        if (inner_padding < 0.0f) inner_padding = 0.0f;
         if (w->border_thickness > 0.0f) {
             viewport.x += w->border_thickness;
             viewport.y += w->border_thickness;
             viewport.w -= w->border_thickness * 2.0f;
             viewport.h -= w->border_thickness * 2.0f;
+            if (viewport.w < 0.0f) viewport.w = 0.0f;
+            if (viewport.h < 0.0f) viewport.h = 0.0f;
+        }
+        if (inner_padding > 0.0f) {
+            viewport.x += inner_padding;
+            viewport.y += inner_padding;
+            viewport.w -= inner_padding * 2.0f;
+            viewport.h -= inner_padding * 2.0f;
             if (viewport.w < 0.0f) viewport.w = 0.0f;
             if (viewport.h < 0.0f) viewport.h = 0.0f;
         }
@@ -249,6 +269,11 @@ void scroll_apply_offsets(ScrollContext* ctx, Widget* widgets, size_t widget_cou
             w->scroll_viewport = viewport_h;
             w->scroll_content = content_h;
             w->show_scrollbar = w->scrollbar_enabled && overflow > 1.0f;
+            if (w->show_scrollbar) {
+                float track_w = w->scrollbar_width > 0.0f ? w->scrollbar_width : fmaxf(4.0f, viewport.w * 0.02f);
+                float inset = track_w + inner_padding * 0.5f;
+                if (viewport.w > inset) viewport.w -= inset; else viewport.w = 0.0f;
+            }
         }
         if (a->has_viewport || a->has_bounds) {
             w->has_clip = 1;
