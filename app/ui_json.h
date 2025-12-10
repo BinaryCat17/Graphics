@@ -28,6 +28,8 @@ typedef struct ModelEntry {
 
 typedef struct Model {
     ModelEntry* entries;
+    char* store;
+    char* key;
     char* source_path;
 } Model;
 
