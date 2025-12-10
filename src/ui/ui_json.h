@@ -32,6 +32,7 @@ typedef struct Model {
     char* store;
     char* key;
     char* source_path;
+    const ConfigDocument* source_doc;
 } Model;
 
 typedef struct Style {
@@ -151,6 +152,9 @@ typedef struct Widget {
     int resizable;
     int draggable;
     int modal;
+    int has_resizable;
+    int has_draggable;
+    int has_modal;
     int has_floating_rect;
     float floating_min_w, floating_min_h;
     float floating_max_w, floating_max_h;
@@ -174,7 +178,7 @@ typedef struct WidgetArray {
     size_t count;
 } WidgetArray;
 
-Model* parse_model_config(const ConfigNode* root, const char* source_path);
+Model* parse_model_config(const ConfigDocument* doc);
 Style* parse_styles_config(const ConfigNode* root);
 UiNode* parse_layout_config(const ConfigNode* root, const Model* model, const Style* styles, const char* font_path, const Scene* scene);
 

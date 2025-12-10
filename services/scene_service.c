@@ -85,13 +85,13 @@ bool scene_service_load(AppServices* services, const char* assets_dir, const cha
         return false;
     }
 
-    if (!load_assets(assets_dir, &core->assets)) {
+    if (!load_assets(assets_dir, config ? config->ui_config_path : NULL, &core->assets)) {
         fprintf(stderr, "Failed to load assets from '%s'.\n", assets_dir);
         scene_service_unload(services);
         return false;
     }
 
-    core->model = parse_model_config(core->assets.model_doc.root, core->assets.model_path);
+    core->model = parse_model_config(&core->assets.ui_doc);
     if (core->model) {
         scene_ui_bind_model(core->model, &core->scene, scene_path);
     }

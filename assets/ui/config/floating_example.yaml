@@ -2,6 +2,15 @@
 store: layout
 key: floatingExample
 data:
+  model:
+    activePanel: ""
+  styles:
+    panelPrimary:
+      color: [0.14, 0.18, 0.26, 0.95]
+      textColor: [0.95, 0.98, 1.0, 1.0]
+    panelSecondary:
+      color: [0.18, 0.24, 0.32, 0.95]
+      textColor: [0.95, 0.98, 1.0, 1.0]
   widgets:
     floatingPanel:
       type: column
