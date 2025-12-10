@@ -117,9 +117,8 @@ void service_manager_wait(ServiceManager* manager) {
     for (size_t i = 0; i < manager->start_order_count; ++i) {
         ServiceEntry* reg = &manager->services[manager->start_order[i]];
         if (reg->started && reg->descriptor && reg->descriptor->thread_handle) {
-            thrd_t* thread = (thrd_t*)reg->descriptor->thread_handle;
+            const thrd_t* thread = (const thrd_t*)reg->descriptor->thread_handle;
             thrd_join(*thread, NULL);
-            reg->descriptor->thread_handle = NULL;
         }
     }
 }
