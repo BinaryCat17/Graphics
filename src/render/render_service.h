@@ -7,7 +7,7 @@
 #include "assets/assets.h"
 #include "render/render_context.h"
 #include "ui/ui_context.h"
-#include "ui/widgets.h"
+#include "ui/ui_json.h"
 
 bool render_service_init(RenderRuntimeContext* render, const Assets* assets, WidgetArray widgets);
 void render_service_update_transformer(RenderRuntimeContext* render);

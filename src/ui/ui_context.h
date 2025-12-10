@@ -1,11 +1,10 @@
 #ifndef UI_CONTEXT_H
 #define UI_CONTEXT_H
 
-#include "ui/layout.h"
+#include "layout.h"
 #include "ui/scene_ui.h"
 #include "ui/scroll.h"
-#include "ui/styles.h"
-#include "ui/widgets.h"
+#include "ui/ui_json.h"
 
 // Stores all UI-related state shared between build and runtime.
 typedef struct UiContext {
