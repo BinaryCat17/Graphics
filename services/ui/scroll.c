@@ -302,12 +302,10 @@ void scroll_apply_offsets(ScrollContext* ctx, Widget* widgets, size_t widget_cou
                 if (choose_clip) {
                     a->clip = clipped_viewport;
                     a->clip_area = clip_area;
+                    a->z_index = w->z_index;
                 }
+                a->has_clip = 1;
             }
-            if (!a->has_clip || w->z_index > a->z_index) {
-                a->z_index = w->z_index;
-            }
-            if (has_clip) a->has_clip = 1;
         }
     }
 }
