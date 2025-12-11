@@ -34,7 +34,7 @@ endif()
 set(CORE_SOURCES
         "src/coordinate_systems/coordinate_systems.c"
         "src/coordinate_systems/layout_geometry.c"
-        "src/core/utils/buffer_reserve.c"
+        "src/memory/buffer.c"
         "src/core/Graphics.h")
 
 set(RENDER_COMMON_SOURCES

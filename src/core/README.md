@@ -4,7 +4,7 @@ This directory hosts reusable primitives that feed higher-level UI, runtime, and
 
 ## Domains and responsibilities
 - `coordinate_systems/*` — shared vector/matrix math with 2D/3D transforms, coordinate hierarchy helpers (local/world/logical/screen), projection math, and the reusable `RenderContext` payload.
-- `utils/buffer_reserve.*` — small allocation helper for growing dynamic buffers used across the rendering and layout pipelines.
+- `memory/buffer.*` — shared buffer growth helpers (`ensure_capacity` and `MEM_BUFFER_DECLARE`) that standardize allocation checks and doubling strategy.
 - `Graphics.h` — convenience umbrella header for the core module.
 
 ## Migration map
@@ -13,6 +13,6 @@ To reduce ambiguous names and single-file folders, prior core files were reorgan
 - `layout.*` → `coordinate_systems/layout_geometry.*`
 - `render_commands.*` → `render/common/render_composition.*`
 - `vertex_buffers.*` → `render/common/ui_mesh_builder.*`
-- `memory_utils.*` → `utils/buffer_reserve.*`
+- `memory_utils.*` → `memory/buffer.*`
 
 Include paths in the rest of the codebase now reference these scoped locations. New additions should follow the same domain-oriented layout and avoid creating one-file directories when a related sibling exists.

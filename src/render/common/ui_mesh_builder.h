@@ -14,7 +14,10 @@ typedef struct UiVertex {
 } UiVertex;
 
 typedef struct UiVertexBuffer {
-    UiVertex *vertices;
+    union {
+        UiVertex *data;
+        UiVertex *vertices;
+    };
     size_t count;
     size_t capacity;
 } UiVertexBuffer;
@@ -26,7 +29,10 @@ typedef struct UiTextVertex {
 } UiTextVertex;
 
 typedef struct UiTextVertexBuffer {
-    UiTextVertex *vertices;
+    union {
+        UiTextVertex *data;
+        UiTextVertex *vertices;
+    };
     size_t count;
     size_t capacity;
 } UiTextVertexBuffer;

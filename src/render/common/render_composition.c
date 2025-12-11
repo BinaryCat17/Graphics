@@ -3,7 +3,9 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "core/utils/buffer_reserve.h"
+#include "memory/buffer.h"
+
+MEM_BUFFER_DECLARE(RenderCommandList, 4)
 
 static int compare_sort_keys(const RenderSortKey *a, const RenderSortKey *b)
 {
@@ -67,24 +69,12 @@ static void stable_sort(RenderCommand *commands, RenderCommand *scratch, size_t 
 
 void render_command_list_init(RenderCommandList *list, size_t initial_capacity)
 {
-    if (!list) {
-        return;
-    }
-    list->count = 0;
-    list->capacity = 0;
-    list->commands = NULL;
-    ensure_capacity((void **)&list->commands, sizeof(RenderCommand), &list->capacity, initial_capacity, 4);
+    RenderCommandList_mem_init(list, initial_capacity);
 }
 
 void render_command_list_dispose(RenderCommandList *list)
 {
-    if (!list) {
-        return;
-    }
-    free(list->commands);
-    list->commands = NULL;
-    list->count = 0;
-    list->capacity = 0;
+    RenderCommandList_mem_dispose(list);
 }
 
 int render_command_list_add(RenderCommandList *list, const RenderCommand *command)
@@ -93,7 +83,7 @@ int render_command_list_add(RenderCommandList *list, const RenderCommand *comman
         return -1;
     }
 
-    if (ensure_capacity((void **)&list->commands, sizeof(RenderCommand), &list->capacity, list->count + 1, 4) != 0) {
+    if (RenderCommandList_mem_reserve(list, list->count + 1) != 0) {
         return -1;
     }
 
