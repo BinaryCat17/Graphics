@@ -72,6 +72,12 @@ typedef struct StateEventQueue {
 /** Function signature invoked for each event delivered to a subscriber. */
 typedef void (*StateEventHandler)(const StateEvent *event, void *user_data);
 
+typedef enum StateManagerResult {
+    STATE_MANAGER_OK = 0,
+    STATE_MANAGER_ERROR_INVALID_ARGUMENT,
+    STATE_MANAGER_ERROR_ALLOCATION_FAILED
+} StateManagerResult;
+
 /** Subscriber filtered by component type and optional key. */
 typedef struct StateSubscriber {
     int type_id;
@@ -93,11 +99,12 @@ typedef struct StateManager {
     StateEventQueue event_queue;
 } StateManager;
 
-void state_manager_init(StateManager *manager, size_t initial_types, size_t initial_queue_capacity);
+StateManagerResult state_manager_init(StateManager *manager, size_t initial_types, size_t initial_queue_capacity);
 void state_manager_dispose(StateManager *manager);
 
-/** Register a new component pool. Returns a type id or -1 on error. */
-int state_manager_register_type(StateManager *manager, const char *name, size_t component_size, size_t chunk_capacity);
+/** Register a new component pool. On success writes the type id to out_type_id. */
+StateManagerResult state_manager_register_type(StateManager *manager, const char *name, size_t component_size,
+                                               size_t chunk_capacity, int *out_type_id);
 
 /**
  * Allocate or update a component instance addressed by (type_id, key).
@@ -123,6 +130,8 @@ int state_manager_publish(StateManager *manager, StateEventKind kind, int type_i
 
 /** Release owned allocations in an event object. */
 void state_event_dispose(StateEvent *event);
+
+const char *state_manager_result_message(StateManagerResult result);
 
 /**
  * Integration guidance:

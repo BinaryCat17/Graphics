@@ -45,8 +45,10 @@ int main(int argc, char** argv) {
     }
 
     AppServices services = {0};
-    if (!app_services_init(&services)) {
-        fprintf(stderr, "Failed to initialize application services.\n");
+    AppServicesResult services_result = app_services_init(&services);
+    if (services_result != APP_SERVICES_OK) {
+        fprintf(stderr, "Failed to initialize application services: %s.\n",
+                app_services_result_message(services_result));
         return 1;
     }
 

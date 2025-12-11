@@ -1,5 +1,6 @@
 #include "state_manager.h"
 
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -50,6 +51,18 @@ static void state_component_pool_dispose(StateComponentPool *pool) {
     pool->name = NULL;
     pool->chunk_count = 0;
     pool->chunk_array_capacity = 0;
+}
+
+const char *state_manager_result_message(StateManagerResult result) {
+    switch (result) {
+        case STATE_MANAGER_OK:
+            return "ok";
+        case STATE_MANAGER_ERROR_INVALID_ARGUMENT:
+            return "invalid argument";
+        case STATE_MANAGER_ERROR_ALLOCATION_FAILED:
+            return "allocation failed";
+    }
+    return "unknown error";
 }
 
 static int state_component_pool_grow(StateComponentPool *pool, size_t component_size) {
@@ -283,16 +296,48 @@ static int state_event_queue_pop(StateEventQueue *queue, StateEvent *out, int wa
     return got_event;
 }
 
-void state_manager_init(StateManager *manager, size_t initial_types, size_t initial_queue_capacity) {
+StateManagerResult state_manager_init(StateManager *manager, size_t initial_types, size_t initial_queue_capacity) {
+    if (!manager) {
+        return STATE_MANAGER_ERROR_INVALID_ARGUMENT;
+    }
+
     manager->pool_capacity = initial_types ? initial_types : STATE_MIN_POOL_CAPACITY;
     manager->pools = (StateComponentPool *)calloc(manager->pool_capacity, sizeof(StateComponentPool));
     manager->pool_count = 0;
+
+    if (!manager->pools) {
+        fprintf(stderr, "state_manager_init: failed to allocate %zu pools\n", manager->pool_capacity);
+        return STATE_MANAGER_ERROR_ALLOCATION_FAILED;
+    }
 
     manager->subscriber_capacity = STATE_MIN_SUBSCRIBER_CAPACITY;
     manager->subscribers = (StateSubscriber *)calloc(manager->subscriber_capacity, sizeof(StateSubscriber));
     manager->subscriber_count = 0;
 
-    state_event_queue_init(&manager->event_queue, initial_queue_capacity);
+    if (!manager->subscribers) {
+        fprintf(stderr, "state_manager_init: failed to allocate %zu subscribers\n", manager->subscriber_capacity);
+        free(manager->pools);
+        manager->pools = NULL;
+        manager->pool_capacity = 0;
+        manager->pool_count = 0;
+        return STATE_MANAGER_ERROR_ALLOCATION_FAILED;
+    }
+
+    if (!state_event_queue_init(&manager->event_queue, initial_queue_capacity)) {
+        fprintf(stderr, "state_manager_init: failed to initialize event queue\n");
+        free(manager->subscribers);
+        free(manager->pools);
+        manager->subscribers = NULL;
+        manager->pools = NULL;
+        manager->subscriber_capacity = 0;
+        manager->pool_capacity = 0;
+        manager->subscriber_count = 0;
+        manager->pool_count = 0;
+        memset(&manager->event_queue, 0, sizeof(StateEventQueue));
+        return STATE_MANAGER_ERROR_ALLOCATION_FAILED;
+    }
+
+    return STATE_MANAGER_OK;
 }
 
 void state_manager_dispose(StateManager *manager) {
@@ -319,16 +364,20 @@ void state_manager_dispose(StateManager *manager) {
     state_event_queue_dispose(&manager->event_queue);
 }
 
-int state_manager_register_type(StateManager *manager, const char *name, size_t component_size, size_t chunk_capacity) {
-    if (!manager || component_size == 0) {
-        return -1;
+StateManagerResult state_manager_register_type(StateManager *manager, const char *name, size_t component_size,
+                                               size_t chunk_capacity, int *out_type_id) {
+    if (!manager || !out_type_id || component_size == 0) {
+        fprintf(stderr, "state_manager_register_type: invalid arguments\n");
+        return STATE_MANAGER_ERROR_INVALID_ARGUMENT;
     }
 
     if (manager->pool_count == manager->pool_capacity) {
         size_t new_capacity = manager->pool_capacity * 2;
-        StateComponentPool *new_pools = (StateComponentPool *)realloc(manager->pools, new_capacity * sizeof(StateComponentPool));
+        StateComponentPool *new_pools =
+            (StateComponentPool *)realloc(manager->pools, new_capacity * sizeof(StateComponentPool));
         if (!new_pools) {
-            return -1;
+            fprintf(stderr, "state_manager_register_type: failed to grow pool array to %zu entries\n", new_capacity);
+            return STATE_MANAGER_ERROR_ALLOCATION_FAILED;
         }
         for (size_t i = manager->pool_capacity; i < new_capacity; ++i) {
             memset(&new_pools[i], 0, sizeof(StateComponentPool));
@@ -337,17 +386,23 @@ int state_manager_register_type(StateManager *manager, const char *name, size_t 
         manager->pool_capacity = new_capacity;
     }
 
+    char *name_copy = state_strdup(name);
+    if (!name_copy) {
+        fprintf(stderr, "state_manager_register_type: failed to duplicate name '%s'\n", name ? name : "(null)");
+        return STATE_MANAGER_ERROR_ALLOCATION_FAILED;
+    }
+
     StateComponentPool *pool = &manager->pools[manager->pool_count];
-    pool->name = state_strdup(name);
+    pool->name = name_copy;
     pool->component_size = component_size;
     pool->per_chunk_capacity = chunk_capacity ? chunk_capacity : STATE_MIN_CHUNK_CAPACITY;
     pool->chunks = NULL;
     pool->chunk_count = 0;
     pool->chunk_array_capacity = 0;
 
-    int id = (int)manager->pool_count;
+    *out_type_id = (int)manager->pool_count;
     manager->pool_count += 1;
-    return id;
+    return STATE_MANAGER_OK;
 }
 
 void *state_manager_write(StateManager *manager, int type_id, const char *key, const void *data) {
