@@ -1,4 +1,4 @@
-#include "module_yaml_loader.h"
+#include "scene/module_yaml_loader.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -10,7 +10,7 @@
 #include <dirent.h>
 #endif
 
-#include "config_io.h"
+#include "config/config_io.h"
 
 static void assign_error(ConfigError *err, int line, int column, const char *msg)
 {

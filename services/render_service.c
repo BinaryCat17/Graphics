@@ -5,7 +5,7 @@
 #include <threads.h>
 
 #include "platform/platform.h"
-#include "render_runtime_service.h"
+#include "render_runtime/render_runtime_service.h"
 #include "ui/ui_config.h"
 
 typedef struct RenderServiceContext {

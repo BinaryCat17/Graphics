@@ -1,4 +1,4 @@
-#include "cad_scene_yaml.h"
+#include "scene/cad_scene_yaml.h"
 
 #include <ctype.h>
 #include <stdio.h>

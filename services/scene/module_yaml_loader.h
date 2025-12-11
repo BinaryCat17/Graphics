@@ -1,6 +1,6 @@
 #pragma once
 
-#include "config_document.h"
+#include "config/config_document.h"
 #include "state/state_manager.h"
 
 typedef struct ModuleStoreSchema {
