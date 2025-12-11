@@ -1,7 +1,7 @@
 #ifndef RENDER_SERVICE_H
 #define RENDER_SERVICE_H
 
-#include "service.h"
+#include "services/service.h"
 
 const ServiceDescriptor* render_service_descriptor(void);
 
