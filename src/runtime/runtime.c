@@ -82,10 +82,17 @@ void runtime_update_transformer(AppServices* services) {
 
 static void on_framebuffer_size(PlatformWindow* window, int width, int height, void* user_data) {
     AppServices* services = NULL;
-    if (width <= 0 || height <= 0) return;
+    PlatformWindowSize logical_size = {0};
+    (void)width;
+    (void)height;
+
     services = (AppServices*)user_data;
     if (!services) return;
-    float new_scale = ui_compute_scale(&services->ui, (float)width, (float)height);
+
+    logical_size = platform_get_window_size(window);
+    if (logical_size.width <= 0 || logical_size.height <= 0) return;
+
+    float new_scale = ui_compute_scale(&services->ui, (float)logical_size.width, (float)logical_size.height);
     ui_refresh_layout(&services->ui, new_scale);
     runtime_update_transformer(services);
 }
