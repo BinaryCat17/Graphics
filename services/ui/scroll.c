@@ -261,6 +261,9 @@ void scroll_apply_offsets(ScrollContext* ctx, Widget* widgets, size_t widget_cou
         ScrollArea* a = find_area(ctx->areas, w->scroll_area);
         if (!a) continue;
         Rect parent_clip = w->has_layout_clip ? w->layout_clip : w->clip;
+        if (w->has_layout_clip && !w->scroll_static) {
+            parent_clip.y += a->offset;
+        }
         Rect viewport = a->has_viewport ? a->viewport : a->bounds;
         if (a->has_viewport && a->has_bounds && !a->has_static_anchor) {
             float viewport_area = viewport.w * viewport.h;
