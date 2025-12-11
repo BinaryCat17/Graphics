@@ -81,7 +81,10 @@ typedef struct RenderCommand {
 } RenderCommand;
 
 typedef struct RenderCommandList {
-    RenderCommand *commands;
+    union {
+        RenderCommand *data;
+        RenderCommand *commands;
+    };
     size_t count;
     size_t capacity;
 } RenderCommandList;

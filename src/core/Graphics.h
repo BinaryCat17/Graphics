@@ -4,5 +4,6 @@
 #include "coordinate_systems/layout_geometry.h"
 #include "render/common/render_composition.h"
 #include "render/common/ui_mesh_builder.h"
-#include "core/utils/buffer_reserve.h"
+
+#include "memory/buffer.h"
 

@@ -4,7 +4,10 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "core/utils/buffer_reserve.h"
+#include "memory/buffer.h"
+
+MEM_BUFFER_DECLARE(UiVertexBuffer, 6)
+MEM_BUFFER_DECLARE(UiTextVertexBuffer, 6)
 
 static int apply_device_clip(const LayoutResult *clip, Vec2 *min, Vec2 *max)
 {
@@ -162,62 +165,32 @@ static int emit_text_vertices(const RenderContext *ctx, const GlyphQuad *glyph, 
 
 int ui_vertex_buffer_init(UiVertexBuffer *buffer, size_t initial_capacity)
 {
-    if (!buffer) {
-        return -1;
-    }
-    buffer->vertices = NULL;
-    buffer->count = 0;
-    buffer->capacity = 0;
-    return ui_vertex_buffer_reserve(buffer, initial_capacity);
+    return UiVertexBuffer_mem_init(buffer, initial_capacity);
 }
 
 void ui_vertex_buffer_dispose(UiVertexBuffer *buffer)
 {
-    if (!buffer) {
-        return;
-    }
-    free(buffer->vertices);
-    buffer->vertices = NULL;
-    buffer->count = 0;
-    buffer->capacity = 0;
+    UiVertexBuffer_mem_dispose(buffer);
 }
 
 int ui_vertex_buffer_reserve(UiVertexBuffer *buffer, size_t vertex_capacity)
 {
-    if (!buffer) {
-        return -1;
-    }
-    return ensure_capacity((void **)&buffer->vertices, sizeof(UiVertex), &buffer->capacity, vertex_capacity, 6);
+    return UiVertexBuffer_mem_reserve(buffer, vertex_capacity);
 }
 
 int ui_text_vertex_buffer_init(UiTextVertexBuffer *buffer, size_t initial_capacity)
 {
-    if (!buffer) {
-        return -1;
-    }
-    buffer->vertices = NULL;
-    buffer->count = 0;
-    buffer->capacity = 0;
-    return ui_text_vertex_buffer_reserve(buffer, initial_capacity);
+    return UiTextVertexBuffer_mem_init(buffer, initial_capacity);
 }
 
 void ui_text_vertex_buffer_dispose(UiTextVertexBuffer *buffer)
 {
-    if (!buffer) {
-        return;
-    }
-    free(buffer->vertices);
-    buffer->vertices = NULL;
-    buffer->count = 0;
-    buffer->capacity = 0;
+    UiTextVertexBuffer_mem_dispose(buffer);
 }
 
 int ui_text_vertex_buffer_reserve(UiTextVertexBuffer *buffer, size_t vertex_capacity)
 {
-    if (!buffer) {
-        return -1;
-    }
-    return ensure_capacity((void **)&buffer->vertices, sizeof(UiTextVertex), &buffer->capacity, vertex_capacity, 6);
+    return UiTextVertexBuffer_mem_reserve(buffer, vertex_capacity);
 }
 
 int renderer_fill_vertices(Renderer *renderer, const ViewModel *view_models, size_t view_model_count, const GlyphQuad *glyphs,
