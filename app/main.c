@@ -7,7 +7,7 @@
 #include "render_runtime/runtime.h"
 #include "services/service.h"
 #include "render_runtime/render_runtime_service.h"
-#include "render_service.h"
+#include "render_service/render_service.h"
 #include "scene/scene_service.h"
 #include "services/service_manager.h"
 #include "ui/ui_service.h"

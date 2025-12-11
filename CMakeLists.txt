@@ -108,7 +108,7 @@ if (NOT VULKAN_STUB)
             "services/scene/scene_service.c" "services/scene/scene_service.h"
             "services/ui/ui_service.c" "services/ui/ui_service.h" "src/services/service_events.h"
             "services/render_runtime/render_runtime_service.c" "services/render_runtime/render_runtime_service.h"
-            "services/render_service.c" "services/render_service.h"
+            "services/render_service/render_service.c" "services/render_service/render_service.h"
             "src/services/service_manager.c" "src/services/service_manager.h" "src/services/service.h"
     )
 else()
