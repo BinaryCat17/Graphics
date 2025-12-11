@@ -116,7 +116,15 @@ int module_schema_register(StateManager *manager, const ModuleSchema *schema, in
     for (size_t i = 0; i < schema->store_count; ++i) {
         char type_name[128];
         snprintf(type_name, sizeof(type_name), "%s::%s", schema->namespace_name, schema->stores[i].name);
-        int type_id = state_manager_register_type(manager, type_name, sizeof(YamlConfigEntry), schema->stores[i].chunk_capacity);
+        int type_id = -1;
+        StateManagerResult result =
+            state_manager_register_type(manager, type_name, sizeof(YamlConfigEntry), schema->stores[i].chunk_capacity,
+                                        &type_id);
+        if (result != STATE_MANAGER_OK) {
+            fprintf(stderr, "module_schema_register: failed to register %s: %s\n", type_name,
+                    state_manager_result_message(result));
+            return 0;
+        }
         if (type_ids_out) type_ids_out[i] = type_id;
         if (schema->type_ids) schema->type_ids[i] = type_id;
     }
