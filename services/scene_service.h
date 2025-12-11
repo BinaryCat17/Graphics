@@ -3,7 +3,7 @@
 
 #include <stdbool.h>
 
-#include "runtime/app_services.h"
+#include "app/app_services.h"
 #include "service.h"
 
 bool scene_service_load(AppServices* services, const ServiceConfig* config);

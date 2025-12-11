@@ -3,7 +3,7 @@
 
 #include <stdbool.h>
 
-#include "runtime/app_services.h"
+#include "app/app_services.h"
 
 bool runtime_init(AppServices* services);
 void runtime_shutdown(AppServices* services);
