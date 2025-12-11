@@ -1,7 +1,6 @@
-#ifndef CORE_CONTEXT_H
-#define CORE_CONTEXT_H
+#ifndef APP_CONTEXT_CORE_CONTEXT_H
+#define APP_CONTEXT_CORE_CONTEXT_H
 
-#include "core/Graphics.h"
 #include "assets/assets.h"
 #include "cad/cad_scene.h"
 #include "config/module_yaml_loader.h"
@@ -17,4 +16,4 @@ typedef struct CoreContext {
     Model* model;
 } CoreContext;
 
-#endif // CORE_CONTEXT_H
+#endif // APP_CONTEXT_CORE_CONTEXT_H
