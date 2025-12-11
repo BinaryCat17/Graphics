@@ -292,7 +292,13 @@ void scroll_apply_offsets(ScrollContext* ctx, Widget* widgets, size_t widget_cou
         }
         if (a->has_viewport || a->has_bounds) {
             w->has_clip = has_clip;
-            if (has_clip) w->clip = clipped_viewport;
+            if (has_clip) {
+                Rect scroll_clip = clipped_viewport;
+                if (!w->scroll_static) {
+                    scroll_clip.y += w->scroll_offset;
+                }
+                w->clip = scroll_clip;
+            }
         }
         if (w->scroll_static) {
             if (has_clip) {
