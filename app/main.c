@@ -4,7 +4,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "runtime/runtime.h"
+#include "services/render_runtime/runtime.h"
 #include "services/service.h"
 #include "render_runtime_service.h"
 #include "render_service.h"

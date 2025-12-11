@@ -1,6 +1,6 @@
 #pragma once
 
-#include "cad_scene.h"
+#include "cad/cad_scene.h"
 
 #ifdef __cplusplus
 extern "C" {

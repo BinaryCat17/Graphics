@@ -6,7 +6,7 @@
 
 #include "platform/platform.h"
 #include "services/service_events.h"
-#include "ui/scroll.h"
+#include "services/ui/scroll.h"
 
 static float clamp01(float v) {
     if (v < 0.0f) return 0.0f;

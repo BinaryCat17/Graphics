@@ -2,7 +2,7 @@
 #define SCENE_UI_H
 
 #include "cad/cad_scene.h"
-#include "ui/ui_config.h"
+#include "services/ui/ui_config.h"
 
 /**
  * Attach scene-specific UI nodes to the parsed layout tree. The layout must

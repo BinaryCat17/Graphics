@@ -1,4 +1,4 @@
-#include "runtime.h"
+#include "services/render_runtime/runtime.h"
 
 #include <math.h>
 #include <stdbool.h>
@@ -6,7 +6,7 @@
 
 #include "platform/platform.h"
 #include "render_runtime_service.h"
-#include "ui_service.h"
+#include "services/ui_service.h"
 
 static bool get_logical_cursor(PlatformWindow* window, double* x, double* y, Vec2* logical_out) {
     AppServices* services = NULL;

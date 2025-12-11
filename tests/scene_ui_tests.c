@@ -3,9 +3,9 @@
 #include <stdio.h>
 #include <string.h>
 
-#include "ui/scene_ui.h"
+#include "services/ui/scene_ui.h"
 #include "config/config_io.h"
-#include "ui/ui_config.h"
+#include "services/ui/ui_config.h"
 
 static UiNode* find_by_id(UiNode* node, const char* id)
 {
