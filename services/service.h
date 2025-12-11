@@ -4,7 +4,7 @@
 #include <stdbool.h>
 #include <stddef.h>
 
-#include "runtime/app_services.h"
+#include "app/app_services.h"
 
 // Generic configuration passed to services during initialization and startup.
 typedef struct ServiceConfig {

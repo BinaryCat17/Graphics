@@ -8,12 +8,14 @@
 #include "ui_service.h"
 
 static bool get_logical_cursor(GLFWwindow* window, double* x, double* y, Vec2* logical_out) {
+    AppServices* services = NULL;
+    double mx = 0.0, my = 0.0;
+    Vec2 screen = {0};
     if (!window || !logical_out) return false;
 
-    AppServices* services = (AppServices*)glfwGetWindowUserPointer(window);
+    services = (AppServices*)glfwGetWindowUserPointer(window);
     if (!services || !services->render.window) return false;
 
-    double mx = 0.0, my = 0.0;
     if (x && y) {
         mx = *x;
         my = *y;
@@ -21,36 +23,39 @@ static bool get_logical_cursor(GLFWwindow* window, double* x, double* y, Vec2* l
         glfwGetCursorPos(window, &mx, &my);
     }
 
-    Vec2 screen = {(float)(mx * services->render.transformer.dpi_scale),
-                   (float)(my * services->render.transformer.dpi_scale)};
+    screen = (Vec2){(float)(mx * services->render.transformer.dpi_scale),
+                    (float)(my * services->render.transformer.dpi_scale)};
     *logical_out = coordinate_screen_to_logical(&services->render.transformer, screen);
 
     return true;
 }
 
 static void on_mouse_button(GLFWwindow* window, int button, int action, int mods) {
-    (void)mods;
+    AppServices* services = NULL;
     Vec2 logical = {0};
+    (void)mods;
     if (!get_logical_cursor(window, NULL, NULL, &logical)) return;
 
-    AppServices* services = (AppServices*)glfwGetWindowUserPointer(window);
+    services = (AppServices*)glfwGetWindowUserPointer(window);
     ui_handle_mouse_button(&services->ui, logical.x, logical.y, button, action);
 }
 
 static void on_scroll(GLFWwindow* window, double xoff, double yoff) {
-    (void)xoff;
+    AppServices* services = NULL;
     Vec2 logical = {0};
+    (void)xoff;
     if (!get_logical_cursor(window, NULL, NULL, &logical)) return;
 
-    AppServices* services = (AppServices*)glfwGetWindowUserPointer(window);
+    services = (AppServices*)glfwGetWindowUserPointer(window);
     ui_handle_scroll(&services->ui, logical.x, logical.y, yoff);
 }
 
 static void on_cursor_pos(GLFWwindow* window, double x, double y) {
+    AppServices* services = NULL;
     Vec2 logical = {0};
     if (!get_logical_cursor(window, &x, &y, &logical)) return;
 
-    AppServices* services = (AppServices*)glfwGetWindowUserPointer(window);
+    services = (AppServices*)glfwGetWindowUserPointer(window);
     ui_handle_cursor(&services->ui, logical.x, logical.y);
 }
 
@@ -72,8 +77,9 @@ void runtime_update_transformer(AppServices* services) {
 }
 
 static void on_framebuffer_size(GLFWwindow* window, int width, int height) {
+    AppServices* services = NULL;
     if (width <= 0 || height <= 0) return;
-    AppServices* services = (AppServices*)glfwGetWindowUserPointer(window);
+    services = (AppServices*)glfwGetWindowUserPointer(window);
     if (!services) return;
     float new_scale = ui_compute_scale(&services->ui, (float)width, (float)height);
     ui_refresh_layout(&services->ui, new_scale);
