@@ -9,6 +9,8 @@ typedef struct RenderNode {
     Rect rect;
     Rect clip;
     int has_clip;
+    int z_index;
+    size_t render_index;
     int inertial_scroll;
     float alpha;
     struct RenderNode* children;

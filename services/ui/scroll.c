@@ -11,7 +11,12 @@ typedef struct ScrollArea {
     int has_bounds;
     int has_viewport;
     int has_static_anchor;
+    int has_render_info;
     float offset;
+    int has_clip;
+    Rect clip;
+    int z_index;
+    size_t render_index;
     struct ScrollArea* next;
 } ScrollArea;
 
@@ -24,6 +29,7 @@ struct ScrollContext {
     float drag_thumb_h;
     float drag_grab_offset;
     float drag_max_offset;
+    RenderNode* render_root;
 };
 
 static void free_scroll_areas(ScrollArea* areas) {
@@ -52,6 +58,10 @@ static ScrollArea* ensure_area(ScrollArea** areas, const char* name) {
     a->has_bounds = 0;
     a->has_viewport = 0;
     a->has_static_anchor = 0;
+    a->has_render_info = 0;
+    a->has_clip = 0;
+    a->z_index = 0;
+    a->render_index = 0;
     a->next = *areas;
     *areas = a;
     return a;
@@ -91,25 +101,6 @@ static void add_area_bounds(ScrollArea* a, const Widget* w) {
             a->has_viewport = 1;
         }
     }
-}
-
-static ScrollArea* find_area_at_point(ScrollArea* areas, float x, float y) {
-    for (ScrollArea* a = areas; a; a = a->next) {
-        if (!a->has_bounds) continue;
-        Rect viewport = a->has_viewport ? a->viewport : a->bounds;
-        if (a->has_viewport && a->has_bounds && !a->has_static_anchor) {
-            float viewport_area = viewport.w * viewport.h;
-            float bounds_area = a->bounds.w * a->bounds.h;
-            if (viewport_area < bounds_area * 0.5f) {
-                viewport = a->bounds;
-            }
-        }
-        if (x >= viewport.x && x <= viewport.x + viewport.w &&
-            y >= viewport.y && y <= viewport.y + viewport.h) {
-            return a;
-        }
-    }
-    return NULL;
 }
 
 static Widget* find_scrollbar_widget(Widget* widgets, size_t widget_count, const ScrollArea* area) {
@@ -172,6 +163,100 @@ static int compute_scrollbar_geometry(const Widget* w, Rect* out_track, Rect* ou
     return 1;
 }
 
+static void clear_area_render_info(ScrollArea* areas) {
+    for (ScrollArea* a = areas; a; a = a->next) {
+        a->has_render_info = 0;
+        a->has_clip = 0;
+        a->z_index = 0;
+        a->render_index = 0;
+    }
+}
+
+static int point_in_rect(const Rect* r, float x, float y) {
+    if (!r) return 0;
+    return x >= r->x && x <= r->x + r->w && y >= r->y && y <= r->y + r->h;
+}
+
+static int area_contains_point(const ScrollArea* area, const Rect* clip, float x, float y) {
+    if (!area || !area->has_bounds) return 0;
+    Rect viewport = area->has_viewport ? area->viewport : area->bounds;
+    if (area->has_viewport && area->has_bounds && !area->has_static_anchor) {
+        float viewport_area = viewport.w * viewport.h;
+        float bounds_area = area->bounds.w * area->bounds.h;
+        if (viewport_area < bounds_area * 0.5f) {
+            viewport = area->bounds;
+        }
+    }
+    if (clip) {
+        Rect clipped = {0};
+        if (!rect_intersect(&viewport, clip, &clipped)) return 0;
+        viewport = clipped;
+    }
+    return point_in_rect(&viewport, x, y);
+}
+
+static void update_area_render_info(ScrollArea* area, const RenderNode* node) {
+    if (!area || !node) return;
+    area->has_render_info = 1;
+    area->z_index = node->z_index;
+    area->render_index = node->render_index;
+    area->has_clip = node->has_clip;
+    if (node->has_clip) area->clip = node->clip;
+}
+
+static void collect_area_render_info(ScrollContext* ctx, const RenderNode* node) {
+    if (!ctx || !node) return;
+    if (node->widget && node->widget->scroll_area) {
+        ScrollArea* area = find_area(ctx->areas, node->widget->scroll_area);
+        if (area && (node->widget->scroll_static || !area->has_render_info)) {
+            update_area_render_info(area, node);
+        }
+    }
+    for (size_t i = 0; i < node->child_count; ++i) collect_area_render_info(ctx, &node->children[i]);
+}
+
+static const RenderNode* top_render_node_at_point(const RenderNode* node, float x, float y, const RenderNode* best) {
+    if (!node) return best;
+    if (node->widget) {
+        const Rect* region = node->has_clip ? &node->clip : &node->rect;
+        if (region && region->w > 0.0f && region->h > 0.0f && point_in_rect(region, x, y)) {
+            if (!best || node->z_index > best->z_index ||
+                (node->z_index == best->z_index && node->render_index > best->render_index)) {
+                best = node;
+            }
+        }
+    }
+    for (size_t i = 0; i < node->child_count; ++i) {
+        best = top_render_node_at_point(&node->children[i], x, y, best);
+    }
+    return best;
+}
+
+static ScrollArea* find_area_by_order(ScrollArea* areas, float x, float y) {
+    ScrollArea* best = NULL;
+    for (ScrollArea* a = areas; a; a = a->next) {
+        const Rect* clip = a->has_clip ? &a->clip : NULL;
+        if (!area_contains_point(a, clip, x, y)) continue;
+        if (!best || a->z_index > best->z_index ||
+            (a->z_index == best->z_index && a->render_index > best->render_index)) {
+            best = a;
+        }
+    }
+    return best;
+}
+
+static ScrollArea* find_scroll_target(ScrollContext* ctx, float x, float y) {
+    if (ctx && ctx->render_root) {
+        const RenderNode* hit = top_render_node_at_point(ctx->render_root, x, y, NULL);
+        if (!hit || !hit->widget) return NULL;
+        if (!hit->widget->scroll_area) return NULL;
+        ScrollArea* area = find_area(ctx->areas, hit->widget->scroll_area);
+        if (area && area_contains_point(area, hit->has_clip ? &hit->clip : NULL, x, y)) return area;
+        return NULL;
+    }
+    return find_area_by_order(ctx ? ctx->areas : NULL, x, y);
+}
+
 static float offset_from_cursor(const Rect* track, float thumb_h, float max_offset, float mouse_y, float grab_offset) {
     if (!track || max_offset <= 0.0f) return 0.0f;
     float range = track->h - thumb_h;
@@ -201,6 +286,8 @@ static void build_scroll_areas(ScrollContext* ctx, Widget* widgets, size_t widge
         if (w->scroll_static) area->has_static_anchor = 1;
         add_area_bounds(area, w);
     }
+
+    clear_area_render_info(ctx->areas);
 }
 
 ScrollContext* scroll_init(Widget* widgets, size_t widget_count) {
@@ -261,7 +348,7 @@ void scroll_handle_event(ScrollContext* ctx, Widget* widgets, size_t widget_coun
     if (!ctx || !widgets) return;
     ctx->widgets = widgets;
     ctx->widget_count = widget_count;
-    ScrollArea* target = find_area_at_point(ctx->areas, (float)mouse_x, (float)mouse_y);
+    ScrollArea* target = find_scroll_target(ctx, (float)mouse_x, (float)mouse_y);
     if (!target) return;
 
     target->offset -= (float)yoff * 24.0f;
@@ -280,11 +367,14 @@ int scroll_handle_mouse_button(ScrollContext* ctx, Widget* widgets, size_t widge
         return consumed;
     }
 
+    ScrollArea* target = find_scroll_target(ctx, (float)mouse_x, (float)mouse_y);
+    if (!target) return 0;
+
     for (size_t i = 0; i < widget_count; i++) {
         Widget* w = &widgets[i];
         if (!w->scroll_area) continue;
         ScrollArea* area = find_area(ctx->areas, w->scroll_area);
-        if (!area) continue;
+        if (!area || area != target) continue;
         Rect track = {0};
         Rect thumb = {0};
         float max_offset = 0.0f;
@@ -344,6 +434,14 @@ void scroll_rebuild(ScrollContext* ctx, Widget* widgets, size_t widget_count, fl
 
     free_scroll_areas(old);
     scroll_apply_offsets(ctx, widgets, widget_count);
+    scroll_set_render_tree(ctx, ctx->render_root);
+}
+
+void scroll_set_render_tree(ScrollContext* ctx, RenderNode* render_root) {
+    if (!ctx) return;
+    ctx->render_root = render_root;
+    clear_area_render_info(ctx->areas);
+    if (ctx->render_root) collect_area_render_info(ctx, ctx->render_root);
 }
 
 void scroll_free(ScrollContext* ctx) {

@@ -19,6 +19,8 @@ static RenderNode* build_node(const LayoutNode* layout, Widget* widgets, size_t 
     node->rect = layout->rect;
     node->clip = layout->clip;
     node->has_clip = layout->has_clip;
+    node->z_index = layout->source ? layout->source->z_index : 0;
+    node->render_index = 0;
     node->alpha = 1.0f;
     node->inertial_scroll = 0;
 
@@ -111,6 +113,15 @@ static void propagate_down(RenderNode* node, const Rect* parent_clip) {
     }
 }
 
+static void assign_render_indices(RenderNode* node, size_t* cursor) {
+    if (!node || !cursor) return;
+    node->render_index = *cursor;
+    (*cursor)++;
+    for (size_t i = 0; i < node->child_count; ++i) {
+        assign_render_indices(&node->children[i], cursor);
+    }
+}
+
 static void propagate_up(RenderNode* node, Rect* content_bounds, int* has_content) {
     if (!node) return;
     Rect bounds = node->rect;
@@ -143,6 +154,8 @@ static void propagate_up(RenderNode* node, Rect* content_bounds, int* has_conten
 void render_tree_propagate(RenderNode* root) {
     if (!root) return;
     propagate_down(root, NULL);
+    size_t order = 0;
+    assign_render_indices(root, &order);
     Rect bounds = {0};
     int has_bounds = 0;
     propagate_up(root, &bounds, &has_bounds);
@@ -154,11 +167,13 @@ static void sync_widget(RenderNode* node) {
         node->rect = node->widget->rect;
         node->has_clip = node->widget->has_clip;
         if (node->has_clip) node->clip = node->widget->clip;
+        node->z_index = node->widget->z_index;
         node->inertial_scroll = (int)(node->widget->scroll_offset != 0.0f);
     } else if (node->layout) {
         node->rect = node->layout->rect;
         node->has_clip = node->layout->has_clip;
         if (node->has_clip) node->clip = node->layout->clip;
+        node->z_index = node->layout->source ? node->layout->source->z_index : node->z_index;
     }
     for (size_t i = 0; i < node->child_count; ++i) sync_widget(&node->children[i]);
 }
