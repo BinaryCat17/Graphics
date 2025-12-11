@@ -15,6 +15,7 @@ typedef struct ScrollArea {
     float offset;
     Rect clip;
     int has_clip;
+    float clip_area;
     int z_index;
     struct ScrollArea* next;
 } ScrollArea;
@@ -249,6 +250,7 @@ void scroll_apply_offsets(ScrollContext* ctx, Widget* widgets, size_t widget_cou
     for (ScrollArea* a = ctx->areas; a; a = a->next) {
         a->has_clip = 0;
         a->clip = (Rect){0};
+        a->clip_area = -1.0f;
         a->z_index = INT_MIN;
     }
     for (size_t i = 0; i < widget_count; i++) {
@@ -293,8 +295,14 @@ void scroll_apply_offsets(ScrollContext* ctx, Widget* widgets, size_t widget_cou
             if (has_clip) w->clip = clipped_viewport;
         }
         if (w->scroll_static) {
-            if (has_clip && (!a->has_clip || w->z_index >= a->z_index)) {
-                a->clip = clipped_viewport;
+            if (has_clip) {
+                float clip_area = clipped_viewport.w * clipped_viewport.h;
+                int choose_clip = (!a->has_clip) || (clip_area > a->clip_area) ||
+                                  (clip_area == a->clip_area && w->z_index >= a->z_index);
+                if (choose_clip) {
+                    a->clip = clipped_viewport;
+                    a->clip_area = clip_area;
+                }
             }
             if (!a->has_clip || w->z_index > a->z_index) {
                 a->z_index = w->z_index;
