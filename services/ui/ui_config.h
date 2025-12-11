@@ -4,7 +4,7 @@
 #include <stddef.h>
 #include "coordinate_systems/coordinate_systems.h"
 #include "render/common/render_composition.h"
-#include "cad/cad_scene.h"
+#include "scene/cad_scene.h"
 #include "config/config_document.h"
 
 #define UI_Z_ORDER_SCALE 1000

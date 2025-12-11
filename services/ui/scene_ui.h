@@ -1,7 +1,7 @@
 #ifndef SCENE_UI_H
 #define SCENE_UI_H
 
-#include "cad/cad_scene.h"
+#include "scene/cad_scene.h"
 #include "ui/ui_config.h"
 
 /**
