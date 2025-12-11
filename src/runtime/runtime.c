@@ -111,10 +111,6 @@ bool runtime_init(AppServices* services) {
 
     float target_w = services->ui.base_w;
     float target_h = services->ui.base_h;
-    float ui_scale = ui_compute_scale(&services->ui, target_w, target_h);
-
-    if (!ui_prepare_runtime(&services->ui, &services->core, ui_scale, &services->state_manager, services->ui_type_id))
-        return false;
 
     float desired_w = services->ui.layout_root->rect.w + 32.0f;
     float desired_h = services->ui.layout_root->rect.h + 32.0f;
@@ -134,6 +130,12 @@ bool runtime_init(AppServices* services) {
     platform_set_scroll_callback(services->render.window, on_scroll, services);
     platform_set_mouse_button_callback(services->render.window, on_mouse_button, services);
     platform_set_cursor_pos_callback(services->render.window, on_cursor_pos, services);
+
+    PlatformWindowSize logical_size = platform_get_window_size(services->render.window);
+    float ui_scale = ui_compute_scale(&services->ui, (float)logical_size.width, (float)logical_size.height);
+
+    if (!ui_prepare_runtime(&services->ui, &services->core, ui_scale, &services->state_manager, services->ui_type_id))
+        return false;
 
     runtime_update_transformer(services);
     return true;
