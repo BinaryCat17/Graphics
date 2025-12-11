@@ -19,6 +19,7 @@ static RenderNode* build_node(const LayoutNode* layout, Widget* widgets, size_t 
     node->rect = layout->rect;
     node->clip = layout->clip;
     node->has_clip = layout->has_clip;
+    node->respect_parent_clip = 1;
     node->alpha = 1.0f;
     node->inertial_scroll = 0;
 
@@ -29,6 +30,7 @@ static RenderNode* build_node(const LayoutNode* layout, Widget* widgets, size_t 
             node->rect = node->widget->rect;
             node->has_clip = node->widget->has_clip;
             if (node->has_clip) node->clip = node->widget->clip;
+            node->respect_parent_clip = node->widget->has_clip_to_viewport ? node->widget->clip_to_viewport : 1;
         }
     }
 
@@ -101,13 +103,15 @@ static Rect intersect_rect(const Rect* a, const Rect* b, int* has) {
 
 static void propagate_down(RenderNode* node, const Rect* parent_clip) {
     if (!node) return;
+    const Rect* incoming_clip = node->respect_parent_clip ? parent_clip : NULL;
     const Rect* self_clip = node->has_clip ? &node->clip : NULL;
     int merged_has = 0;
-    node->clip = intersect_rect(parent_clip, self_clip, &merged_has);
+    node->clip = intersect_rect(incoming_clip, self_clip, &merged_has);
     node->has_clip = merged_has;
 
+    const Rect* downstream_clip = node->has_clip ? &node->clip : incoming_clip;
     for (size_t i = 0; i < node->child_count; ++i) {
-        propagate_down(&node->children[i], node->has_clip ? &node->clip : parent_clip);
+        propagate_down(&node->children[i], downstream_clip);
     }
 }
 
@@ -154,11 +158,13 @@ static void sync_widget(RenderNode* node) {
         node->rect = node->widget->rect;
         node->has_clip = node->widget->has_clip;
         if (node->has_clip) node->clip = node->widget->clip;
+        node->respect_parent_clip = node->widget->has_clip_to_viewport ? node->widget->clip_to_viewport : 1;
         node->inertial_scroll = (int)(node->widget->scroll_offset != 0.0f);
     } else if (node->layout) {
         node->rect = node->layout->rect;
         node->has_clip = node->layout->has_clip;
         if (node->has_clip) node->clip = node->layout->clip;
+        node->respect_parent_clip = 1;
     }
     for (size_t i = 0; i < node->child_count; ++i) sync_widget(&node->children[i]);
 }

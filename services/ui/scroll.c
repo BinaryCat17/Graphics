@@ -8,8 +8,10 @@ typedef struct ScrollArea {
     char* name;
     Rect bounds;
     Rect viewport;
+    Rect scrollbar_viewport;
     int has_bounds;
     int has_viewport;
+    int has_scrollbar_viewport;
     int has_static_anchor;
     float offset;
     struct ScrollArea* next;
@@ -51,6 +53,7 @@ static ScrollArea* ensure_area(ScrollArea** areas, const char* name) {
     a->offset = 0.0f;
     a->has_bounds = 0;
     a->has_viewport = 0;
+    a->has_scrollbar_viewport = 0;
     a->has_static_anchor = 0;
     a->next = *areas;
     *areas = a;
@@ -104,8 +107,15 @@ static ScrollArea* find_area_at_point(ScrollArea* areas, float x, float y) {
                 viewport = a->bounds;
             }
         }
-        if (x >= viewport.x && x <= viewport.x + viewport.w &&
-            y >= viewport.y && y <= viewport.y + viewport.h) {
+        int in_viewport = (x >= viewport.x && x <= viewport.x + viewport.w &&
+                           y >= viewport.y && y <= viewport.y + viewport.h);
+        int in_scrollbar = 0;
+        if (!in_viewport && a->has_scrollbar_viewport) {
+            Rect bar_view = a->scrollbar_viewport;
+            in_scrollbar = (x >= bar_view.x && x <= bar_view.x + bar_view.w &&
+                            y >= bar_view.y && y <= bar_view.y + bar_view.h);
+        }
+        if (in_viewport || in_scrollbar) {
             return a;
         }
     }
@@ -216,10 +226,14 @@ void scroll_apply_offsets(ScrollContext* ctx, Widget* widgets, size_t widget_cou
     if (!ctx) return;
     ctx->widgets = widgets;
     ctx->widget_count = widget_count;
+    for (ScrollArea* a = ctx->areas; a; a = a->next) {
+        a->has_scrollbar_viewport = 0;
+    }
     for (size_t i = 0; i < widget_count; i++) {
         Widget* w = &widgets[i];
         w->scroll_offset = 0.0f;
         w->show_scrollbar = 0;
+        w->has_clip = 0;
         if (!w->scroll_area) continue;
         ScrollArea* a = find_area(ctx->areas, w->scroll_area);
         if (!a) continue;
@@ -249,8 +263,11 @@ void scroll_apply_offsets(ScrollContext* ctx, Widget* widgets, size_t widget_cou
             w->scroll_viewport = viewport_h;
             w->scroll_content = content_h;
             w->show_scrollbar = w->scrollbar_enabled && overflow > 1.0f;
+            a->scrollbar_viewport = viewport;
+            a->has_scrollbar_viewport = 1;
         }
-        if (a->has_viewport || a->has_bounds) {
+        int should_clip = (!w->scroll_static) && (w->has_clip_to_viewport ? w->clip_to_viewport : 1);
+        if (should_clip && (a->has_viewport || a->has_bounds)) {
             w->has_clip = 1;
             w->clip = viewport;
         }

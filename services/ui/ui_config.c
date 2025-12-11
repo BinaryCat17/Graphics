@@ -351,6 +351,8 @@ static UiNode* create_node(void) {
     node->scrollbar_thumb_color = DEFAULT_STYLE.scrollbar_thumb_color;
     node->has_scrollbar_track_color = 0;
     node->has_scrollbar_thumb_color = 0;
+    node->clip_to_viewport = 1;
+    node->has_clip_to_viewport = 0;
     node->has_min = node->has_max = node->has_value = 0;
     node->minv = 0.0f; node->maxv = 1.0f; node->value = 0.0f;
     node->min_w = 0.0f; node->min_h = 0.0f;
@@ -426,6 +428,7 @@ static UiNode* parse_ui_node_config(const ConfigNode* obj) {
         if (strcmp(key, "scrollbarWidth") == 0) { node->scrollbar_width = parse_scalar_number(val, node->scrollbar_width); node->has_scrollbar_width = 1; continue; }
         if (strcmp(key, "spacing") == 0) { node->spacing = parse_scalar_number(val, node->spacing); node->has_spacing = 1; continue; }
         if (strcmp(key, "columns") == 0) { node->columns = (int)parse_scalar_number(val, (float)node->columns); node->has_columns = 1; continue; }
+        if (strcmp(key, "clipToViewport") == 0) { node->clip_to_viewport = parse_scalar_bool(val, node->clip_to_viewport); node->has_clip_to_viewport = 1; continue; }
         if (strcmp(key, "padding") == 0) { node->padding_override = parse_scalar_number(val, node->padding_override); node->has_padding_override = 1; continue; }
         if (strcmp(key, "borderThickness") == 0) { node->border_thickness = parse_scalar_number(val, node->border_thickness); node->has_border_thickness = 1; continue; }
         if (strcmp(key, "color") == 0) { read_color_node(&node->color, val); node->has_color = 1; continue; }
@@ -504,6 +507,7 @@ static void merge_node(UiNode* node, const UiNode* proto) {
     if (!node->has_scrollbar_width && proto->has_scrollbar_width) { node->scrollbar_width = proto->scrollbar_width; node->has_scrollbar_width = 1; }
     if (!node->has_scrollbar_track_color && proto->has_scrollbar_track_color) { node->scrollbar_track_color = proto->scrollbar_track_color; node->has_scrollbar_track_color = 1; }
     if (!node->has_scrollbar_thumb_color && proto->has_scrollbar_thumb_color) { node->scrollbar_thumb_color = proto->scrollbar_thumb_color; node->has_scrollbar_thumb_color = 1; }
+    if (!node->has_clip_to_viewport && proto->has_clip_to_viewport) { node->clip_to_viewport = proto->clip_to_viewport; node->has_clip_to_viewport = 1; }
     if (!proto->scrollbar_enabled) node->scrollbar_enabled = 0;
     if (!node->id && proto->id) node->id = strdup(proto->id);
     if (!node->text && proto->text) node->text = strdup(proto->text);
@@ -571,6 +575,8 @@ static UiNode* clone_node(const UiNode* src) {
     n->scrollbar_thumb_color = src->scrollbar_thumb_color;
     n->has_scrollbar_track_color = src->has_scrollbar_track_color;
     n->has_scrollbar_thumb_color = src->has_scrollbar_thumb_color;
+    n->clip_to_viewport = src->clip_to_viewport;
+    n->has_clip_to_viewport = src->has_clip_to_viewport;
     n->style_name = src->style_name ? strdup(src->style_name) : NULL;
     n->use = src->use ? strdup(src->use) : NULL;
     n->id = src->id ? strdup(src->id) : NULL;
@@ -1202,6 +1208,11 @@ static void populate_widgets_recursive(const LayoutNode* node, Widget* widgets, 
         w->on_focus = node->source->on_focus;
         w->scroll_area = node->source->scroll_area ? node->source->scroll_area : active_scroll_area;
         w->scroll_static = node->source->scroll_static;
+        w->clip_to_viewport = node->source->clip_to_viewport;
+        w->has_clip_to_viewport = node->source->has_clip_to_viewport;
+        if (!w->has_clip_to_viewport && w->scroll_static) {
+            w->clip_to_viewport = 0;
+        }
         w->has_clip = node->has_clip;
         if (node->has_clip) w->clip = node->clip;
         w->scroll_viewport = 0.0f;
