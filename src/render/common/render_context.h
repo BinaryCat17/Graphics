@@ -3,12 +3,12 @@
 
 #include <GLFW/glfw3.h>
 
-#include "core/math/coordinate_spaces.h"
+#include "coordinate_systems/coordinate_systems.h"
 
 // Window and transformer state used by the rendering subsystem.
 typedef struct RenderRuntimeContext {
     GLFWwindow* window;
-    CoordinateTransformer transformer;
+    CoordinateSystem2D transformer;
 } RenderRuntimeContext;
 
 #endif // RENDER_CONTEXT_H

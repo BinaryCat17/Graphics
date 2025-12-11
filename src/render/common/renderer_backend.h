@@ -9,7 +9,7 @@
 
 typedef struct GLFWwindow GLFWwindow;
 
-typedef struct CoordinateTransformer CoordinateTransformer;
+typedef struct CoordinateSystem2D CoordinateTransformer;
 
 typedef enum RenderLogSinkType {
     RENDER_LOG_SINK_STDOUT,

@@ -32,8 +32,8 @@ if (NOT Vulkan_FOUND)
 endif()
 
 set(CORE_SOURCES
-        "src/core/math/coordinate_spaces.c"
-        "src/core/layout/layout_geometry.c"
+        "src/coordinate_systems/coordinate_systems.c"
+        "src/coordinate_systems/layout_geometry.c"
         "src/core/utils/buffer_reserve.c"
         "src/core/Graphics.h")
 

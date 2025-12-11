@@ -1,7 +1,7 @@
 #ifndef UI_CONTEXT_H
 #define UI_CONTEXT_H
 
-#include "core/layout/layout_geometry.h"
+#include "coordinate_systems/layout_geometry.h"
 #include "state/state_manager.h"
 #include "ui/scene_ui.h"
 #include "ui/scroll.h"
