@@ -1,41 +1,56 @@
 #include "runtime.h"
 
 #include <math.h>
+#include <stdbool.h>
 #include <stdio.h>
 
 #include "render_runtime_service.h"
 #include "ui_service.h"
 
-static void on_mouse_button(GLFWwindow* window, int button, int action, int mods) {
-    (void)mods;
+static bool get_logical_cursor(GLFWwindow* window, double* x, double* y, Vec2* logical_out) {
+    if (!window || !logical_out) return false;
+
     AppServices* services = (AppServices*)glfwGetWindowUserPointer(window);
-    if (!services) return;
+    if (!services || !services->render.window) return false;
+
     double mx = 0.0, my = 0.0;
-    glfwGetCursorPos(window, &mx, &my);
+    if (x && y) {
+        mx = *x;
+        my = *y;
+    } else {
+        glfwGetCursorPos(window, &mx, &my);
+    }
+
     Vec2 screen = {(float)(mx * services->render.transformer.dpi_scale),
                    (float)(my * services->render.transformer.dpi_scale)};
-    Vec2 logical = coordinate_screen_to_logical(&services->render.transformer, screen);
+    *logical_out = coordinate_screen_to_logical(&services->render.transformer, screen);
+
+    return true;
+}
+
+static void on_mouse_button(GLFWwindow* window, int button, int action, int mods) {
+    (void)mods;
+    Vec2 logical = {0};
+    if (!get_logical_cursor(window, NULL, NULL, &logical)) return;
+
+    AppServices* services = (AppServices*)glfwGetWindowUserPointer(window);
     ui_handle_mouse_button(&services->ui, logical.x, logical.y, button, action);
 }
 
 static void on_scroll(GLFWwindow* window, double xoff, double yoff) {
     (void)xoff;
+    Vec2 logical = {0};
+    if (!get_logical_cursor(window, NULL, NULL, &logical)) return;
+
     AppServices* services = (AppServices*)glfwGetWindowUserPointer(window);
-    if (!services) return;
-    double mx = 0.0, my = 0.0;
-    glfwGetCursorPos(window, &mx, &my);
-    Vec2 screen = {(float)(mx * services->render.transformer.dpi_scale),
-                   (float)(my * services->render.transformer.dpi_scale)};
-    Vec2 logical = coordinate_screen_to_logical(&services->render.transformer, screen);
     ui_handle_scroll(&services->ui, logical.x, logical.y, yoff);
 }
 
 static void on_cursor_pos(GLFWwindow* window, double x, double y) {
+    Vec2 logical = {0};
+    if (!get_logical_cursor(window, &x, &y, &logical)) return;
+
     AppServices* services = (AppServices*)glfwGetWindowUserPointer(window);
-    if (!services) return;
-    Vec2 screen = {(float)(x * services->render.transformer.dpi_scale),
-                   (float)(y * services->render.transformer.dpi_scale)};
-    Vec2 logical = coordinate_screen_to_logical(&services->render.transformer, screen);
     ui_handle_cursor(&services->ui, logical.x, logical.y);
 }
 
