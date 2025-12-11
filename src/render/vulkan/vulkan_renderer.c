@@ -10,10 +10,8 @@
 #include <string.h>
 #include <time.h>
 
-#define GLFW_INCLUDE_VULKAN
-#include <GLFW/glfw3.h>
-
 #include "coordinate_systems/coordinate_systems.h"
+#include "platform/platform.h"
 #include "render/common/render_composition.h"
 #include "render/common/ui_mesh_builder.h"
 #include "ui/ui_config.h"
@@ -56,7 +54,8 @@ typedef struct {
 } FrameResources;
 
 typedef struct VulkanRendererState {
-    GLFWwindow* window;
+    PlatformWindow* window;
+    PlatformSurface* platform_surface;
     WidgetArray widgets;
     VkInstance g_instance;
     VkPhysicalDevice g_physical;
@@ -100,6 +99,12 @@ typedef struct VulkanRendererState {
     VkDescriptorSet g_descriptor_set;
     CoordinateSystem2D transformer;
     RenderLogger* logger;
+    bool (*get_required_instance_extensions)(const char*** names, uint32_t* count);
+    bool (*create_surface)(PlatformWindow* window, VkInstance instance, const VkAllocationCallbacks* alloc,
+                           PlatformSurface* out_surface);
+    void (*destroy_surface)(VkInstance instance, const VkAllocationCallbacks* alloc, PlatformSurface* surface);
+    PlatformWindowSize (*get_framebuffer_size)(PlatformWindow* window);
+    void (*wait_events)(void);
 } VulkanRendererState;
 
 static VulkanRendererState g_vk = {0};
@@ -107,6 +112,12 @@ static RendererBackend g_vulkan_backend;
 
 #define g_window (g_vk.window)
 #define g_widgets (g_vk.widgets)
+#define g_platform_surface (g_vk.platform_surface)
+#define g_get_required_instance_extensions (g_vk.get_required_instance_extensions)
+#define g_create_surface (g_vk.create_surface)
+#define g_destroy_surface (g_vk.destroy_surface)
+#define g_get_framebuffer_size (g_vk.get_framebuffer_size)
+#define g_wait_events (g_vk.wait_events)
 #define g_instance (g_vk.g_instance)
 #define g_physical (g_vk.g_physical)
 #define g_device (g_vk.g_device)
@@ -292,7 +303,7 @@ static double vk_now_ms(void) {
     clock_gettime(CLOCK_MONOTONIC, &ts);
     return (double)ts.tv_sec * 1000.0 + (double)ts.tv_nsec / 1000000.0;
 #else
-    return glfwGetTime() * 1000.0;
+    return platform_get_time_ms();
 #endif
 }
 
@@ -330,11 +341,14 @@ static void log_gpu_info(VkPhysicalDevice dev) {
 static void create_instance(void) {
     VkApplicationInfo ai = { .sType = VK_STRUCTURE_TYPE_APPLICATION_INFO, .pApplicationName = "vk_gui", .apiVersion = VK_API_VERSION_1_0 };
     VkInstanceCreateInfo ici = { .sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO, .pApplicationInfo = &ai };
-    /* request glfw extensions */
-    uint32_t extc = 0; const char** exts = glfwGetRequiredInstanceExtensions(&extc);
+    /* request platform extensions */
+    uint32_t extc = 0; const char** exts = NULL;
+    if (!g_get_required_instance_extensions || !g_get_required_instance_extensions(&exts, &extc)) {
+        fatal("Failed to query platform Vulkan extensions");
+    }
     ici.enabledExtensionCount = extc; ici.ppEnabledExtensionNames = exts;
     double start = vk_now_ms();
-    VkResult res = vkCreateInstance(&ici, NULL, &g_instance);
+    g_res = vkCreateInstance(&ici, NULL, &g_instance);
     vk_log_command("vkCreateInstance", "application", start);
     if (g_res != VK_SUCCESS) fatal_vk("vkCreateInstance", g_res);
 }
@@ -451,11 +465,19 @@ static void create_swapchain_and_views(VkSwapchainKHR old_swapchain) {
     g_swapchain_format = chosen_fmt.format;
     free(fmts);
 
-    int w, h; glfwGetFramebufferSize(g_window, &w, &h);
+    PlatformWindowSize fb_size = g_get_framebuffer_size ? g_get_framebuffer_size(g_window) : (PlatformWindowSize){0};
+    int w = fb_size.width;
+    int h = fb_size.height;
     while (w == 0 || h == 0) {
-        glfwWaitEvents();
-        if (glfwWindowShouldClose(g_window)) return;
-        glfwGetFramebufferSize(g_window, &w, &h);
+        if (g_wait_events) {
+            g_wait_events();
+        } else {
+            platform_wait_events();
+        }
+        if (platform_window_should_close(g_window)) return;
+        fb_size = g_get_framebuffer_size ? g_get_framebuffer_size(g_window) : (PlatformWindowSize){0};
+        w = fb_size.width;
+        h = fb_size.height;
     }
 
     VkSurfaceCapabilitiesKHR caps; vkGetPhysicalDeviceSurfaceCapabilitiesKHR(g_physical, g_surface, &caps);
@@ -768,12 +790,20 @@ static void destroy_device_resources(void) {
 }
 
 static void recreate_instance_and_surface(void) {
-    if (g_surface) { vkDestroySurfaceKHR(g_instance, g_surface, NULL); g_surface = VK_NULL_HANDLE; }
+    if (g_platform_surface && g_destroy_surface && g_instance) {
+        g_destroy_surface(g_instance, NULL, g_platform_surface);
+    } else if (g_surface && g_instance) {
+        vkDestroySurfaceKHR(g_instance, g_surface, NULL);
+    }
+    g_surface = VK_NULL_HANDLE;
     if (g_instance) { vkDestroyInstance(g_instance, NULL); g_instance = VK_NULL_HANDLE; }
 
     create_instance();
-    g_res = glfwCreateWindowSurface(g_instance, g_window, NULL, &g_surface);
-    if (g_res != VK_SUCCESS) fatal_vk("glfwCreateWindowSurface", g_res);
+    if (!g_create_surface || !g_platform_surface ||
+        !g_create_surface(g_window, g_instance, NULL, g_platform_surface)) {
+        fatal("Failed to recreate platform surface");
+    }
+    g_surface = (VkSurfaceKHR)(g_platform_surface ? g_platform_surface->handle : NULL);
 }
 
 static void recreate_swapchain(void) {
@@ -1774,10 +1804,22 @@ static bool vk_backend_init(RendererBackend* backend, const RenderBackendInit* i
     g_logger = &backend->logger;
 
     g_window = init->window;
+    g_platform_surface = init->surface;
+    g_get_required_instance_extensions = init->get_required_instance_extensions;
+    g_create_surface = init->create_surface;
+    g_destroy_surface = init->destroy_surface;
+    g_get_framebuffer_size = init->get_framebuffer_size;
+    g_wait_events = init->wait_events;
     g_widgets = init->widgets;
     g_vert_spv = init->vert_spv;
     g_frag_spv = init->frag_spv;
     g_font_path = init->font_path;
+
+    if (!g_window || !g_platform_surface || !g_get_required_instance_extensions || !g_create_surface ||
+        !g_destroy_surface || !g_get_framebuffer_size || !g_wait_events) {
+        fprintf(stderr, "Vulkan renderer missing platform callbacks.\n");
+        return false;
+    }
 
     if (init->transformer) {
         g_transformer = *init->transformer;
@@ -1793,8 +1835,8 @@ static bool vk_backend_init(RendererBackend* backend, const RenderBackendInit* i
     }
 
     create_instance();
-    g_res = glfwCreateWindowSurface(g_instance, g_window, NULL, &g_surface);
-    if (g_res != VK_SUCCESS) return false;
+    if (!g_create_surface(g_window, g_instance, NULL, g_platform_surface)) return false;
+    g_surface = (VkSurfaceKHR)(g_platform_surface ? g_platform_surface->handle : NULL);
 
     pick_physical_and_create_device();
     create_swapchain_and_views(VK_NULL_HANDLE);
@@ -1846,7 +1888,12 @@ static void vk_backend_cleanup(RendererBackend* backend) {
     }
     destroy_device_resources();
     if (g_device) { vkDestroyDevice(g_device, NULL); g_device = VK_NULL_HANDLE; }
-    if (g_surface) { vkDestroySurfaceKHR(g_instance, g_surface, NULL); g_surface = VK_NULL_HANDLE; }
+    if (g_platform_surface && g_destroy_surface && g_instance) {
+        g_destroy_surface(g_instance, NULL, g_platform_surface);
+    } else if (g_surface && g_instance) {
+        vkDestroySurfaceKHR(g_instance, g_surface, NULL);
+    }
+    g_surface = VK_NULL_HANDLE;
     if (g_instance) { vkDestroyInstance(g_instance, NULL); g_instance = VK_NULL_HANDLE; }
     render_logger_cleanup(g_logger);
     g_logger = NULL;

@@ -1,9 +1,9 @@
 #include "render_runtime_service.h"
 
-#include <GLFW/glfw3.h>
 #include <stdio.h>
 #include <string.h>
 
+#include "platform/platform.h"
 #include "render/common/renderer_backend.h"
 #include "render/vulkan/vulkan_renderer.h"
 #include "runtime/runtime.h"
@@ -34,6 +34,13 @@ static void try_bootstrap_renderer(RenderRuntimeServiceContext* context) {
 
     RenderBackendInit init = {
         .window = context->render->window,
+        .surface = &context->render->surface,
+        .get_required_instance_extensions = platform_get_required_vulkan_instance_extensions,
+        .create_surface = platform_create_vulkan_surface,
+        .destroy_surface = platform_destroy_vulkan_surface,
+        .get_framebuffer_size = platform_get_framebuffer_size,
+        .wait_events = platform_wait_events,
+        .poll_events = platform_poll_events,
         .vert_spv = context->assets->vert_spv_path,
         .frag_spv = context->assets->frag_spv_path,
         .font_path = context->assets->font_path,

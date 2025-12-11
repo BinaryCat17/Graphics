@@ -5,9 +5,8 @@
 #include <stddef.h>
 #include <stdio.h>
 
+#include "platform/platform.h"
 #include "ui/ui_config.h"
-
-typedef struct GLFWwindow GLFWwindow;
 
 typedef struct CoordinateSystem2D CoordinateTransformer;
 
@@ -42,7 +41,15 @@ typedef struct RenderLogger {
 } RenderLogger;
 
 typedef struct RenderBackendInit {
-    GLFWwindow* window;
+    PlatformWindow* window;
+    PlatformSurface* surface;
+    bool (*get_required_instance_extensions)(const char*** names, uint32_t* count);
+    bool (*create_surface)(PlatformWindow* window, void* instance, const void* allocation_callbacks,
+                           PlatformSurface* out_surface);
+    void (*destroy_surface)(void* instance, const void* allocation_callbacks, PlatformSurface* surface);
+    PlatformWindowSize (*get_framebuffer_size)(PlatformWindow* window);
+    void (*wait_events)(void);
+    void (*poll_events)(void);
     const char* vert_spv;
     const char* frag_spv;
     const char* font_path;

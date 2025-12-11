@@ -31,6 +31,11 @@ if (NOT Vulkan_FOUND)
     set(VULKAN_STUB ON)
 endif()
 
+set(PLATFORM_SOURCES "src/platform/glfw_platform.c")
+add_library(platform_layer STATIC ${PLATFORM_SOURCES})
+target_include_directories(platform_layer PUBLIC "src/")
+target_link_libraries(platform_layer PUBLIC glfw Vulkan::Vulkan)
+
 set(CORE_SOURCES
         "src/coordinate_systems/coordinate_systems.c"
         "src/coordinate_systems/layout_geometry.c"
@@ -84,7 +89,7 @@ if (NOT VULKAN_STUB)
 
     add_library(render_vulkan STATIC ${RENDER_VULKAN_SOURCES})
     target_include_directories(render_vulkan PUBLIC "src/" "services/" ${Stb_INCLUDE_DIR})
-    target_link_libraries(render_vulkan PUBLIC render_common Vulkan::Vulkan glfw Threads::Threads)
+    target_link_libraries(render_vulkan PUBLIC render_common platform_layer Vulkan::Vulkan glfw Threads::Threads)
     if (NOT MSVC)
         target_link_libraries(render_vulkan PUBLIC m)
     endif()
@@ -118,7 +123,7 @@ endif()
 # Добавьте источник в исполняемый файл этого проекта.
 add_executable (Graphics ${APP_SOURCES})
 target_include_directories(Graphics PRIVATE "src/" "services/")
-target_link_libraries(Graphics PRIVATE render_common)
+target_link_libraries(Graphics PRIVATE render_common platform_layer)
 
 if (NOT VULKAN_STUB)
     add_dependencies(Graphics Shaders)
