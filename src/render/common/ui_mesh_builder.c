@@ -34,17 +34,10 @@ static int apply_device_clip(const LayoutResult *clip, Vec2 *min, Vec2 *max)
 
 static void project_point(const RenderContext *ctx, Vec2 point, float z, float out_position[3])
 {
-    const float v[4] = {point.x, point.y, z, 1.0f};
-    float result[4] = {0};
-
-    for (int row = 0; row < 4; ++row) {
-        result[row] = ctx->projection[row * 4 + 0] * v[0] + ctx->projection[row * 4 + 1] * v[1] +
-                      ctx->projection[row * 4 + 2] * v[2] + ctx->projection[row * 4 + 3] * v[3];
-    }
-
-    out_position[0] = result[0];
-    out_position[1] = result[1];
-    out_position[2] = result[2];
+    Vec3 projected = mat4_transform_point(&ctx->projection, (Vec3){point.x, point.y, z});
+    out_position[0] = projected.x;
+    out_position[1] = projected.y;
+    out_position[2] = projected.z;
 }
 
 static int emit_quad_vertices(const RenderContext *ctx, const RenderCommand *command, UiVertexBuffer *vertex_buffer)
@@ -115,8 +108,8 @@ static int emit_text_vertices(const RenderContext *ctx, const GlyphQuad *glyph, 
         logical_max.y = y1;
     }
 
-    Vec2 device_min = coordinate_logical_to_screen(&ctx->transformer, logical_min);
-    Vec2 device_max = coordinate_logical_to_screen(&ctx->transformer, logical_max);
+    Vec2 device_min = coordinate_logical_to_screen(&ctx->coordinates, logical_min);
+    Vec2 device_max = coordinate_logical_to_screen(&ctx->coordinates, logical_max);
 
     Vec2 snapped_min = {roundf(device_min.x), roundf(device_min.y)};
     Vec2 snapped_max = {roundf(device_max.x), roundf(device_max.y)};

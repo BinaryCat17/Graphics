@@ -5,8 +5,8 @@ LayoutResult layout_resolve(const LayoutBox *logical, const RenderContext *ctx)
     LayoutResult result;
     result.logical = *logical;
 
-    result.device.origin = coordinate_logical_to_screen(&ctx->transformer, logical->origin);
-    result.device.size = coordinate_logical_to_screen(&ctx->transformer, logical->size);
+    result.device.origin = coordinate_space_convert_2d(&ctx->coordinates, COORDINATE_SPACE_LOGICAL, COORDINATE_SPACE_SCREEN, logical->origin);
+    result.device.size = coordinate_space_convert_2d(&ctx->coordinates, COORDINATE_SPACE_LOGICAL, COORDINATE_SPACE_SCREEN, logical->size);
 
     return result;
 }

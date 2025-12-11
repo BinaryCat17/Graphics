@@ -1,18 +1,16 @@
 #pragma once
 
-#include "core/math/coordinate_spaces.h"
+#include "coordinate_systems.h"
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-/** Logical layout rect in UI units. */
 typedef struct LayoutBox {
     Vec2 origin;
     Vec2 size;
 } LayoutBox;
 
-/** Logical layout along with device-space result. */
 typedef struct LayoutResult {
     LayoutBox logical;
     LayoutBox device;

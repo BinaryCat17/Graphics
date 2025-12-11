@@ -5,8 +5,8 @@
 
 static Renderer create_renderer(void)
 {
-    CoordinateTransformer transformer;
-    coordinate_transformer_init(&transformer, 1.0f, 1.0f, (Vec2){800.0f, 600.0f});
+    CoordinateSystem2D transformer;
+    coordinate_system2d_init(&transformer, 1.0f, 1.0f, (Vec2){800.0f, 600.0f});
 
     RenderContext ctx;
     render_context_init(&ctx, &transformer, NULL);

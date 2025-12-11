@@ -2,7 +2,7 @@
 
 #include <stddef.h>
 
-#include "core/layout/layout_geometry.h"
+#include "coordinate_systems/layout_geometry.h"
 
 #ifdef __cplusplus
 extern "C" {

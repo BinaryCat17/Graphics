@@ -96,7 +96,7 @@ typedef struct VulkanRendererState {
     VkDescriptorSetLayout g_descriptor_layout;
     VkDescriptorPool g_descriptor_pool;
     VkDescriptorSet g_descriptor_set;
-    CoordinateTransformer transformer;
+    CoordinateSystem2D transformer;
     RenderLogger* logger;
 } VulkanRendererState;
 
@@ -1511,17 +1511,13 @@ static bool build_vertices_from_widgets(FrameResources *frame) {
         }
     }
 
-    float projection[16] = {0};
-    projection[0] = 1.0f;
-    projection[5] = 1.0f;
-    projection[10] = 1.0f;
-    projection[15] = 1.0f;
+    Mat4 projection = mat4_identity();
 
-    CoordinateTransformer transformer = g_transformer;
+    CoordinateSystem2D transformer = g_transformer;
     transformer.viewport_size = (Vec2){(float)g_swapchain_extent.width, (float)g_swapchain_extent.height};
 
     RenderContext context;
-    render_context_init(&context, &transformer, projection);
+    render_context_init(&context, &transformer, &projection);
 
     Renderer renderer;
     renderer_init(&renderer, &context, view_model_count);
@@ -1784,7 +1780,7 @@ static bool vk_backend_init(RendererBackend* backend, const RenderBackendInit* i
     if (init->transformer) {
         g_transformer = *init->transformer;
     } else {
-        coordinate_transformer_init(&g_transformer, 1.0f, 1.0f, (Vec2){0.0f, 0.0f});
+        coordinate_system2d_init(&g_transformer, 1.0f, 1.0f, (Vec2){0.0f, 0.0f});
     }
 
     g_current_frame_cursor = 0;

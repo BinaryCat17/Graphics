@@ -72,7 +72,7 @@ void runtime_update_transformer(AppServices* services) {
     if (dpi_scale <= 0.0f) dpi_scale = 1.0f;
 
     float ui_scale = services->ui.ui_scale;
-    coordinate_transformer_init(&render->transformer, dpi_scale, ui_scale, (Vec2){(float)fb_w, (float)fb_h});
+    coordinate_system2d_init(&render->transformer, dpi_scale, ui_scale, (Vec2){(float)fb_w, (float)fb_h});
     render_runtime_service_update_transformer(services->render_runtime_context, render);
 }
 
