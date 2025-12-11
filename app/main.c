@@ -5,11 +5,11 @@
 #include <string.h>
 
 #include "runtime/runtime.h"
-#include "service.h"
+#include "services/service.h"
 #include "render_runtime_service.h"
 #include "render_service.h"
 #include "scene_service.h"
-#include "service_manager.h"
+#include "services/service_manager.h"
 #include "ui_service.h"
 
 int main(int argc, char** argv) {

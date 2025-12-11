@@ -4,7 +4,7 @@
 #include <stdbool.h>
 
 #include "app/app_services.h"
-#include "service.h"
+#include "services/service.h"
 
 bool scene_service_load(AppServices* services, const ServiceConfig* config);
 void scene_service_unload(AppServices* services);

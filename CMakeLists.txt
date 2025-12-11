@@ -100,10 +100,10 @@ if (NOT VULKAN_STUB)
             "src/runtime/runtime.c" "src/runtime/runtime.h"
             "src/app/app_services.h" "src/app/app_services.c"
             "services/scene_service.c" "services/scene_service.h"
-            "services/ui_service.c" "services/ui_service.h" "services/service_events.h"
+            "services/ui_service.c" "services/ui_service.h" "src/services/service_events.h"
             "services/render_runtime_service.c" "services/render_runtime_service.h"
             "services/render_service.c" "services/render_service.h"
-            "services/service_manager.c" "services/service_manager.h" "services/service.h"
+            "src/services/service_manager.c" "src/services/service_manager.h" "src/services/service.h"
     )
 else()
     set(APP_SOURCES

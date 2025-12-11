@@ -5,7 +5,7 @@
 #include <stdio.h>
 #include <string.h>
 
-#include "service_events.h"
+#include "services/service_events.h"
 #include "ui/scroll.h"
 
 static float clamp01(float v) {

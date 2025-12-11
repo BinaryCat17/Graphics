@@ -2,7 +2,7 @@
 
 #include <string.h>
 
-#include "service_events.h"
+#include "services/service_events.h"
 
 bool app_services_init(AppServices* services) {
     if (!services) return false;

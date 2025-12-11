@@ -6,7 +6,7 @@
 #include "app/context/core_context.h"
 #include "state/state_manager.h"
 #include "ui/ui_context.h"
-#include "service.h"
+#include "services/service.h"
 
 bool ui_build(UiContext* ui, const CoreContext* core);
 bool ui_prepare_runtime(UiContext* ui, const CoreContext* core, float ui_scale, StateManager* state_manager,
