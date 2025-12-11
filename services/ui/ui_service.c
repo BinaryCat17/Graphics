@@ -6,6 +6,7 @@
 
 #include "platform/platform.h"
 #include "services/service_events.h"
+#include "ui/render_tree.h"
 #include "ui/scroll.h"
 
 static float clamp01(float v) {
@@ -133,6 +134,11 @@ bool ui_prepare_runtime(UiContext* ui, const CoreContext* core, float ui_scale, 
     apply_widget_padding_scale(&ui->widgets, ui_scale);
     update_widget_bindings(ui->ui_root, ui->model);
     populate_widgets_from_layout(ui->layout_root, ui->widgets.items, ui->widgets.count);
+    ui->render_tree = render_tree_build(ui->layout_root, ui->widgets.items, ui->widgets.count);
+    if (!ui->render_tree) {
+        fprintf(stderr, "Failed to build UI render tree.\n");
+        return false;
+    }
     ui->scroll = scroll_init(ui->widgets.items, ui->widgets.count);
     if (!ui->scroll) {
         fprintf(stderr, "Failed to initialize scroll subsystem for UI.\n");
@@ -174,6 +180,7 @@ void ui_refresh_layout(UiContext* ui, float new_scale) {
     scale_layout(ui->layout_root, ui->ui_scale);
     populate_widgets_from_layout(ui->layout_root, ui->widgets.items, ui->widgets.count);
     apply_widget_padding_scale(&ui->widgets, ui->ui_scale);
+    if (ui->render_tree) render_tree_sync_widgets(ui->render_tree);
     scroll_rebuild(ui->scroll, ui->widgets.items, ui->widgets.count, ratio);
 }
 
@@ -183,6 +190,7 @@ void ui_frame_update(UiContext* ui) {
     populate_widgets_from_layout(ui->layout_root, ui->widgets.items, ui->widgets.count);
     apply_widget_padding_scale(&ui->widgets, ui->ui_scale);
     scroll_apply_offsets(ui->scroll, ui->widgets.items, ui->widgets.count);
+    if (ui->render_tree) render_tree_sync_widgets(ui->render_tree);
 
     if (ui->state_manager && ui->ui_type_id >= 0) {
         UiRuntimeComponent component = {.ui = ui, .widgets = ui->widgets};
@@ -238,6 +246,10 @@ void ui_context_dispose(UiContext* ui) {
     if (ui->layout_root) {
         free_layout_tree(ui->layout_root);
         ui->layout_root = NULL;
+    }
+    if (ui->render_tree) {
+        render_tree_free(ui->render_tree);
+        ui->render_tree = NULL;
     }
     if (ui->scroll) {
         scroll_free(ui->scroll);

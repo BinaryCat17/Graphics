@@ -6,12 +6,14 @@
 #include "ui/scene_ui.h"
 #include "ui/scroll.h"
 #include "ui/ui_config.h"
+#include "ui/render_tree.h"
 
 // Stores all UI-related state shared between build and runtime.
 typedef struct UiContext {
     Style* styles;
     UiNode* ui_root;
     LayoutNode* layout_root;
+    RenderNode* render_tree;
     WidgetArray widgets;
     ScrollContext* scroll;
     Model* model;

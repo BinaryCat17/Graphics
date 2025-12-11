@@ -97,7 +97,7 @@ if (NOT VULKAN_STUB)
     set(APP_SOURCES
             "app/main.c"
             "src/assets/assets.c" "src/assets/assets.h"
-            "services/ui/scroll.c" "services/ui/scroll.h" "services/ui/ui_config.c" "services/ui/ui_config.h" "services/ui/scene_ui.c" "services/ui/scene_ui.h" "services/ui/ui_context.h"
+            "services/ui/scroll.c" "services/ui/scroll.h" "services/ui/ui_config.c" "services/ui/ui_config.h" "services/ui/scene_ui.c" "services/ui/scene_ui.h" "services/ui/ui_context.h" "services/ui/render_tree.c" "services/ui/render_tree.h"
             ${CORE_SOURCES}
             "services/scene/cad_scene.c" "services/scene/cad_scene.h"
             "services/scene/cad_scene_yaml.c" "services/scene/cad_scene_yaml.h"
@@ -118,7 +118,7 @@ else()
             "services/scene/cad_scene_yaml.c" "services/scene/cad_scene_yaml.h"
             "src/state/state_manager.c" "src/state/state_manager.h"
             "src/config/simple_yaml.c" "src/config/simple_yaml.h" "src/config/module_yaml_loader.c" "src/config/module_yaml_loader.h" "src/config/config_document.c" "src/config/config_document.h" "src/config/config_io.c" "src/config/config_io.h"
-            "services/ui/scene_ui.c" "services/ui/scene_ui.h" "services/ui/ui_config.c" "services/ui/ui_config.h" "services/ui/ui_context.h"
+            "services/ui/scene_ui.c" "services/ui/scene_ui.h" "services/ui/ui_config.c" "services/ui/ui_config.h" "services/ui/ui_context.h" "services/ui/render_tree.c" "services/ui/render_tree.h"
     )
 endif()
 
