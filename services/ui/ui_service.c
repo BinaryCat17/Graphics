@@ -6,7 +6,7 @@
 
 #include "platform/platform.h"
 #include "services/service_events.h"
-#include "ui/render_tree.h"
+#include "ui/compositor.h"
 #include "ui/scroll.h"
 
 static float clamp01(float v) {
@@ -63,6 +63,27 @@ static int point_in_widget(const Widget* w, double mx, double my) {
     float y_offset = w->scroll_static ? 0.0f : w->scroll_offset;
     float y = w->rect.y + y_offset;
     return mx >= x && mx <= x + w->rect.w && my >= y && my <= y + w->rect.h;
+}
+
+static int point_in_rect(const Rect* r, double mx, double my) {
+    if (!r) return 0;
+    return mx >= r->x && mx <= r->x + r->w && my >= r->y && my <= r->y + r->h;
+}
+
+static Widget* pick_widget_at(const UiContext* ui, double mx, double my) {
+    if (!ui || !ui->display_list.items) return NULL;
+    for (size_t i = ui->display_list.count; i > 0; --i) {
+        const DisplayItem* item = &ui->display_list.items[i - 1];
+        Widget* w = item->widget;
+        if (!w) continue;
+        int inside = 1;
+        for (size_t c = 0; c < item->clip_depth && inside; ++c) {
+            inside = point_in_rect(&item->clip_stack[c], mx, my);
+        }
+        if (!inside) continue;
+        if (point_in_widget(w, mx, my)) return w;
+    }
+    return NULL;
 }
 
 static void apply_click_action(Widget* w, Model* model) {
@@ -134,23 +155,19 @@ bool ui_prepare_runtime(UiContext* ui, const CoreContext* core, float ui_scale, 
     apply_widget_padding_scale(&ui->widgets, ui_scale);
     update_widget_bindings(ui->ui_root, ui->model);
     populate_widgets_from_layout(ui->layout_root, ui->widgets.items, ui->widgets.count);
-    ui->render_tree = render_tree_build(ui->layout_root, ui->widgets.items, ui->widgets.count);
-    if (!ui->render_tree) {
-        fprintf(stderr, "Failed to build UI render tree.\n");
-        return false;
-    }
     ui->scroll = scroll_init(ui->widgets.items, ui->widgets.count);
     if (!ui->scroll) {
         fprintf(stderr, "Failed to initialize scroll subsystem for UI.\n");
         return false;
     }
+    ui->display_list = ui_compositor_build(ui->layout_root, ui->widgets.items, ui->widgets.count);
 
     ui->ui_scale = ui_scale;
     ui->state_manager = state_manager;
     ui->ui_type_id = ui_type_id;
 
     if (state_manager && ui_type_id >= 0) {
-        UiRuntimeComponent component = {.ui = ui, .widgets = ui->widgets};
+        UiRuntimeComponent component = {.ui = ui, .widgets = ui->widgets, .display_list = ui->display_list};
         state_manager_publish(state_manager, STATE_EVENT_COMPONENT_ADDED, ui_type_id, "active", &component,
                               sizeof(component));
     }
@@ -180,8 +197,9 @@ void ui_refresh_layout(UiContext* ui, float new_scale) {
     scale_layout(ui->layout_root, ui->ui_scale);
     populate_widgets_from_layout(ui->layout_root, ui->widgets.items, ui->widgets.count);
     apply_widget_padding_scale(&ui->widgets, ui->ui_scale);
-    if (ui->render_tree) render_tree_sync_widgets(ui->render_tree);
     scroll_rebuild(ui->scroll, ui->widgets.items, ui->widgets.count, ratio);
+    ui_compositor_free(ui->display_list);
+    ui->display_list = ui_compositor_build(ui->layout_root, ui->widgets.items, ui->widgets.count);
 }
 
 void ui_frame_update(UiContext* ui) {
@@ -190,10 +208,11 @@ void ui_frame_update(UiContext* ui) {
     populate_widgets_from_layout(ui->layout_root, ui->widgets.items, ui->widgets.count);
     apply_widget_padding_scale(&ui->widgets, ui->ui_scale);
     scroll_apply_offsets(ui->scroll, ui->widgets.items, ui->widgets.count);
-    if (ui->render_tree) render_tree_sync_widgets(ui->render_tree);
+    ui_compositor_free(ui->display_list);
+    ui->display_list = ui_compositor_build(ui->layout_root, ui->widgets.items, ui->widgets.count);
 
     if (ui->state_manager && ui->ui_type_id >= 0) {
-        UiRuntimeComponent component = {.ui = ui, .widgets = ui->widgets};
+        UiRuntimeComponent component = {.ui = ui, .widgets = ui->widgets, .display_list = ui->display_list};
         state_manager_publish(ui->state_manager, STATE_EVENT_COMPONENT_UPDATED, ui->ui_type_id, "active", &component,
                               sizeof(component));
     }
@@ -205,16 +224,12 @@ void ui_handle_mouse_button(UiContext* ui, double mx, double my, int button, int
     if (scroll_handle_mouse_button(ui->scroll, ui->widgets.items, ui->widgets.count, (float)mx, (float)my, pressed))
         return;
     if (button != PLATFORM_MOUSE_BUTTON_LEFT || action != PLATFORM_PRESS) return;
-    for (size_t i = 0; i < ui->widgets.count; i++) {
-        Widget* w = &ui->widgets.items[i];
-        if ((w->type == W_BUTTON || w->type == W_CHECKBOX || w->type == W_HSLIDER) && point_in_widget(w, mx, my)) {
-            if (w->type == W_HSLIDER) {
-                apply_slider_action(w, ui->model, (float)mx);
-            } else {
-                apply_click_action(w, ui->model);
-            }
-            break;
-        }
+    Widget* w = pick_widget_at(ui, mx, my);
+    if (!w) return;
+    if (w->type == W_HSLIDER) {
+        apply_slider_action(w, ui->model, (float)mx);
+    } else if (w->type == W_BUTTON || w->type == W_CHECKBOX) {
+        apply_click_action(w, ui->model);
     }
 }
 
@@ -247,10 +262,7 @@ void ui_context_dispose(UiContext* ui) {
         free_layout_tree(ui->layout_root);
         ui->layout_root = NULL;
     }
-    if (ui->render_tree) {
-        render_tree_free(ui->render_tree);
-        ui->render_tree = NULL;
-    }
+    ui_compositor_free(ui->display_list);
     if (ui->scroll) {
         scroll_free(ui->scroll);
         ui->scroll = NULL;

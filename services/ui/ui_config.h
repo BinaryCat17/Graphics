@@ -123,8 +123,7 @@ typedef struct LayoutNode {
     Rect base_rect;
     Rect local_rect;
     Vec2 transform;
-    Rect clip;
-    int has_clip;
+    int wants_clip;
     struct LayoutNode* children;
     size_t child_count;
 } LayoutNode;

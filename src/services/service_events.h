@@ -30,6 +30,7 @@ typedef struct ModelComponent {
 typedef struct UiRuntimeComponent {
     UiContext* ui;
     WidgetArray widgets;
+    DisplayList display_list;
 } UiRuntimeComponent;
 
 typedef struct RenderReadyComponent {
@@ -37,6 +38,7 @@ typedef struct RenderReadyComponent {
     const Assets* assets;
     UiContext* ui;
     WidgetArray widgets;
+    DisplayList display_list;
     Model* model;
     bool ready;
 } RenderReadyComponent;

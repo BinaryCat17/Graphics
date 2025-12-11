@@ -14,6 +14,7 @@
 #include "platform/platform.h"
 #include "render/common/render_composition.h"
 #include "render/common/ui_mesh_builder.h"
+#include "ui/compositor.h"
 #include "ui/ui_config.h"
 
 #define STB_TRUETYPE_IMPLEMENTATION
@@ -57,6 +58,7 @@ typedef struct VulkanRendererState {
     PlatformWindow* window;
     PlatformSurface* platform_surface;
     WidgetArray widgets;
+    DisplayList display_list;
     VkInstance g_instance;
     VkPhysicalDevice g_physical;
     VkDevice g_device;
@@ -112,6 +114,7 @@ static RendererBackend g_vulkan_backend;
 
 #define g_window (g_vk.window)
 #define g_widgets (g_vk.widgets)
+#define g_display_list (g_vk.display_list)
 #define g_platform_surface (g_vk.platform_surface)
 #define g_get_required_instance_extensions (g_vk.get_required_instance_extensions)
 #define g_create_surface (g_vk.create_surface)
@@ -1065,16 +1068,51 @@ static int apply_clip_rect_to_bounds(const Rect *clip, const Rect *input, Rect *
     return 1;
 }
 
-static int apply_clip_rect(const Widget* widget, const Rect* input, Rect* out) {
-    return apply_clip_rect_to_bounds(widget && widget->has_clip ? &widget->clip : NULL, input, out);
+typedef struct {
+    Rect rects[UI_CLIP_STACK_MAX];
+    Rect combined[UI_CLIP_STACK_MAX];
+    size_t depth;
+    int has_active;
+    Rect active;
+} ClipStack;
+
+static void clip_stack_pop(ClipStack* stack) {
+    if (!stack || stack->depth == 0) return;
+    stack->depth--;
+    if (stack->depth == 0) {
+        stack->has_active = 0;
+        stack->active = (Rect){0};
+    } else {
+        stack->has_active = 1;
+        stack->active = stack->combined[stack->depth - 1];
+    }
 }
 
-static void apply_widget_clip_to_view_model(const Widget *widget, ViewModel *vm) {
-    if (!widget || !vm) return;
-    if (!widget->has_clip) return;
+static void clip_stack_push(ClipStack* stack, Rect clip) {
+    if (!stack || stack->depth >= UI_CLIP_STACK_MAX) return;
+    Rect combined = clip;
+    if (stack->has_active) {
+        if (!apply_clip_rect_to_bounds(&stack->active, &clip, &combined)) {
+            combined = (Rect){0};
+        }
+    }
+    stack->rects[stack->depth] = clip;
+    stack->combined[stack->depth] = combined;
+    stack->depth++;
+    stack->has_active = 1;
+    stack->active = combined;
+}
+
+static const Rect* clip_stack_active(const ClipStack* stack) {
+    if (!stack || !stack->has_active) return NULL;
+    return &stack->active;
+}
+
+static void apply_active_clip_to_view_model(const Rect *clip, ViewModel *vm) {
+    if (!clip || !vm) return;
     vm->has_clip = 1;
-    vm->clip.origin = (Vec2){widget->clip.x, widget->clip.y};
-    vm->clip.size = (Vec2){widget->clip.w, widget->clip.h};
+    vm->clip.origin = (Vec2){clip->x, clip->y};
+    vm->clip.size = (Vec2){clip->w, clip->h};
 }
 
 static void glyph_quad_array_reserve(GlyphQuadArray *arr, size_t required)
@@ -1223,50 +1261,59 @@ static void create_descriptor_pool_and_set(void) {
     vkUpdateDescriptorSets(g_device, 1, &w, 0, NULL);
 }
 
-/* build vtxs from g_widgets each frame */
-static bool build_vertices_from_widgets(FrameResources *frame) {
-    if (!frame) return false;
-    frame->vertex_count = 0;
+    /* build vtxs from g_display_list each frame */
+    static bool build_vertices_from_widgets(FrameResources *frame) {
+        if (!frame) return false;
+        frame->vertex_count = 0;
 
-    if (g_widgets.count == 0 || g_swapchain_extent.width == 0 || g_swapchain_extent.height == 0) {
-        return true;
-    }
-
-    size_t slider_extras = 0;
-    for (size_t i = 0; i < g_widgets.count; ++i) {
-        if (g_widgets.items[i].type == W_HSLIDER) {
-            slider_extras += 2;
+        if (g_display_list.count == 0 || g_swapchain_extent.width == 0 || g_swapchain_extent.height == 0) {
+            return true;
         }
-    }
 
-    /* Each widget can contribute up to: 4 border segments + 1 fill + 2 scrollbar parts. */
-    size_t view_model_capacity = g_widgets.count * 8 + slider_extras;
-    ViewModel *view_models = calloc(view_model_capacity, sizeof(ViewModel));
-    GlyphQuadArray glyph_quads = {0};
-    bool view_models_ok = view_models != NULL;
-    if (!view_models) {
-        return false;
-    }
+        size_t slider_extras = 0;
+        for (size_t i = 0; i < g_display_list.count; ++i) {
+            const DisplayItem* item = &g_display_list.items[i];
+            if (item->widget && item->widget->type == W_HSLIDER) slider_extras += 2;
+        }
 
-    size_t *widget_ordinals = g_widgets.count > 0 ? calloc(g_widgets.count, sizeof(size_t)) : NULL;
-    if (g_widgets.count > 0 && !widget_ordinals) {
-        free(view_models);
-        return false;
-    }
+        /* Each widget can contribute up to: 4 border segments + 1 fill + 2 scrollbar parts. */
+        size_t view_model_capacity = g_display_list.count * 8 + slider_extras;
+        ViewModel *view_models = calloc(view_model_capacity, sizeof(ViewModel));
+        GlyphQuadArray glyph_quads = {0};
+        bool view_models_ok = view_models != NULL;
+        if (!view_models) {
+            return false;
+        }
 
-    size_t view_model_count = 0;
-    for (size_t i = 0; i < g_widgets.count; ++i) {
-        const Widget *widget = &g_widgets.items[i];
-        size_t widget_order = g_widgets.count - 1 - i;
-        int base_z = widget->z_index * LAYER_STRIDE;
-        int scrollbar_z = (widget->z_index + UI_Z_ORDER_SCALE) * LAYER_STRIDE;
-        int text_z = base_z + Z_LAYER_TEXT;
+        size_t *widget_ordinals = g_widgets.count > 0 ? calloc(g_widgets.count, sizeof(size_t)) : NULL;
+        if (g_widgets.count > 0 && !widget_ordinals) {
+            free(view_models);
+            return false;
+        }
+
+        size_t view_model_count = 0;
+        ClipStack clip_stack = {0};
+        for (size_t i = 0; i < g_display_list.count; ++i) {
+            const DisplayItem *item = &g_display_list.items[i];
+            const Widget *widget = item->widget;
+            if (!widget) continue;
+
+            for (size_t p = 0; p < item->clip_pop; ++p) clip_stack_pop(&clip_stack);
+            for (size_t p = 0; p < item->clip_push && p < UI_CLIP_STACK_MAX; ++p) clip_stack_push(&clip_stack, item->push_rects[p]);
+
+            size_t widget_index = (size_t)(widget - g_widgets.items);
+            size_t widget_order = g_widgets.count > 0 ? (g_widgets.count - 1 - widget_index) : 0;
+            int base_z = widget->z_index * LAYER_STRIDE;
+            int scrollbar_z = (widget->z_index + UI_Z_ORDER_SCALE) * LAYER_STRIDE;
+            int text_z = base_z + Z_LAYER_TEXT;
 
         float scroll_offset = widget->scroll_static ? 0.0f : widget->scroll_offset;
         float snapped_scroll_pixels = -snap_to_pixel(scroll_offset * g_transformer.dpi_scale);
         float effective_offset = snapped_scroll_pixels / g_transformer.dpi_scale;
         Rect widget_rect = { widget->rect.x, widget->rect.y + effective_offset, widget->rect.w, widget->rect.h };
         Rect inner_rect = widget_rect;
+        const Rect *active_clip = clip_stack_active(&clip_stack);
+        const Rect *scrollbar_clip = (widget->scrollbar_enabled && widget->show_scrollbar) ? NULL : active_clip;
         if (widget->border_thickness > 0.0f) {
             float b = widget->border_thickness;
             inner_rect.x += b;
@@ -1284,13 +1331,13 @@ static bool build_vertices_from_widgets(FrameResources *frame) {
             };
 
             Rect border_clip = {0};
-            const Rect *clip_bounds = NULL;
-            if (widget->has_clip) {
+            const Rect *clip_bounds = clip_stack_active(&clip_stack);
+            if (clip_bounds) {
                 border_clip = (Rect){
-                    widget->clip.x - b,
-                    widget->clip.y - b,
-                    widget->clip.w + b * 2.0f,
-                    widget->clip.h + b * 2.0f,
+                    clip_bounds->x - b,
+                    clip_bounds->y - b,
+                    clip_bounds->w + b * 2.0f,
+                    clip_bounds->h + b * 2.0f,
                 };
                 clip_bounds = &border_clip;
             }
@@ -1306,15 +1353,10 @@ static bool build_vertices_from_widgets(FrameResources *frame) {
                         .layer = base_z + Z_LAYER_BORDER,
                         .phase = RENDER_PHASE_BACKGROUND,
                         .widget_order = widget_order,
-                        .ordinal = widget_ordinals[i]++,
+                        .ordinal = widget_ordinals[widget_index]++,
                         .color = widget->border_color,
                     };
-                    if (clip_bounds) {
-                        vm.has_clip = 1;
-                        vm.clip = (LayoutBox){ {clip_bounds->x, clip_bounds->y}, {clip_bounds->w, clip_bounds->h} };
-                    } else {
-                        apply_widget_clip_to_view_model(widget, &vm);
-                    }
+                    apply_active_clip_to_view_model(clip_bounds, &vm);
                     view_models[view_model_count++] = vm;
                 }
             }
@@ -1333,7 +1375,7 @@ static bool build_vertices_from_widgets(FrameResources *frame) {
             track_color.a *= 0.35f;
             Rect track_rect = { track_x, track_y, track_w, track_height };
             Rect clipped_track;
-            if (apply_clip_rect(widget, &track_rect, &clipped_track) &&
+            if (apply_clip_rect_to_bounds(active_clip, &track_rect, &clipped_track) &&
                 ensure_view_model_capacity(&view_models, &view_model_capacity, view_model_count + 1, &view_models_ok)) {
                 view_models[view_model_count++] = (ViewModel){
                     .id = widget->id,
@@ -1341,16 +1383,16 @@ static bool build_vertices_from_widgets(FrameResources *frame) {
                     .layer = base_z + Z_LAYER_SLIDER_TRACK,
                     .phase = RENDER_PHASE_BACKGROUND,
                     .widget_order = widget_order,
-                    .ordinal = widget_ordinals[i]++,
+                    .ordinal = widget_ordinals[widget_index]++,
                     .color = track_color,
                 };
-                apply_widget_clip_to_view_model(widget, &view_models[view_model_count - 1]);
+                apply_active_clip_to_view_model(active_clip, &view_models[view_model_count - 1]);
             }
 
             float fill_w = track_w * t;
             Rect fill_rect = { track_x, track_y, fill_w, track_height };
             Rect clipped_fill;
-            if (apply_clip_rect(widget, &fill_rect, &clipped_fill) &&
+            if (apply_clip_rect_to_bounds(active_clip, &fill_rect, &clipped_fill) &&
                 ensure_view_model_capacity(&view_models, &view_model_capacity, view_model_count + 1, &view_models_ok)) {
                 view_models[view_model_count++] = (ViewModel){
                     .id = widget->id,
@@ -1358,10 +1400,10 @@ static bool build_vertices_from_widgets(FrameResources *frame) {
                     .layer = base_z + Z_LAYER_SLIDER_FILL,
                     .phase = RENDER_PHASE_BACKGROUND,
                     .widget_order = widget_order,
-                    .ordinal = widget_ordinals[i]++,
+                    .ordinal = widget_ordinals[widget_index]++,
                     .color = widget->color,
                 };
-                apply_widget_clip_to_view_model(widget, &view_models[view_model_count - 1]);
+                apply_active_clip_to_view_model(active_clip, &view_models[view_model_count - 1]);
             }
 
             float knob_w = fmaxf(track_height, inner_rect.h * 0.3f);
@@ -1375,7 +1417,7 @@ static bool build_vertices_from_widgets(FrameResources *frame) {
             if (knob_color.a <= 0.0f) knob_color = (Color){1.0f, 1.0f, 1.0f, 1.0f};
             Rect knob_rect = { knob_x, knob_y, knob_w, knob_h };
             Rect clipped_knob;
-            if (apply_clip_rect(widget, &knob_rect, &clipped_knob) &&
+            if (apply_clip_rect_to_bounds(active_clip, &knob_rect, &clipped_knob) &&
                 ensure_view_model_capacity(&view_models, &view_model_capacity, view_model_count + 1, &view_models_ok)) {
                 view_models[view_model_count++] = (ViewModel){
                     .id = widget->id,
@@ -1383,16 +1425,16 @@ static bool build_vertices_from_widgets(FrameResources *frame) {
                     .layer = base_z + Z_LAYER_SLIDER_KNOB,
                     .phase = RENDER_PHASE_BACKGROUND,
                     .widget_order = widget_order,
-                    .ordinal = widget_ordinals[i]++,
+                    .ordinal = widget_ordinals[widget_index]++,
                     .color = knob_color,
                 };
-                apply_widget_clip_to_view_model(widget, &view_models[view_model_count - 1]);
+                apply_active_clip_to_view_model(active_clip, &view_models[view_model_count - 1]);
             }
             continue;
         }
 
         Rect clipped_fill;
-        if (apply_clip_rect(widget, &inner_rect, &clipped_fill) &&
+        if (apply_clip_rect_to_bounds(active_clip, &inner_rect, &clipped_fill) &&
             ensure_view_model_capacity(&view_models, &view_model_capacity, view_model_count + 1, &view_models_ok)) {
             view_models[view_model_count++] = (ViewModel){
                 .id = widget->id,
@@ -1400,10 +1442,10 @@ static bool build_vertices_from_widgets(FrameResources *frame) {
                 .layer = base_z + Z_LAYER_FILL,
                 .phase = RENDER_PHASE_BACKGROUND,
                 .widget_order = widget_order,
-                .ordinal = widget_ordinals[i]++,
+                .ordinal = widget_ordinals[widget_index]++,
                 .color = widget->color,
             };
-            apply_widget_clip_to_view_model(widget, &view_models[view_model_count - 1]);
+            apply_active_clip_to_view_model(active_clip, &view_models[view_model_count - 1]);
         }
 
         if (widget->scrollbar_enabled && widget->show_scrollbar && widget->scroll_viewport > 0.0f &&
@@ -1415,7 +1457,7 @@ static bool build_vertices_from_widgets(FrameResources *frame) {
             Color track_color = widget->scrollbar_track_color;
             Rect scroll_track = { track_x, track_y, track_w, track_h };
             Rect clipped_track;
-            if (apply_clip_rect(widget, &scroll_track, &clipped_track) &&
+            if (apply_clip_rect_to_bounds(scrollbar_clip, &scroll_track, &clipped_track) &&
                 ensure_view_model_capacity(&view_models, &view_model_capacity, view_model_count + 1, &view_models_ok)) {
                 view_models[view_model_count++] = (ViewModel){
                     .id = widget->id,
@@ -1423,10 +1465,10 @@ static bool build_vertices_from_widgets(FrameResources *frame) {
                     .layer = scrollbar_z + Z_LAYER_SCROLLBAR_TRACK,
                     .phase = RENDER_PHASE_BACKGROUND,
                     .widget_order = widget_order,
-                    .ordinal = widget_ordinals[i]++,
+                    .ordinal = widget_ordinals[widget_index]++,
                     .color = track_color,
                 };
-                apply_widget_clip_to_view_model(widget, &view_models[view_model_count - 1]);
+                apply_active_clip_to_view_model(scrollbar_clip, &view_models[view_model_count - 1]);
             }
 
             float thumb_ratio = widget->scroll_viewport / widget->scroll_content;
@@ -1441,7 +1483,7 @@ static bool build_vertices_from_widgets(FrameResources *frame) {
 
             Rect thumb_rect = { track_x, thumb_y, track_w, thumb_h };
             Rect clipped_thumb;
-            if (apply_clip_rect(widget, &thumb_rect, &clipped_thumb) &&
+            if (apply_clip_rect_to_bounds(scrollbar_clip, &thumb_rect, &clipped_thumb) &&
                 ensure_view_model_capacity(&view_models, &view_model_capacity, view_model_count + 1, &view_models_ok)) {
                 view_models[view_model_count++] = (ViewModel){
                     .id = widget->id,
@@ -1449,10 +1491,10 @@ static bool build_vertices_from_widgets(FrameResources *frame) {
                     .layer = scrollbar_z + Z_LAYER_SCROLLBAR_THUMB,
                     .phase = RENDER_PHASE_BACKGROUND,
                     .widget_order = widget_order,
-                    .ordinal = widget_ordinals[i]++,
+                    .ordinal = widget_ordinals[widget_index]++,
                     .color = thumb_color,
                 };
-                apply_widget_clip_to_view_model(widget, &view_models[view_model_count - 1]);
+                apply_active_clip_to_view_model(scrollbar_clip, &view_models[view_model_count - 1]);
             }
         }
     }
@@ -1463,13 +1505,18 @@ static bool build_vertices_from_widgets(FrameResources *frame) {
         return false;
     }
 
-    for (size_t i = 0; i < g_widgets.count; ++i) {
-        const Widget *widget = &g_widgets.items[i];
-        size_t widget_order = g_widgets.count - 1 - i;
+    ClipStack text_clip_stack = {0};
+    for (size_t i = 0; i < g_display_list.count; ++i) {
+        const DisplayItem *item = &g_display_list.items[i];
+        const Widget *widget = item->widget;
+        if (!widget || !widget->text || !*widget->text) continue;
 
-        if (!widget->text || !*widget->text) {
-            continue;
-        }
+        for (size_t p = 0; p < item->clip_pop; ++p) clip_stack_pop(&text_clip_stack);
+        for (size_t p = 0; p < item->clip_push && p < UI_CLIP_STACK_MAX; ++p) clip_stack_push(&text_clip_stack, item->push_rects[p]);
+        const Rect *active_clip = clip_stack_active(&text_clip_stack);
+
+        size_t widget_index = (size_t)(widget - g_widgets.items);
+        size_t widget_order = g_widgets.count > 0 ? (g_widgets.count - 1 - widget_index) : 0;
 
         int text_z = widget->z_index * LAYER_STRIDE + Z_LAYER_TEXT;
 
@@ -1493,7 +1540,7 @@ static bool build_vertices_from_widgets(FrameResources *frame) {
             float y0 = snapped_pen_y + g->yoff;
             Rect glyph_rect = { x0, y0, g->w, g->h };
             Rect clipped_rect;
-            if (!apply_clip_rect(widget, &glyph_rect, &clipped_rect)) { pen_x += g->advance; c += adv; continue; }
+            if (!apply_clip_rect_to_bounds(active_clip, &glyph_rect, &clipped_rect)) { pen_x += g->advance; c += adv; continue; }
 
             float u0 = g->u0;
             float v0 = g->v0;
@@ -1533,9 +1580,9 @@ static bool build_vertices_from_widgets(FrameResources *frame) {
                 .widget_order = widget_order,
                 .layer = text_z,
                 .phase = RENDER_PHASE_OVERLAY,
-                .ordinal = widget_ordinals[i]++,
-                .has_clip = widget->has_clip,
-                .clip = { {widget->clip.x, widget->clip.y}, {widget->clip.w, widget->clip.h} },
+                .ordinal = widget_ordinals[widget_index]++,
+                .has_clip = active_clip != NULL,
+                .clip = active_clip ? (LayoutBox){ {active_clip->x, active_clip->y}, {active_clip->w, active_clip->h} } : (LayoutBox){0},
             };
 
             pen_x += g->advance;
@@ -1811,6 +1858,7 @@ static bool vk_backend_init(RendererBackend* backend, const RenderBackendInit* i
     g_get_framebuffer_size = init->get_framebuffer_size;
     g_wait_events = init->wait_events;
     g_widgets = init->widgets;
+    g_display_list = init->display_list;
     g_vert_spv = init->vert_spv;
     g_frag_spv = init->frag_spv;
     g_font_path = init->font_path;

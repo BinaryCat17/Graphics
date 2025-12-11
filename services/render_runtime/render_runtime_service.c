@@ -45,6 +45,7 @@ static void try_bootstrap_renderer(RenderRuntimeServiceContext* context) {
         .frag_spv = context->assets->frag_spv_path,
         .font_path = context->assets->font_path,
         .widgets = context->widgets,
+        .display_list = context->display_list,
         .transformer = &context->render->transformer,
         .logger_config = &context->logger_config,
     };
@@ -66,6 +67,7 @@ static void on_ui_event(const StateEvent* event, void* user_data) {
     const UiRuntimeComponent* component = (const UiRuntimeComponent*)event->payload;
     context->ui = component->ui;
     context->widgets = component->widgets;
+    context->display_list = component->display_list;
     try_bootstrap_renderer(context);
 }
 
@@ -84,6 +86,7 @@ static void on_render_ready_event(const StateEvent* event, void* user_data) {
     context->assets = component->assets;
     context->ui = component->ui;
     context->widgets = component->widgets;
+    context->display_list = component->display_list;
     context->model = component->model;
     context->render_ready = component->ready;
     try_bootstrap_renderer(context);
@@ -137,6 +140,7 @@ bool render_runtime_service_prepare(RenderRuntimeServiceContext* context, AppSer
                                   .assets = &services->core.assets,
                                   .ui = &services->ui,
                                   .widgets = services->ui.widgets,
+                                  .display_list = services->ui.display_list,
                                   .model = services->core.model,
                                   .ready = true};
     state_manager_publish(&services->state_manager, STATE_EVENT_COMPONENT_ADDED, services->render_ready_type_id, "active",

@@ -7,6 +7,7 @@
 
 #include "platform/platform.h"
 #include "ui/ui_config.h"
+#include "ui/compositor.h"
 
 typedef struct CoordinateSystem2D CoordinateTransformer;
 
@@ -54,6 +55,7 @@ typedef struct RenderBackendInit {
     const char* frag_spv;
     const char* font_path;
     WidgetArray widgets;
+    DisplayList display_list;
     const CoordinateTransformer* transformer;
     const RenderLoggerConfig* logger_config;
 } RenderBackendInit;
