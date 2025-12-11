@@ -2,7 +2,7 @@
 
 #include <stddef.h>
 
-#include "core/rendering/render_composition.h"
+#include "render/common/render_composition.h"
 
 #ifdef __cplusplus
 extern "C" {

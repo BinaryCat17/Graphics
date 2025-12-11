@@ -4,8 +4,8 @@
 #include <stdio.h>
 #include <string.h>
 
-#include "render/renderer_backend.h"
-#include "render/vulkan_renderer.h"
+#include "render/common/renderer_backend.h"
+#include "render/vulkan/vulkan_renderer.h"
 #include "runtime/runtime.h"
 #include "service_events.h"
 

@@ -1,7 +1,7 @@
 #ifndef VULKAN_RENDERER_H
 #define VULKAN_RENDERER_H
 
-#include "render/renderer_backend.h"
+#include "render/common/renderer_backend.h"
 
 RendererBackend* vulkan_renderer_backend(void);
 

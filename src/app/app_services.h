@@ -4,7 +4,7 @@
 #include <stdbool.h>
 
 #include "core/context.h"
-#include "render/render_context.h"
+#include "render/common/render_context.h"
 #include "state/state_manager.h"
 #include "ui/ui_context.h"
 
