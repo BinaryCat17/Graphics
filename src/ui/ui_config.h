@@ -2,7 +2,8 @@
 #define UI_CONFIG_H
 
 #include <stddef.h>
-#include "core/Graphics.h"
+#include "coordinate_systems/coordinate_systems.h"
+#include "render/common/render_composition.h"
 #include "cad/cad_scene.h"
 #include "config/config_document.h"
 
