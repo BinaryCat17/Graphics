@@ -31,8 +31,8 @@ int main(void)
         {.min = {0.0f, 0.0f}, .max = {5.0f, 5.0f}, .uv0 = {0.0f, 0.0f}, .uv1 = {1.0f, 1.0f}, .color = {1, 1, 1, 1}, .layer = 0, .phase = RENDER_PHASE_OVERLAY, .ordinal = 0, .widget_order = 0},
     };
 
-    int result = renderer_build_commands(&renderer, views, 2, glyphs, 1);
-    assert(result == 0);
+    RenderBuildResult result = renderer_build_commands(&renderer, views, 2, glyphs, 1);
+    assert(result == RENDER_BUILD_OK);
     assert(renderer.command_list.count == 3);
 
     size_t background_count = 0;
