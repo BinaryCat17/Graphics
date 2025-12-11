@@ -110,6 +110,8 @@ typedef struct UiNode {
     int has_draggable;
     int modal;
     int has_modal;
+    int clip_to_viewport;
+    int has_clip_to_viewport;
     char* on_focus;
     struct UiNode* children;
     size_t child_count;
@@ -169,6 +171,8 @@ typedef struct Widget {
     Color scrollbar_thumb_color;
     int has_clip;
     Rect clip;
+    int clip_to_viewport;
+    int has_clip_to_viewport;
     float scroll_viewport;
     float scroll_content;
     int show_scrollbar;
