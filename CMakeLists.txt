@@ -102,7 +102,7 @@ if (NOT VULKAN_STUB)
             "src/cad/cad_scene.c" "src/cad/cad_scene.h"
             "services/scene/cad_scene_yaml.c" "services/scene/cad_scene_yaml.h"
             "src/state/state_manager.c" "src/state/state_manager.h"
-            "src/config/simple_yaml.c" "src/config/simple_yaml.h" "services/scene/module_yaml_loader.c" "services/scene/module_yaml_loader.h" "src/config/config_document.c" "src/config/config_document.h" "src/config/config_io.c" "src/config/config_io.h"
+            "src/config/simple_yaml.c" "src/config/simple_yaml.h" "src/config/module_yaml_loader.c" "src/config/module_yaml_loader.h" "src/config/config_document.c" "src/config/config_document.h" "src/config/config_io.c" "src/config/config_io.h"
             "services/render_runtime/runtime.c" "services/render_runtime/runtime.h"
             "src/app/app_services.h" "src/app/app_services.c"
             "services/scene/scene_service.c" "services/scene/scene_service.h"
@@ -117,7 +117,7 @@ else()
             "src/cad/cad_scene.c" "src/cad/cad_scene.h"
             "services/scene/cad_scene_yaml.c" "services/scene/cad_scene_yaml.h"
             "src/state/state_manager.c" "src/state/state_manager.h"
-            "src/config/simple_yaml.c" "src/config/simple_yaml.h" "services/scene/module_yaml_loader.c" "services/scene/module_yaml_loader.h" "src/config/config_document.c" "src/config/config_document.h" "src/config/config_io.c" "src/config/config_io.h"
+            "src/config/simple_yaml.c" "src/config/simple_yaml.h" "src/config/module_yaml_loader.c" "src/config/module_yaml_loader.h" "src/config/config_document.c" "src/config/config_document.h" "src/config/config_io.c" "src/config/config_io.h"
             "services/ui/scene_ui.c" "services/ui/scene_ui.h" "services/ui/ui_config.c" "services/ui/ui_config.h" "services/ui/ui_context.h"
     )
 endif()

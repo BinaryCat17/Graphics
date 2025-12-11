@@ -5,7 +5,7 @@
 #include <string.h>
 
 #include "scene/cad_scene_yaml.h"
-#include "scene/module_yaml_loader.h"
+#include "config/module_yaml_loader.h"
 #include "services/service_events.h"
 
 static char* join_path(const char* dir, const char* leaf) {

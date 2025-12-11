@@ -1,4 +1,4 @@
-#include "scene/module_yaml_loader.h"
+#include "config/module_yaml_loader.h"
 
 #include <stdio.h>
 #include <stdlib.h>
