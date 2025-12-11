@@ -5,7 +5,7 @@
 
 #include "assets/assets.h"
 #include "cad/cad_scene.h"
-#include "render/render_context.h"
+#include "render/common/render_context.h"
 #include "ui/ui_context.h"
 
 #define STATE_COMPONENT_SCENE "scene"

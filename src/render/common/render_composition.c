@@ -1,9 +1,9 @@
-#include "render_commands.h"
+#include "render_composition.h"
 
 #include <stdlib.h>
 #include <string.h>
 
-#include "memory_utils.h"
+#include "core/utils/buffer_reserve.h"
 
 static int compare_sort_keys(const RenderSortKey *a, const RenderSortKey *b)
 {

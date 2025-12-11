@@ -30,6 +30,23 @@ if (NOT Vulkan_FOUND)
     add_library(Vulkan::Vulkan ALIAS VulkanStub)
     set(VULKAN_STUB ON)
 endif()
+
+set(CORE_SOURCES
+        "src/core/math/coordinate_spaces.c"
+        "src/core/layout/layout_geometry.c"
+        "src/core/utils/buffer_reserve.c"
+        "src/core/Graphics.h")
+
+set(RENDER_COMMON_SOURCES
+        "src/render/common/render_composition.c"
+        "src/render/common/ui_mesh_builder.c"
+        "src/render/common/renderer_backend.c")
+
+add_library(render_common STATIC ${RENDER_COMMON_SOURCES})
+target_include_directories(render_common PUBLIC "src/" "services/" ${Stb_INCLUDE_DIR})
+if (NOT MSVC)
+    target_link_libraries(render_common PUBLIC m)
+endif()
 if (NOT VULKAN_STUB)
     find_program(GLSLC_EXECUTABLE glslc HINTS ENV VULKAN_SDK PATH_SUFFIXES Bin)
     if (NOT GLSLC_EXECUTABLE)
@@ -62,13 +79,22 @@ if (NOT VULKAN_STUB)
             VERBATIM
     )
 
+    set(RENDER_VULKAN_SOURCES
+            "src/render/vulkan/vulkan_renderer.c"
+            "src/render/vulkan/vulkan_renderer.h")
+
+    add_library(render_vulkan STATIC ${RENDER_VULKAN_SOURCES})
+    target_include_directories(render_vulkan PUBLIC "src/" "services/" ${Stb_INCLUDE_DIR})
+    target_link_libraries(render_vulkan PUBLIC render_common Vulkan::Vulkan glfw Threads::Threads)
+    if (NOT MSVC)
+        target_link_libraries(render_vulkan PUBLIC m)
+    endif()
+
     set(APP_SOURCES
             "app/main.c"
             "src/assets/assets.c" "src/assets/assets.h"
-            "src/render/renderer_backend.c" "src/render/renderer_backend.h"
-            "src/render/vulkan_renderer.c" "src/render/vulkan_renderer.h"
             "src/ui/scroll.c" "src/ui/scroll.h" "src/ui/ui_config.c" "src/ui/ui_config.h" "src/ui/scene_ui.c" "src/ui/scene_ui.h"
-            "src/core/coordinate_transform.c" "src/core/layout.c" "src/core/render_commands.c" "src/core/vertex_buffers.c" "src/core/memory_utils.c" "src/core/Graphics.h"
+            ${CORE_SOURCES}
             "src/cad/cad_scene.c" "src/cad/cad_scene.h" "src/cad/cad_scene_yaml.c" "src/cad/cad_scene_yaml.h"
             "src/state/state_manager.c" "src/state/state_manager.h"
             "src/config/simple_yaml.c" "src/config/simple_yaml.h" "src/config/module_yaml_loader.c" "src/config/module_yaml_loader.h" "src/config/config_document.c" "src/config/config_document.h" "src/config/config_io.c" "src/config/config_io.h"
@@ -93,6 +119,7 @@ endif()
 # Добавьте источник в исполняемый файл этого проекта.
 add_executable (Graphics ${APP_SOURCES})
 target_include_directories(Graphics PRIVATE "src/" "services/")
+target_link_libraries(Graphics PRIVATE render_common)
 
 if (NOT VULKAN_STUB)
     add_dependencies(Graphics Shaders)
@@ -100,6 +127,7 @@ if (NOT VULKAN_STUB)
     target_include_directories(${PROJECT_NAME} PRIVATE
         ${Vulkan_INCLUDE_DIRS}
     )
+    target_link_libraries(Graphics PRIVATE render_vulkan)
 endif()
 
 if (NOT Stb_FOUND)
@@ -144,33 +172,33 @@ add_test(NAME scene_ui_tests COMMAND scene_ui_tests)
 
 add_executable(transform_tests
         tests/transform_tests.c
-        src/core/coordinate_transform.c src/core/layout.c src/core/render_commands.c src/core/vertex_buffers.c src/core/memory_utils.c src/core/Graphics.h)
-target_link_libraries(transform_tests PRIVATE glfw Threads::Threads)
+        ${CORE_SOURCES})
+target_link_libraries(transform_tests PRIVATE glfw Threads::Threads render_common)
 if (NOT MSVC)
     target_link_libraries(transform_tests PRIVATE m)
 endif()
 target_include_directories(transform_tests PRIVATE src services)
 add_test(NAME transform_tests COMMAND transform_tests)
 
-add_executable(render_commands_tests
-        tests/render_commands_tests.c
-        src/core/coordinate_transform.c src/core/layout.c src/core/render_commands.c src/core/vertex_buffers.c src/core/memory_utils.c src/core/Graphics.h)
-target_link_libraries(render_commands_tests PRIVATE glfw Threads::Threads)
+add_executable(render_composition_tests
+        tests/render_composition_tests.c
+        ${CORE_SOURCES})
+target_link_libraries(render_composition_tests PRIVATE glfw Threads::Threads render_common)
 if (NOT MSVC)
-    target_link_libraries(render_commands_tests PRIVATE m)
+    target_link_libraries(render_composition_tests PRIVATE m)
 endif()
-target_include_directories(render_commands_tests PRIVATE src services)
-add_test(NAME render_commands_tests COMMAND render_commands_tests)
+target_include_directories(render_composition_tests PRIVATE src services)
+add_test(NAME render_composition_tests COMMAND render_composition_tests)
 
-add_executable(vertex_buffers_tests
-        tests/vertex_buffers_tests.c
-        src/core/coordinate_transform.c src/core/layout.c src/core/render_commands.c src/core/vertex_buffers.c src/core/memory_utils.c src/core/Graphics.h)
-target_link_libraries(vertex_buffers_tests PRIVATE glfw Threads::Threads)
+add_executable(ui_mesh_builder_tests
+        tests/ui_mesh_builder_tests.c
+        ${CORE_SOURCES})
+target_link_libraries(ui_mesh_builder_tests PRIVATE glfw Threads::Threads render_common)
 if (NOT MSVC)
-    target_link_libraries(vertex_buffers_tests PRIVATE m)
+    target_link_libraries(ui_mesh_builder_tests PRIVATE m)
 endif()
-target_include_directories(vertex_buffers_tests PRIVATE src services)
-add_test(NAME vertex_buffers_tests COMMAND vertex_buffers_tests)
+target_include_directories(ui_mesh_builder_tests PRIVATE src services)
+add_test(NAME ui_mesh_builder_tests COMMAND ui_mesh_builder_tests)
 
 add_executable(scene_yaml_tests
         tests/scene_yaml_tests.c
