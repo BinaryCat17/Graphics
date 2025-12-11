@@ -67,11 +67,13 @@ void runtime_update_transformer(AppServices* services) {
     if (!render->window) return;
     PlatformWindowSize window_size = platform_get_window_size(render->window);
     PlatformWindowSize framebuffer_size = platform_get_framebuffer_size(render->window);
-    PlatformDpiScale dpi_scale_data = platform_get_window_dpi(render->window);
     float dpi_scale_x = (window_size.width > 0) ? (float)framebuffer_size.width / (float)window_size.width : 1.0f;
     float dpi_scale_y = (window_size.height > 0) ? (float)framebuffer_size.height / (float)window_size.height : 1.0f;
-    float dpi_scale = (dpi_scale_data.x_scale + dpi_scale_data.y_scale) * 0.5f;
-    if (dpi_scale <= 0.0f) dpi_scale = (dpi_scale_x + dpi_scale_y) * 0.5f;
+    float dpi_scale = (dpi_scale_x + dpi_scale_y) * 0.5f;
+    if (dpi_scale <= 0.0f) {
+        PlatformDpiScale dpi_scale_data = platform_get_window_dpi(render->window);
+        dpi_scale = (dpi_scale_data.x_scale + dpi_scale_data.y_scale) * 0.5f;
+    }
     if (dpi_scale <= 0.0f) dpi_scale = 1.0f;
 
     float ui_scale = services->ui.ui_scale;
