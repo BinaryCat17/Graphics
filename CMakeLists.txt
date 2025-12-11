@@ -97,17 +97,17 @@ if (NOT VULKAN_STUB)
     set(APP_SOURCES
             "app/main.c"
             "src/assets/assets.c" "src/assets/assets.h"
-            "src/services/ui/scroll.c" "src/services/ui/scroll.h" "src/services/ui/ui_config.c" "src/services/ui/ui_config.h" "src/services/ui/scene_ui.c" "src/services/ui/scene_ui.h" "src/services/ui/ui_context.h"
+            "services/ui/scroll.c" "services/ui/scroll.h" "services/ui/ui_config.c" "services/ui/ui_config.h" "services/ui/scene_ui.c" "services/ui/scene_ui.h" "services/ui/ui_context.h"
             ${CORE_SOURCES}
             "src/cad/cad_scene.c" "src/cad/cad_scene.h"
-            "src/services/scene/cad_scene_yaml.c" "src/services/scene/cad_scene_yaml.h"
+            "services/scene/cad_scene_yaml.c" "services/scene/cad_scene_yaml.h"
             "src/state/state_manager.c" "src/state/state_manager.h"
-            "src/config/simple_yaml.c" "src/config/simple_yaml.h" "src/services/scene/module_yaml_loader.c" "src/services/scene/module_yaml_loader.h" "src/config/config_document.c" "src/config/config_document.h" "src/config/config_io.c" "src/config/config_io.h"
-            "src/services/render_runtime/runtime.c" "src/services/render_runtime/runtime.h"
+            "src/config/simple_yaml.c" "src/config/simple_yaml.h" "services/scene/module_yaml_loader.c" "services/scene/module_yaml_loader.h" "src/config/config_document.c" "src/config/config_document.h" "src/config/config_io.c" "src/config/config_io.h"
+            "services/render_runtime/runtime.c" "services/render_runtime/runtime.h"
             "src/app/app_services.h" "src/app/app_services.c"
-            "services/scene_service.c" "services/scene_service.h"
-            "services/ui_service.c" "services/ui_service.h" "src/services/service_events.h"
-            "services/render_runtime_service.c" "services/render_runtime_service.h"
+            "services/scene/scene_service.c" "services/scene/scene_service.h"
+            "services/ui/ui_service.c" "services/ui/ui_service.h" "src/services/service_events.h"
+            "services/render_runtime/render_runtime_service.c" "services/render_runtime/render_runtime_service.h"
             "services/render_service.c" "services/render_service.h"
             "src/services/service_manager.c" "src/services/service_manager.h" "src/services/service.h"
     )
@@ -115,10 +115,10 @@ else()
     set(APP_SOURCES
             "app/main_stub.c"
             "src/cad/cad_scene.c" "src/cad/cad_scene.h"
-            "src/services/scene/cad_scene_yaml.c" "src/services/scene/cad_scene_yaml.h"
+            "services/scene/cad_scene_yaml.c" "services/scene/cad_scene_yaml.h"
             "src/state/state_manager.c" "src/state/state_manager.h"
-            "src/config/simple_yaml.c" "src/config/simple_yaml.h" "src/services/scene/module_yaml_loader.c" "src/services/scene/module_yaml_loader.h" "src/config/config_document.c" "src/config/config_document.h" "src/config/config_io.c" "src/config/config_io.h"
-            "src/services/ui/scene_ui.c" "src/services/ui/scene_ui.h" "src/services/ui/ui_config.c" "src/services/ui/ui_config.h" "src/services/ui/ui_context.h"
+            "src/config/simple_yaml.c" "src/config/simple_yaml.h" "services/scene/module_yaml_loader.c" "services/scene/module_yaml_loader.h" "src/config/config_document.c" "src/config/config_document.h" "src/config/config_io.c" "src/config/config_io.h"
+            "services/ui/scene_ui.c" "services/ui/scene_ui.h" "services/ui/ui_config.c" "services/ui/ui_config.h" "services/ui/ui_context.h"
     )
 endif()
 
@@ -150,9 +150,9 @@ target_include_directories(Graphics PRIVATE ${Stb_INCLUDE_DIR})
 
 add_executable(layout_tests
         tests/layout_tests.c
-        src/services/ui/ui_config.c src/services/ui/ui_config.h
-        src/services/ui/scene_ui.c src/services/ui/scene_ui.h
-        src/services/ui/scroll.c src/services/ui/scroll.h
+        services/ui/ui_config.c services/ui/ui_config.h
+        services/ui/scene_ui.c services/ui/scene_ui.h
+        services/ui/scroll.c services/ui/scroll.h
         src/config/config_document.c src/config/config_document.h src/config/config_io.c src/config/config_io.h
         src/config/simple_yaml.c src/config/simple_yaml.h)
 target_link_libraries(layout_tests PRIVATE glfw Threads::Threads)
@@ -164,8 +164,8 @@ add_test(NAME layout_tests COMMAND layout_tests)
 
 add_executable(scene_ui_tests
         tests/scene_ui_tests.c
-        src/services/ui/ui_config.c src/services/ui/ui_config.h src/services/ui/scene_ui.c src/services/ui/scene_ui.h
-        src/services/ui/scroll.c src/services/ui/scroll.h
+        services/ui/ui_config.c services/ui/ui_config.h services/ui/scene_ui.c services/ui/scene_ui.h
+        services/ui/scroll.c services/ui/scroll.h
         src/cad/cad_scene.c src/cad/cad_scene.h
         src/config/config_document.c src/config/config_document.h src/config/config_io.c src/config/config_io.h
         src/config/simple_yaml.c src/config/simple_yaml.h)
@@ -208,7 +208,7 @@ add_test(NAME ui_mesh_builder_tests COMMAND ui_mesh_builder_tests)
 
 add_executable(scene_yaml_tests
         tests/scene_yaml_tests.c
-        src/services/scene/cad_scene_yaml.c src/services/scene/cad_scene_yaml.h
+        services/scene/cad_scene_yaml.c services/scene/cad_scene_yaml.h
         src/cad/cad_scene.c src/cad/cad_scene.h)
 target_link_libraries(scene_yaml_tests PRIVATE Threads::Threads)
 target_include_directories(scene_yaml_tests PRIVATE src services)

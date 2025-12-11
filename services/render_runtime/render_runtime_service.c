@@ -1,4 +1,4 @@
-#include "render_runtime_service.h"
+#include "render_runtime/render_runtime_service.h"
 
 #include <stdio.h>
 #include <string.h>
@@ -6,7 +6,7 @@
 #include "platform/platform.h"
 #include "render/common/renderer_backend.h"
 #include "render/vulkan/vulkan_renderer.h"
-#include "services/render_runtime/runtime.h"
+#include "render_runtime/runtime.h"
 #include "services/service_events.h"
 
 static ServiceDescriptor g_render_runtime_service_descriptor;

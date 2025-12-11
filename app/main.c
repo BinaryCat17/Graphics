@@ -4,13 +4,13 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "services/render_runtime/runtime.h"
+#include "render_runtime/runtime.h"
 #include "services/service.h"
-#include "render_runtime_service.h"
+#include "render_runtime/render_runtime_service.h"
 #include "render_service.h"
-#include "scene_service.h"
+#include "scene/scene_service.h"
 #include "services/service_manager.h"
-#include "ui_service.h"
+#include "ui/ui_service.h"
 
 int main(int argc, char** argv) {
     const char* assets_dir = "assets";

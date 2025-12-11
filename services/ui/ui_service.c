@@ -1,4 +1,4 @@
-#include "ui_service.h"
+#include "ui/ui_service.h"
 
 #include <math.h>
 #include <stdio.h>
@@ -6,7 +6,7 @@
 
 #include "platform/platform.h"
 #include "services/service_events.h"
-#include "services/ui/scroll.h"
+#include "ui/scroll.h"
 
 static float clamp01(float v) {
     if (v < 0.0f) return 0.0f;

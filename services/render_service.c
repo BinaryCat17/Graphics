@@ -5,8 +5,8 @@
 #include <threads.h>
 
 #include "platform/platform.h"
-#include "render_runtime_service.h"
-#include "services/ui/ui_config.h"
+#include "render_runtime/render_runtime_service.h"
+#include "ui/ui_config.h"
 
 typedef struct RenderServiceContext {
     RenderRuntimeServiceContext* runtime;

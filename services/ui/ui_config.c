@@ -1,4 +1,4 @@
-#include "services/ui/ui_config.h"
+#include "ui/ui_config.h"
 
 #include <ctype.h>
 #include <math.h>
@@ -7,7 +7,7 @@
 #include <string.h>
 
 #include "stb_truetype.h"
-#include "services/ui/scene_ui.h"
+#include "ui/scene_ui.h"
 
 static int ascii_strcasecmp(const char* a, const char* b) {
     if (a == b) return 0;

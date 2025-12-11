@@ -8,8 +8,8 @@
 #include "render/common/render_context.h"
 #include "services/service.h"
 #include "state/state_manager.h"
-#include "services/ui/ui_context.h"
-#include "services/ui/ui_config.h"
+#include "ui/ui_context.h"
+#include "ui/ui_config.h"
 
 typedef struct RenderRuntimeServiceContext {
     RenderRuntimeContext* render;
