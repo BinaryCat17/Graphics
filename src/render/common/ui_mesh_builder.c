@@ -200,7 +200,7 @@ int renderer_fill_vertices(Renderer *renderer, const ViewModel *view_models, siz
         return -1;
     }
 
-    if (renderer_build_commands(renderer, view_models, view_model_count, glyphs, glyph_count) != 0) {
+    if (renderer_build_commands(renderer, view_models, view_model_count, glyphs, glyph_count) != RENDER_BUILD_OK) {
         return -1;
     }
 

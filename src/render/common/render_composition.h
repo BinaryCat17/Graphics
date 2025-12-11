@@ -95,6 +95,16 @@ typedef struct Renderer {
     RenderCommandList command_list;
 } Renderer;
 
+typedef enum RenderBuildResult {
+    RENDER_BUILD_OK = 0,
+    RENDER_BUILD_ERROR_NULL_RENDERER,
+    RENDER_BUILD_ERROR_INVALID_INPUT,
+    RENDER_BUILD_ERROR_LAYOUT_RESOLVE,
+    RENDER_BUILD_ERROR_BACKGROUND_APPEND,
+    RENDER_BUILD_ERROR_GLYPH_APPEND,
+    RENDER_BUILD_ERROR_SORT,
+} RenderBuildResult;
+
 void render_command_list_init(RenderCommandList *list, size_t initial_capacity);
 void render_command_list_dispose(RenderCommandList *list);
 int render_command_list_add(RenderCommandList *list, const RenderCommand *command);
@@ -102,8 +112,8 @@ int render_command_list_sort(RenderCommandList *list);
 
 void renderer_init(Renderer *renderer, const RenderContext *context, size_t initial_capacity);
 void renderer_dispose(Renderer *renderer);
-int renderer_build_commands(Renderer *renderer, const ViewModel *view_models, size_t view_model_count, const GlyphQuad *glyphs,
-                            size_t glyph_count);
+RenderBuildResult renderer_build_commands(Renderer *renderer, const ViewModel *view_models, size_t view_model_count,
+                                         const GlyphQuad *glyphs, size_t glyph_count);
 
 #ifdef __cplusplus
 }

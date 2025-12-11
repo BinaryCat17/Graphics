@@ -1,5 +1,6 @@
 #include "render_composition.h"
 
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -127,11 +128,31 @@ void renderer_dispose(Renderer *renderer)
     render_command_list_dispose(&renderer->command_list);
 }
 
-int renderer_build_commands(Renderer *renderer, const ViewModel *view_models, size_t view_model_count, const GlyphQuad *glyphs,
-                            size_t glyph_count)
+static void renderer_reset_commands(Renderer *renderer)
+{
+    if (renderer) {
+        renderer->command_list.count = 0;
+    }
+}
+
+static RenderBuildResult renderer_fail(Renderer *renderer, RenderBuildResult result, const char *message)
+{
+    if (message) {
+        fprintf(stderr, "%s\n", message);
+    }
+    renderer_reset_commands(renderer);
+    return result;
+}
+
+RenderBuildResult renderer_build_commands(Renderer *renderer, const ViewModel *view_models, size_t view_model_count,
+                                         const GlyphQuad *glyphs, size_t glyph_count)
 {
     if (!renderer) {
-        return -1;
+        return RENDER_BUILD_ERROR_NULL_RENDERER;
+    }
+    if ((view_model_count > 0 && !view_models) || (glyph_count > 0 && !glyphs)) {
+        return renderer_fail(renderer, RENDER_BUILD_ERROR_INVALID_INPUT,
+                             "renderer_build_commands: null input array with non-zero count");
     }
 
     renderer->command_list.count = 0;
@@ -140,7 +161,8 @@ int renderer_build_commands(Renderer *renderer, const ViewModel *view_models, si
         RenderCommand command = (RenderCommand){0};
         command.primitive = RENDER_PRIMITIVE_BACKGROUND;
         command.phase = view_models[i].phase;
-        command.key = (RenderSortKey){view_models[i].layer, view_models[i].widget_order, view_models[i].phase, view_models[i].ordinal};
+        command.key =
+            (RenderSortKey){view_models[i].layer, view_models[i].widget_order, view_models[i].phase, view_models[i].ordinal};
         command.has_clip = view_models[i].has_clip;
         if (view_models[i].has_clip) {
             command.clip = layout_resolve(&view_models[i].clip, &renderer->context);
@@ -148,7 +170,11 @@ int renderer_build_commands(Renderer *renderer, const ViewModel *view_models, si
         command.data.background.layout = layout;
         command.data.background.color = view_models[i].color;
         if (render_command_list_add(&renderer->command_list, &command) != 0) {
-            return -1;
+            char buffer[256];
+            snprintf(buffer, sizeof(buffer),
+                     "renderer_build_commands: failed to append background command at index %zu (id=%s)", i,
+                     view_models[i].id ? view_models[i].id : "<unnamed>");
+            return renderer_fail(renderer, RENDER_BUILD_ERROR_BACKGROUND_APPEND, buffer);
         }
     }
 
@@ -163,10 +189,19 @@ int renderer_build_commands(Renderer *renderer, const ViewModel *view_models, si
         }
         command.data.glyph = glyphs[i];
         if (render_command_list_add(&renderer->command_list, &command) != 0) {
-            return -1;
+            char buffer[256];
+            snprintf(buffer, sizeof(buffer),
+                     "renderer_build_commands: failed to append glyph command at index %zu (widget_order=%zu, ordinal=%zu)", i,
+                     glyphs[i].widget_order, glyphs[i].ordinal);
+            return renderer_fail(renderer, RENDER_BUILD_ERROR_GLYPH_APPEND, buffer);
         }
     }
 
-    return render_command_list_sort(&renderer->command_list);
+    if (render_command_list_sort(&renderer->command_list) != 0) {
+        return renderer_fail(renderer, RENDER_BUILD_ERROR_SORT,
+                             "renderer_build_commands: failed to sort render command list");
+    }
+
+    return RENDER_BUILD_OK;
 }
 
