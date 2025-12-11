@@ -19,6 +19,31 @@ void ui_context_init(UiContext* ui) {
     memset(ui, 0, sizeof(UiContext));
 }
 
+static int rect_intersect(const Rect* a, const Rect* b, Rect* out) {
+    if (!a || !b || !out) return 0;
+    float x0 = fmaxf(a->x, b->x);
+    float y0 = fmaxf(a->y, b->y);
+    float x1 = fminf(a->x + a->w, b->x + b->w);
+    float y1 = fminf(a->y + a->h, b->y + b->h);
+    if (x1 <= x0 || y1 <= y0) return 0;
+    out->x = x0;
+    out->y = y0;
+    out->w = x1 - x0;
+    out->h = y1 - y0;
+    return 1;
+}
+
+static void refresh_layout_clips(LayoutNode* node, const Rect* parent_clip) {
+    if (!node) return;
+    Rect bounds = {node->rect.x, node->rect.y, node->rect.w, node->rect.h};
+    node->has_clip = parent_clip ? rect_intersect(parent_clip, &bounds, &node->clip) : 1;
+    if (!parent_clip) node->clip = bounds;
+    const Rect* next_parent = node->has_clip ? &node->clip : parent_clip;
+    for (size_t i = 0; i < node->child_count; i++) {
+        refresh_layout_clips(&node->children[i], next_parent);
+    }
+}
+
 float ui_compute_scale(const UiContext* ui, float target_w, float target_h) {
     if (!ui || ui->base_w <= 0.0f || ui->base_h <= 0.0f) return 1.0f;
     float ui_scale = fminf(target_w / ui->base_w, target_h / ui->base_h);
@@ -128,6 +153,8 @@ bool ui_prepare_runtime(UiContext* ui, const CoreContext* core, float ui_scale, 
         return false;
     }
     scale_layout(ui->layout_root, ui_scale);
+    Rect root_clip = {0.0f, 0.0f, ui->layout_root->rect.w, ui->layout_root->rect.h};
+    refresh_layout_clips(ui->layout_root, &root_clip);
 
     ui->widgets = materialize_widgets(ui->layout_root);
     apply_widget_padding_scale(&ui->widgets, ui_scale);
@@ -172,6 +199,8 @@ void ui_refresh_layout(UiContext* ui, float new_scale) {
     float ratio = ui->ui_scale > 0.0f ? new_scale / ui->ui_scale : 1.0f;
     ui->ui_scale = new_scale;
     scale_layout(ui->layout_root, ui->ui_scale);
+    Rect root_clip = {0.0f, 0.0f, ui->layout_root->rect.w, ui->layout_root->rect.h};
+    refresh_layout_clips(ui->layout_root, &root_clip);
     populate_widgets_from_layout(ui->layout_root, ui->widgets.items, ui->widgets.count);
     apply_widget_padding_scale(&ui->widgets, ui->ui_scale);
     scroll_rebuild(ui->scroll, ui->widgets.items, ui->widgets.count, ratio);
