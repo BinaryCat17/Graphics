@@ -28,14 +28,40 @@ float ui_compute_scale(const UiContext* ui, float target_w, float target_h) {
     return ui_scale;
 }
 
-static void scale_layout(LayoutNode* node, float scale) {
+static int intersect_rect(const Rect* a, const Rect* b, Rect* out) {
+    if (!a || !b || !out) return 0;
+    float x0 = fmaxf(a->x, b->x);
+    float y0 = fmaxf(a->y, b->y);
+    float x1 = fminf(a->x + a->w, b->x + b->w);
+    float y1 = fminf(a->y + a->h, b->y + b->h);
+    if (x1 <= x0 || y1 <= y0) return 0;
+    out->x = x0;
+    out->y = y0;
+    out->w = x1 - x0;
+    out->h = y1 - y0;
+    return 1;
+}
+
+static void scale_layout(LayoutNode* node, float scale, const Rect* parent_clip, const Vec2* parent_transform) {
     if (!node) return;
     node->rect.x = node->base_rect.x * scale;
     node->rect.y = node->base_rect.y * scale;
     node->rect.w = node->base_rect.w * scale;
     node->rect.h = node->base_rect.h * scale;
+    node->local_rect = (Rect){0.0f, 0.0f, node->rect.w, node->rect.h};
+
+    Rect bounds = node->rect;
+    node->has_clip = parent_clip ? intersect_rect(parent_clip, &bounds, &node->clip) : 1;
+    if (!parent_clip) node->clip = bounds;
+
+    node->transform = parent_transform
+                           ? (Vec2){parent_transform->x + node->rect.x, parent_transform->y + node->rect.y}
+                           : (Vec2){node->rect.x, node->rect.y};
+
+    const Rect* next_clip = node->has_clip ? &node->clip : parent_clip;
+    const Vec2* next_transform = &node->transform;
     for (size_t i = 0; i < node->child_count; i++) {
-        scale_layout(&node->children[i], scale);
+        scale_layout(&node->children[i], scale, next_clip, next_transform);
     }
 }
 
@@ -128,7 +154,7 @@ bool ui_prepare_runtime(UiContext* ui, const CoreContext* core, float ui_scale, 
         fprintf(stderr, "UI runtime preparation received invalid layout.\n");
         return false;
     }
-    scale_layout(ui->layout_root, ui_scale);
+    scale_layout(ui->layout_root, ui_scale, NULL, NULL);
 
     ui->widgets = materialize_widgets(ui->layout_root);
     apply_widget_padding_scale(&ui->widgets, ui_scale);
@@ -181,7 +207,7 @@ void ui_refresh_layout(UiContext* ui, float new_scale) {
     if (new_scale <= 0.0f) return;
     float ratio = ui->ui_scale > 0.0f ? new_scale / ui->ui_scale : 1.0f;
     ui->ui_scale = new_scale;
-    scale_layout(ui->layout_root, ui->ui_scale);
+    scale_layout(ui->layout_root, ui->ui_scale, NULL, NULL);
     populate_widgets_from_layout(ui->layout_root, ui->widgets.items, ui->widgets.count);
     apply_widget_padding_scale(&ui->widgets, ui->ui_scale);
     scroll_rebuild(ui->scroll, ui->widgets.items, ui->widgets.count, ratio);
