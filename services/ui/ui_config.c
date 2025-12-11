@@ -1202,6 +1202,8 @@ static void populate_widgets_recursive(const LayoutNode* node, Widget* widgets, 
         w->on_focus = node->source->on_focus;
         w->scroll_area = node->source->scroll_area ? node->source->scroll_area : active_scroll_area;
         w->scroll_static = node->source->scroll_static;
+        w->has_layout_clip = node->has_clip;
+        if (node->has_clip) w->layout_clip = node->clip;
         w->has_clip = node->has_clip;
         if (node->has_clip) w->clip = node->clip;
         w->scroll_viewport = 0.0f;

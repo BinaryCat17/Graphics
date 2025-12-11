@@ -167,6 +167,8 @@ typedef struct Widget {
     float scrollbar_width;
     Color scrollbar_track_color;
     Color scrollbar_thumb_color;
+    int has_layout_clip;
+    Rect layout_clip;
     int has_clip;
     Rect clip;
     float scroll_viewport;
