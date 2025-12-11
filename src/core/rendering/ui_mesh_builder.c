@@ -1,10 +1,10 @@
-#include "vertex_buffers.h"
+#include "ui_mesh_builder.h"
 
 #include <math.h>
 #include <stdlib.h>
 #include <string.h>
 
-#include "memory_utils.h"
+#include "core/utils/buffer_reserve.h"
 
 static int apply_device_clip(const LayoutResult *clip, Vec2 *min, Vec2 *max)
 {

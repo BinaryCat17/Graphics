@@ -1,8 +1,8 @@
 #pragma once
 
-#include "coordinate_transform.h"
-#include "layout.h"
-#include "memory_utils.h"
-#include "render_commands.h"
-#include "vertex_buffers.h"
+#include "core/layout/layout_geometry.h"
+#include "core/math/coordinate_spaces.h"
+#include "core/rendering/render_composition.h"
+#include "core/rendering/ui_mesh_builder.h"
+#include "core/utils/buffer_reserve.h"
 

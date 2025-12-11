@@ -68,7 +68,7 @@ if (NOT VULKAN_STUB)
             "src/render/renderer_backend.c" "src/render/renderer_backend.h"
             "src/render/vulkan_renderer.c" "src/render/vulkan_renderer.h"
             "src/ui/scroll.c" "src/ui/scroll.h" "src/ui/ui_config.c" "src/ui/ui_config.h" "src/ui/scene_ui.c" "src/ui/scene_ui.h"
-            "src/core/coordinate_transform.c" "src/core/layout.c" "src/core/render_commands.c" "src/core/vertex_buffers.c" "src/core/memory_utils.c" "src/core/Graphics.h"
+            "src/core/math/coordinate_spaces.c" "src/core/layout/layout_geometry.c" "src/core/rendering/render_composition.c" "src/core/rendering/ui_mesh_builder.c" "src/core/utils/buffer_reserve.c" "src/core/Graphics.h"
             "src/cad/cad_scene.c" "src/cad/cad_scene.h" "src/cad/cad_scene_yaml.c" "src/cad/cad_scene_yaml.h"
             "src/state/state_manager.c" "src/state/state_manager.h"
             "src/config/simple_yaml.c" "src/config/simple_yaml.h" "src/config/module_yaml_loader.c" "src/config/module_yaml_loader.h" "src/config/config_document.c" "src/config/config_document.h" "src/config/config_io.c" "src/config/config_io.h"
@@ -144,7 +144,7 @@ add_test(NAME scene_ui_tests COMMAND scene_ui_tests)
 
 add_executable(transform_tests
         tests/transform_tests.c
-        src/core/coordinate_transform.c src/core/layout.c src/core/render_commands.c src/core/vertex_buffers.c src/core/memory_utils.c src/core/Graphics.h)
+        src/core/math/coordinate_spaces.c src/core/layout/layout_geometry.c src/core/rendering/render_composition.c src/core/rendering/ui_mesh_builder.c src/core/utils/buffer_reserve.c src/core/Graphics.h)
 target_link_libraries(transform_tests PRIVATE glfw Threads::Threads)
 if (NOT MSVC)
     target_link_libraries(transform_tests PRIVATE m)
@@ -152,25 +152,25 @@ endif()
 target_include_directories(transform_tests PRIVATE src services)
 add_test(NAME transform_tests COMMAND transform_tests)
 
-add_executable(render_commands_tests
-        tests/render_commands_tests.c
-        src/core/coordinate_transform.c src/core/layout.c src/core/render_commands.c src/core/vertex_buffers.c src/core/memory_utils.c src/core/Graphics.h)
-target_link_libraries(render_commands_tests PRIVATE glfw Threads::Threads)
+add_executable(render_composition_tests
+        tests/render_composition_tests.c
+        src/core/math/coordinate_spaces.c src/core/layout/layout_geometry.c src/core/rendering/render_composition.c src/core/rendering/ui_mesh_builder.c src/core/utils/buffer_reserve.c src/core/Graphics.h)
+target_link_libraries(render_composition_tests PRIVATE glfw Threads::Threads)
 if (NOT MSVC)
-    target_link_libraries(render_commands_tests PRIVATE m)
+    target_link_libraries(render_composition_tests PRIVATE m)
 endif()
-target_include_directories(render_commands_tests PRIVATE src services)
-add_test(NAME render_commands_tests COMMAND render_commands_tests)
+target_include_directories(render_composition_tests PRIVATE src services)
+add_test(NAME render_composition_tests COMMAND render_composition_tests)
 
-add_executable(vertex_buffers_tests
-        tests/vertex_buffers_tests.c
-        src/core/coordinate_transform.c src/core/layout.c src/core/render_commands.c src/core/vertex_buffers.c src/core/memory_utils.c src/core/Graphics.h)
-target_link_libraries(vertex_buffers_tests PRIVATE glfw Threads::Threads)
+add_executable(ui_mesh_builder_tests
+        tests/ui_mesh_builder_tests.c
+        src/core/math/coordinate_spaces.c src/core/layout/layout_geometry.c src/core/rendering/render_composition.c src/core/rendering/ui_mesh_builder.c src/core/utils/buffer_reserve.c src/core/Graphics.h)
+target_link_libraries(ui_mesh_builder_tests PRIVATE glfw Threads::Threads)
 if (NOT MSVC)
-    target_link_libraries(vertex_buffers_tests PRIVATE m)
+    target_link_libraries(ui_mesh_builder_tests PRIVATE m)
 endif()
-target_include_directories(vertex_buffers_tests PRIVATE src services)
-add_test(NAME vertex_buffers_tests COMMAND vertex_buffers_tests)
+target_include_directories(ui_mesh_builder_tests PRIVATE src services)
+add_test(NAME ui_mesh_builder_tests COMMAND ui_mesh_builder_tests)
 
 add_executable(scene_yaml_tests
         tests/scene_yaml_tests.c

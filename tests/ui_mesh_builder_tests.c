@@ -64,7 +64,7 @@ int main(void)
     ui_text_vertex_buffer_dispose(&text);
     renderer_dispose(&renderer);
 
-    printf("vertex_buffers_tests passed\n");
+    printf("ui_mesh_builder_tests passed\n");
     return 0;
 }
 

@@ -59,7 +59,7 @@ int main(void)
     assert(glyph_count == 1);
 
     renderer_dispose(&renderer);
-    printf("render_commands_tests passed\n");
+    printf("render_composition_tests passed\n");
     return 0;
 }
 
