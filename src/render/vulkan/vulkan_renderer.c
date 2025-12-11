@@ -13,7 +13,9 @@
 #define GLFW_INCLUDE_VULKAN
 #include <GLFW/glfw3.h>
 
-#include "core/Graphics.h"
+#include "coordinate_systems/coordinate_systems.h"
+#include "render/common/render_composition.h"
+#include "render/common/ui_mesh_builder.h"
 #include "ui/ui_config.h"
 
 #define STB_TRUETYPE_IMPLEMENTATION

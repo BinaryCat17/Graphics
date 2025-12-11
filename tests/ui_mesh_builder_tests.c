@@ -1,7 +1,9 @@
 #include <assert.h>
 #include <stdio.h>
 
-#include "core/Graphics.h"
+#include "coordinate_systems/coordinate_systems.h"
+#include "render/common/render_composition.h"
+#include "render/common/ui_mesh_builder.h"
 
 static Renderer create_renderer(void)
 {

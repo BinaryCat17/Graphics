@@ -2,7 +2,8 @@
 #include <math.h>
 #include <stdio.h>
 
-#include "core/Graphics.h"
+#include "coordinate_systems/coordinate_systems.h"
+#include "coordinate_systems/layout_geometry.h"
 
 static int nearly_equal(float a, float b) {
     return fabsf(a - b) < 0.0001f;
