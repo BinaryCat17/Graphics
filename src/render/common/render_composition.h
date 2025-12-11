@@ -85,8 +85,10 @@ typedef struct RenderCommandList {
         RenderCommand *data;
         RenderCommand *commands;
     };
+    RenderCommand *scratch;
     size_t count;
     size_t capacity;
+    size_t scratch_capacity;
 } RenderCommandList;
 
 /** Renderer that owns composition for a frame. */

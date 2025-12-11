@@ -71,10 +71,19 @@ static void stable_sort(RenderCommand *commands, RenderCommand *scratch, size_t 
 void render_command_list_init(RenderCommandList *list, size_t initial_capacity)
 {
     RenderCommandList_mem_init(list, initial_capacity);
+    if (list) {
+        list->scratch = NULL;
+        list->scratch_capacity = 0;
+    }
 }
 
 void render_command_list_dispose(RenderCommandList *list)
 {
+    if (list) {
+        free(list->scratch);
+        list->scratch = NULL;
+        list->scratch_capacity = 0;
+    }
     RenderCommandList_mem_dispose(list);
 }
 
@@ -101,13 +110,18 @@ int render_command_list_sort(RenderCommandList *list)
         return 0;
     }
 
-    RenderCommand *scratch = (RenderCommand *)malloc(list->count * sizeof(RenderCommand));
-    if (!scratch) {
+    size_t initial_capacity = list->scratch_capacity > 0 ? list->scratch_capacity : list->capacity;
+    if (initial_capacity == 0) {
+        initial_capacity = list->count;
+    }
+
+    if (ensure_capacity((void **)&list->scratch, sizeof(RenderCommand), &list->scratch_capacity, list->count,
+                        initial_capacity, MEM_BUFFER_GROWTH_DOUBLE) != 0) {
+        fprintf(stderr, "render_command_list_sort: failed to allocate scratch buffer for %zu commands\n", list->count);
         return -1;
     }
 
-    stable_sort(list->commands, scratch, 0, list->count);
-    free(scratch);
+    stable_sort(list->commands, list->scratch, 0, list->count);
     return 0;
 }
 
