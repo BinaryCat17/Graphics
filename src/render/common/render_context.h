@@ -1,13 +1,13 @@
 #ifndef RENDER_CONTEXT_H
 #define RENDER_CONTEXT_H
 
-#include <GLFW/glfw3.h>
-
+#include "platform/platform.h"
 #include "coordinate_systems/coordinate_systems.h"
 
 // Window and transformer state used by the rendering subsystem.
 typedef struct RenderRuntimeContext {
-    GLFWwindow* window;
+    PlatformWindow* window;
+    PlatformSurface surface;
     CoordinateSystem2D transformer;
 } RenderRuntimeContext;
 

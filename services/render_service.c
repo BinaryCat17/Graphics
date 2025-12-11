@@ -1,10 +1,10 @@
 #include "render_service.h"
 
-#include <GLFW/glfw3.h>
 #include <stdbool.h>
 #include <stdio.h>
 #include <threads.h>
 
+#include "platform/platform.h"
 #include "render_runtime_service.h"
 #include "ui/ui_config.h"
 
@@ -23,9 +23,9 @@ static void render_service_run_loop(RenderServiceContext* service) {
     RenderRuntimeServiceContext* context = service->runtime;
     if (!context->render || !context->state_manager) return;
 
-    while (service->running && !glfwWindowShouldClose(context->render->window)) {
+    while (service->running && !platform_window_should_close(context->render->window)) {
         state_manager_dispatch(context->state_manager, 0);
-        glfwPollEvents();
+        platform_poll_events();
         if (context->renderer_ready && context->ui && context->model && context->backend && context->backend->draw) {
             ui_frame_update(context->ui);
             context->backend->draw(context->backend);
@@ -98,7 +98,7 @@ static void render_service_stop(AppServices* services) {
 
     context->running = false;
     if (context->runtime && context->runtime->render && context->runtime->render->window) {
-        glfwSetWindowShouldClose(context->runtime->render->window, GLFW_TRUE);
+        platform_set_window_should_close(context->runtime->render->window, true);
     }
 
     if (context->thread_active) {

@@ -1,10 +1,10 @@
 #include "ui_service.h"
 
-#include <GLFW/glfw3.h>
 #include <math.h>
 #include <stdio.h>
 #include <string.h>
 
+#include "platform/platform.h"
 #include "services/service_events.h"
 #include "ui/scroll.h"
 
@@ -193,10 +193,10 @@ void ui_frame_update(UiContext* ui) {
 
 void ui_handle_mouse_button(UiContext* ui, double mx, double my, int button, int action) {
     if (!ui || !ui->widgets.items || !ui->model) return;
-    int pressed = (button == GLFW_MOUSE_BUTTON_LEFT && action == GLFW_PRESS);
+    int pressed = (button == PLATFORM_MOUSE_BUTTON_LEFT && action == PLATFORM_PRESS);
     if (scroll_handle_mouse_button(ui->scroll, ui->widgets.items, ui->widgets.count, (float)mx, (float)my, pressed))
         return;
-    if (button != GLFW_MOUSE_BUTTON_LEFT || action != GLFW_PRESS) return;
+    if (button != PLATFORM_MOUSE_BUTTON_LEFT || action != PLATFORM_PRESS) return;
     for (size_t i = 0; i < ui->widgets.count; i++) {
         Widget* w = &ui->widgets.items[i];
         if ((w->type == W_BUTTON || w->type == W_CHECKBOX || w->type == W_HSLIDER) && point_in_widget(w, mx, my)) {
