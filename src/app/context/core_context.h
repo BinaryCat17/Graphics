@@ -2,7 +2,7 @@
 #define APP_CONTEXT_CORE_CONTEXT_H
 
 #include "assets/assets.h"
-#include "services/scene/cad_scene.h"
+#include "scene/cad_scene.h"
 #include "config/module_yaml_loader.h"
 #include "ui/ui_config.h"
 

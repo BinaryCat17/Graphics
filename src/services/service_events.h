@@ -4,7 +4,7 @@
 #include <stdbool.h>
 
 #include "assets/assets.h"
-#include "services/scene/cad_scene.h"
+#include "scene/cad_scene.h"
 #include "render/common/render_context.h"
 #include "ui/ui_context.h"
 
