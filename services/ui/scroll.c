@@ -434,7 +434,6 @@ void scroll_rebuild(ScrollContext* ctx, Widget* widgets, size_t widget_count, fl
 
     free_scroll_areas(old);
     scroll_apply_offsets(ctx, widgets, widget_count);
-    scroll_set_render_tree(ctx, ctx->render_root);
 }
 
 void scroll_set_render_tree(ScrollContext* ctx, RenderNode* render_root) {

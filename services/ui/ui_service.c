@@ -139,12 +139,14 @@ bool ui_prepare_runtime(UiContext* ui, const CoreContext* core, float ui_scale, 
         fprintf(stderr, "Failed to build UI render tree.\n");
         return false;
     }
-    render_tree_propagate(ui->render_tree);
+
     ui->scroll = scroll_init(ui->widgets.items, ui->widgets.count);
     if (!ui->scroll) {
         fprintf(stderr, "Failed to initialize scroll subsystem for UI.\n");
         return false;
     }
+
+    render_tree_sync_widgets(ui->render_tree);
     scroll_set_render_tree(ui->scroll, ui->render_tree);
 
     ui->ui_scale = ui_scale;
@@ -182,9 +184,10 @@ void ui_refresh_layout(UiContext* ui, float new_scale) {
     scale_layout(ui->layout_root, ui->ui_scale);
     populate_widgets_from_layout(ui->layout_root, ui->widgets.items, ui->widgets.count);
     apply_widget_padding_scale(&ui->widgets, ui->ui_scale);
+    scroll_rebuild(ui->scroll, ui->widgets.items, ui->widgets.count, ratio);
+
     if (ui->render_tree) render_tree_sync_widgets(ui->render_tree);
     scroll_set_render_tree(ui->scroll, ui->render_tree);
-    scroll_rebuild(ui->scroll, ui->widgets.items, ui->widgets.count, ratio);
 }
 
 void ui_frame_update(UiContext* ui) {
