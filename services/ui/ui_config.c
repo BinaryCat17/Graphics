@@ -685,6 +685,7 @@ static char* next_scroll_area_name(int* counter) {
 static void wrap_node_with_scrollbar(UiNode* node, int* counter) {
     if (!node) return;
     UiNode content = *node;
+    char* original_scroll_area = content.scroll_area;
     UiNode* defaults = create_node();
     if (!defaults) return;
     *node = *defaults;
@@ -722,11 +723,13 @@ static void wrap_node_with_scrollbar(UiNode* node, int* counter) {
     node->children[0] = content;
 
     if (!node->scroll_area) {
-        node->scroll_area = content.scroll_area ? content.scroll_area : next_scroll_area_name(counter);
+        node->scroll_area = original_scroll_area ? strdup(original_scroll_area) : next_scroll_area_name(counter);
     }
     node->scroll_static = 1;
     node->scrollbar_enabled = 1;
-    node->children[0].scroll_area = node->scroll_area;
+    free(node->children[0].scroll_area);
+    node->children[0].scroll_area = node->scroll_area ? strdup(node->scroll_area) : NULL;
+    free(original_scroll_area);
 }
 
 static void normalize_scrollbars(UiNode* node, int* counter) {
@@ -748,7 +751,8 @@ static void normalize_scrollbars(UiNode* node, int* counter) {
         if (!node->scroll_area) node->scroll_area = next_scroll_area_name(counter);
         if (node->child_count > 0) {
             for (size_t i = 0; i < node->child_count; ++i) {
-                node->children[i].scroll_area = node->scroll_area;
+                free(node->children[i].scroll_area);
+                node->children[i].scroll_area = node->scroll_area ? strdup(node->scroll_area) : NULL;
                 node->children[i].scroll_static = 0;
             }
         } else {
