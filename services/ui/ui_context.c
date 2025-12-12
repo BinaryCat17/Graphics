@@ -33,8 +33,6 @@ void ui_context_dispose(UiContext* ui) {
         scroll_free(ui->scroll);
         ui->scroll = NULL;
     }
-    if (ui->model) {
-        free_model(ui->model);
-        ui->model = NULL;
-    }
+    // The model is owned by the core scene service; only drop the reference here.
+    ui->model = NULL;
 }
