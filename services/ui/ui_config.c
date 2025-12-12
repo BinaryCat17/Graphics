@@ -344,7 +344,7 @@ static UiNode* create_node(void) {
     node->border_color = DEFAULT_STYLE.border_color;
     node->color = DEFAULT_STYLE.background;
     node->text_color = DEFAULT_STYLE.text;
-    node->scrollbar_enabled = 1;
+    node->scrollbar_enabled = 0;
     node->scrollbar_width = 0.0f;
     node->has_scrollbar_width = 0;
     node->scrollbar_track_color = DEFAULT_STYLE.scrollbar_track_color;
@@ -423,8 +423,16 @@ static UiNode* parse_ui_node_config(const ConfigNode* obj) {
         if (strcmp(key, "maxWidth") == 0) { node->max_w = parse_scalar_number(val, node->max_w); node->has_max_w = 1; continue; }
         if (strcmp(key, "maxHeight") == 0) { node->max_h = parse_scalar_number(val, node->max_h); node->has_max_h = 1; continue; }
         if (strcmp(key, "scrollArea") == 0 && sval) { node->scroll_area = strdup(sval); continue; }
-        if (strcmp(key, "scrollStatic") == 0) { node->scroll_static = parse_scalar_bool(val, node->scroll_static); continue; }
-        if (strcmp(key, "scrollbar") == 0) { node->scrollbar_enabled = parse_scalar_bool(val, node->scrollbar_enabled); continue; }
+        if (strcmp(key, "scrollStatic") == 0) {
+            fprintf(stderr, "Warning: 'scrollStatic' is deprecated; wrap the node in a 'scrollbar' container instead.\n");
+            node->scroll_static = parse_scalar_bool(val, node->scroll_static);
+            continue;
+        }
+        if (strcmp(key, "scrollbar") == 0) {
+            fprintf(stderr, "Warning: 'scrollbar' boolean is deprecated; use a 'scrollbar' wrapper node instead.\n");
+            node->scrollbar_enabled = parse_scalar_bool(val, node->scrollbar_enabled);
+            continue;
+        }
         if (strcmp(key, "scrollbarWidth") == 0) { node->scrollbar_width = parse_scalar_number(val, node->scrollbar_width); node->has_scrollbar_width = 1; continue; }
         if (strcmp(key, "spacing") == 0) { node->spacing = parse_scalar_number(val, node->spacing); node->has_spacing = 1; continue; }
         if (strcmp(key, "columns") == 0) { node->columns = (int)parse_scalar_number(val, (float)node->columns); node->has_columns = 1; continue; }
@@ -692,72 +700,85 @@ static void resolve_styles_and_defaults(UiNode* node, const Style* styles, int* 
     }
 }
 
-static void auto_assign_scroll_areas(UiNode* node, int* counter, const char* inherited) {
-    if (!node || !counter) return;
-    const char* active = inherited;
-    if (node->scroll_static && !node->scroll_area) {
-        char buf[32];
-        snprintf(buf, sizeof(buf), "scrollArea%d", *counter);
-        *counter += 1;
-        node->scroll_area = strdup(buf);
-    }
-    if (node->scroll_area) active = node->scroll_area;
-    for (size_t i = 0; i < node->child_count; i++) {
-        auto_assign_scroll_areas(&node->children[i], counter, active);
-    }
+static char* next_scroll_area_name(int* counter) {
+    if (!counter) return NULL;
+    char buf[32];
+    snprintf(buf, sizeof(buf), "scrollArea%d", *counter);
+    *counter += 1;
+    return strdup(buf);
 }
 
-static int has_scrollbar_for_area(const UiNode* node, const char* area) {
-    if (!node || !area) return 0;
-    if (node->widget_type == W_SCROLLBAR && node->scroll_area && strcmp(node->scroll_area, area) == 0) return 1;
-    for (size_t i = 0; i < node->child_count; ++i) {
-        if (has_scrollbar_for_area(&node->children[i], area)) return 1;
-    }
-    return 0;
-}
-
-static UiNode* create_scrollbar_for(const UiNode* anchor) {
-    if (!anchor || !anchor->scroll_area) return NULL;
-    UiNode* sb = create_node();
-    if (!sb) return NULL;
-    sb->widget_type = W_SCROLLBAR;
-    sb->scroll_area = strdup(anchor->scroll_area);
-    sb->scroll_static = 1;
-    sb->clip_to_viewport = 1;
-    sb->has_clip_to_viewport = 1;
-    sb->style = anchor->style;
-    sb->padding_override = anchor->padding_override;
-    sb->has_padding_override = anchor->has_padding_override;
-    sb->border_thickness = anchor->border_thickness;
-    sb->has_border_thickness = anchor->has_border_thickness;
-    sb->scrollbar_enabled = 1;
-    sb->scrollbar_width = anchor->has_scrollbar_width ? anchor->scrollbar_width : anchor->style->scrollbar_width;
-    sb->has_scrollbar_width = 1;
-    sb->scrollbar_track_color = anchor->scrollbar_track_color;
-    sb->scrollbar_thumb_color = anchor->scrollbar_thumb_color;
-    sb->has_scrollbar_track_color = 1;
-    sb->has_scrollbar_thumb_color = 1;
-    sb->color = anchor->scrollbar_track_color;
-    sb->text_color = anchor->text_color;
-    sb->padding_override = 0.0f;
-    sb->has_padding_override = 1;
-    sb->layout = UI_LAYOUT_NONE;
-    sb->has_w = 1;
-    sb->has_h = 1;
-    sb->rect = (Rect){0.0f, 0.0f, 0.0f, 0.0f};
-    return sb;
-}
-
-static void attach_scrollbars(UiNode* node) {
+static void wrap_node_with_scrollbar(UiNode* node, int* counter) {
     if (!node) return;
-    if (node->scroll_static && node->scrollbar_enabled && node->scroll_area && !has_scrollbar_for_area(node, node->scroll_area)) {
-        UiNode* sb = create_scrollbar_for(node);
-        if (sb) {
-            append_child(node, sb);
-        }
+    UiNode content = *node;
+    UiNode* defaults = create_node();
+    if (!defaults) return;
+    *node = *defaults;
+    free(defaults);
+
+    node->type = strdup("scrollbar");
+    node->widget_type = W_SCROLLBAR;
+    node->layout = UI_LAYOUT_NONE;
+    node->style = content.style;
+    node->style_name = content.style_name ? strdup(content.style_name) : NULL;
+    node->rect = content.rect;
+    node->has_x = content.has_x; node->has_y = content.has_y;
+    node->has_w = content.has_w; node->has_h = content.has_h;
+    node->has_min_w = content.has_min_w; node->min_w = content.min_w;
+    node->has_min_h = content.has_min_h; node->min_h = content.min_h;
+    node->has_max_w = content.has_max_w; node->max_w = content.max_w;
+    node->has_max_h = content.has_max_h; node->max_h = content.max_h;
+    node->has_z_index = content.has_z_index; node->z_index = content.z_index;
+    node->has_z_group = content.has_z_group; node->z_group = content.z_group;
+    node->padding_override = content.padding_override; node->has_padding_override = content.has_padding_override;
+    node->border_thickness = content.border_thickness; node->has_border_thickness = content.has_border_thickness;
+    node->border_color = content.border_color; node->has_border_color = content.has_border_color;
+    node->color = content.color; node->has_color = content.has_color;
+    node->text_color = content.text_color; node->has_text_color = content.has_text_color;
+    node->clip_to_viewport = 1; node->has_clip_to_viewport = 1;
+    node->scrollbar_enabled = content.scrollbar_enabled;
+    node->scrollbar_width = content.scrollbar_width; node->has_scrollbar_width = content.has_scrollbar_width;
+    node->scrollbar_track_color = content.scrollbar_track_color; node->has_scrollbar_track_color = content.has_scrollbar_track_color;
+    node->scrollbar_thumb_color = content.scrollbar_thumb_color; node->has_scrollbar_thumb_color = content.has_scrollbar_thumb_color;
+    node->children = (UiNode*)calloc(1, sizeof(UiNode));
+    node->child_count = 1;
+    content.scroll_static = 0;
+    content.scrollbar_enabled = 0;
+    node->children[0] = content;
+
+    if (!node->scroll_area) {
+        node->scroll_area = content.scroll_area ? content.scroll_area : next_scroll_area_name(counter);
     }
+    node->scroll_static = 1;
+    node->scrollbar_enabled = 1;
+    node->children[0].scroll_area = node->scroll_area;
+}
+
+static void normalize_scrollbars(UiNode* node, int* counter) {
+    if (!node || !counter) return;
+
     for (size_t i = 0; i < node->child_count; ++i) {
-        attach_scrollbars(&node->children[i]);
+        normalize_scrollbars(&node->children[i], counter);
+    }
+
+    int legacy_scroll = node->scroll_static || node->scroll_area || node->has_scrollbar_width || node->has_scrollbar_track_color || node->has_scrollbar_thumb_color;
+    if (node->widget_type != W_SCROLLBAR && (legacy_scroll || node->scrollbar_enabled)) {
+        wrap_node_with_scrollbar(node, counter);
+        return;
+    }
+
+    if (node->widget_type == W_SCROLLBAR) {
+        node->scroll_static = 1;
+        node->scrollbar_enabled = 1;
+        if (!node->scroll_area) node->scroll_area = next_scroll_area_name(counter);
+        if (node->child_count > 0) {
+            for (size_t i = 0; i < node->child_count; ++i) {
+                node->children[i].scroll_area = node->scroll_area;
+                node->children[i].scroll_static = 0;
+            }
+        } else {
+            fprintf(stderr, "Warning: scrollbar node declared without a child; scrolling will be disabled.\n");
+        }
     }
 }
 
@@ -939,8 +960,7 @@ UiNode* ui_config_load_layout(const ConfigNode* root, const Model* model, const 
     }
     bind_model_values_to_nodes(root_node, model);
     int scroll_counter = 0;
-    auto_assign_scroll_areas(root_node, &scroll_counter, NULL);
-    attach_scrollbars(root_node);
+    normalize_scrollbars(root_node, &scroll_counter);
     free_prototypes(prototypes);
     return root_node;
 }

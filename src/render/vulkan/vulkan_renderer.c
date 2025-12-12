@@ -1435,9 +1435,18 @@ static void create_descriptor_pool_and_set(void) {
             continue;
         }
 
+        Rect track_rect = inner_rect;
+        if (is_scrollbar) {
+            float track_w = widget->scrollbar_width > 0.0f ? widget->scrollbar_width : fmaxf(4.0f, inner_rect.w * 0.02f);
+            float track_h = inner_rect.h - widget->padding * 2.0f;
+            float track_x = inner_rect.x + inner_rect.w - track_w - widget->padding * 0.5f;
+            float track_y = inner_rect.y + widget->padding;
+            track_rect = (Rect){ track_x, track_y, track_w, track_h };
+        }
+
         Rect clipped_fill;
         Color fill_color = is_scrollbar ? widget->scrollbar_track_color : widget->color;
-        if (apply_clip_rect_to_bounds(active_clip, &inner_rect, &clipped_fill) &&
+        if (apply_clip_rect_to_bounds(active_clip, &track_rect, &clipped_fill) &&
             ensure_view_model_capacity(&view_models, &view_model_capacity, view_model_count + 1, &view_models_ok)) {
             view_models[view_model_count++] = (ViewModel){
                 .id = widget->id,
@@ -1453,21 +1462,17 @@ static void create_descriptor_pool_and_set(void) {
 
         if (is_scrollbar && widget->scrollbar_enabled && widget->show_scrollbar && widget->scroll_viewport > 0.0f &&
             widget->scroll_content > widget->scroll_viewport + 1.0f) {
-            float track_w = widget->rect.w;
-            float track_h = widget->rect.h;
-            float track_x = widget->rect.x;
-            float track_y = widget->rect.y;
             float thumb_ratio = widget->scroll_viewport / widget->scroll_content;
-            float thumb_h = fmaxf(track_h * thumb_ratio, 12.0f);
+            float thumb_h = fmaxf(track_rect.h * thumb_ratio, 12.0f);
             float max_offset = widget->scroll_content - widget->scroll_viewport;
             float clamped_offset = widget->scroll_offset;
             if (clamped_offset < 0.0f) clamped_offset = 0.0f;
             if (clamped_offset > max_offset) clamped_offset = max_offset;
             float offset_t = (max_offset != 0.0f) ? (clamped_offset / max_offset) : 0.0f;
-            float thumb_y = track_y + offset_t * (track_h - thumb_h);
+            float thumb_y = track_rect.y + offset_t * (track_rect.h - thumb_h);
             Color thumb_color = widget->scrollbar_thumb_color;
 
-            Rect thumb_rect = { track_x, thumb_y, track_w, thumb_h };
+            Rect thumb_rect = { track_rect.x, thumb_y, track_rect.w, thumb_h };
             Rect clipped_thumb;
             if (apply_clip_rect_to_bounds(scrollbar_clip, &thumb_rect, &clipped_thumb) &&
                 ensure_view_model_capacity(&view_models, &view_model_capacity, view_model_count + 1, &view_models_ok)) {

@@ -121,19 +121,19 @@ data:
     y: 24
     spacing: 20
     children:
-      - type: column
+      - type: scrollbar
         style: panelPrimary
-        scrollStatic: true
-        scrollbar: true
         scrollbarWidth: 12
         w: 440
         maxHeight: 720
-        spacing: 14
         children:
-          - use: sectionHeader
-            text: "Загруженная сцена"
-          - use: divider
-            w: 400
+          - type: column
+            spacing: 14
+            children:
+              - use: sectionHeader
+                text: "Загруженная сцена"
+              - use: divider
+                w: 400
           - use: muted
             text: "Путь"
             style: mutedLabel
@@ -159,24 +159,24 @@ data:
             w: 400
           - use: sectionHeader
             text: "Иерархия"
-          - type: column
-            id: sceneHierarchy
+          - type: scrollbar
             style: panelSecondary
-            scrollStatic: true
-            scrollbar: true
             maxHeight: 540
-            spacing: 5
-      - type: column
+            children:
+              - type: column
+                id: sceneHierarchy
+                spacing: 5
+      - type: scrollbar
         style: panelSecondary
-        scrollStatic: true
-        scrollbar: true
         w: 560
         maxHeight: 720
-        spacing: 12
         children:
-          - use: sectionHeader
-            text: "Материалы"
           - type: column
+            spacing: 12
+            children:
+              - use: sectionHeader
+                text: "Материалы"
+              - type: column
             id: materialsList
             spacing: 6
           - use: divider
