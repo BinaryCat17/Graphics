@@ -1277,7 +1277,6 @@ static void populate_widgets_recursive(const LayoutNode* node, Widget* widgets, 
         if (node->source->layout != UI_LAYOUT_NONE) {
             w->type = node->source->widget_type == W_PANEL ? node->source->widget_type : W_PANEL;
         }
-        if (node->source->layout == UI_LAYOUT_NONE) return;
     }
     for (size_t i = 0; i < node->child_count; i++) populate_widgets_recursive(&node->children[i], widgets, widget_count, idx, order, active_scroll_area);
 }
