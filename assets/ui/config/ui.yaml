@@ -23,6 +23,14 @@ data:
       scrollbarTrackColor: [0.2, 0.28, 0.4, 0.9]
       scrollbarThumbColor: [0.8, 0.88, 1.0, 1.0]
       scrollbarWidth: 9
+    panelAddition:
+      color: [0.14, 0.2, 0.3, 0.96]
+      textColor: [0.94, 0.97, 1.0, 1.0]
+      borderColor: [0.26, 0.42, 0.68, 1.0]
+      borderThickness: 1.6
+      scrollbarTrackColor: [0.2, 0.28, 0.4, 0.9]
+      scrollbarThumbColor: [0.8, 0.88, 1.0, 1.0]
+      scrollbarWidth: 9
     primaryButton:
       color: [0.18, 0.46, 0.88, 1.0]
       textColor: [1.0, 1.0, 1.0, 1.0]
@@ -167,7 +175,7 @@ data:
             maxHeight: 540
             spacing: 5
       - type: column
-        style: panelSecondary
+        style: panelAddition
         scrollStatic: true
         scrollbar: true
         w: 560
