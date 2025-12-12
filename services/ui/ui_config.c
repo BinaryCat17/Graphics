@@ -735,7 +735,8 @@ static void wrap_node_with_scrollbar(UiNode* node, int* counter) {
     node->border_color = content.border_color; node->has_border_color = content.has_border_color;
     node->color = content.color; node->has_color = content.has_color;
     node->text_color = content.text_color; node->has_text_color = content.has_text_color;
-    node->clip_to_viewport = 1; node->has_clip_to_viewport = 1;
+    node->clip_to_viewport = content.clip_to_viewport;
+    node->has_clip_to_viewport = content.has_clip_to_viewport;
     node->scrollbar_enabled = content.scrollbar_enabled;
     node->scrollbar_width = content.scrollbar_width; node->has_scrollbar_width = content.has_scrollbar_width;
     node->scrollbar_track_color = content.scrollbar_track_color; node->has_scrollbar_track_color = content.has_scrollbar_track_color;

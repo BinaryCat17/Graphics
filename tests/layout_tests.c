@@ -153,6 +153,34 @@ static void test_children_visible_without_clip_flag(void) {
     free_fixture(&fx);
 }
 
+static void test_auto_wrapped_scrollbar_keeps_children_visible(void) {
+    const char* styles_json = "{\"styles\":{\"zeroPad\":{\"padding\":0,\"borderThickness\":0}}}";
+    const char* layout_json =
+        "{\"layout\":{\"type\":\"column\",\"style\":\"zeroPad\",\"children\":[{\"type\":\"column\",\"scrollbar\":true,\"children\":[{\"type\":\"panel\",\"h\":25},{\"type\":\"panel\",\"h\":25}]}]}}";
+
+    LayoutFixture fx = build_widgets(styles_json, layout_json);
+
+    int found_scrollbar = 0;
+    for (size_t i = 0; i < fx.widgets.count; ++i) {
+        Widget* w = &fx.widgets.items[i];
+        if (w->type == W_SCROLLBAR) {
+            found_scrollbar = 1;
+            assert(w->clip_to_viewport == 0);
+            assert(w->has_clip_to_viewport == 0);
+        }
+    }
+
+    assert(found_scrollbar);
+
+    if (fx.layout && fx.layout->child_count > 0) {
+        LayoutNode* scroll_layout = &fx.layout->children[0];
+        assert(scroll_layout->source->widget_type == W_SCROLLBAR);
+        assert(scroll_layout->wants_clip == 0);
+    }
+
+    free_fixture(&fx);
+}
+
 int main(void) {
     test_row_layout();
     test_column_layout_with_scroll();
@@ -162,6 +190,7 @@ int main(void) {
     test_scrollbar_shown_for_overflow();
     test_border_changes_size();
     test_children_visible_without_clip_flag();
+    test_auto_wrapped_scrollbar_keeps_children_visible();
     printf("layout_tests passed\n");
     return 0;
 }
