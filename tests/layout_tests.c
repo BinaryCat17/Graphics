@@ -46,7 +46,7 @@ static void free_fixture(LayoutFixture* fx) {
 }
 
 static void test_row_layout(void) {
-    const char* styles_json = "{\"styles\":{\"zeroPad\":{\"padding\":0}}}";
+    const char* styles_json = "{\"styles\":{\"zeroPad\":{\"padding\":0,\"borderThickness\":0}}}";
     const char* layout_json = "{\"layout\":{\"type\":\"row\",\"style\":\"zeroPad\",\"spacing\":5,\"children\":[{\"type\":\"button\",\"w\":50,\"h\":20},{\"type\":\"label\",\"w\":30,\"h\":10}]}}";
     LayoutFixture fx = build_widgets(styles_json, layout_json);
     assert(fx.widgets.count == 2);
@@ -58,7 +58,7 @@ static void test_row_layout(void) {
 }
 
 static void test_column_layout_with_scroll(void) {
-    const char* styles_json = "{\"styles\":{\"zeroPad\":{\"padding\":0}}}";
+    const char* styles_json = "{\"styles\":{\"zeroPad\":{\"padding\":0,\"borderThickness\":0}}}";
     const char* layout_json = "{\"layout\":{\"type\":\"column\",\"style\":\"zeroPad\",\"spacing\":7,\"children\":[{\"type\":\"button\",\"w\":40,\"h\":18},{\"type\":\"button\",\"w\":40,\"h\":12}]}}";
     LayoutFixture fx = build_widgets(styles_json, layout_json);
     assert(fx.widgets.count == 2);
@@ -75,7 +75,7 @@ static void test_column_layout_with_scroll(void) {
 }
 
 static void test_table_layout(void) {
-    const char* styles_json = "{\"styles\":{\"zeroPad\":{\"padding\":0}}}";
+    const char* styles_json = "{\"styles\":{\"zeroPad\":{\"padding\":0,\"borderThickness\":0}}}";
     const char* layout_json = "{\"layout\":{\"type\":\"table\",\"style\":\"zeroPad\",\"columns\":2,\"spacing\":3,\"children\":[{\"type\":\"panel\",\"w\":10,\"h\":10},{\"type\":\"panel\",\"w\":12,\"h\":8},{\"type\":\"panel\",\"w\":6,\"h\":14}]}}";
     LayoutFixture fx = build_widgets(styles_json, layout_json);
     assert(fx.widgets.count == 3);
@@ -98,7 +98,7 @@ static void test_padding_scale_is_stable(void) {
 
 static void test_label_text_preserved_utf8(void) {
     const char* layout_json = "{\"layout\":{\"type\":\"column\",\"children\":[{\"type\":\"label\",\"text\":\"Привет мир\",\"style\":\"zero\"}]}}";
-    const char* styles_json = "{\"styles\":{\"zero\":{\"padding\":0}}}";
+    const char* styles_json = "{\"styles\":{\"zero\":{\"padding\":0,\"borderThickness\":0}}}";
     LayoutFixture fx = build_widgets(styles_json, layout_json);
     assert(fx.widgets.count == 1);
     assert(strcmp(fx.widgets.items[0].text, "Привет мир") == 0);
@@ -111,15 +111,15 @@ static void test_scrollbar_shown_for_overflow(void) {
     LayoutFixture fx = build_widgets(styles_json, layout_json);
     ScrollContext* ctx = scroll_init(fx.widgets.items, fx.widgets.count);
     assert(ctx != NULL);
-    int found = 0;
+    int found_scrollbar = 0;
     for (size_t i = 0; i < fx.widgets.count; i++) {
         Widget* w = &fx.widgets.items[i];
-        if (w->scroll_static) {
-            found = 1;
+        if (w->type == W_SCROLLBAR) {
+            found_scrollbar = 1;
             assert(w->show_scrollbar);
         }
     }
-    assert(found);
+    assert(found_scrollbar);
     scroll_free(ctx);
     free_fixture(&fx);
 }

@@ -1,6 +1,7 @@
 #include <assert.h>
 #include <stdlib.h>
 #include <string.h>
+#include <stdio.h>
 
 #include "ui/compositor.h"
 #include "ui/scroll.h"
@@ -72,7 +73,18 @@ static void test_scrollbar_not_clipped(void) {
     content.rect = (Rect){0.0f, 0.0f, 100.0f, 240.0f};
     content.id = "content";
 
-    UiNode children[] = {viewport, content};
+    UiNode scrollbar = {
+        .layout = UI_LAYOUT_NONE,
+        .widget_type = W_SCROLLBAR,
+        .scroll_area = "area",
+        .scroll_static = 1,
+        .has_w = 1,
+        .has_h = 1,
+    };
+    scrollbar.rect = (Rect){0.0f, 0.0f, 0.0f, 0.0f};
+    scrollbar.id = "scrollbar";
+
+    UiNode children[] = {viewport, content, scrollbar};
     UiNode root = {.layout = UI_LAYOUT_ABSOLUTE, .widget_type = W_PANEL, .has_w = 1, .has_h = 1};
     root.rect = (Rect){0.0f, 0.0f, 200.0f, 200.0f};
     root.children = children;
@@ -84,7 +96,7 @@ static void test_scrollbar_not_clipped(void) {
     assign_layout(layout, 0.0f, 0.0f);
 
     WidgetArray widgets = materialize_widgets(layout);
-    assert(widgets.count == 2);
+    assert(widgets.count == 3);
     apply_widget_padding_scale(&widgets, 1.0f);
 
     ScrollContext* scroll = scroll_init(widgets.items, widgets.count);
@@ -92,18 +104,21 @@ static void test_scrollbar_not_clipped(void) {
     scroll_apply_offsets(scroll, widgets.items, widgets.count);
 
     DisplayList list = ui_compositor_build(layout, widgets.items, widgets.count);
-    assert(list.count == 2);
+    assert(list.count == 3);
 
     const DisplayItem* content_item = NULL;
     const DisplayItem* viewport_item = NULL;
+    const DisplayItem* scrollbar_item = NULL;
     for (size_t i = 0; i < list.count; ++i) {
         if (!list.items[i].widget) continue;
         if (list.items[i].widget->id && strcmp(list.items[i].widget->id, "content") == 0) content_item = &list.items[i];
         if (list.items[i].widget->id && strcmp(list.items[i].widget->id, "viewport") == 0) viewport_item = &list.items[i];
+        if (list.items[i].widget->type == W_SCROLLBAR) scrollbar_item = &list.items[i];
     }
-    assert(content_item && viewport_item);
+    assert(content_item && viewport_item && scrollbar_item);
     assert(content_item->clip_depth > 0);
     assert(viewport_item->clip_depth == 0);
+    assert(scrollbar_item->clip_depth > 0);
 
     ui_compositor_free(list);
     scroll_free(scroll);
