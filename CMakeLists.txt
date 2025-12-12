@@ -97,7 +97,7 @@ if (NOT VULKAN_STUB)
     set(APP_SOURCES
             "app/main.c"
             "src/assets/assets.c" "src/assets/assets.h"
-            "services/ui/scroll.c" "services/ui/scroll.h" "services/ui/ui_config.c" "services/ui/ui_config.h" "services/ui/scene_ui.c" "services/ui/scene_ui.h" "services/ui/ui_context.h" "services/ui/compositor.c" "services/ui/compositor.h"
+            "services/ui/scroll.c" "services/ui/scroll.h" "services/ui/ui_config.h" "services/ui/model_style.c" "services/ui/model_style.h" "services/ui/ui_parser.c" "services/ui/ui_node.h" "services/ui/layout_engine.c" "services/ui/layout_tree.h" "services/ui/widget_materializer.c" "services/ui/widget_list.h" "services/ui/scene_ui.c" "services/ui/scene_ui.h" "services/ui/ui_context.h" "services/ui/compositor.c" "services/ui/compositor.h"
             ${CORE_SOURCES}
             "services/scene/cad_scene.c" "services/scene/cad_scene.h"
             "services/scene/cad_scene_yaml.c" "services/scene/cad_scene_yaml.h"
@@ -118,7 +118,7 @@ else()
             "services/scene/cad_scene_yaml.c" "services/scene/cad_scene_yaml.h"
             "src/state/state_manager.c" "src/state/state_manager.h"
             "src/config/simple_yaml.c" "src/config/simple_yaml.h" "src/config/module_yaml_loader.c" "src/config/module_yaml_loader.h" "src/config/config_document.c" "src/config/config_document.h" "src/config/config_io.c" "src/config/config_io.h"
-            "services/ui/scene_ui.c" "services/ui/scene_ui.h" "services/ui/ui_config.c" "services/ui/ui_config.h" "services/ui/ui_context.h" "services/ui/compositor.c" "services/ui/compositor.h"
+            "services/ui/scene_ui.c" "services/ui/scene_ui.h" "services/ui/ui_config.h" "services/ui/model_style.c" "services/ui/model_style.h" "services/ui/ui_parser.c" "services/ui/ui_node.h" "services/ui/layout_engine.c" "services/ui/layout_tree.h" "services/ui/widget_materializer.c" "services/ui/widget_list.h" "services/ui/ui_context.h" "services/ui/compositor.c" "services/ui/compositor.h"
     )
 endif()
 
@@ -150,7 +150,11 @@ target_include_directories(Graphics PRIVATE ${Stb_INCLUDE_DIR})
 
 add_executable(layout_tests
         tests/layout_tests.c
-        services/ui/ui_config.c services/ui/ui_config.h
+        services/ui/ui_config.h
+        services/ui/model_style.c services/ui/model_style.h
+        services/ui/ui_parser.c services/ui/ui_node.h
+        services/ui/layout_engine.c services/ui/layout_tree.h
+        services/ui/widget_materializer.c services/ui/widget_list.h
         services/ui/scene_ui.c services/ui/scene_ui.h
         services/ui/scroll.c services/ui/scroll.h
         src/config/config_document.c src/config/config_document.h src/config/config_io.c src/config/config_io.h
@@ -164,7 +168,11 @@ add_test(NAME layout_tests COMMAND layout_tests)
 
 add_executable(ui_compositor_tests
         tests/ui_compositor_tests.c
-        services/ui/ui_config.c services/ui/ui_config.h
+        services/ui/ui_config.h
+        services/ui/model_style.c services/ui/model_style.h
+        services/ui/ui_parser.c services/ui/ui_node.h
+        services/ui/layout_engine.c services/ui/layout_tree.h
+        services/ui/widget_materializer.c services/ui/widget_list.h
         services/ui/scroll.c services/ui/scroll.h
         services/ui/compositor.c services/ui/compositor.h
         services/ui/scene_ui.c services/ui/scene_ui.h
@@ -179,7 +187,11 @@ add_test(NAME ui_compositor_tests COMMAND ui_compositor_tests)
 
 add_executable(scene_ui_tests
         tests/scene_ui_tests.c
-        services/ui/ui_config.c services/ui/ui_config.h services/ui/scene_ui.c services/ui/scene_ui.h
+        services/ui/ui_config.h services/ui/scene_ui.c services/ui/scene_ui.h
+        services/ui/model_style.c services/ui/model_style.h
+        services/ui/ui_parser.c services/ui/ui_node.h
+        services/ui/layout_engine.c services/ui/layout_tree.h
+        services/ui/widget_materializer.c services/ui/widget_list.h
         services/ui/scroll.c services/ui/scroll.h
         services/scene/cad_scene.c services/scene/cad_scene.h
         src/config/config_document.c src/config/config_document.h src/config/config_io.c src/config/config_io.h

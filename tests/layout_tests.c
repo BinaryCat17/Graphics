@@ -3,7 +3,10 @@
 #include <string.h>
 #include <stdio.h>
 
-#include "ui/ui_config.h"
+#include "ui/model_style.h"
+#include "ui/ui_node.h"
+#include "ui/layout_tree.h"
+#include "ui/widget_list.h"
 #include "ui/scroll.h"
 #include "config/config_io.h"
 
@@ -31,7 +34,7 @@ static LayoutFixture build_widgets(const char* styles_json, const char* layout_j
     assert(fx.root);
     fx.layout = build_layout_tree(fx.root);
     assert(fx.layout);
-    measure_layout(fx.layout);
+    measure_layout(fx.layout, NULL);
     assign_layout(fx.layout, 0.0f, 0.0f);
     fx.widgets = materialize_widgets(fx.layout);
     populate_widgets_from_layout(fx.layout, fx.widgets.items, fx.widgets.count);

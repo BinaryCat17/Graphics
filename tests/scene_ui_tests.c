@@ -5,7 +5,10 @@
 
 #include "ui/scene_ui.h"
 #include "config/config_io.h"
-#include "ui/ui_config.h"
+#include "ui/model_style.h"
+#include "ui/ui_node.h"
+#include "ui/layout_tree.h"
+#include "ui/widget_list.h"
 
 static UiNode* find_by_id(UiNode* node, const char* id)
 {
@@ -87,7 +90,7 @@ static void test_tree_population(void)
     assert(strcmp(first_row->children[1].text, "Сцена: Demo") == 0);
 
     LayoutNode* layout_root = build_layout_tree(root);
-    measure_layout(layout_root);
+    measure_layout(layout_root, NULL);
     assign_layout(layout_root, 0.0f, 0.0f);
     WidgetArray widgets = materialize_widgets(layout_root);
     assert(widgets.count >= tree->child_count);

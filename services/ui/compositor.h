@@ -1,7 +1,8 @@
 #ifndef UI_COMPOSITOR_H
 #define UI_COMPOSITOR_H
 
-#include "ui/ui_config.h"
+#include "ui/layout_tree.h"
+#include "ui/widget_list.h"
 
 #define UI_CLIP_STACK_MAX 16
 

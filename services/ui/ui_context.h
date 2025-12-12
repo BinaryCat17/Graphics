@@ -5,7 +5,10 @@
 #include "state/state_manager.h"
 #include "ui/scene_ui.h"
 #include "ui/scroll.h"
-#include "ui/ui_config.h"
+#include "ui/model_style.h"
+#include "ui/ui_node.h"
+#include "ui/layout_tree.h"
+#include "ui/widget_list.h"
 #include "ui/compositor.h"
 
 // Stores all UI-related state shared between build and runtime.

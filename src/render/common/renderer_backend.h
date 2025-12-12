@@ -6,7 +6,6 @@
 #include <stdio.h>
 
 #include "platform/platform.h"
-#include "ui/ui_config.h"
 #include "ui/compositor.h"
 
 typedef struct CoordinateSystem2D CoordinateTransformer;

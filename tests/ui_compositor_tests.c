@@ -5,7 +5,11 @@
 
 #include "ui/compositor.h"
 #include "ui/scroll.h"
-#include "ui/ui_config.h"
+#include "ui/model_style.h"
+#include "ui/ui_node.h"
+#include "ui/layout_tree.h"
+#include "ui/widget_list.h"
+#include "ui/compositor.h"
 
 static void test_popup_not_clipped(void) {
     UiNode popup = {.layout = UI_LAYOUT_NONE, .widget_type = W_PANEL, .has_w = 1, .has_h = 1, .has_x = 1, .has_y = 1};
@@ -25,7 +29,7 @@ static void test_popup_not_clipped(void) {
 
     LayoutNode* layout = build_layout_tree(&root);
     assert(layout);
-    measure_layout(layout);
+    measure_layout(layout, NULL);
     assign_layout(layout, 0.0f, 0.0f);
 
     WidgetArray widgets = materialize_widgets(layout);
@@ -81,7 +85,7 @@ static void test_scrollbar_not_clipped(void) {
 
     LayoutNode* layout = build_layout_tree(&root);
     assert(layout);
-    measure_layout(layout);
+    measure_layout(layout, NULL);
     assign_layout(layout, 0.0f, 0.0f);
 
     WidgetArray widgets = materialize_widgets(layout);

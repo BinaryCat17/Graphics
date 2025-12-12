@@ -9,7 +9,6 @@
 #include "services/service.h"
 #include "state/state_manager.h"
 #include "ui/ui_context.h"
-#include "ui/ui_config.h"
 
 typedef struct RenderRuntimeServiceContext {
     RenderRuntimeContext* render;
