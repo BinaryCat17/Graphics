@@ -685,6 +685,7 @@ static char* next_scroll_area_name(int* counter) {
 static void wrap_node_with_scrollbar(UiNode* node, int* counter) {
     if (!node) return;
     UiNode content = *node;
+    char* original_scroll_area = content.scroll_area;
     UiNode* defaults = create_node();
     if (!defaults) return;
     *node = *defaults;
@@ -722,11 +723,13 @@ static void wrap_node_with_scrollbar(UiNode* node, int* counter) {
     node->children[0] = content;
 
     if (!node->scroll_area) {
-        node->scroll_area = content.scroll_area ? content.scroll_area : next_scroll_area_name(counter);
+        node->scroll_area = original_scroll_area ? strdup(original_scroll_area) : next_scroll_area_name(counter);
     }
     node->scroll_static = 1;
     node->scrollbar_enabled = 1;
-    node->children[0].scroll_area = node->scroll_area;
+    free(node->children[0].scroll_area);
+    node->children[0].scroll_area = node->scroll_area ? strdup(node->scroll_area) : NULL;
+    free(original_scroll_area);
 }
 
 static void normalize_scrollbars(UiNode* node, int* counter) {
@@ -748,7 +751,8 @@ static void normalize_scrollbars(UiNode* node, int* counter) {
         if (!node->scroll_area) node->scroll_area = next_scroll_area_name(counter);
         if (node->child_count > 0) {
             for (size_t i = 0; i < node->child_count; ++i) {
-                node->children[i].scroll_area = node->scroll_area;
+                free(node->children[i].scroll_area);
+                node->children[i].scroll_area = node->scroll_area ? strdup(node->scroll_area) : NULL;
                 node->children[i].scroll_static = 0;
             }
         } else {
@@ -1173,54 +1177,6 @@ static void copy_base_rect(LayoutNode* node) {
 }
 
 void capture_layout_base(LayoutNode* root) { copy_base_rect(root); }
+// UI tree cleanup (free_ui_tree) is implemented in ui_node.c to keep a single
+// deallocation routine and avoid multiple versions being linked accidentally.
 
-void free_model(Model* model) {
-    if (!model) return;
-    ModelEntry* e = model->entries;
-    while (e) {
-        ModelEntry* n = e->next;
-        free(e->key);
-        free(e->string_value);
-        free(e);
-        e = n;
-    }
-    free(model->store);
-    free(model->key);
-    free(model->source_path);
-    free(model);
-}
-
-void free_styles(Style* styles) {
-    while (styles) {
-        Style* n = styles->next;
-        free(styles->name);
-        free(styles);
-        styles = n;
-    }
-}
-
-static void free_ui_node(UiNode* node) {
-    if (!node) return;
-    for (size_t i = 0; i < node->child_count; i++) {
-        free_ui_node(&node->children[i]);
-    }
-    free(node->children);
-    free(node->type);
-    free(node->style_name);
-    free(node->use);
-    free(node->id);
-    free(node->text);
-    free(node->text_binding);
-    free(node->value_binding);
-    free(node->click_binding);
-    free(node->click_value);
-    free(node->scroll_area);
-    free(node->docking);
-    free(node->on_focus);
-}
-
-void free_ui_tree(UiNode* node) {
-    if (!node) return;
-    free_ui_node(node);
-    free(node);
-}

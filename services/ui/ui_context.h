@@ -26,6 +26,8 @@ typedef struct UiContext {
     float base_w;
     float base_h;
     float ui_scale;
+
+    int disposed;
 } UiContext;
 
 void ui_context_init(UiContext* ui);
