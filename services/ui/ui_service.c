@@ -200,6 +200,12 @@ void ui_refresh_layout(UiContext* ui, float new_scale) {
     scroll_rebuild(ui->scroll, ui->widgets.items, ui->widgets.count, ratio);
     ui_compositor_free(ui->display_list);
     ui->display_list = ui_compositor_build(ui->layout_root, ui->widgets.items, ui->widgets.count);
+
+    if (ui->state_manager && ui->ui_type_id >= 0) {
+        UiRuntimeComponent component = {.ui = ui, .widgets = ui->widgets, .display_list = ui->display_list};
+        state_manager_publish(ui->state_manager, STATE_EVENT_COMPONENT_UPDATED, ui->ui_type_id, "active", &component,
+                              sizeof(component));
+    }
 }
 
 void ui_frame_update(UiContext* ui) {
