@@ -1199,28 +1199,6 @@ void free_styles(Style* styles) {
     }
 }
 
-static void free_ui_node(UiNode* node) {
-    if (!node) return;
-    for (size_t i = 0; i < node->child_count; i++) {
-        free_ui_node(&node->children[i]);
-    }
-    free(node->children);
-    free(node->type);
-    free(node->style_name);
-    free(node->use);
-    free(node->id);
-    free(node->text);
-    free(node->text_binding);
-    free(node->value_binding);
-    free(node->click_binding);
-    free(node->click_value);
-    free(node->scroll_area);
-    free(node->docking);
-    free(node->on_focus);
-}
+// UI tree cleanup (free_ui_tree) is implemented in ui_node.c to keep a single
+// deallocation routine and avoid multiple versions being linked accidentally.
 
-void free_ui_tree(UiNode* node) {
-    if (!node) return;
-    free_ui_node(node);
-    free(node);
-}
