@@ -15,11 +15,6 @@ static float clamp01(float v) {
     return v;
 }
 
-void ui_context_init(UiContext* ui) {
-    if (!ui) return;
-    memset(ui, 0, sizeof(UiContext));
-}
-
 float ui_compute_scale(const UiContext* ui, float target_w, float target_h) {
     if (!ui || ui->base_w <= 0.0f || ui->base_h <= 0.0f) return 1.0f;
     float ui_scale = fminf(target_w / ui->base_w, target_h / ui->base_h);
@@ -251,32 +246,6 @@ void ui_handle_scroll(UiContext* ui, double mx, double my, double yoff) {
 void ui_handle_cursor(UiContext* ui, double x, double y) {
     if (!ui || !ui->widgets.items) return;
     scroll_handle_cursor(ui->scroll, ui->widgets.items, ui->widgets.count, (float)x, (float)y);
-}
-
-void ui_context_dispose(UiContext* ui) {
-    if (!ui) return;
-
-    if (ui->styles) {
-        free_styles(ui->styles);
-        ui->styles = NULL;
-    }
-    if (ui->widgets.items) {
-        free_widgets(ui->widgets);
-        ui->widgets = (WidgetArray){0};
-    }
-    if (ui->ui_root) {
-        free_ui_tree(ui->ui_root);
-        ui->ui_root = NULL;
-    }
-    if (ui->layout_root) {
-        free_layout_tree(ui->layout_root);
-        ui->layout_root = NULL;
-    }
-    ui_compositor_free(ui->display_list);
-    if (ui->scroll) {
-        scroll_free(ui->scroll);
-        ui->scroll = NULL;
-    }
 }
 
 static bool ui_service_init(AppServices* services, const ServiceConfig* config) {
