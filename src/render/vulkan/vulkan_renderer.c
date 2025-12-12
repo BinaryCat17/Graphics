@@ -1119,10 +1119,10 @@ static void apply_active_clip_to_view_model(const Rect *clip, const LayoutResult
     }
 }
 
-static void glyph_quad_array_reserve(GlyphQuadArray *arr, size_t required)
+static bool glyph_quad_array_reserve(GlyphQuadArray *arr, size_t required)
 {
     if (required <= arr->capacity) {
-        return;
+        return true;
     }
 
     size_t new_capacity = arr->capacity == 0 ? required : arr->capacity * 2;
@@ -1132,11 +1132,12 @@ static void glyph_quad_array_reserve(GlyphQuadArray *arr, size_t required)
 
     GlyphQuad *expanded = realloc(arr->items, new_capacity * sizeof(GlyphQuad));
     if (!expanded) {
-        return;
+        return false;
     }
 
     arr->items = expanded;
     arr->capacity = new_capacity;
+    return true;
 }
 
 static bool ensure_view_model_capacity(ViewModel **view_models, size_t *capacity, size_t required, bool *ok)
