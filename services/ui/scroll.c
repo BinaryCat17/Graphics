@@ -266,7 +266,7 @@ void scroll_apply_offsets(ScrollContext* ctx, Widget* widgets, size_t widget_cou
             a->scrollbar_viewport = viewport;
             a->has_scrollbar_viewport = 1;
         }
-        int should_clip = (!w->scroll_static) && (w->has_clip_to_viewport ? w->clip_to_viewport : 1);
+        int should_clip = (!w->scroll_static) && (w->has_clip_to_viewport ? w->clip_to_viewport : 0);
         if (should_clip && (a->has_viewport || a->has_bounds)) {
             w->has_clip = 1;
             w->clip = viewport;

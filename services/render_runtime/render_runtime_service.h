@@ -16,6 +16,7 @@ typedef struct RenderRuntimeServiceContext {
     const Assets* assets;
     UiContext* ui;
     WidgetArray widgets;
+    DisplayList display_list;
     Model* model;
     StateManager* state_manager;
     int assets_type_id;

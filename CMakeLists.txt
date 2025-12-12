@@ -97,7 +97,7 @@ if (NOT VULKAN_STUB)
     set(APP_SOURCES
             "app/main.c"
             "src/assets/assets.c" "src/assets/assets.h"
-            "services/ui/scroll.c" "services/ui/scroll.h" "services/ui/ui_config.c" "services/ui/ui_config.h" "services/ui/scene_ui.c" "services/ui/scene_ui.h" "services/ui/ui_context.h" "services/ui/render_tree.c" "services/ui/render_tree.h"
+            "services/ui/scroll.c" "services/ui/scroll.h" "services/ui/ui_config.c" "services/ui/ui_config.h" "services/ui/scene_ui.c" "services/ui/scene_ui.h" "services/ui/ui_context.h" "services/ui/compositor.c" "services/ui/compositor.h"
             ${CORE_SOURCES}
             "services/scene/cad_scene.c" "services/scene/cad_scene.h"
             "services/scene/cad_scene_yaml.c" "services/scene/cad_scene_yaml.h"
@@ -118,7 +118,7 @@ else()
             "services/scene/cad_scene_yaml.c" "services/scene/cad_scene_yaml.h"
             "src/state/state_manager.c" "src/state/state_manager.h"
             "src/config/simple_yaml.c" "src/config/simple_yaml.h" "src/config/module_yaml_loader.c" "src/config/module_yaml_loader.h" "src/config/config_document.c" "src/config/config_document.h" "src/config/config_io.c" "src/config/config_io.h"
-            "services/ui/scene_ui.c" "services/ui/scene_ui.h" "services/ui/ui_config.c" "services/ui/ui_config.h" "services/ui/ui_context.h" "services/ui/render_tree.c" "services/ui/render_tree.h"
+            "services/ui/scene_ui.c" "services/ui/scene_ui.h" "services/ui/ui_config.c" "services/ui/ui_config.h" "services/ui/ui_context.h" "services/ui/compositor.c" "services/ui/compositor.h"
     )
 endif()
 
@@ -161,6 +161,21 @@ if (NOT MSVC)
 endif()
 target_include_directories(layout_tests PRIVATE src services ${Stb_INCLUDE_DIR})
 add_test(NAME layout_tests COMMAND layout_tests)
+
+add_executable(ui_compositor_tests
+        tests/ui_compositor_tests.c
+        services/ui/ui_config.c services/ui/ui_config.h
+        services/ui/scroll.c services/ui/scroll.h
+        services/ui/compositor.c services/ui/compositor.h
+        services/ui/scene_ui.c services/ui/scene_ui.h
+        src/config/config_document.c src/config/config_document.h src/config/config_io.c src/config/config_io.h
+        src/config/simple_yaml.c src/config/simple_yaml.h)
+target_link_libraries(ui_compositor_tests PRIVATE glfw Threads::Threads)
+if (NOT MSVC)
+    target_link_libraries(ui_compositor_tests PRIVATE m)
+endif()
+target_include_directories(ui_compositor_tests PRIVATE src services ${Stb_INCLUDE_DIR})
+add_test(NAME ui_compositor_tests COMMAND ui_compositor_tests)
 
 add_executable(scene_ui_tests
         tests/scene_ui_tests.c
