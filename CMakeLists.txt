@@ -221,6 +221,16 @@ endif()
 target_include_directories(ui_mesh_builder_tests PRIVATE src services)
 add_test(NAME ui_mesh_builder_tests COMMAND ui_mesh_builder_tests)
 
+add_executable(text_clip_integration_tests
+        tests/text_clip_integration_tests.c
+        ${CORE_SOURCES})
+target_link_libraries(text_clip_integration_tests PRIVATE glfw Threads::Threads render_common)
+if (NOT MSVC)
+    target_link_libraries(text_clip_integration_tests PRIVATE m)
+endif()
+target_include_directories(text_clip_integration_tests PRIVATE src services)
+add_test(NAME text_clip_integration_tests COMMAND text_clip_integration_tests)
+
 add_executable(scene_yaml_tests
         tests/scene_yaml_tests.c
         services/scene/cad_scene_yaml.c services/scene/cad_scene_yaml.h
