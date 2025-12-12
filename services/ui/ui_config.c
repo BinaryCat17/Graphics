@@ -1060,7 +1060,7 @@ static void layout_node(LayoutNode* node, float origin_x, float origin_y, const 
     node->rect.y = base_y;
     node->local_rect = (Rect){0.0f, 0.0f, node->rect.w, node->rect.h};
     node->transform = parent_transform ? (Vec2){parent_transform->x + base_x, parent_transform->y + base_y} : (Vec2){base_x, base_y};
-    node->wants_clip = node->source->has_clip_to_viewport ? node->source->clip_to_viewport : 0;
+    node->wants_clip = node->source->clip_to_viewport;
 
     if (node->source->layout == UI_LAYOUT_ROW) {
         float cursor_x = base_x + padding + border;

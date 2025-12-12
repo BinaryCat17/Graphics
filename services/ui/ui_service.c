@@ -198,7 +198,7 @@ void ui_refresh_layout(UiContext* ui, float new_scale) {
     populate_widgets_from_layout(ui->layout_root, ui->widgets.items, ui->widgets.count);
     apply_widget_padding_scale(&ui->widgets, ui->ui_scale);
     scroll_rebuild(ui->scroll, ui->widgets.items, ui->widgets.count, ratio);
-    ui_compositor_free(ui->display_list);
+    DisplayList old_list = ui->display_list;
     ui->display_list = ui_compositor_build(ui->layout_root, ui->widgets.items, ui->widgets.count);
 
     if (ui->state_manager && ui->ui_type_id >= 0) {
@@ -206,6 +206,8 @@ void ui_refresh_layout(UiContext* ui, float new_scale) {
         state_manager_publish(ui->state_manager, STATE_EVENT_COMPONENT_UPDATED, ui->ui_type_id, "active", &component,
                               sizeof(component));
     }
+
+    ui_compositor_free(old_list);
 }
 
 void ui_frame_update(UiContext* ui) {
@@ -214,7 +216,7 @@ void ui_frame_update(UiContext* ui) {
     populate_widgets_from_layout(ui->layout_root, ui->widgets.items, ui->widgets.count);
     apply_widget_padding_scale(&ui->widgets, ui->ui_scale);
     scroll_apply_offsets(ui->scroll, ui->widgets.items, ui->widgets.count);
-    ui_compositor_free(ui->display_list);
+    DisplayList old_list = ui->display_list;
     ui->display_list = ui_compositor_build(ui->layout_root, ui->widgets.items, ui->widgets.count);
 
     if (ui->state_manager && ui->ui_type_id >= 0) {
@@ -222,6 +224,8 @@ void ui_frame_update(UiContext* ui) {
         state_manager_publish(ui->state_manager, STATE_EVENT_COMPONENT_UPDATED, ui->ui_type_id, "active", &component,
                               sizeof(component));
     }
+
+    ui_compositor_free(old_list);
 }
 
 void ui_handle_mouse_button(UiContext* ui, double mx, double my, int button, int action) {
