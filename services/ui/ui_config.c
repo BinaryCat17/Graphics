@@ -351,7 +351,7 @@ static UiNode* create_node(void) {
     node->scrollbar_thumb_color = DEFAULT_STYLE.scrollbar_thumb_color;
     node->has_scrollbar_track_color = 0;
     node->has_scrollbar_thumb_color = 0;
-    node->clip_to_viewport = 1;
+    node->clip_to_viewport = 0;
     node->has_clip_to_viewport = 0;
     node->has_min = node->has_max = node->has_value = 0;
     node->minv = 0.0f; node->maxv = 1.0f; node->value = 0.0f;
