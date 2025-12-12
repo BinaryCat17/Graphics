@@ -101,8 +101,7 @@ static int compute_scrollbar_geometry(const Widget* w, Rect* out_track, Rect* ou
     if (!w || w->type != W_SCROLLBAR || !w->scrollbar_enabled || !w->show_scrollbar || w->scroll_viewport <= 0.0f) return 0;
     float max_offset = w->scroll_content - w->scroll_viewport;
     if (max_offset <= 1.0f) return 0;
-    Rect widget_rect = w->rect;
-    Rect inner_rect = widget_rect;
+    Rect inner_rect = w->rect;
     if (w->border_thickness > 0.0f) {
         inner_rect.x += w->border_thickness;
         inner_rect.y += w->border_thickness;
@@ -111,10 +110,10 @@ static int compute_scrollbar_geometry(const Widget* w, Rect* out_track, Rect* ou
         if (inner_rect.w < 0.0f) inner_rect.w = 0.0f;
         if (inner_rect.h < 0.0f) inner_rect.h = 0.0f;
     }
-    float track_w = inner_rect.w;
+    float track_w = w->scrollbar_width > 0.0f ? w->scrollbar_width : fmaxf(4.0f, inner_rect.w * 0.02f);
     float track_h = inner_rect.h - w->padding * 2.0f;
     if (track_h <= 0.0f) return 0;
-    float track_x = inner_rect.x;
+    float track_x = inner_rect.x + inner_rect.w - track_w - w->padding * 0.5f;
     float track_y = inner_rect.y + w->padding;
     float thumb_ratio = w->scroll_viewport / w->scroll_content;
     float thumb_h = fmaxf(track_h * thumb_ratio, 12.0f);
@@ -210,12 +209,6 @@ void scroll_apply_offsets(ScrollContext* ctx, Widget* widgets, size_t widget_cou
             w->scroll_content = content_h;
             w->scroll_offset = a->offset;
             w->show_scrollbar = w->scrollbar_enabled && overflow > 1.0f;
-            float track_w = w->scrollbar_width > 0.0f ? w->scrollbar_width : fmaxf(4.0f, inner_viewport.w * 0.02f);
-            float track_h = inner_viewport.h - w->padding * 2.0f;
-            if (track_h < 0.0f) track_h = 0.0f;
-            float track_x = inner_viewport.x + inner_viewport.w - track_w - w->padding * 0.5f;
-            float track_y = inner_viewport.y + w->padding;
-            w->rect = (Rect){ track_x, track_y, track_w, track_h };
             w->has_clip = 1;
             w->clip = viewport;
         } else {
