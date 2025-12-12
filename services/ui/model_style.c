@@ -13,8 +13,8 @@ static const Style DEFAULT_STYLE = {
     .scrollbar_thumb_color = {0.58f, 0.82f, 1.0f, 1.0f},
     .padding = 10.0f,
     .border_thickness = 2.0f,
-    .scrollbar_width = 10.0f,
-    .has_scrollbar_width = 1,
+    .scrollbar_width = 0.0f,
+    .has_scrollbar_width = 0,
     .next = NULL
 };
 
