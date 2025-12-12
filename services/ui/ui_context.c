@@ -9,6 +9,8 @@ void ui_context_init(UiContext* ui) {
 
 void ui_context_dispose(UiContext* ui) {
     if (!ui) return;
+    if (ui->disposed) return;
+    ui->disposed = 1;
 
     if (ui->styles) {
         free_styles(ui->styles);
