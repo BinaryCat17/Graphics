@@ -276,32 +276,6 @@ static void config_map_clear(ConfigNode* map) {
     map->pair_capacity = 0;
 }
 
-int save_model(const Model* model) {
-    if (!model || !model->source_path) return 0;
-    FILE* f = fopen(model->source_path, "wb");
-    if (!f) return 0;
-
-    const char* store = model->store ? model->store : "model";
-    const char* key = model->key ? model->key : "default";
-
-    fprintf(f, "store: %s\n", store);
-    fprintf(f, "key: %s\n", key);
-    fputs("data:\n  model:\n", f);
-
-    for (ModelEntry* e = model->entries; e; e = e->next) {
-        fprintf(f, "    %s: ", e->key);
-        if (e->is_string) {
-            fprintf(f, "\"%s\"", e->string_value ? e->string_value : "");
-        } else {
-            fprintf(f, "%g", e->number_value);
-        }
-        fputc('\n', f);
-    }
-
-    fclose(f);
-    return 1;
-}
-
 static Style* style_find(const Style* styles, const char* name) {
     for (const Style* s = styles; s; s = s->next) {
         if (strcmp(s->name, name) == 0) return (Style*)s;
@@ -1330,10 +1304,6 @@ void free_styles(Style* styles) {
         free(styles);
         styles = n;
     }
-}
-
-void free_widgets(WidgetArray widgets) {
-    free(widgets.items);
 }
 
 static void free_ui_node(UiNode* node) {
