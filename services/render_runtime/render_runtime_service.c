@@ -1,6 +1,7 @@
 #include "render_runtime/render_runtime_service.h"
 
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 
 #include "platform/platform.h"
@@ -11,8 +12,36 @@
 
 static ServiceDescriptor g_render_runtime_service_descriptor;
 
+static void render_runtime_free_display_list(RenderRuntimeServiceContext* context) {
+    if (!context || !context->display_list.items) return;
+    free(context->display_list.items);
+    context->display_list = (DisplayList){0};
+}
+
+static void render_runtime_copy_display_list(RenderRuntimeServiceContext* context, DisplayList source) {
+    if (!context) return;
+    render_runtime_free_display_list(context);
+    if (!source.items || source.count == 0) {
+        context->display_list = (DisplayList){0};
+        return;
+    }
+
+    DisplayItem* copy = (DisplayItem*)malloc(source.count * sizeof(DisplayItem));
+    if (!copy) {
+        fprintf(stderr, "Render runtime failed to copy display list.\n");
+        context->display_list = (DisplayList){0};
+        return;
+    }
+
+    memcpy(copy, source.items, source.count * sizeof(DisplayItem));
+    context->display_list.items = copy;
+    context->display_list.count = source.count;
+}
+
 static void render_runtime_service_reset(RenderRuntimeServiceContext* context, AppServices* services) {
     if (!context) return;
+    render_runtime_free_display_list(context);
+
     *context = (RenderRuntimeServiceContext){
         .render = services ? &services->render : NULL,
         .state_manager = services ? &services->state_manager : NULL,
@@ -67,7 +96,7 @@ static void on_ui_event(const StateEvent* event, void* user_data) {
     const UiRuntimeComponent* component = (const UiRuntimeComponent*)event->payload;
     context->ui = component->ui;
     context->widgets = component->widgets;
-    context->display_list = component->display_list;
+    render_runtime_copy_display_list(context, component->display_list);
     if (context->renderer_ready && context->backend && context->backend->update_ui) {
         context->backend->update_ui(context->backend, context->widgets, context->display_list);
     }
@@ -89,7 +118,7 @@ static void on_render_ready_event(const StateEvent* event, void* user_data) {
     context->assets = component->assets;
     context->ui = component->ui;
     context->widgets = component->widgets;
-    context->display_list = component->display_list;
+    render_runtime_copy_display_list(context, component->display_list);
     context->model = component->model;
     context->render_ready = component->ready;
     try_bootstrap_renderer(context);
