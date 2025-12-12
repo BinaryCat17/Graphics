@@ -66,6 +66,7 @@ typedef struct RendererBackend {
     void* state;
     bool (*init)(struct RendererBackend* backend, const RenderBackendInit* init);
     void (*update_transformer)(struct RendererBackend* backend, const CoordinateTransformer* transformer);
+    void (*update_ui)(struct RendererBackend* backend, WidgetArray widgets, DisplayList display_list);
     void (*draw)(struct RendererBackend* backend);
     void (*cleanup)(struct RendererBackend* backend);
 } RendererBackend;

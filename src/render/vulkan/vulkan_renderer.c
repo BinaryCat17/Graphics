@@ -1912,6 +1912,12 @@ static void vk_backend_update_transformer(RendererBackend* backend, const Coordi
     g_transformer.viewport_size = (Vec2){(float)g_swapchain_extent.width, (float)g_swapchain_extent.height};
 }
 
+static void vk_backend_update_ui(RendererBackend* backend, WidgetArray widgets, DisplayList display_list) {
+    (void)backend;
+    g_widgets = widgets;
+    g_display_list = display_list;
+}
+
 static void vk_backend_draw(RendererBackend* backend) {
     (void)backend;
     draw_frame();
@@ -1952,6 +1958,7 @@ RendererBackend* vulkan_renderer_backend(void) {
     g_vulkan_backend.state = &g_vk;
     g_vulkan_backend.init = vk_backend_init;
     g_vulkan_backend.update_transformer = vk_backend_update_transformer;
+    g_vulkan_backend.update_ui = vk_backend_update_ui;
     g_vulkan_backend.draw = vk_backend_draw;
     g_vulkan_backend.cleanup = vk_backend_cleanup;
     return &g_vulkan_backend;

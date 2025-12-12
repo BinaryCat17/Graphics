@@ -68,6 +68,9 @@ static void on_ui_event(const StateEvent* event, void* user_data) {
     context->ui = component->ui;
     context->widgets = component->widgets;
     context->display_list = component->display_list;
+    if (context->renderer_ready && context->backend && context->backend->update_ui) {
+        context->backend->update_ui(context->backend, context->widgets, context->display_list);
+    }
     try_bootstrap_renderer(context);
 }
 
