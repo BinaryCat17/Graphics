@@ -76,7 +76,10 @@ typedef struct RenderCommand {
             LayoutResult layout;
             Color color;
         } background;
-        GlyphQuad glyph;
+        struct {
+            GlyphQuad glyph;
+            LayoutResult layout;
+        } glyph;
     } data;
 } RenderCommand;
 

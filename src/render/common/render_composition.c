@@ -193,6 +193,8 @@ RenderBuildResult renderer_build_commands(Renderer *renderer, const ViewModel *v
     }
 
     for (size_t i = 0; i < glyph_count; ++i) {
+        LayoutBox glyph_box = {glyphs[i].min, {glyphs[i].max.x - glyphs[i].min.x, glyphs[i].max.y - glyphs[i].min.y}};
+        LayoutResult layout = layout_resolve(&glyph_box, &renderer->context);
         RenderCommand command = (RenderCommand){0};
         command.primitive = RENDER_PRIMITIVE_GLYPH;
         command.phase = glyphs[i].phase;
@@ -201,7 +203,8 @@ RenderBuildResult renderer_build_commands(Renderer *renderer, const ViewModel *v
         if (glyphs[i].has_clip) {
             command.clip = layout_resolve(&glyphs[i].clip, &renderer->context);
         }
-        command.data.glyph = glyphs[i];
+        command.data.glyph.glyph = glyphs[i];
+        command.data.glyph.layout = layout;
         if (render_command_list_add(&renderer->command_list, &command) != 0) {
             char buffer[256];
             snprintf(buffer, sizeof(buffer),
