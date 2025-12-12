@@ -134,38 +134,38 @@ data:
                 text: "Загруженная сцена"
               - use: divider
                 w: 400
-          - use: muted
-            text: "Путь"
-            style: mutedLabel
-          - use: card
-            w: 400
-            textBinding: scenePath
-          - use: muted
-            text: "Название"
-          - use: card
-            w: 400
-            textBinding: sceneName
-          - use: muted
-            text: "Автор"
-          - use: card
-            w: 400
-            textBinding: sceneAuthor
-          - use: muted
-            text: "Статистика"
-          - use: card
-            w: 400
-            textBinding: sceneStats
-          - use: divider
-            w: 400
-          - use: sectionHeader
-            text: "Иерархия"
-          - type: scrollbar
-            style: panelSecondary
-            maxHeight: 540
-            children:
-              - type: column
-                id: sceneHierarchy
-                spacing: 5
+              - use: muted
+                text: "Путь"
+                style: mutedLabel
+              - use: card
+                w: 400
+                textBinding: scenePath
+              - use: muted
+                text: "Название"
+              - use: card
+                w: 400
+                textBinding: sceneName
+              - use: muted
+                text: "Автор"
+              - use: card
+                w: 400
+                textBinding: sceneAuthor
+              - use: muted
+                text: "Статистика"
+              - use: card
+                w: 400
+                textBinding: sceneStats
+              - use: divider
+                w: 400
+              - use: sectionHeader
+                text: "Иерархия"
+              - type: scrollbar
+                style: panelSecondary
+                maxHeight: 540
+                children:
+                  - type: column
+                    id: sceneHierarchy
+                    spacing: 5
       - type: scrollbar
         style: panelSecondary
         w: 560
@@ -177,19 +177,19 @@ data:
               - use: sectionHeader
                 text: "Материалы"
               - type: column
-            id: materialsList
-            spacing: 6
-          - use: divider
-            w: 500
-          - use: sectionHeader
-            text: "Соединения"
-          - type: column
-            id: jointsList
-            spacing: 6
-          - use: divider
-            w: 500
-          - use: sectionHeader
-            text: "Сборки и анализ"
-          - type: column
-            id: analysisList
-            spacing: 6
+                id: materialsList
+                spacing: 6
+              - use: divider
+                w: 500
+              - use: sectionHeader
+                text: "Соединения"
+              - type: column
+                id: jointsList
+                spacing: 6
+              - use: divider
+                w: 500
+              - use: sectionHeader
+                text: "Сборки и анализ"
+              - type: column
+                id: analysisList
+                spacing: 6
