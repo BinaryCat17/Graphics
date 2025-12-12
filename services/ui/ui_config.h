@@ -10,7 +10,7 @@
 #define UI_Z_ORDER_SCALE 1000
 
 typedef struct { float x, y, w, h; } Rect;
-typedef enum { W_PANEL, W_LABEL, W_BUTTON, W_HSLIDER, W_RECT, W_SPACER, W_CHECKBOX, W_PROGRESS } WidgetType;
+typedef enum { W_PANEL, W_LABEL, W_BUTTON, W_HSLIDER, W_RECT, W_SPACER, W_CHECKBOX, W_PROGRESS, W_SCROLLBAR } WidgetType;
 
 typedef enum {
     UI_LAYOUT_NONE,

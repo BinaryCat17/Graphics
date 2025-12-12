@@ -1298,6 +1298,8 @@ static void create_descriptor_pool_and_set(void) {
             const Widget *widget = item->widget;
             if (!widget) continue;
 
+            int is_scrollbar = widget->type == W_SCROLLBAR;
+
             for (size_t p = 0; p < item->clip_pop; ++p) clip_stack_pop(&clip_stack);
             for (size_t p = 0; p < item->clip_push && p < UI_CLIP_STACK_MAX; ++p) clip_stack_push(&clip_stack, item->push_rects[p]);
 
@@ -1313,7 +1315,7 @@ static void create_descriptor_pool_and_set(void) {
         Rect widget_rect = { widget->rect.x, widget->rect.y + effective_offset, widget->rect.w, widget->rect.h };
         Rect inner_rect = widget_rect;
         const Rect *active_clip = clip_stack_active(&clip_stack);
-        const Rect *scrollbar_clip = (widget->scrollbar_enabled && widget->show_scrollbar) ? NULL : active_clip;
+        const Rect *scrollbar_clip = active_clip;
         if (widget->border_thickness > 0.0f) {
             float b = widget->border_thickness;
             inner_rect.x += b;
@@ -1434,6 +1436,7 @@ static void create_descriptor_pool_and_set(void) {
         }
 
         Rect clipped_fill;
+        Color fill_color = is_scrollbar ? widget->scrollbar_track_color : widget->color;
         if (apply_clip_rect_to_bounds(active_clip, &inner_rect, &clipped_fill) &&
             ensure_view_model_capacity(&view_models, &view_model_capacity, view_model_count + 1, &view_models_ok)) {
             view_models[view_model_count++] = (ViewModel){
@@ -1443,34 +1446,17 @@ static void create_descriptor_pool_and_set(void) {
                 .phase = RENDER_PHASE_BACKGROUND,
                 .widget_order = widget_order,
                 .ordinal = widget_ordinals[widget_index]++,
-                .color = widget->color,
+                .color = fill_color,
             };
             apply_active_clip_to_view_model(active_clip, &view_models[view_model_count - 1]);
         }
 
-        if (widget->scrollbar_enabled && widget->show_scrollbar && widget->scroll_viewport > 0.0f &&
+        if (is_scrollbar && widget->scrollbar_enabled && widget->show_scrollbar && widget->scroll_viewport > 0.0f &&
             widget->scroll_content > widget->scroll_viewport + 1.0f) {
-            float track_w = widget->scrollbar_width > 0.0f ? widget->scrollbar_width : fmaxf(4.0f, inner_rect.w * 0.02f);
-            float track_h = inner_rect.h - widget->padding * 2.0f;
-            float track_x = inner_rect.x + inner_rect.w - track_w - widget->padding * 0.5f;
-            float track_y = inner_rect.y + widget->padding;
-            Color track_color = widget->scrollbar_track_color;
-            Rect scroll_track = { track_x, track_y, track_w, track_h };
-            Rect clipped_track;
-            if (apply_clip_rect_to_bounds(scrollbar_clip, &scroll_track, &clipped_track) &&
-                ensure_view_model_capacity(&view_models, &view_model_capacity, view_model_count + 1, &view_models_ok)) {
-                view_models[view_model_count++] = (ViewModel){
-                    .id = widget->id,
-                    .logical_box = { {clipped_track.x, clipped_track.y}, {clipped_track.w, clipped_track.h} },
-                    .layer = scrollbar_z + Z_LAYER_SCROLLBAR_TRACK,
-                    .phase = RENDER_PHASE_BACKGROUND,
-                    .widget_order = widget_order,
-                    .ordinal = widget_ordinals[widget_index]++,
-                    .color = track_color,
-                };
-                apply_active_clip_to_view_model(scrollbar_clip, &view_models[view_model_count - 1]);
-            }
-
+            float track_w = widget->rect.w;
+            float track_h = widget->rect.h;
+            float track_x = widget->rect.x;
+            float track_y = widget->rect.y;
             float thumb_ratio = widget->scroll_viewport / widget->scroll_content;
             float thumb_h = fmaxf(track_h * thumb_ratio, 12.0f);
             float max_offset = widget->scroll_content - widget->scroll_viewport;
