@@ -1177,32 +1177,6 @@ static void copy_base_rect(LayoutNode* node) {
 }
 
 void capture_layout_base(LayoutNode* root) { copy_base_rect(root); }
-
-void free_model(Model* model) {
-    if (!model) return;
-    ModelEntry* e = model->entries;
-    while (e) {
-        ModelEntry* n = e->next;
-        free(e->key);
-        free(e->string_value);
-        free(e);
-        e = n;
-    }
-    free(model->store);
-    free(model->key);
-    free(model->source_path);
-    free(model);
-}
-
-void free_styles(Style* styles) {
-    while (styles) {
-        Style* n = styles->next;
-        free(styles->name);
-        free(styles);
-        styles = n;
-    }
-}
-
 // UI tree cleanup (free_ui_tree) is implemented in ui_node.c to keep a single
 // deallocation routine and avoid multiple versions being linked accidentally.
 
