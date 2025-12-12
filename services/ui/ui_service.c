@@ -134,7 +134,7 @@ bool ui_build(UiContext* ui, const CoreContext* core) {
 
     ui->model = core->model;
 
-    measure_layout(ui->layout_root);
+    measure_layout(ui->layout_root, core->assets.font_path);
     assign_layout(ui->layout_root, 0.0f, 0.0f);
     capture_layout_base(ui->layout_root);
     ui->base_w = ui->layout_root->base_rect.w > 1.0f ? ui->layout_root->base_rect.w : 1024.0f;

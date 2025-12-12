@@ -15,7 +15,6 @@
 #include "render/common/render_composition.h"
 #include "render/common/ui_mesh_builder.h"
 #include "ui/compositor.h"
-#include "ui/ui_config.h"
 
 #define STB_TRUETYPE_IMPLEMENTATION
 #include "stb_truetype.h"
