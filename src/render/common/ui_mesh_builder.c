@@ -72,8 +72,9 @@ static int emit_quad_vertices(const RenderContext *ctx, const RenderCommand *com
     return 0;
 }
 
-static int emit_text_vertices(const RenderContext *ctx, const GlyphQuad *glyph, UiTextVertexBuffer *vertex_buffer)
+static int emit_text_vertices(const RenderContext *ctx, const RenderCommand *command, UiTextVertexBuffer *vertex_buffer)
 {
+    const GlyphQuad *glyph = &command->data.glyph;
     Vec2 logical_min = glyph->min;
     Vec2 logical_max = glyph->max;
     float u0 = glyph->uv0.x;
@@ -81,38 +82,31 @@ static int emit_text_vertices(const RenderContext *ctx, const GlyphQuad *glyph, 
     float u1 = glyph->uv1.x;
     float v1 = glyph->uv1.y;
 
-    if (glyph->has_clip) {
-        float cx0 = glyph->clip.origin.x;
-        float cy0 = glyph->clip.origin.y;
-        float cx1 = cx0 + glyph->clip.size.x;
-        float cy1 = cy0 + glyph->clip.size.y;
-        float x0 = fmaxf(logical_min.x, cx0);
-        float y0 = fmaxf(logical_min.y, cy0);
-        float x1 = fminf(logical_max.x, cx1);
-        float y1 = fminf(logical_max.y, cy1);
-        if (x1 <= x0 || y1 <= y0) {
+    Vec2 device_min = coordinate_logical_to_screen(&ctx->coordinates, logical_min);
+    Vec2 device_max = coordinate_logical_to_screen(&ctx->coordinates, logical_max);
+
+    if (command->has_clip) {
+        Vec2 clipped_min = device_min;
+        Vec2 clipped_max = device_max;
+        if (!apply_device_clip(&command->clip, &clipped_min, &clipped_max)) {
             return 0;
         }
-        float span_x = logical_max.x - logical_min.x;
-        float span_y = logical_max.y - logical_min.y;
+
+        float span_x = device_max.x - device_min.x;
+        float span_y = device_max.y - device_min.y;
         if (span_x != 0.0f) {
             float du = (u1 - u0) / span_x;
-            u0 += du * (x0 - logical_min.x);
-            u1 -= du * (logical_max.x - x1);
+            u0 += du * (clipped_min.x - device_min.x);
+            u1 -= du * (device_max.x - clipped_max.x);
         }
         if (span_y != 0.0f) {
             float dv = (v1 - v0) / span_y;
-            v0 += dv * (y0 - logical_min.y);
-            v1 -= dv * (logical_max.y - y1);
+            v0 += dv * (clipped_min.y - device_min.y);
+            v1 -= dv * (device_max.y - clipped_max.y);
         }
-        logical_min.x = x0;
-        logical_min.y = y0;
-        logical_max.x = x1;
-        logical_max.y = y1;
+        device_min = clipped_min;
+        device_max = clipped_max;
     }
-
-    Vec2 device_min = coordinate_logical_to_screen(&ctx->coordinates, logical_min);
-    Vec2 device_max = coordinate_logical_to_screen(&ctx->coordinates, logical_max);
 
     Vec2 snapped_min = {roundf(device_min.x), roundf(device_min.y)};
     Vec2 snapped_max = {roundf(device_max.x), roundf(device_max.y)};
@@ -220,7 +214,7 @@ int renderer_fill_vertices(Renderer *renderer, const ViewModel *view_models, siz
                 }
                 break;
             case RENDER_PRIMITIVE_GLYPH:
-                if (text_buffer && emit_text_vertices(&renderer->context, &command->data.glyph, text_buffer) != 0) {
+                if (text_buffer && emit_text_vertices(&renderer->context, command, text_buffer) != 0) {
                     return -1;
                 }
                 break;

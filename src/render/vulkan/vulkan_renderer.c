@@ -1108,17 +1108,21 @@ static const Rect* clip_stack_active(const ClipStack* stack) {
     return &stack->active;
 }
 
-static void apply_active_clip_to_view_model(const Rect *clip, ViewModel *vm) {
+static void apply_active_clip_to_view_model(const Rect *clip, const LayoutResult *clip_device, ViewModel *vm) {
     if (!clip || !vm) return;
     vm->has_clip = 1;
+    vm->has_device_clip = clip_device != NULL;
     vm->clip.origin = (Vec2){clip->x, clip->y};
     vm->clip.size = (Vec2){clip->w, clip->h};
+    if (clip_device) {
+        vm->clip_device = *clip_device;
+    }
 }
 
-static void glyph_quad_array_reserve(GlyphQuadArray *arr, size_t required)
+static bool glyph_quad_array_reserve(GlyphQuadArray *arr, size_t required)
 {
     if (required <= arr->capacity) {
-        return;
+        return true;
     }
 
     size_t new_capacity = arr->capacity == 0 ? required : arr->capacity * 2;
@@ -1128,11 +1132,12 @@ static void glyph_quad_array_reserve(GlyphQuadArray *arr, size_t required)
 
     GlyphQuad *expanded = realloc(arr->items, new_capacity * sizeof(GlyphQuad));
     if (!expanded) {
-        return;
+        return false;
     }
 
     arr->items = expanded;
     arr->capacity = new_capacity;
+    return true;
 }
 
 static bool ensure_view_model_capacity(ViewModel **view_models, size_t *capacity, size_t required, bool *ok)
@@ -1291,6 +1296,13 @@ static void create_descriptor_pool_and_set(void) {
             return false;
         }
 
+        Mat4 projection = mat4_identity();
+        CoordinateSystem2D transformer = g_transformer;
+        transformer.viewport_size = (Vec2){(float)g_swapchain_extent.width, (float)g_swapchain_extent.height};
+
+        RenderContext context;
+        render_context_init(&context, &transformer, &projection);
+
         size_t view_model_count = 0;
         ClipStack clip_stack = {0};
         for (size_t i = 0; i < g_display_list.count; ++i) {
@@ -1303,291 +1315,282 @@ static void create_descriptor_pool_and_set(void) {
             for (size_t p = 0; p < item->clip_pop; ++p) clip_stack_pop(&clip_stack);
             for (size_t p = 0; p < item->clip_push && p < UI_CLIP_STACK_MAX; ++p) clip_stack_push(&clip_stack, item->push_rects[p]);
 
+            const Rect *active_clip = clip_stack_active(&clip_stack);
+            LayoutResult clip_device = {0};
+            const LayoutResult *clip_device_ptr = NULL;
+            if (active_clip) {
+                LayoutBox clip_box = { {active_clip->x, active_clip->y}, {active_clip->w, active_clip->h} };
+                clip_device = layout_resolve(&clip_box, &context);
+                clip_device_ptr = &clip_device;
+            }
+
             size_t widget_index = (size_t)(widget - g_widgets.items);
             size_t widget_order = g_widgets.count > 0 ? (g_widgets.count - 1 - widget_index) : 0;
             int base_z = widget->z_index * LAYER_STRIDE;
             int scrollbar_z = (widget->z_index + UI_Z_ORDER_SCALE) * LAYER_STRIDE;
             int text_z = base_z + Z_LAYER_TEXT;
 
-        float scroll_offset = widget->scroll_static ? 0.0f : widget->scroll_offset;
-        float snapped_scroll_pixels = -snap_to_pixel(scroll_offset * g_transformer.dpi_scale);
-        float effective_offset = snapped_scroll_pixels / g_transformer.dpi_scale;
-        Rect widget_rect = { widget->rect.x, widget->rect.y + effective_offset, widget->rect.w, widget->rect.h };
-        Rect inner_rect = widget_rect;
-        const Rect *active_clip = clip_stack_active(&clip_stack);
-        const Rect *scrollbar_clip = active_clip;
-        if (widget->border_thickness > 0.0f) {
-            float b = widget->border_thickness;
-            inner_rect.x += b;
-            inner_rect.y += b;
-            inner_rect.w -= b * 2.0f;
-            inner_rect.h -= b * 2.0f;
-            if (inner_rect.w < 0.0f) inner_rect.w = 0.0f;
-            if (inner_rect.h < 0.0f) inner_rect.h = 0.0f;
+            float scroll_offset = widget->scroll_static ? 0.0f : widget->scroll_offset;
+            float snapped_scroll_pixels = -snap_to_pixel(scroll_offset * g_transformer.dpi_scale);
+            float effective_offset = snapped_scroll_pixels / g_transformer.dpi_scale;
+            Rect widget_rect = { widget->rect.x, widget->rect.y + effective_offset, widget->rect.w, widget->rect.h };
+            Rect inner_rect = widget_rect;
+            const Rect *scrollbar_clip = active_clip;
+            if (widget->border_thickness > 0.0f) {
+                float b = widget->border_thickness;
+                inner_rect.x += b;
+                inner_rect.y += b;
+                inner_rect.w -= b * 2.0f;
+                inner_rect.h -= b * 2.0f;
+                if (inner_rect.w < 0.0f) inner_rect.w = 0.0f;
+                if (inner_rect.h < 0.0f) inner_rect.h = 0.0f;
 
-            Rect borders[4] = {
-                { widget_rect.x, widget_rect.y, widget_rect.w, b },
-                { widget_rect.x, widget_rect.y + widget_rect.h - b, widget_rect.w, b },
-                { widget_rect.x, widget_rect.y + b, b, widget_rect.h - b * 2.0f },
-                { widget_rect.x + widget_rect.w - b, widget_rect.y + b, b, widget_rect.h - b * 2.0f },
-            };
-
-            Rect border_clip = {0};
-            const Rect *clip_bounds = clip_stack_active(&clip_stack);
-            if (clip_bounds) {
-                border_clip = (Rect){
-                    clip_bounds->x - b,
-                    clip_bounds->y - b,
-                    clip_bounds->w + b * 2.0f,
-                    clip_bounds->h + b * 2.0f,
+                Rect borders[4] = {
+                    { widget_rect.x, widget_rect.y, widget_rect.w, b },
+                    { widget_rect.x, widget_rect.y + widget_rect.h - b, widget_rect.w, b },
+                    { widget_rect.x, widget_rect.y + b, b, widget_rect.h - b * 2.0f },
+                    { widget_rect.x + widget_rect.w - b, widget_rect.y + b, b, widget_rect.h - b * 2.0f },
                 };
-                clip_bounds = &border_clip;
+
+                Rect border_clip = {0};
+                const Rect *clip_bounds = clip_stack_active(&clip_stack);
+                LayoutResult border_clip_device = {0};
+                const LayoutResult *border_clip_ptr = NULL;
+                if (clip_bounds) {
+                    border_clip = (Rect){
+                        clip_bounds->x - b,
+                        clip_bounds->y - b,
+                        clip_bounds->w + b * 2.0f,
+                        clip_bounds->h + b * 2.0f,
+                    };
+                    clip_bounds = &border_clip;
+                    LayoutBox clip_box = { {clip_bounds->x, clip_bounds->y}, {clip_bounds->w, clip_bounds->h} };
+                    border_clip_device = layout_resolve(&clip_box, &context);
+                    border_clip_ptr = &border_clip_device;
+                }
+
+                for (size_t edge = 0; edge < 4; ++edge) {
+                    if (borders[edge].w <= 0.0f || borders[edge].h <= 0.0f) continue;
+                    Rect clipped_border;
+                    if (apply_clip_rect_to_bounds(clip_bounds, &borders[edge], &clipped_border) &&
+                        ensure_view_model_capacity(&view_models, &view_model_capacity, view_model_count + 1, &view_models_ok)) {
+                        ViewModel vm = {
+                            .id = widget->id,
+                            .logical_box = { {clipped_border.x, clipped_border.y}, {clipped_border.w, clipped_border.h} },
+                            .layer = base_z + Z_LAYER_BORDER,
+                            .phase = RENDER_PHASE_BACKGROUND,
+                            .widget_order = widget_order,
+                            .ordinal = widget_ordinals[widget_index]++,
+                            .color = widget->border_color,
+                        };
+                        apply_active_clip_to_view_model(clip_bounds, border_clip_ptr, &vm);
+                        view_models[view_model_count++] = vm;
+                    }
+                }
             }
 
-            for (size_t edge = 0; edge < 4; ++edge) {
-                if (borders[edge].w <= 0.0f || borders[edge].h <= 0.0f) continue;
-                Rect clipped_border;
-                if (apply_clip_rect_to_bounds(clip_bounds, &borders[edge], &clipped_border) &&
+            if (widget->type == W_HSLIDER) {
+                float track_height = fmaxf(inner_rect.h * 0.35f, 6.0f);
+                float track_y = inner_rect.y + (inner_rect.h - track_height) * 0.5f;
+                float track_x = inner_rect.x;
+                float track_w = inner_rect.w;
+                float denom = widget->maxv - widget->minv;
+                float t = denom != 0.0f ? (widget->value - widget->minv) / denom : 0.0f;
+                if (t < 0.0f) t = 0.0f; else if (t > 1.0f) t = 1.0f;
+
+                Color track_color = widget->color;
+                track_color.a *= 0.35f;
+                Rect track_rect = { track_x, track_y, track_w, track_height };
+                Rect clipped_track;
+                if (apply_clip_rect_to_bounds(active_clip, &track_rect, &clipped_track) &&
                     ensure_view_model_capacity(&view_models, &view_model_capacity, view_model_count + 1, &view_models_ok)) {
-                    ViewModel vm = {
+                    view_models[view_model_count++] = (ViewModel){
                         .id = widget->id,
-                        .logical_box = { {clipped_border.x, clipped_border.y}, {clipped_border.w, clipped_border.h} },
-                        .layer = base_z + Z_LAYER_BORDER,
+                        .logical_box = { {clipped_track.x, clipped_track.y}, {clipped_track.w, clipped_track.h} },
+                        .layer = base_z + Z_LAYER_SLIDER_TRACK,
                         .phase = RENDER_PHASE_BACKGROUND,
                         .widget_order = widget_order,
                         .ordinal = widget_ordinals[widget_index]++,
-                        .color = widget->border_color,
+                        .color = track_color,
                     };
-                    apply_active_clip_to_view_model(clip_bounds, &vm);
-                    view_models[view_model_count++] = vm;
+                    apply_active_clip_to_view_model(active_clip, clip_device_ptr, &view_models[view_model_count - 1]);
+                }
+
+                float fill_w = track_w * t;
+                Rect fill_rect = { track_x, track_y, fill_w, track_height };
+                Rect clipped_fill;
+                if (apply_clip_rect_to_bounds(active_clip, &fill_rect, &clipped_fill) &&
+                    ensure_view_model_capacity(&view_models, &view_model_capacity, view_model_count + 1, &view_models_ok)) {
+                    view_models[view_model_count++] = (ViewModel){
+                        .id = widget->id,
+                        .logical_box = { {clipped_fill.x, clipped_fill.y}, {clipped_fill.w, clipped_fill.h} },
+                        .layer = base_z + Z_LAYER_SLIDER_FILL,
+                        .phase = RENDER_PHASE_BACKGROUND,
+                        .widget_order = widget_order,
+                        .ordinal = widget_ordinals[widget_index]++,
+                        .color = widget->color,
+                    };
+                    apply_active_clip_to_view_model(active_clip, clip_device_ptr, &view_models[view_model_count - 1]);
+                }
+
+                float knob_w = fmaxf(track_height, inner_rect.h * 0.3f);
+                float knob_x = track_x + fill_w - knob_w * 0.5f;
+                if (knob_x < track_x) knob_x = track_x;
+                float knob_max = track_x + track_w - knob_w;
+                if (knob_x > knob_max) knob_x = knob_max;
+                float knob_h = track_height * 1.5f;
+                float knob_y = track_y + (track_height - knob_h) * 0.5f;
+                Color knob_color = widget->text_color;
+                if (knob_color.a <= 0.0f) knob_color = (Color){1.0f, 1.0f, 1.0f, 1.0f};
+                Rect knob_rect = { knob_x, knob_y, knob_w, knob_h };
+                Rect clipped_knob;
+                if (apply_clip_rect_to_bounds(active_clip, &knob_rect, &clipped_knob) &&
+                    ensure_view_model_capacity(&view_models, &view_model_capacity, view_model_count + 1, &view_models_ok)) {
+                    view_models[view_model_count++] = (ViewModel){
+                        .id = widget->id,
+                        .logical_box = { {clipped_knob.x, clipped_knob.y}, {clipped_knob.w, clipped_knob.h} },
+                        .layer = base_z + Z_LAYER_SLIDER_KNOB,
+                        .phase = RENDER_PHASE_BACKGROUND,
+                        .widget_order = widget_order,
+                        .ordinal = widget_ordinals[widget_index]++,
+                        .color = knob_color,
+                    };
+                    apply_active_clip_to_view_model(active_clip, clip_device_ptr, &view_models[view_model_count - 1]);
+                }
+            } else {
+                Rect track_rect = inner_rect;
+                if (is_scrollbar) {
+                    float track_w = widget->scrollbar_width > 0.0f ? widget->scrollbar_width : fmaxf(4.0f, inner_rect.w * 0.02f);
+                    float track_h = inner_rect.h - widget->padding * 2.0f;
+                    float track_x = inner_rect.x + inner_rect.w - track_w - widget->padding * 0.5f;
+                    float track_y = inner_rect.y + widget->padding;
+                    track_rect = (Rect){ track_x, track_y, track_w, track_h };
+                }
+
+                Rect clipped_fill;
+                Color fill_color = is_scrollbar ? widget->scrollbar_track_color : widget->color;
+                if (apply_clip_rect_to_bounds(active_clip, &track_rect, &clipped_fill) &&
+                    ensure_view_model_capacity(&view_models, &view_model_capacity, view_model_count + 1, &view_models_ok)) {
+                    view_models[view_model_count++] = (ViewModel){
+                        .id = widget->id,
+                        .logical_box = { {clipped_fill.x, clipped_fill.y}, {clipped_fill.w, clipped_fill.h} },
+                        .layer = base_z + Z_LAYER_FILL,
+                        .phase = RENDER_PHASE_BACKGROUND,
+                        .widget_order = widget_order,
+                        .ordinal = widget_ordinals[widget_index]++,
+                        .color = fill_color,
+                    };
+                    apply_active_clip_to_view_model(active_clip, clip_device_ptr, &view_models[view_model_count - 1]);
+                }
+
+                if (is_scrollbar && widget->scrollbar_enabled && widget->show_scrollbar && widget->scroll_viewport > 0.0f &&
+                    widget->scroll_content > widget->scroll_viewport + 1.0f) {
+                    float thumb_ratio = widget->scroll_viewport / widget->scroll_content;
+                    float thumb_h = fmaxf(track_rect.h * thumb_ratio, 12.0f);
+                    float max_offset = widget->scroll_content - widget->scroll_viewport;
+                    float clamped_offset = widget->scroll_offset;
+                    if (clamped_offset < 0.0f) clamped_offset = 0.0f;
+                    if (clamped_offset > max_offset) clamped_offset = max_offset;
+                    float offset_t = (max_offset != 0.0f) ? (clamped_offset / max_offset) : 0.0f;
+                    float thumb_y = track_rect.y + offset_t * (track_rect.h - thumb_h);
+                    Color thumb_color = widget->scrollbar_thumb_color;
+
+                    Rect thumb_rect = { track_rect.x, thumb_y, track_rect.w, thumb_h };
+                    Rect clipped_thumb;
+                    if (apply_clip_rect_to_bounds(scrollbar_clip, &thumb_rect, &clipped_thumb) &&
+                        ensure_view_model_capacity(&view_models, &view_model_capacity, view_model_count + 1, &view_models_ok)) {
+                        view_models[view_model_count++] = (ViewModel){
+                            .id = widget->id,
+                            .logical_box = { {clipped_thumb.x, clipped_thumb.y}, {clipped_thumb.w, clipped_thumb.h} },
+                            .layer = scrollbar_z + Z_LAYER_SCROLLBAR_THUMB,
+                            .phase = RENDER_PHASE_BACKGROUND,
+                            .widget_order = widget_order,
+                            .ordinal = widget_ordinals[widget_index]++,
+                            .color = thumb_color,
+                        };
+                        apply_active_clip_to_view_model(scrollbar_clip, clip_device_ptr, &view_models[view_model_count - 1]);
+                    }
                 }
             }
-        }
 
-        if (widget->type == W_HSLIDER) {
-            float track_height = fmaxf(inner_rect.h * 0.35f, 6.0f);
-            float track_y = inner_rect.y + (inner_rect.h - track_height) * 0.5f;
-            float track_x = inner_rect.x;
-            float track_w = inner_rect.w;
-            float denom = widget->maxv - widget->minv;
-            float t = denom != 0.0f ? (widget->value - widget->minv) / denom : 0.0f;
-            if (t < 0.0f) t = 0.0f; else if (t > 1.0f) t = 1.0f;
+            if (!widget->text || !*widget->text) continue;
 
-            Color track_color = widget->color;
-            track_color.a *= 0.35f;
-            Rect track_rect = { track_x, track_y, track_w, track_height };
-            Rect clipped_track;
-            if (apply_clip_rect_to_bounds(active_clip, &track_rect, &clipped_track) &&
-                ensure_view_model_capacity(&view_models, &view_model_capacity, view_model_count + 1, &view_models_ok)) {
-                view_models[view_model_count++] = (ViewModel){
-                    .id = widget->id,
-                    .logical_box = { {clipped_track.x, clipped_track.y}, {clipped_track.w, clipped_track.h} },
-                    .layer = base_z + Z_LAYER_SLIDER_TRACK,
-                    .phase = RENDER_PHASE_BACKGROUND,
+            float pen_x = widget->rect.x + widget->padding;
+            float pen_y = widget->rect.y + effective_offset + widget->padding + (float)ascent;
+
+            for (const char *c = widget->text; *c; ) {
+                int adv = 0;
+                int codepoint = utf8_decode(c, &adv);
+                if (adv <= 0) break;
+                if (codepoint < 32) { c += adv; continue; }
+
+                const Glyph *g = get_glyph(codepoint);
+                if (!g) { c += adv; continue; }
+                float snapped_pen_x = floorf(pen_x + 0.5f);
+                float snapped_pen_y = floorf(pen_y + 0.5f);
+                float x0 = snapped_pen_x + g->xoff;
+                float y0 = snapped_pen_y + g->yoff;
+                Rect glyph_rect = { x0, y0, g->w, g->h };
+                Rect clipped_rect;
+                if (!apply_clip_rect_to_bounds(active_clip, &glyph_rect, &clipped_rect)) { pen_x += g->advance; c += adv; continue; }
+
+                float u0 = g->u0;
+                float v0 = g->v0;
+                float u1 = g->u1;
+                float v1 = g->v1;
+                if (clipped_rect.x > glyph_rect.x && glyph_rect.w > 0.0f) {
+                    float t = (clipped_rect.x - glyph_rect.x) / glyph_rect.w;
+                    u0 += (u1 - u0) * t;
+                }
+                if (clipped_rect.y > glyph_rect.y && glyph_rect.h > 0.0f) {
+                    float t = (clipped_rect.y - glyph_rect.y) / glyph_rect.h;
+                    v0 += (v1 - v0) * t;
+                }
+                if (clipped_rect.x + clipped_rect.w < glyph_rect.x + glyph_rect.w && glyph_rect.w > 0.0f) {
+                    float t = (glyph_rect.x + glyph_rect.w - (clipped_rect.x + clipped_rect.w)) / glyph_rect.w;
+                    u1 -= (u1 - u0) * t;
+                }
+                if (clipped_rect.y + clipped_rect.h < glyph_rect.y + glyph_rect.h && glyph_rect.h > 0.0f) {
+                    float t = (glyph_rect.y + glyph_rect.h - (clipped_rect.y + clipped_rect.h)) / glyph_rect.h;
+                    v1 -= (v1 - v0) * t;
+                }
+
+                if (!g->w || !g->h || !glyph_quad_array_reserve(&glyph_quads, glyph_quads.count + 1)) {
+                    pen_x += g->advance; c += adv; continue;
+                }
+                LayoutResult glyph_clip_device = {0};
+                if (clip_device_ptr) {
+                    glyph_clip_device = *clip_device_ptr;
+                }
+                size_t glyph_ordinal = widget_ordinals ? widget_ordinals[widget_index]++ : 0;
+                glyph_quads.items[glyph_quads.count++] = (GlyphQuad){
+                    .min = { clipped_rect.x, clipped_rect.y },
+                    .max = { clipped_rect.x + clipped_rect.w, clipped_rect.y + clipped_rect.h },
+                    .uv0 = { u0, v0 },
+                    .uv1 = { u1, v1 },
+                    .color = widget->text_color,
+                    .widget_id = widget->id,
                     .widget_order = widget_order,
-                    .ordinal = widget_ordinals[widget_index]++,
-                    .color = track_color,
+                    .layer = text_z,
+                    .phase = RENDER_PHASE_CONTENT,
+                    .ordinal = glyph_ordinal,
+                    .has_clip = active_clip != NULL,
+                    .has_device_clip = clip_device_ptr != NULL,
+                    .clip.origin = { active_clip ? active_clip->x : 0.0f, active_clip ? active_clip->y : 0.0f },
+                    .clip.size = { active_clip ? active_clip->w : 0.0f, active_clip ? active_clip->h : 0.0f },
+                    .clip_device = glyph_clip_device,
                 };
-                apply_active_clip_to_view_model(active_clip, &view_models[view_model_count - 1]);
-            }
-
-            float fill_w = track_w * t;
-            Rect fill_rect = { track_x, track_y, fill_w, track_height };
-            Rect clipped_fill;
-            if (apply_clip_rect_to_bounds(active_clip, &fill_rect, &clipped_fill) &&
-                ensure_view_model_capacity(&view_models, &view_model_capacity, view_model_count + 1, &view_models_ok)) {
-                view_models[view_model_count++] = (ViewModel){
-                    .id = widget->id,
-                    .logical_box = { {clipped_fill.x, clipped_fill.y}, {clipped_fill.w, clipped_fill.h} },
-                    .layer = base_z + Z_LAYER_SLIDER_FILL,
-                    .phase = RENDER_PHASE_BACKGROUND,
-                    .widget_order = widget_order,
-                    .ordinal = widget_ordinals[widget_index]++,
-                    .color = widget->color,
-                };
-                apply_active_clip_to_view_model(active_clip, &view_models[view_model_count - 1]);
-            }
-
-            float knob_w = fmaxf(track_height, inner_rect.h * 0.3f);
-            float knob_x = track_x + fill_w - knob_w * 0.5f;
-            if (knob_x < track_x) knob_x = track_x;
-            float knob_max = track_x + track_w - knob_w;
-            if (knob_x > knob_max) knob_x = knob_max;
-            float knob_h = track_height * 1.5f;
-            float knob_y = track_y + (track_height - knob_h) * 0.5f;
-            Color knob_color = widget->text_color;
-            if (knob_color.a <= 0.0f) knob_color = (Color){1.0f, 1.0f, 1.0f, 1.0f};
-            Rect knob_rect = { knob_x, knob_y, knob_w, knob_h };
-            Rect clipped_knob;
-            if (apply_clip_rect_to_bounds(active_clip, &knob_rect, &clipped_knob) &&
-                ensure_view_model_capacity(&view_models, &view_model_capacity, view_model_count + 1, &view_models_ok)) {
-                view_models[view_model_count++] = (ViewModel){
-                    .id = widget->id,
-                    .logical_box = { {clipped_knob.x, clipped_knob.y}, {clipped_knob.w, clipped_knob.h} },
-                    .layer = base_z + Z_LAYER_SLIDER_KNOB,
-                    .phase = RENDER_PHASE_BACKGROUND,
-                    .widget_order = widget_order,
-                    .ordinal = widget_ordinals[widget_index]++,
-                    .color = knob_color,
-                };
-                apply_active_clip_to_view_model(active_clip, &view_models[view_model_count - 1]);
-            }
-            continue;
-        }
-
-        Rect track_rect = inner_rect;
-        if (is_scrollbar) {
-            float track_w = widget->scrollbar_width > 0.0f ? widget->scrollbar_width : fmaxf(4.0f, inner_rect.w * 0.02f);
-            float track_h = inner_rect.h - widget->padding * 2.0f;
-            float track_x = inner_rect.x + inner_rect.w - track_w - widget->padding * 0.5f;
-            float track_y = inner_rect.y + widget->padding;
-            track_rect = (Rect){ track_x, track_y, track_w, track_h };
-        }
-
-        Rect clipped_fill;
-        Color fill_color = is_scrollbar ? widget->scrollbar_track_color : widget->color;
-        if (apply_clip_rect_to_bounds(active_clip, &track_rect, &clipped_fill) &&
-            ensure_view_model_capacity(&view_models, &view_model_capacity, view_model_count + 1, &view_models_ok)) {
-            view_models[view_model_count++] = (ViewModel){
-                .id = widget->id,
-                .logical_box = { {clipped_fill.x, clipped_fill.y}, {clipped_fill.w, clipped_fill.h} },
-                .layer = base_z + Z_LAYER_FILL,
-                .phase = RENDER_PHASE_BACKGROUND,
-                .widget_order = widget_order,
-                .ordinal = widget_ordinals[widget_index]++,
-                .color = fill_color,
-            };
-            apply_active_clip_to_view_model(active_clip, &view_models[view_model_count - 1]);
-        }
-
-        if (is_scrollbar && widget->scrollbar_enabled && widget->show_scrollbar && widget->scroll_viewport > 0.0f &&
-            widget->scroll_content > widget->scroll_viewport + 1.0f) {
-            float thumb_ratio = widget->scroll_viewport / widget->scroll_content;
-            float thumb_h = fmaxf(track_rect.h * thumb_ratio, 12.0f);
-            float max_offset = widget->scroll_content - widget->scroll_viewport;
-            float clamped_offset = widget->scroll_offset;
-            if (clamped_offset < 0.0f) clamped_offset = 0.0f;
-            if (clamped_offset > max_offset) clamped_offset = max_offset;
-            float offset_t = (max_offset != 0.0f) ? (clamped_offset / max_offset) : 0.0f;
-            float thumb_y = track_rect.y + offset_t * (track_rect.h - thumb_h);
-            Color thumb_color = widget->scrollbar_thumb_color;
-
-            Rect thumb_rect = { track_rect.x, thumb_y, track_rect.w, thumb_h };
-            Rect clipped_thumb;
-            if (apply_clip_rect_to_bounds(scrollbar_clip, &thumb_rect, &clipped_thumb) &&
-                ensure_view_model_capacity(&view_models, &view_model_capacity, view_model_count + 1, &view_models_ok)) {
-                view_models[view_model_count++] = (ViewModel){
-                    .id = widget->id,
-                    .logical_box = { {clipped_thumb.x, clipped_thumb.y}, {clipped_thumb.w, clipped_thumb.h} },
-                    .layer = scrollbar_z + Z_LAYER_SCROLLBAR_THUMB,
-                    .phase = RENDER_PHASE_BACKGROUND,
-                    .widget_order = widget_order,
-                    .ordinal = widget_ordinals[widget_index]++,
-                    .color = thumb_color,
-                };
-                apply_active_clip_to_view_model(scrollbar_clip, &view_models[view_model_count - 1]);
+                pen_x += g->advance;
+                c += adv;
             }
         }
-    }
+
     if (!view_models_ok) {
         free(glyph_quads.items);
         free(view_models);
         free(widget_ordinals);
         return false;
     }
-
-    ClipStack text_clip_stack = {0};
-    for (size_t i = 0; i < g_display_list.count; ++i) {
-        const DisplayItem *item = &g_display_list.items[i];
-        const Widget *widget = item->widget;
-        if (!widget || !widget->text || !*widget->text) continue;
-
-        for (size_t p = 0; p < item->clip_pop; ++p) clip_stack_pop(&text_clip_stack);
-        for (size_t p = 0; p < item->clip_push && p < UI_CLIP_STACK_MAX; ++p) clip_stack_push(&text_clip_stack, item->push_rects[p]);
-        const Rect *active_clip = clip_stack_active(&text_clip_stack);
-
-        size_t widget_index = (size_t)(widget - g_widgets.items);
-        size_t widget_order = g_widgets.count > 0 ? (g_widgets.count - 1 - widget_index) : 0;
-
-        int text_z = widget->z_index * LAYER_STRIDE + Z_LAYER_TEXT;
-
-        float scroll_offset = widget->scroll_static ? 0.0f : widget->scroll_offset;
-        float snapped_scroll_pixels = -snap_to_pixel(scroll_offset * g_transformer.dpi_scale);
-        float effective_offset = snapped_scroll_pixels / g_transformer.dpi_scale;
-        float pen_x = widget->rect.x + widget->padding;
-        float pen_y = widget->rect.y + effective_offset + widget->padding + (float)ascent;
-
-        for (const char *c = widget->text; *c; ) {
-            int adv = 0;
-            int codepoint = utf8_decode(c, &adv);
-            if (adv <= 0) break;
-            if (codepoint < 32) { c += adv; continue; }
-
-            const Glyph *g = get_glyph(codepoint);
-            if (!g) { c += adv; continue; }
-            float snapped_pen_x = floorf(pen_x + 0.5f);
-            float snapped_pen_y = floorf(pen_y + 0.5f);
-            float x0 = snapped_pen_x + g->xoff;
-            float y0 = snapped_pen_y + g->yoff;
-            Rect glyph_rect = { x0, y0, g->w, g->h };
-            Rect clipped_rect;
-            if (!apply_clip_rect_to_bounds(active_clip, &glyph_rect, &clipped_rect)) { pen_x += g->advance; c += adv; continue; }
-
-            float u0 = g->u0;
-            float v0 = g->v0;
-            float u1 = g->u1;
-            float v1 = g->v1;
-            if (clipped_rect.x > glyph_rect.x && glyph_rect.w > 0.0f) {
-                float t = (clipped_rect.x - glyph_rect.x) / glyph_rect.w;
-                u0 += (u1 - u0) * t;
-            }
-            if (clipped_rect.y > glyph_rect.y && glyph_rect.h > 0.0f) {
-                float t = (clipped_rect.y - glyph_rect.y) / glyph_rect.h;
-                v0 += (v1 - v0) * t;
-            }
-            float glyph_x1 = glyph_rect.x + glyph_rect.w;
-            float glyph_y1 = glyph_rect.y + glyph_rect.h;
-            if (clipped_rect.x + clipped_rect.w < glyph_x1 && glyph_rect.w > 0.0f) {
-                float t = (glyph_x1 - (clipped_rect.x + clipped_rect.w)) / glyph_rect.w;
-                u1 -= (u1 - u0) * t;
-            }
-            if (clipped_rect.y + clipped_rect.h < glyph_y1 && glyph_rect.h > 0.0f) {
-                float t = (glyph_y1 - (clipped_rect.y + clipped_rect.h)) / glyph_rect.h;
-                v1 -= (v1 - v0) * t;
-            }
-
-            glyph_quad_array_reserve(&glyph_quads, glyph_quads.count + 1);
-            if (glyph_quads.capacity < glyph_quads.count + 1) {
-                break;
-            }
-
-            glyph_quads.items[glyph_quads.count++] = (GlyphQuad){
-                .min = {clipped_rect.x, clipped_rect.y},
-                .max = {clipped_rect.x + clipped_rect.w, clipped_rect.y + clipped_rect.h},
-                .uv0 = {u0, v0},
-                .uv1 = {u1, v1},
-                .color = widget->text_color,
-                .widget_id = widget->id,
-                .widget_order = widget_order,
-                .layer = text_z,
-                .phase = RENDER_PHASE_OVERLAY,
-                .ordinal = widget_ordinals[widget_index]++,
-                .has_clip = active_clip != NULL,
-                .clip = active_clip ? (LayoutBox){ {active_clip->x, active_clip->y}, {active_clip->w, active_clip->h} } : (LayoutBox){0},
-            };
-
-            pen_x += g->advance;
-            c += adv;
-        }
-    }
-
-    Mat4 projection = mat4_identity();
-
-    CoordinateSystem2D transformer = g_transformer;
-    transformer.viewport_size = (Vec2){(float)g_swapchain_extent.width, (float)g_swapchain_extent.height};
-
-    RenderContext context;
-    render_context_init(&context, &transformer, &projection);
 
     Renderer renderer;
     renderer_init(&renderer, &context, view_model_count);

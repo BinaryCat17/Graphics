@@ -177,8 +177,10 @@ RenderBuildResult renderer_build_commands(Renderer *renderer, const ViewModel *v
         command.phase = view_models[i].phase;
         command.key =
             (RenderSortKey){view_models[i].layer, view_models[i].widget_order, view_models[i].phase, view_models[i].ordinal};
-        command.has_clip = view_models[i].has_clip;
-        if (view_models[i].has_clip) {
+        command.has_clip = view_models[i].has_clip || view_models[i].has_device_clip;
+        if (view_models[i].has_device_clip) {
+            command.clip = view_models[i].clip_device;
+        } else if (view_models[i].has_clip) {
             command.clip = layout_resolve(&view_models[i].clip, &renderer->context);
         }
         command.data.background.layout = layout;
@@ -197,8 +199,10 @@ RenderBuildResult renderer_build_commands(Renderer *renderer, const ViewModel *v
         command.primitive = RENDER_PRIMITIVE_GLYPH;
         command.phase = glyphs[i].phase;
         command.key = (RenderSortKey){glyphs[i].layer, glyphs[i].widget_order, glyphs[i].phase, glyphs[i].ordinal};
-        command.has_clip = glyphs[i].has_clip;
-        if (glyphs[i].has_clip) {
+        command.has_clip = glyphs[i].has_clip || glyphs[i].has_device_clip;
+        if (glyphs[i].has_device_clip) {
+            command.clip = glyphs[i].clip_device;
+        } else if (glyphs[i].has_clip) {
             command.clip = layout_resolve(&glyphs[i].clip, &renderer->context);
         }
         command.data.glyph = glyphs[i];

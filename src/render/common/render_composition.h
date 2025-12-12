@@ -33,7 +33,9 @@ typedef struct GlyphQuad {
     RenderPhase phase;
     size_t ordinal;
     int has_clip;
+    int has_device_clip;
     LayoutBox clip;
+    LayoutResult clip_device;
 } GlyphQuad;
 
 /**
@@ -45,7 +47,9 @@ typedef struct ViewModel {
     const char *id;
     LayoutBox logical_box;
     int has_clip;
+    int has_device_clip;
     LayoutBox clip;
+    LayoutResult clip_device;
     int layer;
     RenderPhase phase;
     size_t widget_order;
