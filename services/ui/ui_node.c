@@ -1,12 +1,12 @@
 #include "ui/ui_node.h"
 
 #include <ctype.h>
-#include <dirent.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
 #include "config/config_io.h"
+#include "platform/fs.h"
 #include "scene/cad_scene.h"
 
 static int ascii_strcasecmp(const char* a, const char* b) {
@@ -168,30 +168,36 @@ static void load_component_file(const char* path, const char* base_dir, Prototyp
 
 static void gather_component_tree(const char* dir, const char* base_dir, const char* skip, Prototype** prototypes) {
     if (!dir || !prototypes) return;
-    DIR* d = opendir(dir);
+    PlatformDir* d = platform_dir_open(dir);
     if (!d) return;
-    struct dirent* ent = NULL;
-    while ((ent = readdir(d)) != NULL) {
-        if (strcmp(ent->d_name, ".") == 0 || strcmp(ent->d_name, "..") == 0) continue;
-        char* path = join_path(dir, ent->d_name);
-        if (!path) continue;
-        if (ent->d_type == DT_DIR) {
-            gather_component_tree(path, base_dir, skip, prototypes);
-            free(path);
+    PlatformDirEntry ent;
+    while (platform_dir_read(d, &ent)) {
+        char* path = join_path(dir, ent.name);
+        if (!path) {
+            free(ent.name);
             continue;
         }
-        if (!ends_with_yaml(ent->d_name)) {
+        if (ent.is_dir) {
+            gather_component_tree(path, base_dir, skip, prototypes);
             free(path);
+            free(ent.name);
+            continue;
+        }
+        if (!ends_with_yaml(ent.name)) {
+            free(path);
+            free(ent.name);
             continue;
         }
         if (skip && strcmp(skip, path) == 0) {
             free(path);
+            free(ent.name);
             continue;
         }
         load_component_file(path, base_dir, prototypes);
         free(path);
+        free(ent.name);
     }
-    closedir(d);
+    platform_dir_close(d);
 }
 
 static void gather_component_prototypes(const ConfigDocument* layout_doc, Prototype** prototypes) {

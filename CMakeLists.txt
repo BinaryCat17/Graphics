@@ -31,7 +31,7 @@ if (NOT Vulkan_FOUND)
     set(VULKAN_STUB ON)
 endif()
 
-set(PLATFORM_SOURCES "src/platform/glfw_platform.c")
+set(PLATFORM_SOURCES "src/platform/glfw_platform.c" "src/platform/fs.c")
 add_library(platform_layer STATIC ${PLATFORM_SOURCES})
 target_include_directories(platform_layer PUBLIC "src/")
 target_link_libraries(platform_layer PUBLIC glfw Vulkan::Vulkan)

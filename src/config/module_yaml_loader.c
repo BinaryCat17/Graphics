@@ -4,13 +4,8 @@
 #include <stdlib.h>
 #include <string.h>
 
-#ifdef _WIN32
-#include <windows.h>
-#else
-#include <dirent.h>
-#endif
-
 #include "config/config_io.h"
+#include "platform/fs.h"
 
 static void assign_error(ConfigError *err, int line, int column, const char *msg)
 {
@@ -248,59 +243,30 @@ static int load_single_config(StateManager *manager, const ModuleSchema *schema,
 static int module_load_configs_recursive(const ModuleSchema *schema, const char *config_dir, StateManager *manager)
 {
     if (!schema || !config_dir || !manager) return 0;
-#ifdef _WIN32
-    size_t dir_len = strlen(config_dir);
-    while (dir_len > 0 && (config_dir[dir_len - 1] == '/' || config_dir[dir_len - 1] == '\\')) dir_len--;
-    size_t pattern_len = dir_len + 3; // "\\*" + null
-    char *pattern = (char *)malloc(pattern_len);
-    if (!pattern) return 0;
-    memcpy(pattern, config_dir, dir_len);
-    pattern[dir_len] = '\\';
-    pattern[dir_len + 1] = '*';
-    pattern[dir_len + 2] = 0;
+    PlatformDir *dir = platform_dir_open(config_dir);
+    if (!dir) return 0;
 
-    WIN32_FIND_DATAA ffd;
-    HANDLE hFind = FindFirstFileA(pattern, &ffd);
-    free(pattern);
-    if (hFind == INVALID_HANDLE_VALUE) return 0;
-
-    do {
-        const char *name = ffd.cFileName;
-        if (strcmp(name, ".") == 0 || strcmp(name, "..") == 0) continue;
-        if (ffd.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) {
-            char *nested = join_path(config_dir, name);
-            module_load_configs_recursive(schema, nested, manager);
-            free(nested);
+    PlatformDirEntry ent;
+    while (platform_dir_read(dir, &ent)) {
+        char *path = join_path(config_dir, ent.name);
+        if (!path) {
+            free(ent.name);
             continue;
         }
-        size_t len = strlen(name);
-        if (len < 6 || strcmp(name + len - 5, ".yaml") != 0) continue;
-        char *path = join_path(config_dir, name);
-        load_single_config(manager, schema, path);
-        free(path);
-    } while (FindNextFileA(hFind, &ffd));
-    FindClose(hFind);
-#else
-    DIR *dir = opendir(config_dir);
-    if (!dir) return 0;
-    struct dirent *ent = NULL;
-    while ((ent = readdir(dir)) != NULL) {
-        if (strcmp(ent->d_name, ".") == 0 || strcmp(ent->d_name, "..") == 0) continue;
-        char *path = join_path(config_dir, ent->d_name);
-        if (ent->d_type == DT_DIR) {
+        if (ent.is_dir) {
             module_load_configs_recursive(schema, path, manager);
             free(path);
+            free(ent.name);
             continue;
         }
-        const char *name = ent->d_name;
-        size_t len = strlen(name);
-        if (len >= 6 && strcmp(name + len - 5, ".yaml") == 0) {
+        size_t len = strlen(ent.name);
+        if (len >= 6 && strcmp(ent.name + len - 5, ".yaml") == 0) {
             load_single_config(manager, schema, path);
         }
         free(path);
+        free(ent.name);
     }
-    closedir(dir);
-#endif
+    platform_dir_close(dir);
     return 1;
 }
 
