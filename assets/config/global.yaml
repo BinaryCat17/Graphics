@@ -1,0 +1,18 @@
+namespace: global
+stores:
+  - name: environment
+    chunk_capacity: 2
+  - name: defaults
+    chunk_capacity: 2
+configs:
+  - store: environment
+    key: runtime
+    data:
+      appName: Graphics Viewer
+      locale: ru-RU
+      theme: midnight
+  - store: defaults
+    key: ui
+    data:
+      unitSystem: metric
+      snapping: coarse
