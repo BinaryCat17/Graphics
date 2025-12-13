@@ -80,14 +80,17 @@ data:
       type: label
       style: chip
       padding: 7
-    divider: &dividerBase
+    divider:
       type: rect
       h: 2
       style: divider
       padding: 1.5
       w: 400
     dividerWide:
-      <<: *dividerBase
+      type: rect
+      h: 2
+      style: divider
+      padding: 1.5
       w: 500
     panelPrimaryScroll:
       type: scrollbar
