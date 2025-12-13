@@ -1,0 +1,5 @@
+type: component
+key: components/treeSpacer
+component:
+  type: spacer
+  h: 18

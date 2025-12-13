@@ -2,6 +2,7 @@
 #define UI_UI_NODE_H
 
 #include <stddef.h>
+#include "config/config_document.h"
 #include "scene/cad_scene.h"
 #include "ui/model_style.h"
 
@@ -86,7 +87,7 @@ typedef struct UiNode {
     size_t child_count;
 } UiNode;
 
-UiNode* ui_config_load_layout(const ConfigNode* root, const Model* model, const Style* styles, const char* font_path,
+UiNode* ui_config_load_layout(const ConfigDocument* doc, const Model* model, const Style* styles, const char* font_path,
                               const Scene* scene);
 void update_widget_bindings(UiNode* root, const Model* model);
 void free_ui_tree(UiNode* node);

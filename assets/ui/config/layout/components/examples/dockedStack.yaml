@@ -1,0 +1,12 @@
+type: component
+key: components/examples/dockedStack
+component:
+  type: column
+  style: panelSecondary
+  docking: right
+  z: 1
+  children:
+    - type: label
+      text: "Док-стек"
+    - type: button
+      text: "Переключить"

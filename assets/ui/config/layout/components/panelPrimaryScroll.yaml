@@ -1,0 +1,6 @@
+type: component
+key: components/panelPrimaryScroll
+component:
+  type: scrollbar
+  style: panelPrimary
+  scrollbarWidth: 10

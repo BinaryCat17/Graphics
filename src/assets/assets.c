@@ -34,7 +34,7 @@ int load_assets(const char* assets_dir, const char* ui_config_path, Assets* out_
     if (ui_config_path && ui_config_path[0]) {
         out_assets->ui_path = strdup(ui_config_path);
     } else {
-        out_assets->ui_path = join_path(assets_dir, "ui/config/ui.yaml");
+        out_assets->ui_path = join_path(assets_dir, "ui/config/layout/ui.yaml");
     }
     out_assets->vert_spv_path = join_path(assets_dir, "shaders/shader.vert.spv");
     out_assets->frag_spv_path = join_path(assets_dir, "shaders/shader.frag.spv");

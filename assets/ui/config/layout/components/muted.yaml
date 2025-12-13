@@ -1,0 +1,6 @@
+type: component
+key: components/muted
+component:
+  type: label
+  style: mutedLabel
+  padding: 6

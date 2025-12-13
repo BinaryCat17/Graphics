@@ -140,6 +140,40 @@ static int detect_store_type(const ModuleSchema *schema, const char *store)
     return -1;
 }
 
+static char *dirname_dup(const char *path)
+{
+    if (!path) return NULL;
+    const char *slash = strrchr(path, '/');
+    if (!slash) slash = strrchr(path, '\\');
+    if (!slash) return NULL;
+    size_t len = (size_t)(slash - path);
+    char *out = (char *)malloc(len + 1);
+    if (!out) return NULL;
+    memcpy(out, path, len);
+    out[len] = 0;
+    return out;
+}
+
+static char *derive_store_from_path(const ModuleSchema *schema, const char *path)
+{
+    if (!schema || !path) return NULL;
+    size_t path_len = strlen(path);
+    for (size_t i = 0; i < schema->store_count; ++i) {
+        const char *name = schema->stores[i].name;
+        if (!name) continue;
+        size_t name_len = strlen(name);
+        if (name_len == 0) continue;
+        for (size_t pos = 0; pos + name_len <= path_len; ++pos) {
+            if (path[pos] != '/' && path[pos] != '\\') continue;
+            if (strncmp(path + pos + 1, name, name_len) == 0) {
+                char next = path[pos + 1 + name_len];
+                if (next == '/' || next == '\\') return dup_string(name);
+            }
+        }
+    }
+    return NULL;
+}
+
 static char *basename_no_ext(const char *path)
 {
     const char *slash = strrchr(path, '/');
@@ -176,32 +210,10 @@ static int load_single_config(StateManager *manager, const ModuleSchema *schema,
 
     const ConfigNode *store_node = config_map_get(doc.root, "store");
     const ConfigNode *key_node = config_map_get(doc.root, "key");
-    const ConfigNode *data_node = config_map_get(doc.root, "data");
     const char *store = (store_node && store_node->scalar) ? store_node->scalar : NULL;
     char *fallback_store = NULL;
-    if (!store && data_node && data_node->type == CONFIG_NODE_MAP) {
-        // If the document omits the explicit store name, try to infer it from the
-        // keys present under the data section to support unified UI config files.
-        for (size_t i = 0; i < schema->store_count; ++i) {
-            const char *candidate = schema->stores[i].name;
-            if (config_map_get(data_node, candidate)) {
-                store = candidate;
-                break;
-            }
-        }
-        if (!store) {
-            // Heuristics for common UI config layouts where the section name does
-            // not exactly match the schema store name.
-            if (config_map_get(data_node, "layout") || config_map_get(data_node, "widgets") ||
-                config_map_get(data_node, "floating")) {
-                store = "layout";
-            } else if (config_map_get(data_node, "styles")) {
-                store = "styles";
-            } else if (config_map_get(data_node, "model")) {
-                store = "model";
-            }
-        }
-    }
+    if (!store) fallback_store = derive_store_from_path(schema, path);
+    if (!store) store = fallback_store;
     if (!store && schema->store_count == 1) {
         fallback_store = dup_string(schema->stores[0].name);
         store = fallback_store;
@@ -233,7 +245,7 @@ static int load_single_config(StateManager *manager, const ModuleSchema *schema,
     return 1;
 }
 
-int module_load_configs(const ModuleSchema *schema, const char *config_dir, StateManager *manager)
+static int module_load_configs_recursive(const ModuleSchema *schema, const char *config_dir, StateManager *manager)
 {
     if (!schema || !config_dir || !manager) return 0;
 #ifdef _WIN32
@@ -253,8 +265,14 @@ int module_load_configs(const ModuleSchema *schema, const char *config_dir, Stat
     if (hFind == INVALID_HANDLE_VALUE) return 0;
 
     do {
-        if (ffd.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) continue;
         const char *name = ffd.cFileName;
+        if (strcmp(name, ".") == 0 || strcmp(name, "..") == 0) continue;
+        if (ffd.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) {
+            char *nested = join_path(config_dir, name);
+            module_load_configs_recursive(schema, nested, manager);
+            free(nested);
+            continue;
+        }
         size_t len = strlen(name);
         if (len < 6 || strcmp(name + len - 5, ".yaml") != 0) continue;
         char *path = join_path(config_dir, name);
@@ -267,15 +285,26 @@ int module_load_configs(const ModuleSchema *schema, const char *config_dir, Stat
     if (!dir) return 0;
     struct dirent *ent = NULL;
     while ((ent = readdir(dir)) != NULL) {
-        if (ent->d_type == DT_DIR) continue;
+        if (strcmp(ent->d_name, ".") == 0 || strcmp(ent->d_name, "..") == 0) continue;
+        char *path = join_path(config_dir, ent->d_name);
+        if (ent->d_type == DT_DIR) {
+            module_load_configs_recursive(schema, path, manager);
+            free(path);
+            continue;
+        }
         const char *name = ent->d_name;
         size_t len = strlen(name);
-        if (len < 6 || strcmp(name + len - 5, ".yaml") != 0) continue;
-        char *path = join_path(config_dir, name);
-        load_single_config(manager, schema, path);
+        if (len >= 6 && strcmp(name + len - 5, ".yaml") == 0) {
+            load_single_config(manager, schema, path);
+        }
         free(path);
     }
     closedir(dir);
 #endif
     return 1;
+}
+
+int module_load_configs(const ModuleSchema *schema, const char *config_dir, StateManager *manager)
+{
+    return module_load_configs_recursive(schema, config_dir, manager);
 }

@@ -37,7 +37,7 @@ static UiNode* make_label_row(const char* text, int depth, const char* style_use
     UiNode* row = create_node();
     if (!row) return NULL;
     row->type = strdup("row");
-    row->use = strdup("treeRow");
+    row->use = strdup("components/treeRow");
     row->layout = UI_LAYOUT_ROW;
     row->has_spacing = 1;
     row->spacing = 6.0f;
@@ -51,7 +51,7 @@ static UiNode* make_label_row(const char* text, int depth, const char* style_use
         return NULL;
     }
     spacer->type = strdup("spacer");
-    spacer->use = strdup("treeSpacer");
+    spacer->use = strdup("components/treeSpacer");
     spacer->widget_type = W_SPACER;
     spacer->has_w = 1;
     spacer->rect.w = (float)(depth * 16);
@@ -59,7 +59,7 @@ static UiNode* make_label_row(const char* text, int depth, const char* style_use
     spacer->rect.h = 18.0f;
 
     label->type = strdup("label");
-    label->use = style_use ? strdup(style_use) : strdup("treeLabel");
+    label->use = style_use ? strdup(style_use) : strdup("components/treeLabel");
     label->widget_type = W_LABEL;
     if (text) label->text = strdup(text);
 
@@ -73,7 +73,7 @@ static void append_materials(UiNode* container, const Scene* scene)
     if (!container || !scene) return;
     char header[128];
     snprintf(header, sizeof(header), "Материалы (%zu)", scene->material_count);
-    append_child(container, make_label_row(header, 1, "treeHeader"));
+    append_child(container, make_label_row(header, 1, "components/treeHeader"));
     for (size_t i = 0; i < scene->material_count; ++i) {
         const Material* m = &scene->materials[i];
         char line[256];
@@ -121,7 +121,7 @@ static void append_parts(UiNode* container, const Scene* scene)
     if (!container || !scene) return;
     char header[128];
     snprintf(header, sizeof(header), "Детали (%zu)", scene->part_count);
-    append_child(container, make_label_row(header, 1, "treeHeader"));
+    append_child(container, make_label_row(header, 1, "components/treeHeader"));
     for (size_t i = 0; i < scene->part_count; ++i) {
         const Part* p = &scene->parts[i];
         char geo[128];
@@ -138,7 +138,7 @@ static void append_joints(UiNode* container, const Scene* scene)
     if (!container || !scene) return;
     char header[128];
     snprintf(header, sizeof(header), "Соединения (%zu)", scene->joint_count);
-    append_child(container, make_label_row(header, 1, "treeHeader"));
+    append_child(container, make_label_row(header, 1, "components/treeHeader"));
     for (size_t i = 0; i < scene->joint_count; ++i) {
         const Joint* j = &scene->joints[i];
         const char* t = j->type == JOINT_PRISMATIC ? "Поступ." : (j->type == JOINT_FIXED ? "Фикс." : "Поворот");
@@ -155,7 +155,7 @@ static void append_assemblies(UiNode* container, const Scene* scene)
     if (!container || !scene) return;
     char header[128];
     snprintf(header, sizeof(header), "Сборки (%zu)", scene->assembly_count);
-    append_child(container, make_label_row(header, 1, "treeHeader"));
+    append_child(container, make_label_row(header, 1, "components/treeHeader"));
     for (size_t i = 0; i < scene->assembly_count; ++i) {
         const Assembly* a = &scene->assemblies[i];
         const char* root_part = a->root.part && a->root.part->id ? a->root.part->id : "<root>";
@@ -170,7 +170,7 @@ static void append_analysis(UiNode* container, const Scene* scene)
     if (!container || !scene) return;
     char header[128];
     snprintf(header, sizeof(header), "Нагрузки (%zu)", scene->analysis_count);
-    append_child(container, make_label_row(header, 1, "treeHeader"));
+    append_child(container, make_label_row(header, 1, "components/treeHeader"));
     for (size_t i = 0; i < scene->analysis_count; ++i) {
         const LoadCase* lc = &scene->analysis[i];
         char line[256];
@@ -184,7 +184,7 @@ static void append_motion(UiNode* container, const Scene* scene)
     if (!container || !scene) return;
     char header[128];
     snprintf(header, sizeof(header), "Движения (%zu)", scene->motion_count);
-    append_child(container, make_label_row(header, 1, "treeHeader"));
+    append_child(container, make_label_row(header, 1, "components/treeHeader"));
     for (size_t i = 0; i < scene->motion_count; ++i) {
         const MotionProfile* mp = &scene->motion_profiles[i];
         const char* joint_id = (mp->joint && mp->joint->id) ? mp->joint->id : "—";
@@ -200,7 +200,7 @@ static void append_header_info(UiNode* container, const Scene* scene)
     char title[160];
     const char* scene_name = scene->metadata.name ? scene->metadata.name : "Без названия";
     snprintf(title, sizeof(title), "Сцена: %s", scene_name);
-    append_child(container, make_label_row(title, 0, "treeHeader"));
+    append_child(container, make_label_row(title, 0, "components/treeHeader"));
     if (scene->metadata.author && *scene->metadata.author) {
         char author[160];
         snprintf(author, sizeof(author), "Автор: %s", scene->metadata.author);

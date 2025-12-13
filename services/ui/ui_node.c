@@ -1,10 +1,12 @@
 #include "ui/ui_node.h"
 
 #include <ctype.h>
+#include <dirent.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
+#include "config/config_io.h"
 #include "scene/cad_scene.h"
 
 static int ascii_strcasecmp(const char* a, const char* b) {
@@ -19,6 +21,48 @@ static int ascii_strcasecmp(const char* a, const char* b) {
         ++b;
     }
     return tolower((unsigned char)*a) - tolower((unsigned char)*b);
+}
+
+static char* basename_no_ext(const char* path) {
+    if (!path) return NULL;
+    const char* slash = strrchr(path, '/');
+    if (!slash) slash = strrchr(path, '\\');
+    const char* name = slash ? slash + 1 : path;
+    const char* dot = strrchr(name, '.');
+    size_t len = dot ? (size_t)(dot - name) : strlen(name);
+    char* out = (char*)malloc(len + 1);
+    if (!out) return NULL;
+    memcpy(out, name, len);
+    out[len] = 0;
+    return out;
+}
+
+static char* dirname_dup(const char* path) {
+    if (!path) return NULL;
+    const char* slash = strrchr(path, '/');
+    if (!slash) slash = strrchr(path, '\\');
+    if (!slash) return NULL;
+    size_t len = (size_t)(slash - path);
+    char* out = (char*)malloc(len + 1);
+    if (!out) return NULL;
+    memcpy(out, path, len);
+    out[len] = 0;
+    return out;
+}
+
+static char* join_path(const char* dir, const char* leaf) {
+    if (!dir || !leaf) return NULL;
+    size_t dir_len = strlen(dir);
+    while (dir_len > 0 && (dir[dir_len - 1] == '/' || dir[dir_len - 1] == '\\')) dir_len--;
+    size_t leaf_len = strlen(leaf);
+    size_t total = dir_len + 1 + leaf_len + 1;
+    char* out = (char*)malloc(total);
+    if (!out) return NULL;
+    memcpy(out, dir, dir_len);
+    out[dir_len] = '/';
+    memcpy(out + dir_len + 1, leaf, leaf_len);
+    out[total - 1] = 0;
+    return out;
 }
 
 static float parse_scalar_number(const ConfigNode* node, float fallback) {
@@ -47,6 +91,121 @@ typedef struct Prototype {
     UiNode* node;
     struct Prototype* next;
 } Prototype;
+
+static int ends_with_yaml(const char* name) {
+    if (!name) return 0;
+    size_t len = strlen(name);
+    return len >= 5 && strcmp(name + len - 5, ".yaml") == 0;
+}
+
+static char* relative_component_name(const char* path, const char* base_dir) {
+    if (!path) return NULL;
+    const char* rel = path;
+    if (base_dir) {
+        size_t base_len = strlen(base_dir);
+        if (strncmp(path, base_dir, base_len) == 0) {
+            rel = path + base_len;
+            if (*rel == '/' || *rel == '\\') rel++;
+        }
+    }
+    char* trimmed = strdup(rel);
+    if (!trimmed) return NULL;
+    for (char* p = trimmed; *p; ++p) {
+        if (*p == '\\') *p = '/';
+    }
+    char* dot = strrchr(trimmed, '.');
+    if (dot) *dot = 0;
+    return trimmed;
+}
+
+static void append_prototype(Prototype** list, const char* name, UiNode* node) {
+    if (!list || !name || !node) return;
+    Prototype* pnode = (Prototype*)calloc(1, sizeof(Prototype));
+    if (!pnode) {
+        free_ui_tree(node);
+        return;
+    }
+    pnode->name = strdup(name);
+    pnode->node = node;
+    pnode->next = *list;
+    *list = pnode;
+}
+
+static void load_component_file(const char* path, const char* base_dir, Prototype** prototypes) {
+    if (!path || !prototypes) return;
+    ConfigError err = {0};
+    ConfigDocument doc = {0};
+    if (!load_config_document(path, CONFIG_FORMAT_YAML, &doc, &err)) {
+        fprintf(stderr, "Warning: failed to read component %s: %s\n", path, err.message);
+        return;
+    }
+
+    const ConfigNode* type_node = config_node_get_scalar(doc.root, "type");
+    int is_component = type_node && type_node->scalar && strcmp(type_node->scalar, "component") == 0;
+    int hinted_by_path = strstr(path, "components/") != NULL || strstr(path, "components\\") != NULL;
+    if (!is_component && !hinted_by_path) {
+        config_document_free(&doc);
+        return;
+    }
+
+    const ConfigNode* key_node = config_node_get_scalar(doc.root, "key");
+    char* derived = relative_component_name(path, base_dir);
+    const char* key = key_node && key_node->scalar ? key_node->scalar : (derived ? derived : NULL);
+    const ConfigNode* comp_node = config_node_get_map(doc.root, "component");
+    if (!comp_node) comp_node = config_node_get_map(doc.root, "layout");
+    if (!comp_node) comp_node = doc.root;
+
+    UiNode* def = parse_ui_node_config(comp_node);
+    if (def && key) {
+        append_prototype(prototypes, key, def);
+    } else {
+        free_ui_tree(def);
+    }
+
+    free(derived);
+    config_document_free(&doc);
+}
+
+static void gather_component_tree(const char* dir, const char* base_dir, const char* skip, Prototype** prototypes) {
+    if (!dir || !prototypes) return;
+    DIR* d = opendir(dir);
+    if (!d) return;
+    struct dirent* ent = NULL;
+    while ((ent = readdir(d)) != NULL) {
+        if (strcmp(ent->d_name, ".") == 0 || strcmp(ent->d_name, "..") == 0) continue;
+        char* path = join_path(dir, ent->d_name);
+        if (!path) continue;
+        if (ent->d_type == DT_DIR) {
+            gather_component_tree(path, base_dir, skip, prototypes);
+            free(path);
+            continue;
+        }
+        if (!ends_with_yaml(ent->d_name)) {
+            free(path);
+            continue;
+        }
+        if (skip && strcmp(skip, path) == 0) {
+            free(path);
+            continue;
+        }
+        load_component_file(path, base_dir, prototypes);
+        free(path);
+    }
+    closedir(d);
+}
+
+static void gather_component_prototypes(const ConfigDocument* layout_doc, Prototype** prototypes) {
+    if (!layout_doc || !layout_doc->source_path || !prototypes) return;
+    char* base_dir = dirname_dup(layout_doc->source_path);
+    if (!base_dir) return;
+    gather_component_tree(base_dir, base_dir, layout_doc->source_path, prototypes);
+    char* components_dir = join_path(base_dir, "components");
+    if (components_dir) {
+        gather_component_tree(components_dir, base_dir, layout_doc->source_path, prototypes);
+    }
+    free(components_dir);
+    free(base_dir);
+}
 
 static ConfigNode* config_node_new_map(void) {
     ConfigNode* n = (ConfigNode*)calloc(1, sizeof(ConfigNode));
@@ -638,8 +797,7 @@ Model* ui_config_load_model(const ConfigDocument* doc) {
 
     const ConfigNode* store_node = config_node_get_scalar(doc->root, "store");
     const ConfigNode* key_node = config_node_get_scalar(doc->root, "key");
-    const ConfigNode* data_node = config_node_get_map(doc->root, "data");
-    const ConfigNode* model_node = data_node ? config_node_get_map(data_node, "model") : config_node_get_map(doc->root, "model");
+    const ConfigNode* model_node = config_node_get_map(doc->root, "model");
 
     if (!model_node) {
         fprintf(stderr, "Error: model section missing in UI config %s\n", doc->source_path ? doc->source_path : "(unknown)");
@@ -649,8 +807,9 @@ Model* ui_config_load_model(const ConfigDocument* doc) {
     Model* model = (Model*)calloc(1, sizeof(Model));
     if (!model) return NULL;
 
-    model->store = strdup(store_node && store_node->scalar ? store_node->scalar : "model");
-    model->key = strdup(key_node && key_node->scalar ? key_node->scalar : "default");
+    char* derived_key = key_node && key_node->scalar ? NULL : basename_no_ext(doc->source_path);
+    model->store = strdup(store_node && store_node->scalar ? store_node->scalar : "layout");
+    model->key = strdup(key_node && key_node->scalar ? key_node->scalar : (derived_key ? derived_key : "default"));
     model->source_path = strdup(doc->source_path ? doc->source_path : "model.yaml");
 
     if (!model->store || !model->key || !model->source_path) { free_model(model); return NULL; }
@@ -668,12 +827,12 @@ Model* ui_config_load_model(const ConfigDocument* doc) {
     }
 
     model->source_doc = doc;
+    free(derived_key);
     return model;
 }
 
 Style* ui_config_load_styles(const ConfigNode* root) {
-    const ConfigNode* data_node = config_node_get_map(root, "data");
-    const ConfigNode* styles_node = data_node ? config_node_get_map(data_node, "styles") : config_node_get_map(root, "styles");
+    const ConfigNode* styles_node = config_node_get_map(root, "styles");
     if (!styles_node || styles_node->type != CONFIG_NODE_MAP) {
         fprintf(stderr, "Error: styles section missing in UI config\n");
         return NULL;
@@ -720,36 +879,20 @@ Style* ui_config_load_styles(const ConfigNode* root) {
     return styles;
 }
 
-UiNode* ui_config_load_layout(const ConfigNode* root, const Model* model, const Style* styles, const char* font_path, const Scene* scene) {
-    if (!root) return NULL;
+UiNode* ui_config_load_layout(const ConfigDocument* doc, const Model* model, const Style* styles, const char* font_path, const Scene* scene) {
+    if (!doc || !doc->root) return NULL;
 
-    const ConfigNode* data_node = config_node_get_map(root, "data");
-    const ConfigNode* layout_node = data_node ? config_node_get_map(data_node, "layout") : config_node_get_map(root, "layout");
-    const ConfigNode* widgets_node = data_node ? config_node_get_map(data_node, "widgets") : config_node_get_map(root, "widgets");
-    const ConfigNode* floating_node = data_node ? config_node_get_sequence(data_node, "floating") : config_node_get_sequence(root, "floating");
+    const ConfigNode* root = doc->root;
+    const ConfigNode* layout_node = config_node_get_map(root, "layout");
+    const ConfigNode* floating_node = config_node_get_sequence(root, "floating");
 
-    if (!layout_node && !widgets_node) {
-        fprintf(stderr, "Error: layout or widgets section missing in UI config\n");
+    if (!layout_node && !floating_node) {
+        fprintf(stderr, "Error: layout or floating section missing in UI config\n");
         return NULL;
     }
 
     Prototype* prototypes = NULL;
-    if (widgets_node) {
-        for (size_t i = 0; i < widgets_node->pair_count; ++i) {
-            const ConfigPair* pair = &widgets_node->pairs[i];
-            if (!pair->key || !pair->value) continue;
-            UiNode* def = parse_ui_node_config(pair->value);
-            Prototype* pnode = (Prototype*)calloc(1, sizeof(Prototype));
-            if (pnode) {
-                pnode->name = strdup(pair->key);
-                pnode->node = def;
-                pnode->next = prototypes;
-                prototypes = pnode;
-            } else {
-                free_ui_tree(def);
-            }
-        }
-    }
+    gather_component_prototypes(doc, &prototypes);
 
     UiNode* root_node = create_node();
     if (!root_node) { free_prototypes(prototypes); return NULL; }
