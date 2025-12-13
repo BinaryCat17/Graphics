@@ -1,0 +1,22 @@
+type: component
+key: components/examples/floatingPanel
+component:
+  type: column
+  style: panelPrimary
+  floating:
+    x: 620
+    y: 80
+    w: 320
+    h: 260
+    minWidth: 240
+    minHeight: 160
+    maxWidth: 480
+    maxHeight: 360
+  draggable: true
+  resizable: true
+  z_group: 1
+  children:
+    - type: label
+      text: "Плавающее окно"
+    - type: label
+      text: "Здесь можно размещать настройки"

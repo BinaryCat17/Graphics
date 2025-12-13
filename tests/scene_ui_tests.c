@@ -63,9 +63,7 @@ static void test_tree_population(void)
 {
     const char* styles = "{\"styles\":{\"panelPrimary\":{\"padding\":4},\"panelSecondary\":{\"padding\":4},"
                           "\"divider\":{\"padding\":1},\"treeItem\":{\"padding\":4},\"treeHeader\":{\"padding\":4}}}";
-    const char* layout = "{\"widgets\":{\"treeRow\":{\"type\":\"row\"},\"treeLabel\":{\"type\":\"label\",\"style\":\"treeItem\"},"
-                         "\"treeHeader\":{\"type\":\"label\",\"style\":\"treeHeader\"},\"treeSpacer\":{\"type\":\"spacer\"}},"
-                         "\"layout\":{\"type\":\"column\",\"children\":[{\"type\":\"column\",\"id\":\"sceneHierarchy\"}]}}";
+    const char* layout = "{\"layout\":{\"type\":\"column\",\"children\":[{\"type\":\"column\",\"id\":\"sceneHierarchy\"}]}}";
 
     Scene scene = make_sample_scene();
     ConfigNode* styles_root = NULL;
@@ -75,7 +73,9 @@ static void test_tree_population(void)
     err = (ConfigError){0};
     assert(parse_config_text(layout, CONFIG_FORMAT_JSON, &config_layout_root, &err));
     Style* parsed_styles = ui_config_load_styles(styles_root);
-    UiNode* root = ui_config_load_layout(config_layout_root, NULL, parsed_styles, NULL, &scene);
+    ConfigDocument layout_doc = {.format = CONFIG_FORMAT_JSON, .root = config_layout_root,
+                                 .source_path = "assets/ui/config/layout/ui.yaml"};
+    UiNode* root = ui_config_load_layout(&layout_doc, NULL, parsed_styles, NULL, &scene);
     config_node_free(styles_root);
     config_node_free(config_layout_root);
     assert(root);
@@ -127,7 +127,9 @@ static void test_yaml_layout_parsing(void)
 
     Style* parsed_styles = ui_config_load_styles(styles_root);
     assert(parsed_styles);
-    UiNode* root = ui_config_load_layout(layout_root, NULL, parsed_styles, NULL, NULL);
+    ConfigDocument layout_doc = {.format = CONFIG_FORMAT_YAML, .root = layout_root,
+                                 .source_path = "assets/ui/config/layout/ui.yaml"};
+    UiNode* root = ui_config_load_layout(&layout_doc, NULL, parsed_styles, NULL, NULL);
     assert(root);
     assert(root->child_count == 1);
     UiNode* child = &root->children[0];

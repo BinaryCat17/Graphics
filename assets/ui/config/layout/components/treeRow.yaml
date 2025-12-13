@@ -1,0 +1,5 @@
+type: component
+key: components/treeRow
+component:
+  type: row
+  spacing: 6

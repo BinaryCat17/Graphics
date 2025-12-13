@@ -55,7 +55,7 @@ bool scene_service_load(AppServices* services, const ServiceConfig* config) {
 
     if (ui_schema_path && module_schema_load(ui_schema_path, &core->ui_schema, &schema_err)) {
         module_schema_register(&services->state_manager, &core->ui_schema, NULL);
-        char* ui_config = join_path(ui_dir, "config");
+        char* ui_config = join_path(ui_dir, "config/layout");
         module_load_configs(&core->ui_schema, ui_config, &services->state_manager);
         free(ui_config);
     } else {

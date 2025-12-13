@@ -28,7 +28,8 @@ static LayoutFixture build_widgets(const char* styles_json, const char* layout_j
     err = (ConfigError){0};
     assert(parse_config_text(layout_json, CONFIG_FORMAT_JSON, &layout_root, &err));
     fx.styles = styles_root ? ui_config_load_styles(styles_root) : NULL;
-    fx.root = ui_config_load_layout(layout_root, NULL, fx.styles, NULL, NULL);
+    ConfigDocument layout_doc = {.format = CONFIG_FORMAT_JSON, .root = layout_root, .source_path = NULL};
+    fx.root = ui_config_load_layout(&layout_doc, NULL, fx.styles, NULL, NULL);
     config_node_free(styles_root);
     config_node_free(layout_root);
     assert(fx.root);

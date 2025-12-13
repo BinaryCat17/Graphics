@@ -114,8 +114,8 @@ bool ui_build(UiContext* ui, const CoreContext* core) {
         return false;
     }
 
-    ui->ui_root = ui_config_load_layout(core->assets.ui_doc.root, core->model, ui->styles, core->assets.font_path,
-                                      &core->scene);
+    ui->ui_root = ui_config_load_layout(&core->assets.ui_doc, core->model, ui->styles, core->assets.font_path,
+                                        &core->scene);
     if (!ui->ui_root) {
         fprintf(stderr, "Failed to parse UI layout configuration.\n");
         return false;

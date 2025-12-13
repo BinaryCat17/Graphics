@@ -1,0 +1,8 @@
+type: component
+key: components/divider
+component:
+  type: rect
+  h: 2
+  style: divider
+  padding: 1.5
+  w: 400
