@@ -116,6 +116,8 @@ static const char* scalar_text(const ConfigNode* node) {
     return node->scalar;
 }
 
+static UiNode* parse_ui_node_config(const ConfigNode* obj);
+
 static int ensure_font_metrics(const char* font_path) {
     if (g_font_ready) return 1;
     if (!font_path) return 0;

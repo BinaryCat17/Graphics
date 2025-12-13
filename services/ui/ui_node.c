@@ -86,6 +86,8 @@ static const char* scalar_text(const ConfigNode* node) {
     return node->scalar;
 }
 
+static UiNode* parse_ui_node_config(const ConfigNode* obj);
+
 typedef struct Prototype {
     char* name;
     UiNode* node;
