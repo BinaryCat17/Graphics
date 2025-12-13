@@ -24,6 +24,10 @@ static void free_paths(Assets* assets) {
     free(assets->vert_spv_path);
     free(assets->frag_spv_path);
     free(assets->font_path);
+    assets->ui_path = NULL;
+    assets->vert_spv_path = NULL;
+    assets->frag_spv_path = NULL;
+    assets->font_path = NULL;
 }
 
 int load_assets(const char* assets_dir, const char* ui_config_path, Assets* out_assets) {
@@ -59,4 +63,5 @@ void free_assets(Assets* assets) {
     if (!assets) return;
     free_paths(assets);
     config_document_free(&assets->ui_doc);
+    memset(assets, 0, sizeof(*assets));
 }
