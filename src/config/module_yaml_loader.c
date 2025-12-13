@@ -42,6 +42,83 @@ static char *join_path(const char *dir, const char *leaf)
     return out;
 }
 
+static ConfigNode *config_node_clone(const ConfigNode *node)
+{
+    if (!node) return NULL;
+
+    ConfigNode *copy = (ConfigNode *)calloc(1, sizeof(ConfigNode));
+    if (!copy) return NULL;
+
+    copy->type = node->type;
+    copy->line = node->line;
+    copy->scalar_type = node->scalar_type;
+    if (node->scalar) {
+        copy->scalar = dup_string(node->scalar);
+        if (node->scalar && !copy->scalar) {
+            config_node_free(copy);
+            return NULL;
+        }
+    }
+
+    copy->pair_count = node->pair_count;
+    copy->pair_capacity = node->pair_count;
+    if (node->pair_count > 0) {
+        copy->pairs = (ConfigPair *)calloc(node->pair_count, sizeof(ConfigPair));
+        if (!copy->pairs) {
+            config_node_free(copy);
+            return NULL;
+        }
+        for (size_t i = 0; i < node->pair_count; ++i) {
+            copy->pairs[i].key = dup_string(node->pairs[i].key);
+            copy->pairs[i].value = config_node_clone(node->pairs[i].value);
+            if ((node->pairs[i].key && !copy->pairs[i].key) || (node->pairs[i].value && !copy->pairs[i].value)) {
+                config_node_free(copy);
+                return NULL;
+            }
+        }
+    }
+
+    copy->item_count = node->item_count;
+    copy->item_capacity = node->item_count;
+    if (node->item_count > 0) {
+        copy->items = (ConfigNode **)calloc(node->item_count, sizeof(ConfigNode *));
+        if (!copy->items) {
+            config_node_free(copy);
+            return NULL;
+        }
+        for (size_t i = 0; i < node->item_count; ++i) {
+            copy->items[i] = config_node_clone(node->items[i]);
+            if (node->items[i] && !copy->items[i]) {
+                config_node_free(copy);
+                return NULL;
+            }
+        }
+    }
+
+    return copy;
+}
+
+static int config_document_from_node(const ConfigNode *node, const char *source_path, ConfigDocument *out_doc)
+{
+    if (!node || !out_doc) return 0;
+
+    ConfigNode *root_copy = config_node_clone(node);
+    if (!root_copy) return 0;
+
+    char *path_copy = source_path ? dup_string(source_path) : NULL;
+    if (source_path && !path_copy) {
+        config_node_free(root_copy);
+        return 0;
+    }
+
+    *out_doc = (ConfigDocument){
+        .format = CONFIG_FORMAT_YAML,
+        .source_path = path_copy,
+        .root = root_copy,
+    };
+    return 1;
+}
+
 static size_t detect_default_chunk_capacity(const ConfigNode *node)
 {
     const ConfigNode *cap = config_map_get(node, "chunk_capacity");
@@ -182,6 +259,43 @@ static char *basename_no_ext(const char *path)
     return out;
 }
 
+static int store_entry(StateManager *manager, int type_id, const ModuleSchema *schema, const char *store, const char *key, const char *path, ConfigDocument *doc);
+
+static int load_document_entry(StateManager *manager, const ModuleSchema *schema, const char *path, ConfigDocument *doc)
+{
+    const ConfigNode *store_node = config_map_get(doc->root, "store");
+    const ConfigNode *key_node = config_map_get(doc->root, "key");
+    const char *store = (store_node && store_node->scalar) ? store_node->scalar : NULL;
+    char *fallback_store = NULL;
+    if (!store) fallback_store = derive_store_from_path(schema, path);
+    if (!store) store = fallback_store;
+    if (!store && schema->store_count == 1) {
+        fallback_store = dup_string(schema->stores[0].name);
+        store = fallback_store;
+    }
+    if (!store && schema->store_count > 0) {
+        fallback_store = dup_string(schema->stores[0].name);
+        store = fallback_store;
+    }
+    if (!store) {
+        fprintf(stderr, "Config %s missing store name\n", path);
+        free(fallback_store);
+        return 0;
+    }
+    int store_idx = detect_store_type(schema, store);
+    if (store_idx < 0) {
+        fprintf(stderr, "Unknown store '%s' in %s\n", store, path);
+        free(fallback_store);
+        return 0;
+    }
+    char *key = key_node && key_node->scalar ? dup_string(key_node->scalar) : basename_no_ext(path);
+    int type_id = schema->type_ids ? schema->type_ids[store_idx] : store_idx;
+    store_entry(manager, type_id, schema, store, key, path, doc);
+    free(key);
+    free(fallback_store);
+    return 1;
+}
+
 static int store_entry(StateManager *manager, int type_id, const ModuleSchema *schema, const char *store, const char *key, const char *path, ConfigDocument *doc)
 {
     YamlConfigEntry entry = {0};
@@ -203,41 +317,11 @@ static int load_single_config(StateManager *manager, const ModuleSchema *schema,
         return 0;
     }
 
-    const ConfigNode *store_node = config_map_get(doc.root, "store");
-    const ConfigNode *key_node = config_map_get(doc.root, "key");
-    const char *store = (store_node && store_node->scalar) ? store_node->scalar : NULL;
-    char *fallback_store = NULL;
-    if (!store) fallback_store = derive_store_from_path(schema, path);
-    if (!store) store = fallback_store;
-    if (!store && schema->store_count == 1) {
-        fallback_store = dup_string(schema->stores[0].name);
-        store = fallback_store;
-    }
-    if (!store && schema->store_count > 0) {
-        // As a last resort, pick the first store from the schema to keep the
-        // configuration usable instead of hard failing.
-        fallback_store = dup_string(schema->stores[0].name);
-        store = fallback_store;
-    }
-    if (!store) {
-        fprintf(stderr, "Config %s missing store name\n", path);
+    int result = load_document_entry(manager, schema, path, &doc);
+    if (!result) {
         config_document_free(&doc);
-        free(fallback_store);
-        return 0;
     }
-    int store_idx = detect_store_type(schema, store);
-    if (store_idx < 0) {
-        fprintf(stderr, "Unknown store '%s' in %s\n", store, path);
-        config_document_free(&doc);
-        free(fallback_store);
-        return 0;
-    }
-    char *key = key_node && key_node->scalar ? dup_string(key_node->scalar) : basename_no_ext(path);
-    int type_id = schema->type_ids ? schema->type_ids[store_idx] : store_idx;
-    store_entry(manager, type_id, schema, store, key, path, &doc);
-    free(key);
-    free(fallback_store);
-    return 1;
+    return result;
 }
 
 static int module_load_configs_recursive(const ModuleSchema *schema, const char *config_dir, StateManager *manager)
@@ -270,7 +354,49 @@ static int module_load_configs_recursive(const ModuleSchema *schema, const char 
     return 1;
 }
 
+static int module_load_config_bundle(const ModuleSchema *schema, const char *config_file, StateManager *manager)
+{
+    ConfigError err = {0};
+    ConfigNode *root = NULL;
+    if (!parse_config(config_file, CONFIG_FORMAT_YAML, &root, &err)) {
+        fprintf(stderr, "Config error %s:%d:%d %s\n", config_file, err.line, err.column, err.message);
+        return 0;
+    }
+
+    const ConfigNode *configs = config_map_get(root, "configs");
+    int loaded = 1;
+    if (configs && configs->type == CONFIG_NODE_SEQUENCE) {
+        for (size_t i = 0; i < configs->item_count; ++i) {
+            ConfigDocument doc = {0};
+            if (!config_document_from_node(configs->items[i], config_file, &doc) ||
+                !load_document_entry(manager, schema, config_file, &doc)) {
+                config_document_free(&doc);
+                loaded = 0;
+                break;
+            }
+        }
+    } else {
+        ConfigDocument doc = {0};
+        if (!config_document_from_node(root, config_file, &doc) ||
+            !load_document_entry(manager, schema, config_file, &doc)) {
+            config_document_free(&doc);
+            loaded = 0;
+        }
+    }
+
+    config_node_free(root);
+    return loaded;
+}
+
 int module_load_configs(const ModuleSchema *schema, const char *config_dir, StateManager *manager)
 {
-    return module_load_configs_recursive(schema, config_dir, manager);
+    if (!schema || !config_dir || !manager) return 0;
+
+    PlatformDir *dir = platform_dir_open(config_dir);
+    if (dir) {
+        platform_dir_close(dir);
+        return module_load_configs_recursive(schema, config_dir, manager);
+    }
+
+    return module_load_config_bundle(schema, config_dir, manager);
 }

@@ -1,6 +1,0 @@
-namespace: global
-stores:
-  - name: environment
-    chunk_capacity: 2
-  - name: defaults
-    chunk_capacity: 2

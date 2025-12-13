@@ -40,16 +40,14 @@ bool scene_service_load(AppServices* services, const ServiceConfig* config) {
     ConfigError schema_err = {0};
 
     char* ui_dir = join_path(assets_dir, "ui");
-    char* global_dir = join_path(assets_dir, "global_state");
+    char* global_config_path = join_path(assets_dir, "config/global.yaml");
     char* ui_schema_path = join_path(ui_dir, "schema.yaml");
-    char* global_schema_path = join_path(global_dir, "schema.yaml");
 
-    if (!ui_dir || !global_dir || !ui_schema_path || !global_schema_path) {
+    if (!ui_dir || !global_config_path || !ui_schema_path) {
         fprintf(stderr, "Failed to allocate memory for schema paths.\n");
         free(ui_dir);
-        free(global_dir);
         free(ui_schema_path);
-        free(global_schema_path);
+        free(global_config_path);
         return false;
     }
 
@@ -64,20 +62,17 @@ bool scene_service_load(AppServices* services, const ServiceConfig* config) {
     }
 
     schema_err = (ConfigError){0};
-    if (global_schema_path && module_schema_load(global_schema_path, &core->global_schema, &schema_err)) {
+    if (global_config_path && module_schema_load(global_config_path, &core->global_schema, &schema_err)) {
         module_schema_register(&services->state_manager, &core->global_schema, NULL);
-        char* global_config = join_path(global_dir, "config");
-        module_load_configs(&core->global_schema, global_config, &services->state_manager);
-        free(global_config);
+        module_load_configs(&core->global_schema, global_config_path, &services->state_manager);
     } else {
-        fprintf(stderr, "Global schema error %s:%d:%d %s\n", global_schema_path ? global_schema_path : "(null)",
+        fprintf(stderr, "Global schema error %s:%d:%d %s\n", global_config_path ? global_config_path : "(null)",
                 schema_err.line, schema_err.column, schema_err.message);
     }
 
     free(ui_dir);
-    free(global_dir);
     free(ui_schema_path);
-    free(global_schema_path);
+    free(global_config_path);
 
     SceneError scene_err = {0};
     if (!parse_scene_yaml(scene_path, &core->scene, &scene_err)) {
