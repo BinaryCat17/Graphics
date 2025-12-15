@@ -163,8 +163,13 @@ void render_runtime_service_update_transformer(RenderRuntimeServiceContext* cont
 bool render_runtime_service_prepare(RenderRuntimeServiceContext* context, AppServices* services) {
     if (!context || !services) return false;
 
-    if (!runtime_init(services)) {
-        fprintf(stderr, "Render runtime initialization failed.\\n");
+    // Inject dependencies required for initialization
+    context->ui = &services->ui;
+    context->assets = &services->core.assets;
+    context->model = services->core.model;
+
+    if (!runtime_init(context)) {
+        fprintf(stderr, "Render runtime initialization failed.\n");
         return false;
     }
 
@@ -231,7 +236,7 @@ static void render_runtime_service_stop(void* ptr) {
     if (context->backend && context->backend->cleanup) {
         context->backend->cleanup(context->backend);
     }
-    runtime_shutdown(services);
+    runtime_shutdown(context);
     render_runtime_service_reset(services->render_runtime_context, services);
 }
 

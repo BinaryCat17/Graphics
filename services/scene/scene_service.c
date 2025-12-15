@@ -4,6 +4,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "app/app_services.h"
 #include "scene/cad_scene_yaml.h"
 #include "config/module_yaml_loader.h"
 #include "services/service_events.h"
@@ -27,15 +28,15 @@ static void free_schemas(CoreContext* core) {
     module_schema_free(&core->global_schema);
 }
 
-bool scene_service_load(AppServices* services, const ServiceConfig* config) {
-    if (!services || !config || !config->assets_dir || !config->scene_path) {
+bool scene_service_load(CoreContext* core, StateManager* state_manager, int scene_type_id, int assets_type_id,
+                        int model_type_id, const ServiceConfig* config) {
+    if (!core || !state_manager || !config || !config->assets_dir || !config->scene_path) {
         fprintf(stderr, "Scene service load called with invalid arguments.\n");
         return false;
     }
 
     const char* assets_dir = config->assets_dir;
     const char* scene_path = config->scene_path;
-    CoreContext* core = &services->core;
 
     ConfigError schema_err = {0};
 
@@ -52,9 +53,9 @@ bool scene_service_load(AppServices* services, const ServiceConfig* config) {
     }
 
     if (ui_schema_path && module_schema_load(ui_schema_path, &core->ui_schema, &schema_err)) {
-        module_schema_register(&services->state_manager, &core->ui_schema, NULL);
+        module_schema_register(state_manager, &core->ui_schema, NULL);
         char* ui_config = join_path(ui_dir, "config/layout");
-        module_load_configs(&core->ui_schema, ui_config, &services->state_manager);
+        module_load_configs(&core->ui_schema, ui_config, state_manager);
         free(ui_config);
     } else {
         fprintf(stderr, "UI schema error %s:%d:%d %s\n", ui_schema_path ? ui_schema_path : "(null)", schema_err.line,
@@ -63,8 +64,8 @@ bool scene_service_load(AppServices* services, const ServiceConfig* config) {
 
     schema_err = (ConfigError){0};
     if (global_config_path && module_schema_load(global_config_path, &core->global_schema, &schema_err)) {
-        module_schema_register(&services->state_manager, &core->global_schema, NULL);
-        module_load_configs(&core->global_schema, global_config_path, &services->state_manager);
+        module_schema_register(state_manager, &core->global_schema, NULL);
+        module_load_configs(&core->global_schema, global_config_path, state_manager);
     } else {
         fprintf(stderr, "Global schema error %s:%d:%d %s\n", global_config_path ? global_config_path : "(null)",
                 schema_err.line, schema_err.column, schema_err.message);
@@ -78,13 +79,13 @@ bool scene_service_load(AppServices* services, const ServiceConfig* config) {
     if (!parse_scene_yaml(scene_path, &core->scene, &scene_err)) {
         fprintf(stderr, "Failed to load scene %s:%d:%d %s\n", scene_path, scene_err.line, scene_err.column,
                 scene_err.message);
-        scene_service_unload(services);
+        scene_service_unload(core);
         return false;
     }
 
     if (!load_assets(assets_dir, config->ui_config_path, &core->assets)) {
         fprintf(stderr, "Failed to load assets from '%s'.\n", assets_dir);
-        scene_service_unload(services);
+        scene_service_unload(core);
         return false;
     }
 
@@ -94,24 +95,22 @@ bool scene_service_load(AppServices* services, const ServiceConfig* config) {
     }
 
     SceneComponent scene_component = {.scene = &core->scene, .path = scene_path};
-    state_manager_publish(&services->state_manager, STATE_EVENT_COMPONENT_ADDED, services->scene_type_id, "active",
+    state_manager_publish(state_manager, STATE_EVENT_COMPONENT_ADDED, scene_type_id, "active",
                           &scene_component, sizeof(scene_component));
 
     AssetsComponent assets_component = {.assets = &core->assets};
-    state_manager_publish(&services->state_manager, STATE_EVENT_COMPONENT_ADDED, services->assets_type_id, "active",
+    state_manager_publish(state_manager, STATE_EVENT_COMPONENT_ADDED, assets_type_id, "active",
                           &assets_component, sizeof(assets_component));
 
     ModelComponent model_component = {.model = core->model};
-    state_manager_publish(&services->state_manager, STATE_EVENT_COMPONENT_ADDED, services->model_type_id, "active",
+    state_manager_publish(state_manager, STATE_EVENT_COMPONENT_ADDED, model_type_id, "active",
                           &model_component, sizeof(model_component));
 
     return true;
 }
 
-void scene_service_unload(AppServices* services) {
-    if (!services) return;
-
-    CoreContext* core = &services->core;
+void scene_service_unload(CoreContext* core) {
+    if (!core) return;
 
     if (core->model) {
         free_model(core->model);
@@ -132,12 +131,13 @@ static bool scene_service_init(void* ptr, const ServiceConfig* config) {
 
 static bool scene_service_start(void* ptr, const ServiceConfig* config) {
     AppServices* services = (AppServices*)ptr;
-    return scene_service_load(services, config);
+    return scene_service_load(&services->core, &services->state_manager, services->scene_type_id,
+                              services->assets_type_id, services->model_type_id, config);
 }
 
 static void scene_service_stop(void* ptr) {
     AppServices* services = (AppServices*)ptr;
-    scene_service_unload(services);
+    scene_service_unload(&services->core);
 }
 
 static const ServiceDescriptor g_scene_service_descriptor = {

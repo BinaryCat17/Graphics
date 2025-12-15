@@ -8,7 +8,7 @@
 #include "ui/ui_context.h"
 #include "services/service.h"
 
-bool ui_build(UiContext* ui, const CoreContext* core);
+bool ui_build(UiContext* ui, const Assets* assets, const Scene* scene, Model* model);
 bool ui_prepare_runtime(UiContext* ui, float ui_scale, StateManager* state_manager,
                        int ui_type_id);
 bool ui_service_subscribe(UiContext* ui, StateManager* state_manager, int model_type_id);

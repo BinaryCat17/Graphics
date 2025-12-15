@@ -102,20 +102,20 @@ static void apply_click_action(Widget* w, Model* model) {
     }
 }
 
-bool ui_build(UiContext* ui, const CoreContext* core) {
-    if (!ui || !core || !core->model) {
+bool ui_build(UiContext* ui, const Assets* assets, const Scene* scene, Model* model) {
+    if (!ui || !assets || !model) {
         fprintf(stderr, "UI build received invalid context or missing model.\n");
         return false;
     }
 
-    ui->styles = ui_config_load_styles(core->assets.ui_doc.root);
+    ui->styles = ui_config_load_styles(assets->ui_doc.root);
     if (!ui->styles) {
         fprintf(stderr, "Failed to parse UI styles from %s.\n",
-                core->assets.ui_doc.source_path ? core->assets.ui_doc.source_path : "(unknown)");
+                assets->ui_doc.source_path ? assets->ui_doc.source_path : "(unknown)");
         return false;
     }
 
-    ui->ui_root = ui_config_load_layout(&core->assets.ui_doc, core->model, ui->styles, &core->scene);
+    ui->ui_root = ui_config_load_layout(&assets->ui_doc, model, ui->styles, scene);
     if (!ui->ui_root) {
         fprintf(stderr, "Failed to parse UI layout configuration.\n");
         return false;
@@ -127,9 +127,9 @@ bool ui_build(UiContext* ui, const CoreContext* core) {
         return false;
     }
 
-    ui->model = core->model;
+    ui->model = model;
 
-    measure_layout(ui->layout_root, core->assets.font_path);
+    measure_layout(ui->layout_root, assets->font_path);
     assign_layout(ui->layout_root, 0.0f, 0.0f);
     capture_layout_base(ui->layout_root);
     ui->base_w = ui->layout_root->base_rect.w > 1.0f ? ui->layout_root->base_rect.w : 1024.0f;
@@ -266,7 +266,7 @@ static bool ui_service_start(void* ptr, const ServiceConfig* config) {
         fprintf(stderr, "UI service start received null services context.\n");
         return false;
     }
-    if (!ui_build(&services->ui, &services->core)) {
+    if (!ui_build(&services->ui, &services->core.assets, &services->core.scene, services->core.model)) {
         fprintf(stderr, "UI service failed to build UI.\n");
         return false;
     }
