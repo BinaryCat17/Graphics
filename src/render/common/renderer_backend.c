@@ -32,7 +32,7 @@ bool render_logger_init(RenderLogger* logger, const RenderLoggerConfig* config, 
     if (!enabled) return true;
 
     if (sink == RENDER_LOG_SINK_FILE && target) {
-        logger->file = fopen(target, "w");
+        logger->file = platform_fopen(target, "w");
         if (!logger->file) {
             fprintf(stderr, "Failed to open render log file '%s'. Defaulting to stdout.\n", target);
             logger->sink_type = RENDER_LOG_SINK_STDOUT;

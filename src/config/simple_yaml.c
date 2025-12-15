@@ -1,4 +1,5 @@
 #include "simple_yaml.h"
+#include "platform/platform.h"
 
 #include <ctype.h>
 #include <stdio.h>
@@ -15,7 +16,7 @@ static void set_error(SimpleYamlError *err, int line, int column, const char *ms
     if (!err) return;
     err->line = line;
     err->column = column;
-    strncpy(err->message, msg, sizeof(err->message) - 1);
+    platform_strncpy(err->message, msg, sizeof(err->message) - 1);
     err->message[sizeof(err->message) - 1] = 0;
 }
 
@@ -47,7 +48,7 @@ static int yaml_pair_append(SimpleYamlNode *map, const char *key, SimpleYamlNode
         map->pairs = expanded;
         map->pair_capacity = new_cap;
     }
-    map->pairs[map->pair_count].key = strdup(key);
+    map->pairs[map->pair_count].key = platform_strdup(key);
     map->pairs[map->pair_count].value = value;
     map->pair_count++;
     return 1;

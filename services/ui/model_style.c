@@ -1,4 +1,5 @@
 #include "ui/model_style.h"
+#include "platform/platform.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -35,7 +36,7 @@ static ModelEntry* model_get_or_create(Model* model, const char* key) {
     if (e) return e;
     e = (ModelEntry*)calloc(1, sizeof(ModelEntry));
     if (!e) return NULL;
-    e->key = strdup(key);
+    e->key = platform_strdup(key);
     e->string_value = NULL;
     e->number_value = 0.0f;
     e->is_string = 0;
@@ -71,13 +72,13 @@ void model_set_string(Model* model, const char* key, const char* value) {
     ModelEntry* e = model_get_or_create(model, key);
     if (!e) return;
     free(e->string_value);
-    e->string_value = strdup(value);
+    e->string_value = platform_strdup(value);
     e->is_string = 1;
 }
 
 int save_model(const Model* model) {
     if (!model || !model->source_path) return 0;
-    FILE* f = fopen(model->source_path, "wb");
+    FILE* f = platform_fopen(model->source_path, "wb");
     if (!f) return 0;
 
     const char* store = model->store ? model->store : "model";

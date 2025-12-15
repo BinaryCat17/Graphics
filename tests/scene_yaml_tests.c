@@ -1,4 +1,5 @@
 #include <assert.h>
+#include "platform/platform.h"
 #include <stdio.h>
 #include <string.h>
 
@@ -6,7 +7,7 @@
 
 static const char *write_temp(const char *name, const char *text)
 {
-    FILE *f = fopen(name, "wb");
+    FILE *f = platform_fopen(name, "wb");
     if (!f) return NULL;
     fputs(text, f);
     fclose(f);

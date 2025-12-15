@@ -1,4 +1,5 @@
 #include "assets/assets.h"
+#include "platform/platform.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -36,7 +37,7 @@ int load_assets(const char* assets_dir, const char* ui_config_path, Assets* out_
     memset(out_assets, 0, sizeof(*out_assets));
 
     if (ui_config_path && ui_config_path[0]) {
-        out_assets->ui_path = strdup(ui_config_path);
+        out_assets->ui_path = platform_strdup(ui_config_path);
     } else {
         out_assets->ui_path = join_path(assets_dir, "ui/config/layout/ui.yaml");
     }

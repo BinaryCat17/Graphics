@@ -6,6 +6,7 @@
 
 #include "platform/platform.h"
 #include "render_runtime/render_runtime_service.h"
+#include "ui/ui_service.h"
 
 typedef struct RenderServiceContext {
     RenderRuntimeServiceContext* runtime;

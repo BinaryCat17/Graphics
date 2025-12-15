@@ -1,4 +1,5 @@
 #include "ui/scroll.h"
+#include "platform/platform.h"
 
 #include <stdlib.h>
 #include <string.h>
@@ -45,7 +46,7 @@ static ScrollArea* ensure_area(ScrollArea** areas, const char* name) {
     if (a) return a;
     a = (ScrollArea*)calloc(1, sizeof(ScrollArea));
     if (!a) return NULL;
-    a->name = strdup(name);
+    a->name = platform_strdup(name);
     a->offset = 0.0f;
     a->has_bounds = 0;
     a->has_viewport = 0;

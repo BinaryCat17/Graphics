@@ -1,4 +1,5 @@
 #include "config_document.h"
+#include "platform/platform.h"
 
 #include <ctype.h>
 #include <stdio.h>
@@ -33,7 +34,7 @@ static void assign_error(ConfigError *err, int line, int column, const char *msg
     if (!err) return;
     err->line = line;
     err->column = column;
-    strncpy(err->message, msg, sizeof(err->message) - 1);
+    platform_strncpy(err->message, msg, sizeof(err->message) - 1);
     err->message[sizeof(err->message) - 1] = 0;
 }
 
@@ -74,7 +75,7 @@ static int config_pair_append(ConfigNode *map, const char *key, ConfigNode *valu
         map->pairs = expanded;
         map->pair_capacity = new_cap;
     }
-    map->pairs[map->pair_count].key = strdup(key);
+    map->pairs[map->pair_count].key = platform_strdup(key);
     map->pairs[map->pair_count].value = value;
     map->pair_count++;
     return 1;
@@ -110,7 +111,7 @@ static ConfigNode *copy_yaml_node(const SimpleYamlNode *node)
     ConfigNode *out = config_node_new(type, node->line);
     if (!out) return NULL;
     if (node->scalar) {
-        out->scalar = strdup(node->scalar);
+        out->scalar = platform_strdup(node->scalar);
         out->scalar_type = detect_scalar_type(out->scalar);
     }
     if (node->type == SIMPLE_YAML_MAP) {
@@ -376,7 +377,7 @@ int load_config_document(const char *path, ConfigFormat format, ConfigDocument *
 
     out_doc->format = format;
     out_doc->root = root;
-    out_doc->source_path = strdup(path);
+    out_doc->source_path = platform_strdup(path);
     return 1;
 }
 

@@ -122,7 +122,7 @@ static int ensure_font_metrics(const char* font_path) {
     if (g_font_ready) return 1;
     if (!font_path) return 0;
 
-    FILE* f = fopen(font_path, "rb");
+    FILE* f = platform_fopen(font_path, "rb");
     if (!f) {
         fprintf(stderr, "Warning: unable to open font at %s\n", font_path);
         return 0;
@@ -209,7 +209,7 @@ static char* relative_component_name(const char* path, const char* base_dir) {
             if (*rel == '/' || *rel == '\\') rel++;
         }
     }
-    char* trimmed = strdup(rel);
+    char* trimmed = platform_strdup(rel);
     if (!trimmed) return NULL;
     for (char* p = trimmed; *p; ++p) {
         if (*p == '\\') *p = '/';
@@ -226,7 +226,7 @@ static void append_prototype(Prototype** list, const char* name, UiNode* node) {
         free_ui_tree(node);
         return;
     }
-    pnode->name = strdup(name);
+    pnode->name = platform_strdup(name);
     pnode->node = node;
     pnode->next = *list;
     *list = pnode;
@@ -326,7 +326,7 @@ static ModelEntry* model_get_or_create(Model* model, const char* key) {
     if (e) return e;
     e = (ModelEntry*)calloc(1, sizeof(ModelEntry));
     if (!e) return NULL;
-    e->key = strdup(key);
+    e->key = platform_strdup(key);
     e->string_value = NULL;
     e->number_value = 0.0f;
     e->is_string = 0;
@@ -362,7 +362,7 @@ void model_set_string(Model* model, const char* key, const char* value) {
     ModelEntry* e = model_get_or_create(model, key);
     if (!e) return;
     free(e->string_value);
-    e->string_value = strdup(value);
+    e->string_value = platform_strdup(value);
     e->is_string = 1;
 }
 
@@ -379,7 +379,7 @@ static ConfigNode* config_node_from_string(const char* value, ConfigScalarType t
     if (!n) return NULL;
     n->type = CONFIG_NODE_SCALAR;
     n->scalar_type = type;
-    if (value) n->scalar = strdup(value);
+    if (value) n->scalar = platform_strdup(value);
     return n;
 }
 
@@ -405,7 +405,7 @@ static int config_map_set(ConfigNode* map, const char* key, ConfigNode* value) {
         }
     }
     if (!config_map_reserve(map, map->pair_count + 1)) return 0;
-    map->pairs[map->pair_count].key = strdup(key);
+    map->pairs[map->pair_count].key = platform_strdup(key);
     map->pairs[map->pair_count].value = value;
     map->pair_count++;
     return 1;
@@ -541,21 +541,21 @@ static UiNode* parse_ui_node_config(const ConfigNode* obj) {
         const ConfigNode* val = pair->value;
         if (!key || !val) continue;
         const char* sval = scalar_text(val);
-        if (strcmp(key, "type") == 0 && sval) { node->type = strdup(sval); continue; }
-        if (strcmp(key, "style") == 0 && sval) { node->style_name = strdup(sval); continue; }
+        if (strcmp(key, "type") == 0 && sval) { node->type = platform_strdup(sval); continue; }
+        if (strcmp(key, "style") == 0 && sval) { node->style_name = platform_strdup(sval); continue; }
         if (strcmp(key, "x") == 0) { node->rect.x = parse_scalar_number(val, node->rect.x); node->has_x = 1; continue; }
         if (strcmp(key, "y") == 0) { node->rect.y = parse_scalar_number(val, node->rect.y); node->has_y = 1; continue; }
         if (strcmp(key, "w") == 0) { node->rect.w = parse_scalar_number(val, node->rect.w); node->has_w = 1; continue; }
         if (strcmp(key, "h") == 0) { node->rect.h = parse_scalar_number(val, node->rect.h); node->has_h = 1; continue; }
         if (strcmp(key, "z") == 0) { node->z_index = (int)parse_scalar_number(val, (float)node->z_index); node->has_z_index = 1; continue; }
         if (strcmp(key, "zGroup") == 0 || strcmp(key, "z_group") == 0) { node->z_group = (int)parse_scalar_number(val, (float)node->z_group); node->has_z_group = 1; continue; }
-        if (strcmp(key, "id") == 0 && sval) { node->id = strdup(sval); continue; }
-        if (strcmp(key, "use") == 0 && sval) { node->use = strdup(sval); continue; }
-        if (strcmp(key, "text") == 0 && sval) { node->text = strdup(sval); continue; }
-        if (strcmp(key, "textBinding") == 0 && sval) { node->text_binding = strdup(sval); continue; }
-        if (strcmp(key, "valueBinding") == 0 && sval) { node->value_binding = strdup(sval); continue; }
-        if (strcmp(key, "onClick") == 0 && sval) { node->click_binding = strdup(sval); continue; }
-        if (strcmp(key, "clickValue") == 0 && sval) { node->click_value = strdup(sval); continue; }
+        if (strcmp(key, "id") == 0 && sval) { node->id = platform_strdup(sval); continue; }
+        if (strcmp(key, "use") == 0 && sval) { node->use = platform_strdup(sval); continue; }
+        if (strcmp(key, "text") == 0 && sval) { node->text = platform_strdup(sval); continue; }
+        if (strcmp(key, "textBinding") == 0 && sval) { node->text_binding = platform_strdup(sval); continue; }
+        if (strcmp(key, "valueBinding") == 0 && sval) { node->value_binding = platform_strdup(sval); continue; }
+        if (strcmp(key, "onClick") == 0 && sval) { node->click_binding = platform_strdup(sval); continue; }
+        if (strcmp(key, "clickValue") == 0 && sval) { node->click_value = platform_strdup(sval); continue; }
         if (strcmp(key, "min") == 0) { node->minv = parse_scalar_number(val, node->minv); node->has_min = 1; continue; }
         if (strcmp(key, "max") == 0) { node->maxv = parse_scalar_number(val, node->maxv); node->has_max = 1; continue; }
         if (strcmp(key, "value") == 0) { node->value = parse_scalar_number(val, node->value); node->has_value = 1; continue; }
@@ -563,7 +563,7 @@ static UiNode* parse_ui_node_config(const ConfigNode* obj) {
         if (strcmp(key, "minHeight") == 0) { node->min_h = parse_scalar_number(val, node->min_h); node->has_min_h = 1; continue; }
         if (strcmp(key, "maxWidth") == 0) { node->max_w = parse_scalar_number(val, node->max_w); node->has_max_w = 1; continue; }
         if (strcmp(key, "maxHeight") == 0) { node->max_h = parse_scalar_number(val, node->max_h); node->has_max_h = 1; continue; }
-        if (strcmp(key, "scrollArea") == 0 && sval) { node->scroll_area = strdup(sval); continue; }
+        if (strcmp(key, "scrollArea") == 0 && sval) { node->scroll_area = platform_strdup(sval); continue; }
         if (strcmp(key, "scrollStatic") == 0) {
             fprintf(stderr, "Warning: 'scrollStatic' is deprecated; wrap the node in a 'scrollbar' container instead.\n");
             node->scroll_static = parse_scalar_bool(val, node->scroll_static);
@@ -585,11 +585,11 @@ static UiNode* parse_ui_node_config(const ConfigNode* obj) {
         if (strcmp(key, "textColor") == 0) { read_color_node(&node->text_color, val); node->has_text_color = 1; continue; }
         if (strcmp(key, "scrollbarTrackColor") == 0) { read_color_node(&node->scrollbar_track_color, val); node->has_scrollbar_track_color = 1; continue; }
         if (strcmp(key, "scrollbarThumbColor") == 0) { read_color_node(&node->scrollbar_thumb_color, val); node->has_scrollbar_thumb_color = 1; continue; }
-        if (strcmp(key, "docking") == 0 && sval) { node->docking = strdup(sval); continue; }
+        if (strcmp(key, "docking") == 0 && sval) { node->docking = platform_strdup(sval); continue; }
         if (strcmp(key, "resizable") == 0) { node->resizable = parse_scalar_bool(val, node->resizable); node->has_resizable = 1; continue; }
         if (strcmp(key, "draggable") == 0) { node->draggable = parse_scalar_bool(val, node->draggable); node->has_draggable = 1; continue; }
         if (strcmp(key, "modal") == 0) { node->modal = parse_scalar_bool(val, node->modal); node->has_modal = 1; continue; }
-        if (strcmp(key, "onFocus") == 0 && sval) { node->on_focus = strdup(sval); continue; }
+        if (strcmp(key, "onFocus") == 0 && sval) { node->on_focus = platform_strdup(sval); continue; }
         if (strcmp(key, "floating") == 0 && val->type == CONFIG_NODE_MAP) {
             const ConfigNode* fx = config_node_get_scalar(val, "x"); if (fx) { node->floating_rect.x = parse_scalar_number(fx, node->floating_rect.x); node->has_floating_rect = 1; }
             const ConfigNode* fy = config_node_get_scalar(val, "y"); if (fy) { node->floating_rect.y = parse_scalar_number(fy, node->floating_rect.y); node->has_floating_rect = 1; }
@@ -634,9 +634,9 @@ static UiNode* clone_node(const UiNode* src);
 
 static void merge_node(UiNode* node, const UiNode* proto) {
     if (!node || !proto) return;
-    if (!node->type && proto->type) node->type = strdup(proto->type);
-    if (!node->style_name && proto->style_name) node->style_name = strdup(proto->style_name);
-    if (!node->use && proto->use) node->use = strdup(proto->use);
+    if (!node->type && proto->type) node->type = platform_strdup(proto->type);
+    if (!node->style_name && proto->style_name) node->style_name = platform_strdup(proto->style_name);
+    if (!node->use && proto->use) node->use = platform_strdup(proto->use);
     if (node->layout == UI_LAYOUT_NONE && proto->layout != UI_LAYOUT_NONE) node->layout = proto->layout;
     if (node->widget_type == W_PANEL && proto->widget_type != W_PANEL && proto->type) node->widget_type = proto->widget_type;
     if (!node->has_x && proto->has_x) { node->rect.x = proto->rect.x; node->has_x = 1; }
@@ -658,12 +658,12 @@ static void merge_node(UiNode* node, const UiNode* proto) {
     if (!node->has_scrollbar_thumb_color && proto->has_scrollbar_thumb_color) { node->scrollbar_thumb_color = proto->scrollbar_thumb_color; node->has_scrollbar_thumb_color = 1; }
     if (!node->has_clip_to_viewport && proto->has_clip_to_viewport) { node->clip_to_viewport = proto->clip_to_viewport; node->has_clip_to_viewport = 1; }
     if (!proto->scrollbar_enabled) node->scrollbar_enabled = 0;
-    if (!node->id && proto->id) node->id = strdup(proto->id);
-    if (!node->text && proto->text) node->text = strdup(proto->text);
-    if (!node->text_binding && proto->text_binding) node->text_binding = strdup(proto->text_binding);
-    if (!node->value_binding && proto->value_binding) node->value_binding = strdup(proto->value_binding);
-    if (!node->click_binding && proto->click_binding) node->click_binding = strdup(proto->click_binding);
-    if (!node->click_value && proto->click_value) node->click_value = strdup(proto->click_value);
+    if (!node->id && proto->id) node->id = platform_strdup(proto->id);
+    if (!node->text && proto->text) node->text = platform_strdup(proto->text);
+    if (!node->text_binding && proto->text_binding) node->text_binding = platform_strdup(proto->text_binding);
+    if (!node->value_binding && proto->value_binding) node->value_binding = platform_strdup(proto->value_binding);
+    if (!node->click_binding && proto->click_binding) node->click_binding = platform_strdup(proto->click_binding);
+    if (!node->click_value && proto->click_value) node->click_value = platform_strdup(proto->click_value);
     if (!node->has_min && proto->has_min) { node->minv = proto->minv; node->has_min = 1; }
     if (!node->has_max && proto->has_max) { node->maxv = proto->maxv; node->has_max = 1; }
     if (!node->has_value && proto->has_value) { node->value = proto->value; node->has_value = 1; }
@@ -682,13 +682,13 @@ static void merge_node(UiNode* node, const UiNode* proto) {
         node->floating_max_h = proto->floating_max_h;
         node->has_floating_max = 1;
     }
-    if (!node->scroll_area && proto->scroll_area) node->scroll_area = strdup(proto->scroll_area);
+    if (!node->scroll_area && proto->scroll_area) node->scroll_area = platform_strdup(proto->scroll_area);
     if (!node->scroll_static && proto->scroll_static) node->scroll_static = 1;
-    if (!node->docking && proto->docking) node->docking = strdup(proto->docking);
+    if (!node->docking && proto->docking) node->docking = platform_strdup(proto->docking);
     if (!node->has_resizable && proto->has_resizable) { node->resizable = proto->resizable; node->has_resizable = 1; }
     if (!node->has_draggable && proto->has_draggable) { node->draggable = proto->draggable; node->has_draggable = 1; }
     if (!node->has_modal && proto->has_modal) { node->modal = proto->modal; node->has_modal = 1; }
-    if (!node->on_focus && proto->on_focus) node->on_focus = strdup(proto->on_focus);
+    if (!node->on_focus && proto->on_focus) node->on_focus = platform_strdup(proto->on_focus);
 
     if (node->child_count == 0 && proto->child_count > 0) {
         node->children = (UiNode*)calloc(proto->child_count, sizeof(UiNode));
@@ -704,7 +704,7 @@ static UiNode* clone_node(const UiNode* src) {
     if (!src) return NULL;
     UiNode* n = create_node();
     if (!n) return NULL;
-    n->type = src->type ? strdup(src->type) : NULL;
+    n->type = src->type ? platform_strdup(src->type) : NULL;
     n->layout = src->layout;
     n->widget_type = src->widget_type;
     n->rect = src->rect;
@@ -726,14 +726,14 @@ static UiNode* clone_node(const UiNode* src) {
     n->has_scrollbar_thumb_color = src->has_scrollbar_thumb_color;
     n->clip_to_viewport = src->clip_to_viewport;
     n->has_clip_to_viewport = src->has_clip_to_viewport;
-    n->style_name = src->style_name ? strdup(src->style_name) : NULL;
-    n->use = src->use ? strdup(src->use) : NULL;
-    n->id = src->id ? strdup(src->id) : NULL;
-    n->text = src->text ? strdup(src->text) : NULL;
-    n->text_binding = src->text_binding ? strdup(src->text_binding) : NULL;
-    n->value_binding = src->value_binding ? strdup(src->value_binding) : NULL;
-    n->click_binding = src->click_binding ? strdup(src->click_binding) : NULL;
-    n->click_value = src->click_value ? strdup(src->click_value) : NULL;
+    n->style_name = src->style_name ? platform_strdup(src->style_name) : NULL;
+    n->use = src->use ? platform_strdup(src->use) : NULL;
+    n->id = src->id ? platform_strdup(src->id) : NULL;
+    n->text = src->text ? platform_strdup(src->text) : NULL;
+    n->text_binding = src->text_binding ? platform_strdup(src->text_binding) : NULL;
+    n->value_binding = src->value_binding ? platform_strdup(src->value_binding) : NULL;
+    n->click_binding = src->click_binding ? platform_strdup(src->click_binding) : NULL;
+    n->click_value = src->click_value ? platform_strdup(src->click_value) : NULL;
     n->minv = src->minv; n->maxv = src->maxv; n->value = src->value;
     n->has_min = src->has_min; n->has_max = src->has_max; n->has_value = src->has_value;
     n->min_w = src->min_w; n->min_h = src->min_h;
@@ -744,16 +744,16 @@ static UiNode* clone_node(const UiNode* src) {
     n->floating_min_w = src->floating_min_w; n->floating_min_h = src->floating_min_h;
     n->floating_max_w = src->floating_max_w; n->floating_max_h = src->floating_max_h;
     n->has_floating_min = src->has_floating_min; n->has_floating_max = src->has_floating_max;
-    n->scroll_area = src->scroll_area ? strdup(src->scroll_area) : NULL;
+    n->scroll_area = src->scroll_area ? platform_strdup(src->scroll_area) : NULL;
     n->scroll_static = src->scroll_static;
-    n->docking = src->docking ? strdup(src->docking) : NULL;
+    n->docking = src->docking ? platform_strdup(src->docking) : NULL;
     n->resizable = src->resizable;
     n->has_resizable = src->has_resizable;
     n->draggable = src->draggable;
     n->has_draggable = src->has_draggable;
     n->modal = src->modal;
     n->has_modal = src->has_modal;
-    n->on_focus = src->on_focus ? strdup(src->on_focus) : NULL;
+    n->on_focus = src->on_focus ? platform_strdup(src->on_focus) : NULL;
 
     if (src->child_count > 0) {
         n->children = (UiNode*)calloc(src->child_count, sizeof(UiNode));
@@ -846,7 +846,7 @@ static char* next_scroll_area_name(int* counter) {
     char buf[32];
     snprintf(buf, sizeof(buf), "scrollArea%d", *counter);
     *counter += 1;
-    return strdup(buf);
+    return platform_strdup(buf);
 }
 
 static void wrap_node_with_scrollbar(UiNode* node, int* counter) {
@@ -858,11 +858,11 @@ static void wrap_node_with_scrollbar(UiNode* node, int* counter) {
     *node = *defaults;
     free(defaults);
 
-    node->type = strdup("scrollbar");
+    node->type = platform_strdup("scrollbar");
     node->widget_type = W_SCROLLBAR;
     node->layout = UI_LAYOUT_NONE;
     node->style = content.style;
-    node->style_name = content.style_name ? strdup(content.style_name) : NULL;
+    node->style_name = content.style_name ? platform_strdup(content.style_name) : NULL;
     node->rect = content.rect;
     node->has_x = content.has_x; node->has_y = content.has_y;
     node->has_w = content.has_w; node->has_h = content.has_h;
@@ -890,12 +890,12 @@ static void wrap_node_with_scrollbar(UiNode* node, int* counter) {
     node->children[0] = content;
 
     if (!node->scroll_area) {
-        node->scroll_area = original_scroll_area ? strdup(original_scroll_area) : next_scroll_area_name(counter);
+        node->scroll_area = original_scroll_area ? platform_strdup(original_scroll_area) : next_scroll_area_name(counter);
     }
     node->scroll_static = 1;
     node->scrollbar_enabled = 1;
     free(node->children[0].scroll_area);
-    node->children[0].scroll_area = node->scroll_area ? strdup(node->scroll_area) : NULL;
+    node->children[0].scroll_area = node->scroll_area ? platform_strdup(node->scroll_area) : NULL;
     free(original_scroll_area);
 }
 
@@ -919,7 +919,7 @@ static void normalize_scrollbars(UiNode* node, int* counter) {
         if (node->child_count > 0) {
             for (size_t i = 0; i < node->child_count; ++i) {
                 free(node->children[i].scroll_area);
-                node->children[i].scroll_area = node->scroll_area ? strdup(node->scroll_area) : NULL;
+                node->children[i].scroll_area = node->scroll_area ? platform_strdup(node->scroll_area) : NULL;
                 node->children[i].scroll_static = 0;
             }
         } else {
@@ -934,7 +934,7 @@ static void bind_model_values_to_nodes(UiNode* node, const Model* model) {
         const char* v = model_get_string(model, node->text_binding, NULL);
         if (v) {
             free(node->text);
-            node->text = strdup(v);
+            node->text = platform_strdup(v);
         }
     }
     if (node->value_binding) {
@@ -966,9 +966,9 @@ Model* ui_config_load_model(const ConfigDocument* doc) {
     if (!model) return NULL;
 
     char* derived_key = key_node && key_node->scalar ? NULL : basename_no_ext(doc->source_path);
-    model->store = strdup(store_node && store_node->scalar ? store_node->scalar : "layout");
-    model->key = strdup(key_node && key_node->scalar ? key_node->scalar : (derived_key ? derived_key : "default"));
-    model->source_path = strdup(doc->source_path ? doc->source_path : "model.yaml");
+    model->store = platform_strdup(store_node && store_node->scalar ? store_node->scalar : "layout");
+    model->key = platform_strdup(key_node && key_node->scalar ? key_node->scalar : (derived_key ? derived_key : "default"));
+    model->source_path = platform_strdup(doc->source_path ? doc->source_path : "model.yaml");
 
     if (!model->store || !model->key || !model->source_path) { free_model(model); return NULL; }
 
@@ -1003,7 +1003,7 @@ Style* ui_config_load_styles(const ConfigNode* root) {
         if (!pair->key || !val || val->type != CONFIG_NODE_MAP) continue;
         Style* st = (Style*)calloc(1, sizeof(Style));
         if (!st) break;
-        st->name = strdup(pair->key);
+        st->name = platform_strdup(pair->key);
         st->background = DEFAULT_STYLE.background;
         st->text = DEFAULT_STYLE.text;
         st->border_color = DEFAULT_STYLE.border_color;

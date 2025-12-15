@@ -1,4 +1,5 @@
 #include "scene/cad_scene_yaml.h"
+#include "platform/platform.h"
 
 #include <ctype.h>
 #include <stdio.h>
@@ -43,7 +44,7 @@ static void set_error(SceneError *err, int line, int column, const char *msg)
     if (!err) return;
     err->line = line;
     err->column = column;
-    strncpy(err->message, msg, sizeof(err->message) - 1);
+    platform_strncpy(err->message, msg, sizeof(err->message) - 1);
     err->message[sizeof(err->message) - 1] = 0;
 }
 
@@ -91,7 +92,7 @@ static int yaml_pair_append(YamlNode *map, const char *key, YamlNode *value)
         map->pairs = expanded;
         map->pair_capacity = new_cap;
     }
-    map->pairs[map->pair_count].key = strdup(key);
+    map->pairs[map->pair_count].key = platform_strdup(key);
     map->pairs[map->pair_count].value = value;
     map->pair_count++;
     return 1;
@@ -389,7 +390,7 @@ static GeometryNode *parse_geometry_node(const YamlNode *node)
         if (!g) return NULL;
         g->kind = GEO_SKETCH;
         YamlNode *path = yaml_map_get(sketch, "path");
-        if (path && path->scalar) g->data.sketch.path = strdup(path->scalar);
+        if (path && path->scalar) g->data.sketch.path = platform_strdup(path->scalar);
         return g;
     }
 
@@ -399,7 +400,7 @@ static GeometryNode *parse_geometry_node(const YamlNode *node)
         g->kind = GEO_STEP;
         YamlNode *path = yaml_map_get(step, "path");
         YamlNode *scale = yaml_map_get(step, "scale");
-        if (path && path->scalar) g->data.step.path = strdup(path->scalar);
+        if (path && path->scalar) g->data.step.path = platform_strdup(path->scalar);
         g->data.step.scale = scale && scale->scalar ? parse_float(scale->scalar) : 1.0f;
         return g;
     }
@@ -484,7 +485,7 @@ int parse_scene_yaml(const char *path, Scene *out, SceneError *err)
     if (!out || !path) return 0;
     memset(out, 0, sizeof(Scene));
 
-    FILE *f = fopen(path, "rb");
+    FILE *f = platform_fopen(path, "rb");
     if (!f) {
         set_error(err, 0, 0, "Failed to open scene file");
         return 0;
@@ -515,8 +516,8 @@ int parse_scene_yaml(const char *path, Scene *out, SceneError *err)
     if (metadata && metadata->type == YAML_MAP) {
         YamlNode *name = yaml_map_get(metadata, "name");
         YamlNode *author = yaml_map_get(metadata, "author");
-        if (name && name->scalar) out->metadata.name = strdup(name->scalar);
-        if (author && author->scalar) out->metadata.author = strdup(author->scalar);
+        if (name && name->scalar) out->metadata.name = platform_strdup(name->scalar);
+        if (author && author->scalar) out->metadata.author = platform_strdup(author->scalar);
     }
 
     YamlNode *units = yaml_map_get(root, "units");
@@ -553,7 +554,7 @@ int parse_scene_yaml(const char *path, Scene *out, SceneError *err)
                         return 0;
                     }
                 }
-                out->materials[i].id = strdup(id->scalar);
+                out->materials[i].id = platform_strdup(id->scalar);
             }
             YamlNode *density = yaml_map_get(m, "density");
             YamlNode *young = yaml_map_get(m, "young_modulus");
@@ -581,7 +582,7 @@ int parse_scene_yaml(const char *path, Scene *out, SceneError *err)
             const YamlNode *p = parts->items[i];
             if (!p || p->type != YAML_MAP) continue;
             YamlNode *id = yaml_map_get(p, "id");
-            if (id && id->scalar) out->parts[i].id = strdup(id->scalar);
+            if (id && id->scalar) out->parts[i].id = platform_strdup(id->scalar);
             for (size_t j = 0; j < i; ++j) {
                 if (out->parts[i].id && out->parts[j].id && strcmp(out->parts[i].id, out->parts[j].id) == 0) {
                     set_error(err, p->line, 1, "Duplicate part id");
@@ -593,7 +594,7 @@ int parse_scene_yaml(const char *path, Scene *out, SceneError *err)
             }
             init_identity(out->parts[i].transform);
             YamlNode *mat = yaml_map_get(p, "material");
-            if (mat && mat->scalar) part_material_ids[i] = strdup(mat->scalar);
+            if (mat && mat->scalar) part_material_ids[i] = platform_strdup(mat->scalar);
             YamlNode *geo = yaml_map_get(p, "geometry");
             if (geo) out->parts[i].geometry = parse_geometry_node(geo);
         }
@@ -620,7 +621,7 @@ int parse_scene_yaml(const char *path, Scene *out, SceneError *err)
             const YamlNode *j = joints->items[i];
             if (!j || j->type != YAML_MAP) continue;
             YamlNode *id = yaml_map_get(j, "id");
-            if (id && id->scalar) out->joints[i].id = strdup(id->scalar);
+            if (id && id->scalar) out->joints[i].id = platform_strdup(id->scalar);
             for (size_t k = 0; k < i; ++k) {
                 if (out->joints[i].id && out->joints[k].id && strcmp(out->joints[i].id, out->joints[k].id) == 0) {
                     set_error(err, j->line, 1, "Duplicate joint id");
@@ -634,8 +635,8 @@ int parse_scene_yaml(const char *path, Scene *out, SceneError *err)
             }
             YamlNode *parent = yaml_map_get(j, "parent");
             YamlNode *child = yaml_map_get(j, "child");
-            if (parent && parent->scalar) joint_parent_ids[i] = strdup(parent->scalar);
-            if (child && child->scalar) joint_child_ids[i] = strdup(child->scalar);
+            if (parent && parent->scalar) joint_parent_ids[i] = platform_strdup(parent->scalar);
+            if (child && child->scalar) joint_child_ids[i] = platform_strdup(child->scalar);
             YamlNode *type = yaml_map_get(j, "type");
             out->joints[i].type = parse_joint_type(type && type->scalar ? type->scalar : "revolute");
             parse_float_array(yaml_map_get(j, "origin"), out->joints[i].origin, 3);
@@ -660,7 +661,7 @@ int parse_scene_yaml(const char *path, Scene *out, SceneError *err)
             const YamlNode *a = assemblies->items[i];
             if (!a || a->type != YAML_MAP) continue;
             YamlNode *id = yaml_map_get(a, "id");
-            if (id && id->scalar) out->assemblies[i].id = strdup(id->scalar);
+            if (id && id->scalar) out->assemblies[i].id = platform_strdup(id->scalar);
             for (size_t k = 0; k < i; ++k) {
                 if (out->assemblies[i].id && out->assemblies[k].id && strcmp(out->assemblies[i].id, out->assemblies[k].id) == 0) {
                     set_error(err, a->line, 1, "Duplicate assembly id");
@@ -723,7 +724,7 @@ int parse_scene_yaml(const char *path, Scene *out, SceneError *err)
             const YamlNode *a = analysis->items[i];
             if (!a || a->type != YAML_MAP) continue;
             YamlNode *id = yaml_map_get(a, "id");
-            if (id && id->scalar) out->analysis[i].id = strdup(id->scalar);
+            if (id && id->scalar) out->analysis[i].id = platform_strdup(id->scalar);
             YamlNode *loads = yaml_map_get(a, "loads");
             if (loads && loads->type == YAML_SEQUENCE) {
                 out->analysis[i].load_count = loads->item_count;
@@ -734,7 +735,7 @@ int parse_scene_yaml(const char *path, Scene *out, SceneError *err)
                     const YamlNode *l = loads->items[j];
                     if (!l || l->type != YAML_MAP) continue;
                     YamlNode *target = yaml_map_get(l, "target");
-                    if (target && target->scalar) load_targets[j] = strdup(target->scalar);
+                    if (target && target->scalar) load_targets[j] = platform_strdup(target->scalar);
                     if (parse_float_array(yaml_map_get(l, "force"), out->analysis[i].loads[j].force, 3)) out->analysis[i].loads[j].has_force = 1;
                     if (parse_float_array(yaml_map_get(l, "moment"), out->analysis[i].loads[j].moment, 3)) out->analysis[i].loads[j].has_moment = 1;
                     if (parse_float_array(yaml_map_get(l, "point"), out->analysis[i].loads[j].point, 3)) out->analysis[i].loads[j].has_point = 1;
@@ -789,11 +790,11 @@ int parse_scene_yaml(const char *path, Scene *out, SceneError *err)
             YamlNode *id = yaml_map_get(m, "id");
             YamlNode *joint = yaml_map_get(m, "joint");
             YamlNode *profile = yaml_map_get(m, "profile");
-            if (id && id->scalar) out->motion_profiles[i].id = strdup(id->scalar);
-            if (joint && joint->scalar) motion_joint_ids[i] = strdup(joint->scalar);
+            if (id && id->scalar) out->motion_profiles[i].id = platform_strdup(id->scalar);
+            if (joint && joint->scalar) motion_joint_ids[i] = platform_strdup(joint->scalar);
             if (profile && profile->type == YAML_MAP) {
                 YamlNode *type = yaml_map_get(profile, "type");
-                if (type && type->scalar) out->motion_profiles[i].type = strdup(type->scalar);
+                if (type && type->scalar) out->motion_profiles[i].type = platform_strdup(type->scalar);
                 YamlNode *start = yaml_map_get(profile, "start");
                 YamlNode *end = yaml_map_get(profile, "end");
                 YamlNode *v_max = yaml_map_get(profile, "v_max");

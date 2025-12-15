@@ -1,4 +1,5 @@
 #include "ui/layout_tree.h"
+#include "platform/platform.h"
 
 #include <math.h>
 #include <stdio.h>
@@ -55,7 +56,7 @@ static void measure_text(const char* text, float* out_w, float* out_h) {
 static void ensure_font_metrics(const char* font_path) {
     if (g_font_ready || !font_path) return;
 
-    FILE* f = fopen(font_path, "rb");
+    FILE* f = platform_fopen(font_path, "rb");
     if (!f) {
         return;
     }

@@ -1,14 +1,50 @@
 #include "platform/fs.h"
+#include "platform/platform.h"
 
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
 #ifdef _WIN32
+#define WIN32_LEAN_AND_MEAN
 #include <windows.h>
 #else
 #include <dirent.h>
 #include <sys/stat.h>
+#include <unistd.h>
 #endif
+
+char* platform_strdup(const char* src) {
+    if (!src) return NULL;
+    size_t len = strlen(src) + 1;
+    char* dest = (char*)malloc(len);
+    if (dest) {
+        memcpy(dest, src, len);
+    }
+    return dest;
+}
+
+void platform_strncpy(char* dest, const char* src, size_t count) {
+    if (!dest) return;
+    // Standard strncpy behavior: copy up to count, pad with nulls
+    size_t i;
+    for (i = 0; i < count && src[i] != '\0'; i++) {
+        dest[i] = src[i];
+    }
+    for (; i < count; i++) {
+        dest[i] = '\0';
+    }
+}
+
+FILE* platform_fopen(const char* filename, const char* mode) {
+#ifdef _MSC_VER
+    FILE* f = NULL;
+    if (fopen_s(&f, filename, mode) != 0) return NULL;
+    return f;
+#else
+    return fopen(filename, mode);
+#endif
+}
 
 struct PlatformDir {
 #ifdef _WIN32

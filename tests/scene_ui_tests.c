@@ -3,6 +3,7 @@
 #include <stdio.h>
 #include <string.h>
 
+#include "platform/platform.h"
 #include "ui/scene_ui.h"
 #include "config/config_io.h"
 #include "ui/model_style.h"
@@ -24,19 +25,19 @@ static UiNode* find_by_id(UiNode* node, const char* id)
 static Scene make_sample_scene(void)
 {
     Scene scene = {0};
-    scene.metadata.name = strdup("Demo");
-    scene.metadata.author = strdup("User");
+    scene.metadata.name = platform_strdup("Demo");
+    scene.metadata.author = platform_strdup("User");
 
     scene.material_count = 1;
     scene.materials = calloc(scene.material_count, sizeof(Material));
-    scene.materials[0].id = strdup("steel");
+    scene.materials[0].id = platform_strdup("steel");
     scene.materials[0].density = 7800.0f;
     scene.materials[0].young_modulus = 2.1e11f;
     scene.materials[0].poisson_ratio = 0.3f;
 
     scene.part_count = 1;
     scene.parts = calloc(scene.part_count, sizeof(Part));
-    scene.parts[0].id = strdup("base");
+    scene.parts[0].id = platform_strdup("base");
     scene.parts[0].material = &scene.materials[0];
     GeometryNode* geo = calloc(1, sizeof(GeometryNode));
     geo->kind = GEO_PRIMITIVE;
@@ -48,7 +49,7 @@ static Scene make_sample_scene(void)
 
     scene.joint_count = 1;
     scene.joints = calloc(scene.joint_count, sizeof(Joint));
-    scene.joints[0].id = strdup("j1");
+    scene.joints[0].id = platform_strdup("j1");
     scene.joints[0].parent = &scene.parts[0];
     scene.joints[0].child = &scene.parts[0];
     scene.joints[0].type = JOINT_REVOLUTE;

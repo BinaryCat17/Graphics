@@ -1,4 +1,5 @@
 #include "config/module_yaml_loader.h"
+#include "platform/platform.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -12,7 +13,7 @@ static void assign_error(ConfigError *err, int line, int column, const char *msg
     if (!err) return;
     err->line = line;
     err->column = column;
-    strncpy(err->message, msg, sizeof(err->message) - 1);
+    platform_strncpy(err->message, msg, sizeof(err->message) - 1);
     err->message[sizeof(err->message) - 1] = 0;
 }
 

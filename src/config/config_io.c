@@ -1,4 +1,5 @@
 #include "config_io.h"
+#include "platform/platform.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -7,7 +8,7 @@
 char *read_text_file(const char *path)
 {
     if (!path) return NULL;
-    FILE *f = fopen(path, "rb");
+    FILE *f = platform_fopen(path, "rb");
     if (!f) return NULL;
     fseek(f, 0, SEEK_END);
     long len = ftell(f);

@@ -16,7 +16,6 @@
 #include "render/common/ui_mesh_builder.h"
 #include "ui/compositor.h"
 
-#define STB_TRUETYPE_IMPLEMENTATION
 #include "stb_truetype.h"
 
 typedef struct { float viewport[2]; } ViewConstants;
@@ -249,13 +248,13 @@ static VkFormat choose_depth_format(void)
 
 /* Utility: read file into memory */
 static char* read_file_text(const char* path, size_t * out_len) {
-    FILE* f = fopen(path, "rb"); if (!f) { fprintf(stderr, "Failed open %s\n", path); return NULL; }
+    FILE* f = platform_fopen(path, "rb"); if (!f) { fprintf(stderr, "Failed open %s\n", path); return NULL; }
     fseek(f, 0, SEEK_END); long len = ftell(f); fseek(f, 0, SEEK_SET);
     char* b = malloc(len + 1); fread(b, 1, len, f); b[len] = 0; if (out_len) *out_len = (size_t)len; fclose(f); return b;
 }
 /* read SPIR-V binary */
 static uint32_t* read_file_bin_u32(const char* path, size_t * out_words) {
-    FILE* f = fopen(path, "rb"); if (!f) { fprintf(stderr, "Failed open %s\n", path); return NULL; }
+    FILE* f = platform_fopen(path, "rb"); if (!f) { fprintf(stderr, "Failed open %s\n", path); return NULL; }
     fseek(f, 0, SEEK_END); long len = ftell(f); fseek(f, 0, SEEK_SET);
     uint32_t* b = malloc(len); fread(b, 1, len, f); if (out_words) *out_words = (size_t)(len / 4); fclose(f); return b;
 }
@@ -1307,7 +1306,7 @@ static void resolve_node_layouts(UiRenderNode *nodes, size_t count, const Render
 
 static void build_font_atlas(void) {
     if (!g_font_path) fatal("Font path is null");
-    FILE* f = fopen(g_font_path, "rb");
+    FILE* f = platform_fopen(g_font_path, "rb");
     if (!f) { fprintf(stderr, "Fatal: font not found at %s\n", g_font_path); fatal("font load"); }
     fseek(f, 0, SEEK_END); long sz = ftell(f); fseek(f, 0, SEEK_SET);
     ttf_buffer = malloc(sz); fread(ttf_buffer, 1, sz, f); fclose(f);

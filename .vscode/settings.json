@@ -1,0 +1,9 @@
+{
+    "cmake.debugConfig": {
+        "args": [
+            "--scene", "../../../assets/scenes/gear_reducer.yaml",
+            "--assets", "../../../assets",
+            "--ui", "../../../assets/ui/config/layout/ui.yaml"
+        ]
+    }
+}

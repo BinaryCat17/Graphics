@@ -1,4 +1,5 @@
 #include "ui/scene_ui.h"
+#include "platform/platform.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -36,8 +37,8 @@ static UiNode* make_label_row(const char* text, int depth, const char* style_use
 {
     UiNode* row = create_node();
     if (!row) return NULL;
-    row->type = strdup("row");
-    row->use = strdup("components/treeRow");
+    row->type = platform_strdup("row");
+    row->use = platform_strdup("components/treeRow");
     row->layout = UI_LAYOUT_ROW;
     row->has_spacing = 1;
     row->spacing = 6.0f;
@@ -50,18 +51,18 @@ static UiNode* make_label_row(const char* text, int depth, const char* style_use
         free(label);
         return NULL;
     }
-    spacer->type = strdup("spacer");
-    spacer->use = strdup("components/treeSpacer");
+    spacer->type = platform_strdup("spacer");
+    spacer->use = platform_strdup("components/treeSpacer");
     spacer->widget_type = W_SPACER;
     spacer->has_w = 1;
     spacer->rect.w = (float)(depth * 16);
     spacer->has_h = 1;
     spacer->rect.h = 18.0f;
 
-    label->type = strdup("label");
-    label->use = style_use ? strdup(style_use) : strdup("components/treeLabel");
+    label->type = platform_strdup("label");
+    label->use = style_use ? platform_strdup(style_use) : platform_strdup("components/treeLabel");
     label->widget_type = W_LABEL;
-    if (text) label->text = strdup(text);
+    if (text) label->text = platform_strdup(text);
 
     append_child(row, spacer);
     append_child(row, label);

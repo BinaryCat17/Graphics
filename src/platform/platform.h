@@ -3,6 +3,7 @@
 
 #include <stdbool.h>
 #include <stdint.h>
+#include <stddef.h>
 
 typedef struct PlatformWindow PlatformWindow;
 
@@ -72,5 +73,13 @@ bool platform_get_required_vulkan_instance_extensions(const char*** names, uint3
 bool platform_create_vulkan_surface(PlatformWindow* window, void* instance, const void* allocation_callbacks,
                                     PlatformSurface* out_surface);
 void platform_destroy_vulkan_surface(void* instance, const void* allocation_callbacks, PlatformSurface* surface);
+
+// String utilities
+char* platform_strdup(const char* src);
+void platform_strncpy(char* dest, const char* src, size_t count);
+
+// File utilities
+#include <stdio.h>
+FILE* platform_fopen(const char* filename, const char* mode);
 
 #endif // PLATFORM_H
