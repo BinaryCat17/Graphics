@@ -408,7 +408,27 @@ static void create_instance(void) {
 static void pick_physical_and_create_device(void) {
     uint32_t pc = 0; vkEnumeratePhysicalDevices(g_instance, &pc, NULL); if (pc == 0) fatal("No g_physical dev");
     VkPhysicalDevice* list = malloc(sizeof(VkPhysicalDevice) * pc); vkEnumeratePhysicalDevices(g_instance, &pc, list);
-    g_physical = list[0]; free(list);
+    
+    VkPhysicalDevice best_device = VK_NULL_HANDLE;
+    int best_score = -1;
+
+    for (uint32_t i = 0; i < pc; i++) {
+        VkPhysicalDeviceProperties props;
+        vkGetPhysicalDeviceProperties(list[i], &props);
+        
+        int score = 0;
+        if (props.deviceType == VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU) score = 1000;
+        else if (props.deviceType == VK_PHYSICAL_DEVICE_TYPE_INTEGRATED_GPU) score = 100;
+        else if (props.deviceType == VK_PHYSICAL_DEVICE_TYPE_VIRTUAL_GPU) score = 50;
+        else if (props.deviceType == VK_PHYSICAL_DEVICE_TYPE_CPU) score = 1;
+        
+        if (score > best_score) {
+            best_score = score;
+            best_device = list[i];
+        }
+    }
+    g_physical = best_device;
+    free(list);
 
     log_gpu_info(g_physical);
 
