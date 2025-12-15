@@ -217,83 +217,6 @@ static void gather_component_prototypes(const ConfigDocument* layout_doc, Protot
     free(base_dir);
 }
 
-static ConfigNode* config_node_new_map(void) {
-    ConfigNode* n = (ConfigNode*)calloc(1, sizeof(ConfigNode));
-    if (!n) return NULL;
-    n->type = CONFIG_NODE_MAP;
-    n->scalar_type = CONFIG_SCALAR_STRING;
-    return n;
-}
-
-static ConfigNode* config_node_from_string(const char* value, ConfigScalarType type) {
-    ConfigNode* n = (ConfigNode*)calloc(1, sizeof(ConfigNode));
-    if (!n) return NULL;
-    n->type = CONFIG_NODE_SCALAR;
-    n->scalar_type = type;
-    if (value) n->scalar = platform_strdup(value);
-    return n;
-}
-
-static int config_map_reserve(ConfigNode* map, size_t desired) {
-    if (!map || map->type != CONFIG_NODE_MAP) return 0;
-    if (desired <= map->pair_capacity) return 1;
-    size_t new_cap = map->pair_capacity == 0 ? 4 : map->pair_capacity;
-    while (new_cap < desired) new_cap *= 2;
-    ConfigPair* resized = (ConfigPair*)realloc(map->pairs, new_cap * sizeof(ConfigPair));
-    if (!resized) return 0;
-    map->pairs = resized;
-    map->pair_capacity = new_cap;
-    return 1;
-}
-
-static int config_map_set(ConfigNode* map, const char* key, ConfigNode* value) {
-    if (!map || map->type != CONFIG_NODE_MAP || !key) return 0;
-    for (size_t i = 0; i < map->pair_count; ++i) {
-        if (map->pairs[i].key && strcmp(map->pairs[i].key, key) == 0) {
-            config_node_free(map->pairs[i].value);
-            map->pairs[i].value = value;
-            return 1;
-        }
-    }
-    if (!config_map_reserve(map, map->pair_count + 1)) return 0;
-    map->pairs[map->pair_count].key = platform_strdup(key);
-    map->pairs[map->pair_count].value = value;
-    map->pair_count++;
-    return 1;
-}
-
-static ConfigNode* config_map_get_mut(ConfigNode* map, const char* key) {
-    if (!map || map->type != CONFIG_NODE_MAP || !key) return NULL;
-    for (size_t i = 0; i < map->pair_count; ++i) {
-        if (map->pairs[i].key && strcmp(map->pairs[i].key, key) == 0) return map->pairs[i].value;
-    }
-    return NULL;
-}
-
-static ConfigNode* ensure_map_entry(ConfigNode* map, const char* key) {
-    ConfigNode* existing = config_map_get_mut(map, key);
-    if (existing && existing->type == CONFIG_NODE_MAP) return existing;
-    ConfigNode* fresh = config_node_new_map();
-    if (!fresh) return NULL;
-    if (!config_map_set(map, key, fresh)) {
-        config_node_free(fresh);
-        return NULL;
-    }
-    return fresh;
-}
-
-static void config_map_clear(ConfigNode* map) {
-    if (!map || map->type != CONFIG_NODE_MAP) return;
-    for (size_t i = 0; i < map->pair_count; ++i) {
-        free(map->pairs[i].key);
-        config_node_free(map->pairs[i].value);
-    }
-    free(map->pairs);
-    map->pairs = NULL;
-    map->pair_count = 0;
-    map->pair_capacity = 0;
-}
-
 static Style* style_find(const Style* styles, const char* name) {
     for (const Style* s = styles; s; s = s->next) {
         if (strcmp(s->name, name) == 0) return (Style*)s;
@@ -889,7 +812,7 @@ Style* ui_config_load_styles(const ConfigNode* root) {
     return styles;
 }
 
-UiNode* ui_config_load_layout(const ConfigDocument* doc, const Model* model, const Style* styles, const char* font_path, const Scene* scene) {
+UiNode* ui_config_load_layout(const ConfigDocument* doc, const Model* model, const Style* styles, const Scene* scene) {
     if (!doc || !doc->root) return NULL;
 
     const ConfigNode* root = doc->root;

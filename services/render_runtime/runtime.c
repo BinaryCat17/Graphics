@@ -136,7 +136,7 @@ bool runtime_init(AppServices* services) {
     PlatformWindowSize logical_size = platform_get_window_size(services->render.window);
     float ui_scale = ui_compute_scale(&services->ui, (float)logical_size.width, (float)logical_size.height);
 
-    if (!ui_prepare_runtime(&services->ui, &services->core, ui_scale, &services->state_manager, services->ui_type_id))
+    if (!ui_prepare_runtime(&services->ui, ui_scale, &services->state_manager, services->ui_type_id))
         return false;
 
     runtime_update_transformer(services);

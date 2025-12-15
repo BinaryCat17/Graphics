@@ -199,7 +199,6 @@ void scroll_apply_offsets(ScrollContext* ctx, Widget* widgets, size_t widget_cou
             if (view_w < 0.0f) view_w = 0.0f;
             if (view_h < 0.0f) view_h = 0.0f;
         }
-        Rect inner_viewport = { view_x, view_y, view_w, view_h };
         float viewport_h = viewport.h;
         float content_h = a->has_bounds ? a->bounds.h : viewport_h;
         float overflow = content_h - viewport_h;
@@ -305,6 +304,7 @@ int scroll_handle_mouse_button(ScrollContext* ctx, Widget* widgets, size_t widge
 }
 
 void scroll_handle_cursor(ScrollContext* ctx, Widget* widgets, size_t widget_count, double mouse_x, double mouse_y) {
+    (void)mouse_x;
     if (!ctx || !ctx->dragging_area || !widgets || !ctx->dragging_widget) return;
     ctx->widgets = widgets;
     ctx->widget_count = widget_count;

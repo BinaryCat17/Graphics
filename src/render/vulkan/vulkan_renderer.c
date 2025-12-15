@@ -246,12 +246,6 @@ static VkFormat choose_depth_format(void)
     return VK_FORMAT_UNDEFINED;
 }
 
-/* Utility: read file into memory */
-static char* read_file_text(const char* path, size_t * out_len) {
-    FILE* f = platform_fopen(path, "rb"); if (!f) { fprintf(stderr, "Failed open %s\n", path); return NULL; }
-    fseek(f, 0, SEEK_END); long len = ftell(f); fseek(f, 0, SEEK_SET);
-    char* b = malloc(len + 1); fread(b, 1, len, f); b[len] = 0; if (out_len) *out_len = (size_t)len; fclose(f); return b;
-}
 /* read SPIR-V binary */
 static uint32_t* read_file_bin_u32(const char* path, size_t * out_words) {
     FILE* f = platform_fopen(path, "rb"); if (!f) { fprintf(stderr, "Failed open %s\n", path); return NULL; }
@@ -1503,7 +1497,6 @@ static bool emit_border_view_models(const UiRenderNode *node, ViewModelBuffer *b
 
     Rect border_clip = node->clip_rect;
     const Rect *clip_bounds = node_clip_rect(node);
-    LayoutResult border_clip_device = {0};
     const LayoutResult *border_clip_ptr = NULL;
     if (clip_bounds) {
         border_clip = (Rect){
@@ -1958,8 +1951,8 @@ static bool vk_backend_init(RendererBackend* backend, const RenderBackendInit* i
     g_window = init->window;
     g_platform_surface = init->surface;
     g_get_required_instance_extensions = init->get_required_instance_extensions;
-    g_create_surface = init->create_surface;
-    g_destroy_surface = init->destroy_surface;
+    g_create_surface = (bool (*)(PlatformWindow*, VkInstance, const VkAllocationCallbacks*, PlatformSurface*))init->create_surface;
+    g_destroy_surface = (void (*)(VkInstance, const VkAllocationCallbacks*, PlatformSurface*))init->destroy_surface;
     g_get_framebuffer_size = init->get_framebuffer_size;
     g_wait_events = init->wait_events;
     g_widgets = init->widgets;
@@ -2029,6 +2022,7 @@ static void vk_backend_draw(RendererBackend* backend) {
 }
 
 static void vk_backend_cleanup(RendererBackend* backend) {
+    (void)backend;
     if (g_device) vkDeviceWaitIdle(g_device);
     free(atlas);
     atlas = NULL;

@@ -115,7 +115,7 @@ PlatformDir* platform_dir_open(const char* path) {
     return dir;
 }
 
-static bool populate_entry(PlatformDir* dir, const char* name, bool is_dir, PlatformDirEntry* out_entry) {
+static bool populate_entry(const char* name, bool is_dir, PlatformDirEntry* out_entry) {
     if (!out_entry) return false;
     out_entry->name = strdup(name);
     if (!out_entry->name) return false;
@@ -140,7 +140,7 @@ bool platform_dir_read(PlatformDir* dir, PlatformDirEntry* out_entry) {
     const char* name = data.cFileName;
     if (strcmp(name, ".") == 0 || strcmp(name, "..") == 0) return platform_dir_read(dir, out_entry);
     bool is_dir = (data.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) != 0;
-    if (!populate_entry(dir, name, is_dir, out_entry)) return false;
+    if (!populate_entry(name, is_dir, out_entry)) return false;
     return true;
 #else
     struct dirent* ent = NULL;
@@ -155,7 +155,7 @@ bool platform_dir_read(PlatformDir* dir, PlatformDirEntry* out_entry) {
                 free(full);
             }
         }
-        if (populate_entry(dir, ent->d_name, is_dir, out_entry)) return true;
+        if (populate_entry(ent->d_name, is_dir, out_entry)) return true;
         return false;
     }
     return false;

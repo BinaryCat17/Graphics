@@ -114,8 +114,7 @@ bool ui_build(UiContext* ui, const CoreContext* core) {
         return false;
     }
 
-    ui->ui_root = ui_config_load_layout(&core->assets.ui_doc, core->model, ui->styles, core->assets.font_path,
-                                        &core->scene);
+    ui->ui_root = ui_config_load_layout(&core->assets.ui_doc, core->model, ui->styles, &core->scene);
     if (!ui->ui_root) {
         fprintf(stderr, "Failed to parse UI layout configuration.\n");
         return false;
@@ -138,7 +137,7 @@ bool ui_build(UiContext* ui, const CoreContext* core) {
     return true;
 }
 
-bool ui_prepare_runtime(UiContext* ui, const CoreContext* core, float ui_scale, StateManager* state_manager,
+bool ui_prepare_runtime(UiContext* ui, float ui_scale, StateManager* state_manager,
                        int ui_type_id) {
     if (!ui || !ui->layout_root) {
         fprintf(stderr, "UI runtime preparation received invalid layout.\n");

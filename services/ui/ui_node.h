@@ -87,8 +87,7 @@ typedef struct UiNode {
     size_t child_count;
 } UiNode;
 
-UiNode* ui_config_load_layout(const ConfigDocument* doc, const Model* model, const Style* styles, const char* font_path,
-                              const Scene* scene);
+UiNode* ui_config_load_layout(const ConfigDocument* doc, const Model* model, const Style* styles, const Scene* scene);
 void update_widget_bindings(UiNode* root, const Model* model);
 void free_ui_tree(UiNode* node);
 

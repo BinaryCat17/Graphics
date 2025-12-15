@@ -76,7 +76,7 @@ static void test_tree_population(void)
     Style* parsed_styles = ui_config_load_styles(styles_root);
     ConfigDocument layout_doc = {.format = CONFIG_FORMAT_JSON, .root = config_layout_root,
                                  .source_path = "assets/ui/config/layout/ui.yaml"};
-    UiNode* root = ui_config_load_layout(&layout_doc, NULL, parsed_styles, NULL, &scene);
+    UiNode* root = ui_config_load_layout(&layout_doc, NULL, parsed_styles, &scene);
     config_node_free(styles_root);
     config_node_free(config_layout_root);
     assert(root);
@@ -130,7 +130,7 @@ static void test_yaml_layout_parsing(void)
     assert(parsed_styles);
     ConfigDocument layout_doc = {.format = CONFIG_FORMAT_YAML, .root = layout_root,
                                  .source_path = "assets/ui/config/layout/ui.yaml"};
-    UiNode* root = ui_config_load_layout(&layout_doc, NULL, parsed_styles, NULL, NULL);
+    UiNode* root = ui_config_load_layout(&layout_doc, NULL, parsed_styles, NULL);
     assert(root);
     assert(root->child_count == 1);
     UiNode* child = &root->children[0];

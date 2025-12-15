@@ -213,20 +213,6 @@ static int detect_store_type(const ModuleSchema *schema, const char *store)
     return -1;
 }
 
-static char *dirname_dup(const char *path)
-{
-    if (!path) return NULL;
-    const char *slash = strrchr(path, '/');
-    if (!slash) slash = strrchr(path, '\\');
-    if (!slash) return NULL;
-    size_t len = (size_t)(slash - path);
-    char *out = (char *)malloc(len + 1);
-    if (!out) return NULL;
-    memcpy(out, path, len);
-    out[len] = 0;
-    return out;
-}
-
 static char *derive_store_from_path(const ModuleSchema *schema, const char *path)
 {
     if (!schema || !path) return NULL;
