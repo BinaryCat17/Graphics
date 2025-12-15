@@ -4,6 +4,7 @@
 #include <stdio.h>
 #include <threads.h>
 
+#include "app/app_services.h"
 #include "platform/platform.h"
 #include "render_runtime/render_runtime_service.h"
 #include "ui/ui_service.h"
@@ -55,7 +56,8 @@ static RenderServiceContext* render_service_context(void) {
     return (RenderServiceContext*)g_render_service_descriptor.context;
 }
 
-static bool render_service_init(AppServices* services, const ServiceConfig* config) {
+static bool render_service_init(void* ptr, const ServiceConfig* config) {
+    AppServices* services = (AppServices*)ptr;
     (void)config;
     if (!services || !services->render_runtime_context) {
         fprintf(stderr, "Render service init received invalid runtime context.\n");
@@ -70,7 +72,8 @@ static bool render_service_init(AppServices* services, const ServiceConfig* conf
     return true;
 }
 
-static bool render_service_start(AppServices* services, const ServiceConfig* config) {
+static bool render_service_start(void* ptr, const ServiceConfig* config) {
+    AppServices* services = (AppServices*)ptr;
     (void)config;
     RenderServiceContext* context = render_service_context();
     if (!context || !services || !services->render_runtime_context) {
@@ -89,7 +92,8 @@ static bool render_service_start(AppServices* services, const ServiceConfig* con
     return true;
 }
 
-static void render_service_stop(AppServices* services) {
+static void render_service_stop(void* ptr) {
+    AppServices* services = (AppServices*)ptr;
     (void)services;
     RenderServiceContext* context = render_service_context();
     if (!context) return;

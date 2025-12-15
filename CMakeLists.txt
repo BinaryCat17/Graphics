@@ -93,7 +93,14 @@ add_custom_target(Shaders DEPENDS ${SHADER_OUTPUTS})
 # --- More Libraries ---
 
 # Vulkan Renderer
-set(RENDER_VULKAN_SOURCES "src/render/vulkan/vulkan_renderer.c")
+set(RENDER_VULKAN_SOURCES
+    "src/render/vulkan/vulkan_renderer.c"
+    "src/render/vulkan/vk_utils.c"
+    "src/render/vulkan/vk_context.c"
+    "src/render/vulkan/vk_swapchain.c"
+    "src/render/vulkan/vk_pipeline.c"
+    "src/render/vulkan/vk_resources.c"
+    "src/render/vulkan/vk_ui_render.c")
 add_library(render_vulkan STATIC ${RENDER_VULKAN_SOURCES})
 target_include_directories(render_vulkan PUBLIC "src/" "services/" ${Stb_INCLUDE_DIR})
 target_link_libraries(render_vulkan PUBLIC render_common platform_layer Vulkan::Vulkan glfw Threads::Threads system_libs)

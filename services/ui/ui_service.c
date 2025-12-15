@@ -4,6 +4,7 @@
 #include <stdio.h>
 #include <string.h>
 
+#include "app/app_services.h"
 #include "platform/platform.h"
 #include "services/service_events.h"
 #include "ui/compositor.h"
@@ -247,7 +248,8 @@ void ui_handle_cursor(UiContext* ui, double x, double y) {
     scroll_handle_cursor(ui->scroll, ui->widgets.items, ui->widgets.count, (float)x, (float)y);
 }
 
-static bool ui_service_init(AppServices* services, const ServiceConfig* config) {
+static bool ui_service_init(void* ptr, const ServiceConfig* config) {
+    AppServices* services = (AppServices*)ptr;
     (void)config;
     if (!services) {
         fprintf(stderr, "UI service init received null services context.\n");
@@ -257,7 +259,8 @@ static bool ui_service_init(AppServices* services, const ServiceConfig* config) 
     return ui_service_subscribe(&services->ui, &services->state_manager, services->model_type_id);
 }
 
-static bool ui_service_start(AppServices* services, const ServiceConfig* config) {
+static bool ui_service_start(void* ptr, const ServiceConfig* config) {
+    AppServices* services = (AppServices*)ptr;
     (void)config;
     if (!services) {
         fprintf(stderr, "UI service start received null services context.\n");
@@ -270,7 +273,10 @@ static bool ui_service_start(AppServices* services, const ServiceConfig* config)
     return true;
 }
 
-static void ui_service_stop(AppServices* services) { ui_context_dispose(&services->ui); }
+static void ui_service_stop(void* ptr) {
+    AppServices* services = (AppServices*)ptr;
+    if (services) ui_context_dispose(&services->ui);
+}
 
 static const char* g_ui_dependencies[] = {"scene"};
 

@@ -73,7 +73,7 @@ static bool resolve_start_order(ServiceManager* manager) {
     return true;
 }
 
-void service_manager_stop(ServiceManager* manager, AppServices* services) {
+void service_manager_stop(ServiceManager* manager, void* services) {
     if (!manager) return;
     for (size_t i = manager->start_order_count; i-- > 0;) {
         size_t idx = manager->start_order[i];
@@ -86,7 +86,7 @@ void service_manager_stop(ServiceManager* manager, AppServices* services) {
     manager->start_order_count = 0;
 }
 
-bool service_manager_start(ServiceManager* manager, AppServices* services, const ServiceConfig* config) {
+bool service_manager_start(ServiceManager* manager, void* services, const ServiceConfig* config) {
     if (!manager || !services) return false;
     if (!resolve_start_order(manager)) return false;
 

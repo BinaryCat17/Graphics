@@ -182,7 +182,8 @@ bool render_runtime_service_prepare(RenderRuntimeServiceContext* context, AppSer
     return true;
 }
 
-static bool render_runtime_service_init(AppServices* services, const ServiceConfig* config) {
+static bool render_runtime_service_init(void* ptr, const ServiceConfig* config) {
+    AppServices* services = (AppServices*)ptr;
     if (!services) return false;
 
     static RenderRuntimeServiceContext g_context = {0};
@@ -212,7 +213,8 @@ static bool render_runtime_service_init(AppServices* services, const ServiceConf
     return render_runtime_service_bind(&g_context, services);
 }
 
-static bool render_runtime_service_start(AppServices* services, const ServiceConfig* config) {
+static bool render_runtime_service_start(void* ptr, const ServiceConfig* config) {
+    AppServices* services = (AppServices*)ptr;
     (void)config;
     if (!services || !services->render_runtime_context) {
         fprintf(stderr, "Render runtime service start received null services context.\n");
@@ -221,7 +223,8 @@ static bool render_runtime_service_start(AppServices* services, const ServiceCon
     return true;
 }
 
-static void render_runtime_service_stop(AppServices* services) {
+static void render_runtime_service_stop(void* ptr) {
+    AppServices* services = (AppServices*)ptr;
     if (!services || !services->render_runtime_context) return;
 
     RenderRuntimeServiceContext* context = services->render_runtime_context;

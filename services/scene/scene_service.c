@@ -123,17 +123,20 @@ void scene_service_unload(AppServices* services) {
     free_schemas(core);
 }
 
-static bool scene_service_init(AppServices* services, const ServiceConfig* config) {
+static bool scene_service_init(void* ptr, const ServiceConfig* config) {
+    AppServices* services = (AppServices*)ptr;
     (void)services;
     (void)config;
     return true;
 }
 
-static bool scene_service_start(AppServices* services, const ServiceConfig* config) {
+static bool scene_service_start(void* ptr, const ServiceConfig* config) {
+    AppServices* services = (AppServices*)ptr;
     return scene_service_load(services, config);
 }
 
-static void scene_service_stop(AppServices* services) {
+static void scene_service_stop(void* ptr) {
+    AppServices* services = (AppServices*)ptr;
     scene_service_unload(services);
 }
 

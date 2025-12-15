@@ -3,6 +3,7 @@
 
 #include <stdbool.h>
 
+#include "app/app_services.h"
 #include "assets/assets.h"
 #include "render/common/renderer_backend.h"
 #include "render/common/render_context.h"

@@ -4,8 +4,6 @@
 #include <stdbool.h>
 #include <stddef.h>
 
-#include "app/app_services.h"
-
 // Generic configuration passed to services during initialization and startup.
 typedef struct ServiceConfig {
     const char* assets_dir;
@@ -22,9 +20,9 @@ typedef struct ServiceDescriptor {
     const char* name;
     const char* const* dependencies;
     size_t dependency_count;
-    bool (*init)(AppServices* services, const ServiceConfig* config);
-    bool (*start)(AppServices* services, const ServiceConfig* config);
-    void (*stop)(AppServices* services);
+    bool (*init)(void* services, const ServiceConfig* config);
+    bool (*start)(void* services, const ServiceConfig* config);
+    void (*stop)(void* services);
     void* context;
     void* thread_handle;
 } ServiceDescriptor;
