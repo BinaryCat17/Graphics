@@ -248,6 +248,19 @@ void ui_handle_cursor(UiContext* ui, double x, double y) {
     scroll_handle_cursor(ui->scroll, ui->widgets.items, ui->widgets.count, (float)x, (float)y);
 }
 
+typedef struct UiServiceContext {
+    UiContext* ui;
+    const Assets* assets;
+    const Scene* scene;
+    Model* model;
+} UiServiceContext;
+
+static UiServiceContext g_ui_service_context_storage;
+
+static UiServiceContext* ui_service_context(void) {
+    return &g_ui_service_context_storage;
+}
+
 static bool ui_service_init(void* ptr, const ServiceConfig* config) {
     AppServices* services = (AppServices*)ptr;
     (void)config;
@@ -255,18 +268,28 @@ static bool ui_service_init(void* ptr, const ServiceConfig* config) {
         fprintf(stderr, "UI service init received null services context.\n");
         return false;
     }
+    
+    UiServiceContext* context = ui_service_context();
+    context->ui = &services->ui;
+    context->assets = &services->core.assets;
+    context->scene = &services->core.scene;
+    context->model = services->core.model;
+    
     ui_context_init(&services->ui);
     return ui_service_subscribe(&services->ui, &services->state_manager, services->model_type_id);
 }
 
 static bool ui_service_start(void* ptr, const ServiceConfig* config) {
-    AppServices* services = (AppServices*)ptr;
+    (void)ptr; // Ignore AppServices*
     (void)config;
-    if (!services) {
-        fprintf(stderr, "UI service start received null services context.\n");
+    
+    UiServiceContext* context = ui_service_context();
+    if (!context || !context->ui || !context->assets || !context->scene || !context->model) {
+        fprintf(stderr, "UI service start missing context or dependencies.\n");
         return false;
     }
-    if (!ui_build(&services->ui, &services->core.assets, &services->core.scene, services->core.model)) {
+    
+    if (!ui_build(context->ui, context->assets, context->scene, context->model)) {
         fprintf(stderr, "UI service failed to build UI.\n");
         return false;
     }
@@ -274,21 +297,26 @@ static bool ui_service_start(void* ptr, const ServiceConfig* config) {
 }
 
 static void ui_service_stop(void* ptr) {
-    AppServices* services = (AppServices*)ptr;
-    if (services) ui_context_dispose(&services->ui);
+    (void)ptr;
+    UiServiceContext* context = ui_service_context();
+    if (context && context->ui) {
+        ui_context_dispose(context->ui);
+    }
 }
 
 static const char* g_ui_dependencies[] = {"scene"};
 
-static const ServiceDescriptor g_ui_service_descriptor = {
+static ServiceDescriptor g_ui_service_descriptor = {
     .name = "ui",
     .dependencies = g_ui_dependencies,
     .dependency_count = sizeof(g_ui_dependencies) / sizeof(g_ui_dependencies[0]),
     .init = ui_service_init,
     .start = ui_service_start,
     .stop = ui_service_stop,
-    .context = NULL,
+    .context = &g_ui_service_context_storage,
     .thread_handle = NULL,
 };
 
-const ServiceDescriptor* ui_service_descriptor(void) { return &g_ui_service_descriptor; }
+const ServiceDescriptor* ui_service_descriptor(void) { 
+    return &g_ui_service_descriptor; 
+}

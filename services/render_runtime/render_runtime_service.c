@@ -44,6 +44,9 @@ static void render_runtime_service_reset(RenderRuntimeServiceContext* context, A
 
     *context = (RenderRuntimeServiceContext){
         .render = services ? &services->render : NULL,
+        .assets = services ? &services->core.assets : NULL,
+        .ui = services ? &services->ui : NULL,
+        .model = services ? services->core.model : NULL,
         .state_manager = services ? &services->state_manager : NULL,
         .assets_type_id = services ? services->assets_type_id : -1,
         .ui_type_id = services ? services->ui_type_id : -1,
@@ -160,30 +163,25 @@ void render_runtime_service_update_transformer(RenderRuntimeServiceContext* cont
     }
 }
 
-bool render_runtime_service_prepare(RenderRuntimeServiceContext* context, AppServices* services) {
-    if (!context || !services) return false;
-
-    // Inject dependencies required for initialization
-    context->ui = &services->ui;
-    context->assets = &services->core.assets;
-    context->model = services->core.model;
+bool render_runtime_service_prepare(RenderRuntimeServiceContext* context) {
+    if (!context) return false;
 
     if (!runtime_init(context)) {
         fprintf(stderr, "Render runtime initialization failed.\n");
         return false;
     }
 
-    RenderReadyComponent ready = {.render = &services->render,
-                                  .assets = &services->core.assets,
-                                  .ui = &services->ui,
-                                  .widgets = services->ui.widgets,
-                                  .display_list = services->ui.display_list,
-                                  .model = services->core.model,
+    RenderReadyComponent ready = {.render = context->render,
+                                  .assets = context->assets,
+                                  .ui = context->ui,
+                                  .widgets = context->widgets,
+                                  .display_list = context->display_list,
+                                  .model = context->model,
                                   .ready = true};
-    state_manager_publish(&services->state_manager, STATE_EVENT_COMPONENT_ADDED, services->render_ready_type_id, "active",
+    state_manager_publish(context->state_manager, STATE_EVENT_COMPONENT_ADDED, context->render_ready_type_id, "active",
                           &ready, sizeof(ready));
 
-    state_manager_dispatch(&services->state_manager, 0);
+    state_manager_dispatch(context->state_manager, 0);
     return true;
 }
 

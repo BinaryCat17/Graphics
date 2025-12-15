@@ -32,6 +32,6 @@ typedef struct RenderRuntimeServiceContext {
 const ServiceDescriptor* render_runtime_service_descriptor(void);
 RenderRuntimeServiceContext* render_runtime_service_context(const ServiceDescriptor* descriptor);
 void render_runtime_service_update_transformer(RenderRuntimeServiceContext* context, RenderRuntimeContext* render);
-bool render_runtime_service_prepare(RenderRuntimeServiceContext* context, AppServices* services);
+bool render_runtime_service_prepare(RenderRuntimeServiceContext* context);
 
 #endif // RENDER_RUNTIME_SERVICE_H

@@ -11,7 +11,6 @@
 
 typedef struct RenderServiceContext {
     RenderRuntimeServiceContext* runtime;
-    AppServices* services;
     thrd_t thread;
     bool running;
     bool thread_active;
@@ -36,11 +35,11 @@ static void render_service_run_loop(RenderServiceContext* service) {
 
 static int render_service_thread(void* user_data) {
     RenderServiceContext* context = (RenderServiceContext*)user_data;
-    if (!context || !context->runtime || !context->services) {
+    if (!context || !context->runtime) {
         return -1;
     }
 
-    if (!render_runtime_service_prepare(context->runtime, context->services)) {
+    if (!render_runtime_service_prepare(context->runtime)) {
         context->running = false;
         context->thread_active = false;
         return -1;
@@ -65,7 +64,6 @@ static bool render_service_init(void* ptr, const ServiceConfig* config) {
     }
     static RenderServiceContext g_context = {0};
     g_context.runtime = services->render_runtime_context;
-    g_context.services = services;
     g_context.running = false;
     g_context.thread_active = false;
     g_render_service_descriptor.context = &g_context;
