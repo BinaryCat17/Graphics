@@ -105,7 +105,7 @@ static void test_label_text_preserved_utf8(void) {
     const char* styles_json = "{\"styles\":{\"zero\":{\"padding\":0,\"borderThickness\":0}}}";
     LayoutFixture fx = build_widgets(styles_json, layout_json);
     assert(fx.widgets.count == 1);
-    assert(strcmp(fx.widgets.items[0].text, "Привет мир") == 0);
+    assert(strcmp(fx.widgets.items[0].data.label.text, "Привет мир") == 0);
     free_fixture(&fx);
 }
 
@@ -120,7 +120,7 @@ static void test_scrollbar_shown_for_overflow(void) {
         Widget* w = &fx.widgets.items[i];
         if (w->type == W_SCROLLBAR) {
             found_scrollbar = 1;
-            assert(w->show_scrollbar);
+            assert(w->data.scroll.show);
         }
     }
     assert(found_scrollbar);
@@ -143,10 +143,15 @@ static void test_children_visible_without_clip_flag(void) {
         "{\"layout\":{\"type\":\"column\",\"style\":\"zeroPad\",\"children\":[{\"type\":\"panel\",\"h\":25},{\"type\":\"panel\",\"h\":25}]}}";
     LayoutFixture fx = build_widgets(styles_json, layout_json);
 
-    assert(fx.layout->wants_clip == 0);
-    assert(fx.layout->child_count == 2);
-    assert(fx.layout->children[0].wants_clip == 0);
-    assert(fx.layout->children[1].wants_clip == 0);
+    LayoutNode* root = fx.layout;
+    if (root && root->child_count == 1 && root->source->layout == UI_LAYOUT_ABSOLUTE) {
+        root = &root->children[0];
+    }
+
+    assert(root->wants_clip == 0);
+    assert(root->child_count == 2);
+    assert(root->children[0].wants_clip == 0);
+    assert(root->children[1].wants_clip == 0);
 
     assert(fx.widgets.count == 2);
     for (size_t i = 0; i < fx.widgets.count; i++) {
@@ -176,8 +181,13 @@ static void test_auto_wrapped_scrollbar_keeps_children_visible(void) {
 
     assert(found_scrollbar);
 
-    if (fx.layout && fx.layout->child_count > 0) {
-        LayoutNode* scroll_layout = &fx.layout->children[0];
+    LayoutNode* root = fx.layout;
+    if (root && root->child_count == 1 && root->source->layout == UI_LAYOUT_ABSOLUTE) {
+        root = &root->children[0];
+    }
+
+    if (root && root->child_count > 0) {
+        LayoutNode* scroll_layout = &root->children[0];
         assert(scroll_layout->source->widget_type == W_SCROLLBAR);
         assert(scroll_layout->wants_clip == 0);
     }

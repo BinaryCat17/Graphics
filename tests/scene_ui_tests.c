@@ -132,8 +132,19 @@ static void test_yaml_layout_parsing(void)
                                  .source_path = "assets/ui/config/layout/ui.yaml"};
     UiNode* root = ui_config_load_layout(&layout_doc, NULL, parsed_styles, NULL);
     assert(root);
-    assert(root->child_count == 1);
-    UiNode* child = &root->children[0];
+    
+    // Unwrap the root absolute container
+    UiNode* layout_node = root;
+    if (root->child_count == 1 && (!root->type || strcmp(root->type, "column") != 0)) {
+        layout_node = &root->children[0];
+    }
+    
+    // Verify column
+    assert(layout_node->type && strcmp(layout_node->type, "column") == 0);
+    assert(layout_node->child_count == 1);
+
+    // Verify label
+    UiNode* child = &layout_node->children[0];
     assert(child->type && strcmp(child->type, "label") == 0);
     assert(child->text && strcmp(child->text, "Example") == 0);
     assert(child->style_name && strcmp(child->style_name, "base") == 0);
