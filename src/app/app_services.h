@@ -2,9 +2,9 @@
 #define APP_SERVICES_H
 
 #include "app/context/core_context.h"
-#include "render/common/render_context.h"
-#include "state/state_manager.h"
-#include "ui/ui_context.h"
+#include "services/render/backend/common/render_context.h"
+#include "core/state/state_manager.h"
+#include "services/ui/ui_context.h"
 
 struct RenderRuntimeServiceContext;
 

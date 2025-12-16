@@ -1,0 +1,9 @@
+service:
+  name: AssetsService
+  header: services/assets/assets.h
+  runtime: false
+
+components:
+  - name: AssetsComponent
+    fields:
+      - { name: "assets", type: "Assets*" }

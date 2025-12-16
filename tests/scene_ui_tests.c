@@ -3,13 +3,13 @@
 #include <stdio.h>
 #include <string.h>
 
-#include "platform/platform.h"
-#include "ui/scene_ui.h"
-#include "config/config_io.h"
-#include "ui/model_style.h"
-#include "ui/ui_node.h"
-#include "ui/layout_tree.h"
-#include "ui/widget_list.h"
+#include "core/platform/platform.h"
+#include "services/ui/scene_ui.h"
+#include "core/config/config_io.h"
+#include "services/ui/model_style.h"
+#include "services/ui/ui_node.h"
+#include "services/ui/layout_tree.h"
+#include "services/ui/widget_list.h"
 
 static UiNode* find_by_id(UiNode* node, const char* id)
 {

@@ -3,9 +3,9 @@
 #include <math.h>
 #include <stdio.h>
 
-#include "coordinate_systems/coordinate_systems.h"
-#include "render/common/render_composition.h"
-#include "render/common/ui_mesh_builder.h"
+#include "core/math/coordinate_systems.h"
+#include "services/render/backend/common/render_composition.h"
+#include "services/render/backend/common/ui_mesh_builder.h"
 
 static void compute_bounds(const UiVertexBuffer *background, const UiTextVertexBuffer *text, float *bg_min_x, float *bg_max_x,
                            float *bg_min_y, float *bg_max_y, float *text_min_x, float *text_max_x, float *text_min_y,

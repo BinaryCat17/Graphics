@@ -3,3 +3,6 @@ out
 vcpkg_installed
 *.spv
 .gemini
+worktmp/
+generated/
+__pycache__/

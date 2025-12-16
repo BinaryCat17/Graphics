@@ -3,13 +3,13 @@
 #include <string.h>
 #include <stdio.h>
 
-#include "ui/compositor.h"
-#include "ui/scroll.h"
-#include "ui/model_style.h"
-#include "ui/ui_node.h"
-#include "ui/layout_tree.h"
-#include "ui/widget_list.h"
-#include "ui/compositor.h"
+#include "services/ui/compositor.h"
+#include "services/ui/scroll.h"
+#include "services/ui/model_style.h"
+#include "services/ui/ui_node.h"
+#include "services/ui/layout_tree.h"
+#include "services/ui/widget_list.h"
+#include "services/ui/compositor.h"
 
 static void test_popup_not_clipped(void) {
     UiNode popup = {.layout = UI_LAYOUT_NONE, .widget_type = W_PANEL, .has_w = 1, .has_h = 1, .has_x = 1, .has_y = 1};

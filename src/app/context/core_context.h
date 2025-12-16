@@ -1,10 +1,10 @@
 #ifndef APP_CONTEXT_CORE_CONTEXT_H
 #define APP_CONTEXT_CORE_CONTEXT_H
 
-#include "assets/assets.h"
-#include "scene/cad_scene.h"
-#include "config/module_yaml_loader.h"
-#include "ui/model_style.h"
+#include "services/assets/assets.h"
+#include "services/scene/cad_scene.h"
+#include "core/config/module_yaml_loader.h"
+#include "services/ui/model_style.h"
 
 // Owns application-level state shared between systems.
 typedef struct CoreContext {

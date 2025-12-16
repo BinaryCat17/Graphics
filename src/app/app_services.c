@@ -3,7 +3,7 @@
 #include <stdio.h>
 #include <string.h>
 
-#include "services/service_events.h"
+#include "services/manager/service_events.h"
 
 AppServicesResult app_services_init(AppServices* services) {
     if (!services) return APP_SERVICES_ERROR_INVALID_ARGUMENT;
@@ -16,35 +16,15 @@ AppServicesResult app_services_init(AppServices* services) {
         return APP_SERVICES_ERROR_STATE_MANAGER_INIT;
     }
 
-    sm_result =
-        state_manager_register_type(&services->state_manager, STATE_COMPONENT_SCENE, sizeof(SceneComponent), 1,
-                                    &services->scene_type_id);
-    if (sm_result != STATE_MANAGER_OK) goto register_error;
+    Generated_RegisterComponents(&services->state_manager);
 
-    sm_result = state_manager_register_type(&services->state_manager, STATE_COMPONENT_ASSETS, sizeof(AssetsComponent), 1,
-                                            &services->assets_type_id);
-    if (sm_result != STATE_MANAGER_OK) goto register_error;
-
-    sm_result = state_manager_register_type(&services->state_manager, STATE_COMPONENT_MODEL, sizeof(ModelComponent), 1,
-                                            &services->model_type_id);
-    if (sm_result != STATE_MANAGER_OK) goto register_error;
-
-    sm_result = state_manager_register_type(&services->state_manager, STATE_COMPONENT_UI, sizeof(UiRuntimeComponent), 1,
-                                            &services->ui_type_id);
-    if (sm_result != STATE_MANAGER_OK) goto register_error;
-
-    sm_result = state_manager_register_type(&services->state_manager, STATE_COMPONENT_RENDER_READY,
-                                            sizeof(RenderReadyComponent), 1, &services->render_ready_type_id);
-    if (sm_result != STATE_MANAGER_OK) goto register_error;
+    services->scene_type_id = TYPE_ID_SCENE;
+    services->assets_type_id = TYPE_ID_ASSETS;
+    services->model_type_id = TYPE_ID_MODEL;
+    services->ui_type_id = TYPE_ID_UIRUNTIME;
+    services->render_ready_type_id = TYPE_ID_RENDERREADY;
 
     return APP_SERVICES_OK;
-
-register_error:
-    fprintf(stderr, "app_services_init: failed to register component types: %s\n",
-            state_manager_result_message(sm_result));
-    state_manager_dispose(&services->state_manager);
-    memset(services, 0, sizeof(AppServices));
-    return APP_SERVICES_ERROR_STATE_MANAGER_REGISTER;
 }
 
 void app_services_shutdown(AppServices* services) {
@@ -65,4 +45,3 @@ const char* app_services_result_message(AppServicesResult result) {
     }
     return "unknown error";
 }
-

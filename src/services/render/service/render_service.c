@@ -1,0 +1,127 @@
+#include "services/render/service/render_service.h"
+
+#include <stdbool.h>
+#include <stdio.h>
+#include <threads.h>
+
+#include "app/app_services.h"
+#include "core/platform/platform.h"
+#include "services/render/runtime/render_runtime_service.h"
+#include "services/ui/ui_service.h"
+
+typedef struct RenderServiceContext {
+    RenderRuntimeServiceContext* runtime;
+    thrd_t thread;
+    bool running;
+    bool thread_active;
+} RenderServiceContext;
+
+static ServiceDescriptor g_render_service_descriptor;
+
+static void render_service_run_loop(RenderServiceContext* service) {
+    if (!service || !service->runtime) return;
+    RenderRuntimeServiceContext* context = service->runtime;
+    if (!context->render || !context->state_manager) return;
+
+    while (service->running && !platform_window_should_close(context->render->window)) {
+        state_manager_dispatch(context->state_manager, 0);
+        platform_poll_events();
+        if (context->renderer_ready && context->ui && context->model && context->backend && context->backend->draw) {
+            ui_frame_update(context->ui);
+            context->backend->draw(context->backend);
+        }
+    }
+}
+
+static int render_service_thread(void* user_data) {
+    RenderServiceContext* context = (RenderServiceContext*)user_data;
+    if (!context || !context->runtime) {
+        return -1;
+    }
+
+    if (!render_runtime_service_prepare(context->runtime)) {
+        context->running = false;
+        context->thread_active = false;
+        return -1;
+    }
+
+    render_service_run_loop(context);
+    context->running = false;
+    context->thread_active = false;
+    return 0;
+}
+
+static RenderServiceContext* render_service_context(void) {
+    return (RenderServiceContext*)g_render_service_descriptor.context;
+}
+
+static bool render_service_init(void* ptr, const ServiceConfig* config) {
+    AppServices* services = (AppServices*)ptr;
+    (void)config;
+    if (!services || !services->render_runtime_context) {
+        fprintf(stderr, "Render service init received invalid runtime context.\n");
+        return false;
+    }
+    static RenderServiceContext g_context = {0};
+    g_context.runtime = services->render_runtime_context;
+    g_context.running = false;
+    g_context.thread_active = false;
+    g_render_service_descriptor.context = &g_context;
+    return true;
+}
+
+static bool render_service_start(void* ptr, const ServiceConfig* config) {
+    AppServices* services = (AppServices*)ptr;
+    (void)config;
+    RenderServiceContext* context = render_service_context();
+    if (!context || !services || !services->render_runtime_context) {
+        fprintf(stderr, "Render service start received invalid arguments.\n");
+        return false;
+    }
+
+    context->running = true;
+    context->thread_active = thrd_create(&context->thread, render_service_thread, context) == thrd_success;
+    if (!context->thread_active) {
+        fprintf(stderr, "Failed to start render service loop thread.\n");
+        context->running = false;
+        return false;
+    }
+    g_render_service_descriptor.thread_handle = &context->thread;
+    return true;
+}
+
+static void render_service_stop(void* ptr) {
+    AppServices* services = (AppServices*)ptr;
+    (void)services;
+    RenderServiceContext* context = render_service_context();
+    if (!context) return;
+
+    if (!context->running && !context->thread_active) return;
+
+    context->running = false;
+    if (context->runtime && context->runtime->render && context->runtime->render->window) {
+        platform_set_window_should_close(context->runtime->render->window, true);
+    }
+
+    if (context->thread_active) {
+        thrd_join(context->thread, NULL);
+        context->thread_active = false;
+    }
+}
+
+static const char* g_render_service_dependencies[] = {"render-runtime"};
+
+static ServiceDescriptor g_render_service_descriptor = {
+    .name = "render",
+    .dependencies = g_render_service_dependencies,
+    .dependency_count = sizeof(g_render_service_dependencies) / sizeof(g_render_service_dependencies[0]),
+    .init = render_service_init,
+    .start = render_service_start,
+    .stop = render_service_stop,
+    .context = NULL,
+    .thread_handle = NULL,
+};
+
+const ServiceDescriptor* render_service_descriptor(void) {
+    return &g_render_service_descriptor;
+}

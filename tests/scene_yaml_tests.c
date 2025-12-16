@@ -1,9 +1,9 @@
 #include <assert.h>
-#include "platform/platform.h"
+#include "core/platform/platform.h"
 #include <stdio.h>
 #include <string.h>
 
-#include "scene/cad_scene_yaml.h"
+#include "services/scene/cad_scene_yaml.h"
 
 static const char *write_temp(const char *name, const char *text)
 {
