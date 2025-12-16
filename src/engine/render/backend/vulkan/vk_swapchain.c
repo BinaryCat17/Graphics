@@ -182,7 +182,7 @@ void vk_create_swapchain_and_views(VulkanRendererState* state, VkSwapchainKHR ol
     
     double swapchain_start = vk_now_ms();
     state->res = vkCreateSwapchainKHR(state->device, &sci, NULL, &state->swapchain);
-    vk_log_command(state, "vkCreateSwapchainKHR", "swapchain setup", swapchain_start);
+    vk_log_command(state, RENDER_LOG_INFO, "vkCreateSwapchainKHR", "swapchain setup", swapchain_start);
     
     if (state->res != VK_SUCCESS) fatal_vk("vkCreateSwapchainKHR", state->res);
     
@@ -369,7 +369,7 @@ void vk_cleanup_swapchain(VulkanRendererState* state, bool keep_swapchain_handle
     if (!keep_swapchain_handle && state->swapchain) {
         double destroy_start = vk_now_ms();
         vkDestroySwapchainKHR(state->device, state->swapchain, NULL);
-        vk_log_command(state, "vkDestroySwapchainKHR", "cleanup", destroy_start);
+        vk_log_command(state, RENDER_LOG_INFO, "vkDestroySwapchainKHR", "cleanup", destroy_start);
         state->swapchain = VK_NULL_HANDLE;
     }
     if (state->pipeline) {

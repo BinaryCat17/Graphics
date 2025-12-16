@@ -50,7 +50,7 @@ typedef struct RenderSystem {
 
 typedef struct RenderSystemConfig {
     const char* backend_type; // "vulkan"
-    bool render_log_enabled;
+    RenderLogLevel log_level; // Changed from bool to level
 } RenderSystemConfig;
 
 bool render_system_init(RenderSystem* sys, const RenderSystemConfig* config);

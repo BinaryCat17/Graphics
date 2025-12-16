@@ -1,13 +1,22 @@
 #ifndef VK_UTILS_H
 #define VK_UTILS_H
 
-#include "vk_types.h"
+#include "engine/render/backend/vulkan/vk_types.h"
 
+// Error handling
+void fatal_vk(const char* msg, VkResult res);
 void fatal(const char* msg);
-void fatal_vk(const char* msg, VkResult r);
+
+// Time
 double vk_now_ms(void);
-void vk_log_command(VulkanRendererState* state, const char* command, const char* params, double start_ms);
-uint32_t find_mem_type(VkPhysicalDevice physical, uint32_t typeFilter, VkMemoryPropertyFlags props);
-uint32_t* read_file_bin_u32(const char* path, size_t * out_words);
+
+// Logging
+void vk_log_command(VulkanRendererState* state, RenderLogLevel level, const char* cmd, const char* param, double start_time_ms);
+
+// Memory
+uint32_t find_mem_type(VkPhysicalDevice physical_device, uint32_t type_filter, VkMemoryPropertyFlags properties);
+
+// File I/O
+uint32_t* read_file_bin_u32(const char* filename, size_t* out_size);
 
 #endif // VK_UTILS_H

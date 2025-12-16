@@ -125,8 +125,10 @@ bool render_system_init(RenderSystem* sys, const RenderSystemConfig* config) {
     }
 
     if (config) {
-        sys->logger_config.enabled = config->render_log_enabled;
+        sys->logger_config.level = config->log_level;
         sys->logger_config.sink_type = RENDER_LOG_SINK_STDOUT;
+    } else {
+        sys->logger_config.level = RENDER_LOG_INFO; // Default
     }
 
     // Init runtime thread context (window creation usually happens here or in runtime_init)

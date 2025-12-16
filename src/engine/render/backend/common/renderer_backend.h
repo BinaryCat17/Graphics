@@ -16,6 +16,12 @@ typedef enum RenderLogSinkType {
     RENDER_LOG_SINK_RING_BUFFER,
 } RenderLogSinkType;
 
+typedef enum RenderLogLevel {
+    RENDER_LOG_NONE = 0,
+    RENDER_LOG_INFO = 1,    // Initialization, Resizing, Recreation
+    RENDER_LOG_VERBOSE = 2  // Per-frame commands (Draw, Present)
+} RenderLogLevel;
+
 typedef struct RenderLogEntry {
     const char* backend_id;
     const char* command;
@@ -27,7 +33,7 @@ typedef struct RenderLoggerConfig {
     RenderLogSinkType sink_type;
     const char* sink_target;
     size_t ring_capacity;
-    bool enabled;
+    RenderLogLevel level; // Replaces 'enabled'
 } RenderLoggerConfig;
 
 typedef struct RenderLogger {
@@ -37,7 +43,7 @@ typedef struct RenderLogger {
     RenderLogEntry* ring_entries;
     size_t ring_capacity;
     size_t ring_head;
-    bool enabled;
+    RenderLogLevel level;
 } RenderLogger;
 
 typedef struct RenderBackendInit {
@@ -71,7 +77,7 @@ typedef struct RendererBackend {
 } RendererBackend;
 
 bool render_logger_init(RenderLogger* logger, const RenderLoggerConfig* config, const char* backend_id);
-void render_logger_log(RenderLogger* logger, const char* command, const char* parameters, double duration_ms);
+void render_logger_log(RenderLogger* logger, RenderLogLevel level, const char* command, const char* parameters, double duration_ms);
 void render_logger_cleanup(RenderLogger* logger);
 
 bool renderer_backend_register(RendererBackend* backend);

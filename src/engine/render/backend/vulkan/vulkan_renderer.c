@@ -219,7 +219,7 @@ static void draw_frame(VulkanRendererState* state) {
     
     double submit_start = vk_now_ms();
     VkResult submit = vkQueueSubmit(state->queue, 1, &si, state->fences[img_idx]);
-    vk_log_command(state, "vkQueueSubmit", "draw", submit_start);
+    vk_log_command(state, RENDER_LOG_VERBOSE, "vkQueueSubmit", "draw", submit_start);
     
     if (submit == VK_ERROR_DEVICE_LOST) {
         if (!recover_device_loss(state)) fatal_vk("vkQueueSubmit", submit);
@@ -240,7 +240,7 @@ static void draw_frame(VulkanRendererState* state) {
     VkPresentInfoKHR pi = { .sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR, .waitSemaphoreCount = 1, .pWaitSemaphores = &state->sem_render_done, .swapchainCount = 1, .pSwapchains = &state->swapchain, .pImageIndices = &img_idx };
     double present_start = vk_now_ms();
     VkResult present = vkQueuePresentKHR(state->queue, &pi);
-    vk_log_command(state, "vkQueuePresentKHR", "present", present_start);
+    vk_log_command(state, RENDER_LOG_VERBOSE, "vkQueuePresentKHR", "present", present_start);
     
     if (present == VK_ERROR_DEVICE_LOST) { if (!recover_device_loss(state)) fatal_vk("vkQueuePresentKHR", present); return; }
     if (present == VK_ERROR_OUT_OF_DATE_KHR || present == VK_SUBOPTIMAL_KHR) { 

@@ -43,7 +43,7 @@ void vk_create_instance(VulkanRendererState* state) {
     
     double start = vk_now_ms();
     state->res = vkCreateInstance(&ici, NULL, &state->instance);
-    vk_log_command(state, "vkCreateInstance", "application", start);
+    vk_log_command(state, RENDER_LOG_INFO, "vkCreateInstance", "application", start);
     
     if (state->res != VK_SUCCESS) fatal_vk("vkCreateInstance", state->res);
 }

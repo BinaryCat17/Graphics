@@ -4,11 +4,11 @@
 #include <stddef.h>
 
 static VkShaderModule create_shader_module_from_spv(VulkanRendererState* state, const char* path) {
-    size_t words = 0; 
-    uint32_t* code = read_file_bin_u32(path, &words);
+    size_t code_size_bytes = 0; 
+    uint32_t* code = read_file_bin_u32(path, &code_size_bytes);
     if (!code) fatal("read spv");
     
-    VkShaderModuleCreateInfo smci = { .sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO, .codeSize = words * 4, .pCode = code };
+    VkShaderModuleCreateInfo smci = { .sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO, .codeSize = code_size_bytes, .pCode = code };
     VkShaderModule mod; 
     state->res = vkCreateShaderModule(state->device, &smci, NULL, &mod);
     if (state->res != VK_SUCCESS) fatal_vk("vkCreateShaderModule", state->res);
