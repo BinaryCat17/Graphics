@@ -26,61 +26,8 @@ find_package(Stb REQUIRED)
 find_package(glfw3 CONFIG REQUIRED)
 find_package(Vulkan REQUIRED)
 
-# --- Code Generation ---
-
-find_package(Python3 REQUIRED)
-set(GENERATED_DIR ${CMAKE_CURRENT_SOURCE_DIR}/generated)
-file(MAKE_DIRECTORY ${GENERATED_DIR})
-
-add_custom_command(
-    OUTPUT ${GENERATED_DIR}/services_registry.h ${GENERATED_DIR}/services_registry.c
-    COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tools/generate_services.py
-    WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
-    DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/tools/generate_services.py
-    COMMENT "Generating service registry code"
-)
-
-add_custom_target(GenerateServices DEPENDS ${GENERATED_DIR}/services_registry.h ${GENERATED_DIR}/services_registry.c)
-
-# --- Common Helpers ---
-
-# Interface library for system dependencies (like math lib)
-add_library(system_libs INTERFACE)
-target_include_directories(system_libs INTERFACE "${GENERATED_DIR}")
-if(NOT MSVC)
-    target_link_libraries(system_libs INTERFACE m)
-endif()
-
-# --- Library Targets ---
-
-# Platform Layer
-set(PLATFORM_SOURCES "src/core/platform/glfw_platform.c" "src/core/platform/fs.c")
-add_library(platform_layer STATIC ${PLATFORM_SOURCES})
-target_include_directories(platform_layer PUBLIC "src/")
-target_link_libraries(platform_layer PUBLIC glfw Vulkan::Vulkan system_libs)
-
-# Core library (Math + Memory)
-set(CORE_SOURCES
-        "src/core/math/coordinate_systems.c"
-        "src/core/math/layout_geometry.c"
-        "src/core/memory/buffer.c")
-add_library(core STATIC ${CORE_SOURCES})
-target_include_directories(core PUBLIC "src/")
-target_link_libraries(core PUBLIC system_libs)
-
-# Render Backend Common
-set(RENDER_COMMON_SOURCES
-        "src/services/render/render_graph/render_graph.c"
-        "src/services/render/backend/common/render_composition.c"
-        "src/services/render/backend/common/ui_mesh_builder.c"
-        "src/services/render/backend/common/renderer_backend.c"
-        "src/services/render/backend/common/stb_impl.c")
-add_library(render_common STATIC ${RENDER_COMMON_SOURCES})
-target_include_directories(render_common PUBLIC "src/" ${Stb_INCLUDE_DIR})
-target_link_libraries(render_common PUBLIC core system_libs)
-
 # --- Shaders ---
-
+# (Keeping shader compilation logic as is)
 find_program(GLSLC_EXECUTABLE glslc HINTS ENV VULKAN_SDK PATH_SUFFIXES Bin)
 if (NOT GLSLC_EXECUTABLE)
     message(FATAL_ERROR "glslc compiler not found. Install Vulkan SDK or ensure glslc is on PATH.")
@@ -99,7 +46,6 @@ function(add_shader_compile FILE_NAME)
         COMMENT "Compiling shader ${FILE_NAME}"
         VERBATIM
     )
-    # Append to the list in parent scope so the target sees it
     set(SHADER_OUTPUTS ${SHADER_OUTPUTS} ${OUTPUT} PARENT_SCOPE)
 endfunction()
 
@@ -108,121 +54,132 @@ add_shader_compile("shader.frag")
 
 add_custom_target(Shaders DEPENDS ${SHADER_OUTPUTS})
 
-# --- More Libraries ---
+# --- FOUNDATION LAYER ---
 
-# Vulkan Renderer Backend
-set(RENDER_VULKAN_SOURCES
-    "src/services/render/backend/vulkan/vk_render_graph.c"
-    "src/services/render/backend/vulkan/vulkan_renderer.c"
-    "src/services/render/backend/vulkan/vk_utils.c"
-    "src/services/render/backend/vulkan/vk_context.c"
-    "src/services/render/backend/vulkan/vk_swapchain.c"
-    "src/services/render/backend/vulkan/vk_pipeline.c"
-    "src/services/render/backend/vulkan/vk_resources.c"
-    "src/services/render/backend/vulkan/vk_ui_render.c")
-add_library(render_vulkan STATIC ${RENDER_VULKAN_SOURCES})
-target_include_directories(render_vulkan PUBLIC "src/" ${Stb_INCLUDE_DIR})
-target_link_libraries(render_vulkan PUBLIC render_common platform_layer Vulkan::Vulkan glfw Threads::Threads system_libs)
+# Platform
+set(FOUNDATION_PLATFORM_SOURCES
+    "src/foundation/platform/glfw_platform.c"
+    "src/foundation/platform/fs.c")
+add_library(foundation_platform STATIC ${FOUNDATION_PLATFORM_SOURCES})
+target_include_directories(foundation_platform PUBLIC "src/")
+target_link_libraries(foundation_platform PUBLIC glfw Vulkan::Vulkan)
 
-# Config library
-set(CONFIG_SOURCES
-    "src/core/config/simple_yaml.c"
-    "src/core/config/module_yaml_loader.c"
-    "src/core/config/config_document.c"
-    "src/core/config/config_io.c")
-add_library(config STATIC ${CONFIG_SOURCES})
-target_include_directories(config PUBLIC "src/")
-target_link_libraries(config PUBLIC platform_layer system_libs)
+# Math
+set(FOUNDATION_MATH_SOURCES
+    "src/foundation/math/coordinate_systems.c"
+    "src/foundation/math/layout_geometry.c")
+add_library(foundation_math STATIC ${FOUNDATION_MATH_SOURCES})
+target_include_directories(foundation_math PUBLIC "src/")
 
-# State Manager library
-set(STATE_MANAGER_SOURCES "src/core/state/state_manager.c")
-add_library(state_manager STATIC ${STATE_MANAGER_SOURCES})
-target_include_directories(state_manager PUBLIC "src/")
+# Memory
+set(FOUNDATION_MEMORY_SOURCES "src/foundation/memory/buffer.c")
+add_library(foundation_memory STATIC ${FOUNDATION_MEMORY_SOURCES})
+target_include_directories(foundation_memory PUBLIC "src/")
 
-# Assets Service Library
-set(ASSETS_SOURCES "src/services/assets/assets_service.c")
-add_library(assets STATIC ${ASSETS_SOURCES})
-target_include_directories(assets PUBLIC "src/")
-target_link_libraries(assets PUBLIC platform_layer)
+# Config
+set(FOUNDATION_CONFIG_SOURCES
+    "src/foundation/config/simple_yaml.c"
+    "src/foundation/config/module_yaml_loader.c"
+    "src/foundation/config/config_document.c"
+    "src/foundation/config/config_io.c")
+add_library(foundation_config STATIC ${FOUNDATION_CONFIG_SOURCES})
+target_include_directories(foundation_config PUBLIC "src/")
+target_link_libraries(foundation_config PUBLIC foundation_platform)
 
-# Service Manager library
-set(SERVICE_MANAGER_SOURCES "src/core/service_manager/service_manager.c")
-add_library(service_manager_lib STATIC ${SERVICE_MANAGER_SOURCES})
-target_include_directories(service_manager_lib PUBLIC "src/")
-target_link_libraries(service_manager_lib PUBLIC Threads::Threads)
+# State (Event Bus)
+set(FOUNDATION_STATE_SOURCES "src/foundation/state/state_manager.c")
+add_library(foundation_state STATIC ${FOUNDATION_STATE_SOURCES})
+target_include_directories(foundation_state PUBLIC "src/")
 
-# Scene Service
-set(SERVICE_SCENE_SOURCES
-    "src/services/scene/cad_scene.c"
-    "src/services/scene/cad_scene_yaml.c"
-    "src/services/scene/math_scene.c"
-    "src/services/scene/math_mesh_builder.c"
-    "src/services/scene/scene_service.c")
-add_library(service_scene STATIC ${SERVICE_SCENE_SOURCES})
-target_include_directories(service_scene PUBLIC "src/")
-target_link_libraries(service_scene PUBLIC config platform_layer assets system_libs)
-add_dependencies(service_scene GenerateServices)
+# --- ENGINE LAYER ---
 
-# UI Service
-set(SERVICE_UI_SOURCES
-    "src/services/ui/scroll.c"
-    "src/services/ui/model_style.c"
-    "src/services/ui/ui_node.c"
-    "src/services/ui/layout_tree.c"
-    "src/services/ui/widget_list.c"
-    "src/services/ui/scene_ui.c"
-    "src/services/ui/ui_context.c"
-    "src/services/ui/compositor.c"
-    "src/services/ui/ui_service.c")
-add_library(service_ui STATIC ${SERVICE_UI_SOURCES})
-target_include_directories(service_ui PUBLIC "src/" ${Stb_INCLUDE_DIR})
-target_link_libraries(service_ui PUBLIC config service_scene platform_layer system_libs)
-add_dependencies(service_ui GenerateServices)
+# Render (Common + Vulkan + Graph)
+# Note: merging backend/common, backend/vulkan, render_graph into one 'engine_render' lib for simplicity.
+# Or keeping them split but under engine_render umbrella.
+set(ENGINE_RENDER_SOURCES
+    "src/engine/render/backend/common/render_composition.c"
+    "src/engine/render/backend/common/ui_mesh_builder.c"
+    "src/engine/render/backend/common/renderer_backend.c"
+    "src/engine/render/backend/common/stb_impl.c"
+    "src/engine/render/backend/vulkan/vulkan_renderer.c"
+    "src/engine/render/backend/vulkan/vk_utils.c"
+    "src/engine/render/backend/vulkan/vk_context.c"
+    "src/engine/render/backend/vulkan/vk_swapchain.c"
+    "src/engine/render/backend/vulkan/vk_pipeline.c"
+    "src/engine/render/backend/vulkan/vk_resources.c"
+    "src/engine/render/backend/vulkan/vk_ui_render.c"
+    "src/engine/render/backend/vulkan/vk_render_graph.c"
+    "src/engine/render/render_graph/render_graph.c"
+    # Runtime
+    "src/engine/render/render_thread.c"
+    "src/engine/render/render_system.c"
+)
+add_library(engine_render STATIC ${ENGINE_RENDER_SOURCES})
+target_include_directories(engine_render PUBLIC "src/" ${Stb_INCLUDE_DIR})
+target_link_libraries(engine_render PUBLIC foundation_platform foundation_math foundation_memory Vulkan::Vulkan glfw Threads::Threads foundation_state foundation_config engine_ui engine_assets)
+# Note: circular dependency UI <-> Render might exist in legacy code.
 
-# Render Runtime Service
-set(SERVICE_RENDER_RUNTIME_SOURCES
-    "src/services/render/runtime/runtime.c"
-    "src/services/render/runtime/render_runtime_service.c")
-add_library(service_render_runtime STATIC ${SERVICE_RENDER_RUNTIME_SOURCES})
-target_include_directories(service_render_runtime PUBLIC "src/" "${GENERATED_DIR}")
-target_link_libraries(service_render_runtime PUBLIC render_vulkan)
-add_dependencies(service_render_runtime GenerateServices)
+# Assets
+set(ENGINE_ASSETS_SOURCES "src/engine/assets/assets_service.c")
+add_library(engine_assets STATIC ${ENGINE_ASSETS_SOURCES})
+target_include_directories(engine_assets PUBLIC "src/")
+target_link_libraries(engine_assets PUBLIC foundation_platform foundation_config)
 
-# Render Service (Descriptor)
-set(SERVICE_RENDER_SOURCES "src/services/render/render_service.c")
-add_library(service_render STATIC ${SERVICE_RENDER_SOURCES})
-target_include_directories(service_render PUBLIC "src/" "${GENERATED_DIR}")
-add_dependencies(service_render GenerateServices)
+# UI
+set(ENGINE_UI_SOURCES
+    "src/engine/ui/scroll.c"
+    "src/engine/ui/model_style.c"
+    "src/engine/ui/ui_node.c"
+    "src/engine/ui/layout_tree.c"
+    "src/engine/ui/widget_list.c"
+    "src/engine/ui/scene_ui.c"
+    "src/engine/ui/ui_context.c"
+    "src/engine/ui/compositor.c"
+    "src/engine/ui/ui_service.c")
+add_library(engine_ui STATIC ${ENGINE_UI_SOURCES})
+target_include_directories(engine_ui PUBLIC "src/" ${Stb_INCLUDE_DIR})
+target_link_libraries(engine_ui PUBLIC foundation_config engine_assets)
 
-# App Services
-set(APP_SERVICES_SOURCES "src/app/app_services.c" "${GENERATED_DIR}/services_registry.c")
-add_library(app_services STATIC ${APP_SERVICES_SOURCES})
-target_include_directories(app_services PUBLIC "src/" "${GENERATED_DIR}")
-add_dependencies(app_services GenerateServices)
-target_link_libraries(app_services PUBLIC service_manager_lib service_scene service_ui service_render_runtime service_render)
+# --- DOMAIN LAYER ---
 
-# --- Main Executable ---
+# CAD Model
+set(DOMAIN_CAD_SOURCES
+    "src/domains/cad_model/cad_scene.c"
+    "src/domains/cad_model/cad_scene_yaml.c"
+    "src/domains/cad_model/scene_service.c")
+add_library(domain_cad STATIC ${DOMAIN_CAD_SOURCES})
+target_include_directories(domain_cad PUBLIC "src/")
+target_link_libraries(domain_cad PUBLIC foundation_config engine_assets engine_ui)
+
+# Math Model
+set(DOMAIN_MATH_SOURCES
+    "src/domains/math_model/math_scene.c"
+    "src/domains/math_model/math_mesh_builder.c")
+add_library(domain_math STATIC ${DOMAIN_MATH_SOURCES})
+target_include_directories(domain_math PUBLIC "src/")
+target_link_libraries(domain_math PUBLIC foundation_math)
+
+# --- APP ---
+
+# We need to create a dummy main.c first or use the existing one, but existing one is full of service junk.
+# I will overwrite the existing main.c in next step.
 
 add_executable(Graphics "src/app/main.c")
 target_include_directories(Graphics PRIVATE "src/" ${Vulkan_INCLUDE_DIRS} ${Stb_INCLUDE_DIR})
 target_link_libraries(Graphics PRIVATE
-    app_services
-    assets
-    config
-    core
-    platform_layer
-    render_common
-    render_vulkan
-    service_manager_lib
-    service_scene
-    service_ui
-    service_render_runtime
-    service_render
-    state_manager
+    domain_cad
+    domain_math
+    engine_render
+    engine_ui
+    engine_assets
+    foundation_state
+    foundation_config
+    foundation_platform
+    foundation_math
+    foundation_memory
     glfw
     Vulkan::Vulkan
-    Threads::Threads
-    system_libs)
+    Threads::Threads)
 add_dependencies(Graphics Shaders)
 
 # --- Tests ---
@@ -230,19 +187,19 @@ add_dependencies(Graphics Shaders)
 function(add_graphics_test TEST_NAME SOURCE_FILE)
     add_executable(${TEST_NAME} ${SOURCE_FILE})
     target_include_directories(${TEST_NAME} PRIVATE src ${Stb_INCLUDE_DIR})
-    # Link passed libraries (${ARGN}) plus common deps
-    target_link_libraries(${TEST_NAME} PRIVATE ${ARGN} system_libs glfw Threads::Threads)
+    target_link_libraries(${TEST_NAME} PRIVATE ${ARGN} foundation_math foundation_memory) # Link common base
     add_test(NAME ${TEST_NAME} COMMAND ${TEST_NAME})
 endfunction()
 
-add_graphics_test(layout_tests tests/layout_tests.c service_ui config platform_layer render_common)
-add_graphics_test(ui_compositor_tests tests/ui_compositor_tests.c service_ui config platform_layer render_common)
-add_graphics_test(scene_ui_tests tests/scene_ui_tests.c service_ui service_scene config platform_layer render_common)
-add_graphics_test(transform_tests tests/transform_tests.c core render_common)
-add_graphics_test(render_composition_tests tests/render_composition_tests.c core render_common)
-add_graphics_test(ui_mesh_builder_tests tests/ui_mesh_builder_tests.c core render_common)
-add_graphics_test(text_clip_integration_tests tests/text_clip_integration_tests.c core render_common)
-add_graphics_test(scene_yaml_tests tests/scene_yaml_tests.c service_scene config)
-add_graphics_test(math_scene_tests tests/math_scene_tests.c service_scene)
-add_graphics_test(math_mesh_tests tests/math_mesh_tests.c service_scene)
-add_graphics_test(render_graph_tests tests/render_graph_tests.c render_common)
+# Update test paths and libs
+add_graphics_test(layout_tests tests/layout_tests.c engine_ui foundation_config foundation_platform engine_render)
+add_graphics_test(ui_compositor_tests tests/ui_compositor_tests.c engine_ui foundation_config foundation_platform engine_render)
+add_graphics_test(scene_ui_tests tests/scene_ui_tests.c engine_ui domain_cad foundation_config foundation_platform engine_render)
+add_graphics_test(transform_tests tests/transform_tests.c foundation_math engine_render)
+add_graphics_test(render_composition_tests tests/render_composition_tests.c foundation_math engine_render)
+add_graphics_test(ui_mesh_builder_tests tests/ui_mesh_builder_tests.c foundation_math engine_render)
+add_graphics_test(text_clip_integration_tests tests/text_clip_integration_tests.c foundation_math engine_render)
+add_graphics_test(scene_yaml_tests tests/scene_yaml_tests.c domain_cad foundation_config)
+add_graphics_test(math_scene_tests tests/math_scene_tests.c domain_math)
+add_graphics_test(math_mesh_tests tests/math_mesh_tests.c domain_math)
+add_graphics_test(render_graph_tests tests/render_graph_tests.c engine_render)

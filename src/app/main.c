@@ -1,75 +1,66 @@
-#define _POSIX_C_SOURCE 200809L
-#include <stdbool.h>
 #include <stdio.h>
-#include <stdlib.h>
 #include <string.h>
 
-#include "services/render/runtime/runtime.h"
-#include "core/service_manager/service.h"
-#include "services_registry.h"
-#include "core/service_manager/service_manager.h"
+#include "foundation/platform/platform.h"
+#include "engine/assets/assets_service.h"
+#include "engine/ui/ui_service.h"
+#include "engine/render/render_system.h"
+#include "domains/cad_model/scene_service.h"
 
 int main(int argc, char** argv) {
+    // 1. Config
     const char* assets_dir = "assets";
-    const char* scene_path = NULL;
-    const char* ui_config_path = NULL;
-    const char* renderer_backend = "vulkan";
-    const char* render_log_sink = "stdout";
-    const char* render_log_target = NULL;
-    bool render_log_enabled = false;
+    const char* scene_path = "assets/scenes/gear_reducer.yaml"; // Default
+    const char* ui_path = NULL;
+
     for (int i = 1; i < argc; ++i) {
-        if (strcmp(argv[i], "--assets") == 0 && i + 1 < argc) {
-            assets_dir = argv[++i];
-        } else if (strcmp(argv[i], "--scene") == 0 && i + 1 < argc) {
-            scene_path = argv[++i];
-        } else if (strcmp(argv[i], "--ui") == 0 && i + 1 < argc) {
-            ui_config_path = argv[++i];
-        } else if (strcmp(argv[i], "--renderer") == 0 && i + 1 < argc) {
-            renderer_backend = argv[++i];
-        } else if (strcmp(argv[i], "--render-log") == 0) {
-            render_log_enabled = true;
-        } else if (strcmp(argv[i], "--render-log-sink") == 0 && i + 1 < argc) {
-            render_log_sink = argv[++i];
-            render_log_enabled = true;
-        } else if (strcmp(argv[i], "--render-log-target") == 0 && i + 1 < argc) {
-            render_log_target = argv[++i];
-            render_log_enabled = true;
-        }
+        if (strcmp(argv[i], "--assets") == 0 && i + 1 < argc) assets_dir = argv[++i];
+        if (strcmp(argv[i], "--scene") == 0 && i + 1 < argc) scene_path = argv[++i];
+        if (strcmp(argv[i], "--ui") == 0 && i + 1 < argc) ui_path = argv[++i];
     }
-    if (!scene_path) {
-        fprintf(stderr, "Usage: %s --scene <file> [--assets <dir>] [--ui <ui.yaml>]\n", argv[0]);
+
+    printf("Initializing Graphics Engine...\n");
+    printf("Assets: %s\n", assets_dir);
+    printf("Scene: %s\n", scene_path);
+
+    // 2. Systems
+    Assets assets = {0};
+    if (!assets_init(&assets, assets_dir, ui_path)) return 1;
+
+    Scene scene = {0};
+    Model* model = scene_load(&scene, scene_path, &assets);
+    if (!model) {
+        fprintf(stderr, "Failed to load scene/model.\n");
+        // Don't return, maybe we can run without scene? 
+        // For now fail.
         return 1;
     }
 
-    AppServices services = {0};
-    AppServicesResult services_result = app_services_init(&services);
-    if (services_result != APP_SERVICES_OK) {
-        fprintf(stderr, "Failed to initialize application services: %s.\n",
-                app_services_result_message(services_result));
-        return 1;
-    }
+    UiContext ui = {0};
+    if (!ui_system_init(&ui)) return 1;
+    if (!ui_system_build(&ui, &assets, &scene, model)) return 1;
 
-    ServiceConfig config = {.assets_dir = assets_dir,
-                           .scene_path = scene_path,
-                           .ui_config_path = ui_config_path,
-                           .renderer_backend = renderer_backend,
-                           .render_log_sink = render_log_sink,
-                           .render_log_target = render_log_target,
-                           .render_log_enabled = render_log_enabled};
+    RenderSystem render = {0};
+    RenderSystemConfig render_config = { .backend_type = "vulkan", .render_log_enabled = true };
+    if (!render_system_init(&render, &render_config)) return 1;
 
-    ServiceManager manager;
-    service_manager_init(&manager);
+    // 3. Bindings
+    render_system_bind_assets(&render, &assets);
+    render_system_bind_ui(&render, &ui);
+    render_system_bind_model(&render, model);
 
-    if (!Generated_StartServices(&manager, &services, &config)) {
-        fprintf(stderr, "Application exiting because not all services started successfully.\n");
-        app_services_shutdown(&services);
-        return 1;
-    }
+    // 4. Run
+    ui_system_prepare_runtime(&ui, 1.0f);
 
-    service_manager_wait(&manager);
+    printf("Starting Main Loop...\n");
+    render_system_run(&render);
 
-    service_manager_stop(&manager, &services);
-    app_services_shutdown(&services);
+    // 5. Shutdown
+    render_system_shutdown(&render);
+    ui_system_shutdown(&ui);
+    scene_unload(&scene);
+    assets_shutdown(&assets);
+    if (model) free_model(model);
 
     return 0;
 }
