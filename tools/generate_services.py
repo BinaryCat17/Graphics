@@ -3,10 +3,11 @@ import sys
 import re
 
 def parse_real_yaml(path):
-    data = {'service': {}, 'components': [], 'includes': []}
+    data = {'service': {}, 'components': [], 'includes': [], 'context': []}
     
     current_section = None
     current_component = None
+    current_context = None
     
     with open(path, 'r') as f:
         content = f.read()
@@ -14,6 +15,8 @@ def parse_real_yaml(path):
     for line in content.splitlines():
         line = line.strip()
         if not line or line.startswith('#'): continue
+        
+        # print(f"DEBUG: {line} [sec={current_section}]")
         
         if line.startswith('service:'):
             current_section = 'service'
@@ -23,6 +26,9 @@ def parse_real_yaml(path):
             continue
         elif line.startswith('includes:'):
             current_section = 'includes'
+            continue
+        elif line.startswith('context:'):
+            current_section = 'context'
             continue
             
         if current_section == 'service':
@@ -51,6 +57,25 @@ def parse_real_yaml(path):
                         pk, pv = part.split(':', 1)
                         field[pk.strip()] = pv.strip().strip('"')
                 current_component['fields'].append(field)
+
+        elif current_section == 'context':
+            if line.startswith('- '):
+                current_context = {}
+                data['context'].append(current_context)
+                line = line[2:].strip()
+            
+            if current_context is not None:
+                # Remove braces if present (inline format)
+                clean_line = line
+                if clean_line.startswith('{'): clean_line = clean_line[1:]
+                if clean_line.endswith('}'): clean_line = clean_line[:-1]
+
+                parts = clean_line.split(',')
+                for part in parts:
+                    if ':' in part:
+                        pk, pv = part.split(':', 1)
+                        current_context[pk.strip()] = pv.strip().strip('"')
+
                 
     return data
 
@@ -67,7 +92,7 @@ def generate_code(services, output_dir):
         f.write("#ifndef SERVICES_REGISTRY_H\n")
         f.write("#define SERVICES_REGISTRY_H\n\n")
         f.write("#include \"core/state/state_manager.h\"\n")
-        f.write("#include \"services/manager/service_manager.h\"\n")
+        f.write("#include \"core/service_manager/service_manager.h\"\n")
         f.write("#include <stdbool.h>\n\n")
 
         # Emit Includes
@@ -80,27 +105,48 @@ def generate_code(services, output_dir):
             f.write(f"#include \"{inc}\"\n")
         f.write("\n")
         
-        # Define component ID constants and externs
+        # Define component ID constants
         for s in services:
             for c in s['components']:
                 short_name = get_short_name(c['name'])
                 define_name = f"STATE_COMPONENT_{short_name.upper()}"
-                
                 f.write(f"#define {define_name} \"{short_name}\"\n")
-                f.write(f"extern int TYPE_ID_{short_name.upper()};\n")
-
         f.write("\n")
 
-        # Declare structs
+        # Declare component structs
         for s in services:
             for c in s['components']:
                 f.write(f"typedef struct {c['name']} {{\n")
                 for field in c['fields']:
                      f.write(f"    {field['type']} {field['name']};\n")
                 f.write(f"}} {c['name']};\n\n")
+
+        # Generate Context Struct
+        f.write("typedef struct GeneratedServicesContext {\n")
+        f.write("    StateManager state_manager;\n")
+        
+        # Type IDs
+        for s in services:
+            for c in s['components']:
+                short_name = get_short_name(c['name'])
+                f.write(f"    int type_id_{short_name};\n")
+        
+        # Service Context Fields
+        for s in services:
+            for ctx in s.get('context', []):
+                f.write(f"    {ctx['type']} {ctx['name']};\n")
                 
-        f.write("void Generated_RegisterComponents(StateManager* sm);\n")
-        f.write("bool Generated_StartServices(ServiceManager* sm, void* services, const ServiceConfig* config);\n")
+        f.write("} GeneratedServicesContext;\n\n")
+        
+        # Extern global ID variables (for backward compatibility if needed, but we prefer context)
+        for s in services:
+            for c in s['components']:
+                short_name = get_short_name(c['name'])
+                f.write(f"extern int TYPE_ID_{short_name.upper()};\n")
+        f.write("\n")
+
+        f.write("void Generated_RegisterComponents(GeneratedServicesContext* context);\n")
+        f.write("bool Generated_StartServices(ServiceManager* sm, GeneratedServicesContext* context, const ServiceConfig* config);\n")
         f.write("\n#endif // SERVICES_REGISTRY_H\n")
 
     with open(c_path, 'w') as f:
@@ -113,23 +159,25 @@ def generate_code(services, output_dir):
         
         f.write("\n")
         
-        # Define Global ID variables
+        # Define Global ID variables (backed by context in future, but static for now for easy access)
         for s in services:
             for c in s['components']:
                 short_name = get_short_name(c['name'])
                 f.write(f"int TYPE_ID_{short_name.upper()} = -1;\n")
         
-        f.write("\nvoid Generated_RegisterComponents(StateManager* sm) {\n")
+        f.write("\nvoid Generated_RegisterComponents(GeneratedServicesContext* context) {\n")
         for s in services:
             for c in s['components']:
                 short_name = get_short_name(c['name'])
                 define_name = f"STATE_COMPONENT_{short_name.upper()}"
                 var_name = f"TYPE_ID_{short_name.upper()}"
+                context_field = f"context->type_id_{short_name}"
                 
-                f.write(f"    state_manager_register_type(sm, {define_name}, sizeof({c['name']}), 1, &{var_name});\n") 
+                f.write(f"    state_manager_register_type(&context->state_manager, {define_name}, sizeof({c['name']}), 1, &{var_name});\n") 
+                f.write(f"    {context_field} = {var_name};\n")
         f.write("}\n\n")
         
-        f.write("bool Generated_StartServices(ServiceManager* sm, void* services, const ServiceConfig* config) {\n")
+        f.write("bool Generated_StartServices(ServiceManager* sm, GeneratedServicesContext* context, const ServiceConfig* config) {\n")
         for s in services:
             runtime = s['service'].get('runtime', 'true').lower()
             if runtime == 'false':
@@ -139,7 +187,7 @@ def generate_code(services, output_dir):
             descriptor_func = f"{snake_name}_descriptor"
             f.write(f"    if (!service_manager_register(sm, {descriptor_func}())) return false;\n")
             
-        f.write("\n    return service_manager_start(sm, services, config);\n")
+        f.write("\n    return service_manager_start(sm, context, config);\n")
         f.write("}\n")
 
 def main():

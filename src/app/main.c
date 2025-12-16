@@ -5,9 +5,9 @@
 #include <string.h>
 
 #include "services/render/runtime/runtime.h"
-#include "services/manager/service.h"
+#include "core/service_manager/service.h"
 #include "services_registry.h"
-#include "services/manager/service_manager.h"
+#include "core/service_manager/service_manager.h"
 
 int main(int argc, char** argv) {
     const char* assets_dir = "assets";

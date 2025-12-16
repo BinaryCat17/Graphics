@@ -8,6 +8,10 @@ includes:
   - "services/render/backend/common/render_composition.h"
   - "services/ui/model_style.h"
 
+context:
+  - name: ui
+    type: UiContext
+
 components:
   - name: UiRuntimeComponent
     fields:

@@ -7,7 +7,7 @@
 #include "app/app_services.h"
 #include "services/scene/cad_scene_yaml.h"
 #include "core/config/module_yaml_loader.h"
-#include "services/manager/service_events.h"
+#include "core/service_manager/service_events.h"
 
 static char* join_path(const char* dir, const char* leaf) {
     size_t dir_len = strlen(dir);
@@ -129,8 +129,8 @@ static bool scene_service_init(void* ptr, const ServiceConfig* config) {
 
 static bool scene_service_start(void* ptr, const ServiceConfig* config) {
     AppServices* services = (AppServices*)ptr;
-    return scene_service_load(&services->core, &services->state_manager, services->scene_type_id,
-                              services->assets_type_id, services->model_type_id, config);
+    return scene_service_load(&services->core, &services->state_manager, services->type_id_scene,
+                              services->type_id_assets, services->type_id_model, config);
 }
 
 static void scene_service_stop(void* ptr) {

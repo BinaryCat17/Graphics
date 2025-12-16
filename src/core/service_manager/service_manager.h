@@ -4,7 +4,7 @@
 #include <stdbool.h>
 #include <stddef.h>
 
-#include "services/manager/service.h"
+#include "core/service_manager/service.h"
 
 #define SERVICE_MANAGER_MAX_SERVICES 16
 

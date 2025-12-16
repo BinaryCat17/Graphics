@@ -9,7 +9,7 @@
 #include "services/assets/assets.h"
 #include "services/render/backend/common/renderer_backend.h"
 #include "services/render/backend/common/render_context.h"
-#include "services/manager/service.h"
+#include "core/service_manager/service.h"
 #include "core/state/state_manager.h"
 #include "services/ui/ui_context.h"
 

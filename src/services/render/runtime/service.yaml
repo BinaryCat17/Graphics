@@ -10,6 +10,12 @@ includes:
   - "services/render/backend/common/render_composition.h"
   - "services/ui/model_style.h"
 
+context:
+  - name: render
+    type: RenderRuntimeContext
+  - name: render_runtime_context
+    type: "struct RenderRuntimeServiceContext*"
+
 components:
   - name: RenderReadyComponent
     fields:

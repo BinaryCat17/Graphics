@@ -3,10 +3,10 @@
 
 #include <stdbool.h>
 
-#include "app/context/core_context.h"
+#include "services/core/core_context.h"
 #include "core/state/state_manager.h"
 #include "services/ui/ui_context.h"
-#include "services/manager/service.h"
+#include "core/service_manager/service.h"
 
 bool ui_build(UiContext* ui, const Assets* assets, const Scene* scene, Model* model);
 bool ui_prepare_runtime(UiContext* ui, float ui_scale, StateManager* state_manager,

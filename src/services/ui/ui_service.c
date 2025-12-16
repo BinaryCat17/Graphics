@@ -6,7 +6,7 @@
 
 #include "app/app_services.h"
 #include "core/platform/platform.h"
-#include "services/manager/service_events.h"
+#include "core/service_manager/service_events.h"
 #include "services/ui/compositor.h"
 #include "services/ui/scroll.h"
 
@@ -276,7 +276,7 @@ static bool ui_service_init(void* ptr, const ServiceConfig* config) {
     context->model = services->core.model;
     
     ui_context_init(&services->ui);
-    return ui_service_subscribe(&services->ui, &services->state_manager, services->model_type_id);
+    return ui_service_subscribe(&services->ui, &services->state_manager, services->type_id_model);
 }
 
 static bool ui_service_start(void* ptr, const ServiceConfig* config) {

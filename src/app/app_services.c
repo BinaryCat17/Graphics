@@ -3,7 +3,7 @@
 #include <stdio.h>
 #include <string.h>
 
-#include "services/manager/service_events.h"
+#include "core/service_manager/service_events.h"
 
 AppServicesResult app_services_init(AppServices* services) {
     if (!services) return APP_SERVICES_ERROR_INVALID_ARGUMENT;
@@ -16,13 +16,7 @@ AppServicesResult app_services_init(AppServices* services) {
         return APP_SERVICES_ERROR_STATE_MANAGER_INIT;
     }
 
-    Generated_RegisterComponents(&services->state_manager);
-
-    services->scene_type_id = TYPE_ID_SCENE;
-    services->assets_type_id = TYPE_ID_ASSETS;
-    services->model_type_id = TYPE_ID_MODEL;
-    services->ui_type_id = TYPE_ID_UIRUNTIME;
-    services->render_ready_type_id = TYPE_ID_RENDERREADY;
+    Generated_RegisterComponents(services);
 
     return APP_SERVICES_OK;
 }

@@ -144,7 +144,7 @@ target_include_directories(assets PUBLIC "src/")
 target_link_libraries(assets PUBLIC platform_layer)
 
 # Service Manager library
-set(SERVICE_MANAGER_SOURCES "src/services/manager/service_manager.c")
+set(SERVICE_MANAGER_SOURCES "src/core/service_manager/service_manager.c")
 add_library(service_manager_lib STATIC ${SERVICE_MANAGER_SOURCES})
 target_include_directories(service_manager_lib PUBLIC "src/")
 target_link_libraries(service_manager_lib PUBLIC Threads::Threads)
@@ -180,14 +180,14 @@ set(SERVICE_RENDER_RUNTIME_SOURCES
     "src/services/render/runtime/runtime.c"
     "src/services/render/runtime/render_runtime_service.c")
 add_library(service_render_runtime STATIC ${SERVICE_RENDER_RUNTIME_SOURCES})
-target_include_directories(service_render_runtime PUBLIC "src/")
+target_include_directories(service_render_runtime PUBLIC "src/" "${GENERATED_DIR}")
 target_link_libraries(service_render_runtime PUBLIC render_vulkan)
 add_dependencies(service_render_runtime GenerateServices)
 
 # Render Service (Descriptor)
 set(SERVICE_RENDER_SOURCES "src/services/render/service/render_service.c")
 add_library(service_render STATIC ${SERVICE_RENDER_SOURCES})
-target_include_directories(service_render PUBLIC "src/")
+target_include_directories(service_render PUBLIC "src/" "${GENERATED_DIR}")
 add_dependencies(service_render GenerateServices)
 
 # App Services

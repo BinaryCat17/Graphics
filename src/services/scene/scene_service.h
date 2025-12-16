@@ -3,8 +3,8 @@
 
 #include <stdbool.h>
 
-#include "app/context/core_context.h"
-#include "services/manager/service.h"
+#include "services/core/core_context.h"
+#include "core/service_manager/service.h"
 #include "core/state/state_manager.h"
 
 bool scene_service_load(CoreContext* core, StateManager* state_manager, int scene_type_id, int assets_type_id,

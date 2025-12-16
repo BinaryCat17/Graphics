@@ -8,7 +8,7 @@
 #include "services/render/backend/common/renderer_backend.h"
 #include "services/render/backend/vulkan/vulkan_renderer.h"
 #include "services/render/runtime/runtime.h"
-#include "services/manager/service_events.h"
+#include "core/service_manager/service_events.h"
 
 static ServiceDescriptor g_render_runtime_service_descriptor;
 
@@ -112,10 +112,10 @@ static void render_runtime_service_reset(RenderRuntimeServiceContext* context, A
         .ui = services ? &services->ui : NULL,
         .model = services ? services->core.model : NULL,
         .state_manager = services ? &services->state_manager : NULL,
-        .assets_type_id = services ? services->assets_type_id : -1,
-        .ui_type_id = services ? services->ui_type_id : -1,
-        .model_type_id = services ? services->model_type_id : -1,
-        .render_ready_type_id = services ? services->render_ready_type_id : -1,
+        .assets_type_id = services ? services->type_id_assets : -1,
+        .ui_type_id = services ? services->type_id_uiruntime : -1,
+        .model_type_id = services ? services->type_id_model : -1,
+        .render_ready_type_id = services ? services->type_id_renderready : -1,
         .renderer_ready = false,
         .render_ready = false,
         .backend = context->backend,
