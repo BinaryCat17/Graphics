@@ -51,24 +51,6 @@ static void render_service_run_loop(RenderServiceContext* service) {
     }
 }
 
-static int render_service_thread(void* user_data) {
-    RenderServiceContext* context = (RenderServiceContext*)user_data;
-    if (!context || !context->runtime) {
-        return -1;
-    }
-
-    if (!render_runtime_service_prepare(context->runtime)) {
-        context->running = false;
-        context->thread_active = false;
-        return -1;
-    }
-
-    render_service_run_loop(context);
-    context->running = false;
-    context->thread_active = false;
-    return 0;
-}
-
 static RenderServiceContext* render_service_context(void) {
     return (RenderServiceContext*)g_render_service_descriptor.context;
 }
@@ -97,14 +79,20 @@ static bool render_service_start(void* ptr, const ServiceConfig* config) {
         return false;
     }
 
-    context->running = true;
-    context->thread_active = thrd_create(&context->thread, render_service_thread, context) == thrd_success;
-    if (!context->thread_active) {
-        fprintf(stderr, "Failed to start render service loop thread.\n");
-        context->running = false;
+    if (!render_runtime_service_prepare(context->runtime)) {
         return false;
     }
-    g_render_service_descriptor.thread_handle = &context->thread;
+
+    context->running = true;
+    context->thread_active = true; // reusing this flag to indicate "loop active"
+    
+    // We run the loop directly here. This blocks until the window closes.
+    // This effectively makes the "render" service the "main" service.
+    render_service_run_loop(context);
+    
+    context->running = false;
+    context->thread_active = false;
+    
     return true;
 }
 
@@ -114,16 +102,11 @@ static void render_service_stop(void* ptr) {
     RenderServiceContext* context = render_service_context();
     if (!context) return;
 
-    if (!context->running && !context->thread_active) return;
+    if (!context->running) return;
 
     context->running = false;
     if (context->runtime && context->runtime->render && context->runtime->render->window) {
         platform_set_window_should_close(context->runtime->render->window, true);
-    }
-
-    if (context->thread_active) {
-        thrd_join(context->thread, NULL);
-        context->thread_active = false;
     }
 }
 
