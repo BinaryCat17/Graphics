@@ -78,7 +78,7 @@ bool vk_create_vertex_buffer(VulkanRendererState* state, FrameResources *frame, 
 
     VkBuffer new_buffer = VK_NULL_HANDLE;
     VkDeviceMemory new_memory = VK_NULL_HANDLE;
-    VkBufferCreateInfo bci = { .sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO, .size = bytes, .usage = VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, .sharingMode = VK_SHARING_MODE_EXCLUSIVE };
+    VkBufferCreateInfo bci = { .sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO, .size = bytes, .usage = VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT, .sharingMode = VK_SHARING_MODE_EXCLUSIVE };
     
     VkResult create = vkCreateBuffer(state->device, &bci, NULL, &new_buffer);
     if (create != VK_SUCCESS) {
@@ -87,7 +87,7 @@ bool vk_create_vertex_buffer(VulkanRendererState* state, FrameResources *frame, 
     }
 
     VkMemoryRequirements mr; vkGetBufferMemoryRequirements(state->device, new_buffer, &mr);
-    VkMemoryAllocateInfo mai = { .sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO, .allocationSize = mr.size, .memoryTypeIndex = find_mem_type(state->physical_device, mr.memoryTypeBits, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT) };
+    VkMemoryAllocateInfo mai = { .sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO, .allocationSize = mr.size, .memoryTypeIndex = find_mem_type(state->physical_device, mr.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT) };
     
     VkResult alloc = vkAllocateMemory(state->device, &mai, NULL, &new_memory);
     if (alloc != VK_SUCCESS) {
@@ -221,14 +221,35 @@ bool vk_upload_vertices(VulkanRendererState* state, FrameResources *frame) {
     if (!vk_create_vertex_buffer(state, frame, bytes)) {
         return false;
     }
-    void* dst = NULL;
-    VkResult map = vkMapMemory(state->device, frame->vertex_memory, 0, bytes, 0, &dst);
-    if (map != VK_SUCCESS) {
-        fprintf(stderr, "Failed to map vertex memory\n");
+
+    // Staging Buffer
+    VkBuffer staging_buffer;
+    VkDeviceMemory staging_memory;
+    VkBufferCreateInfo bci = { .sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO, .size = bytes, .usage = VK_BUFFER_USAGE_TRANSFER_SRC_BIT, .sharingMode = VK_SHARING_MODE_EXCLUSIVE };
+    if (vkCreateBuffer(state->device, &bci, NULL, &staging_buffer) != VK_SUCCESS) return false;
+
+    VkMemoryRequirements mr; vkGetBufferMemoryRequirements(state->device, staging_buffer, &mr);
+    VkMemoryAllocateInfo mai = { .sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO, .allocationSize = mr.size, .memoryTypeIndex = find_mem_type(state->physical_device, mr.memoryTypeBits, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT) };
+    if (vkAllocateMemory(state->device, &mai, NULL, &staging_memory) != VK_SUCCESS) {
+        vkDestroyBuffer(state->device, staging_buffer, NULL);
         return false;
     }
+    vkBindBufferMemory(state->device, staging_buffer, staging_memory, 0);
+
+    void* dst = NULL;
+    vkMapMemory(state->device, staging_memory, 0, bytes, 0, &dst);
     memcpy(dst, frame->cpu.vertices, bytes);
-    vkUnmapMemory(state->device, frame->vertex_memory);
+    vkUnmapMemory(state->device, staging_memory);
+
+    // Copy from Staging to Device Local
+    VkCommandBuffer cb = begin_single_time_commands(state);
+    VkBufferCopy copyRegion = { .srcOffset = 0, .dstOffset = 0, .size = bytes };
+    vkCmdCopyBuffer(cb, staging_buffer, frame->vertex_buffer, 1, &copyRegion);
+    end_single_time_commands(state, cb);
+
+    vkDestroyBuffer(state->device, staging_buffer, NULL);
+    vkFreeMemory(state->device, staging_memory, NULL);
+
     return true;
 }
 

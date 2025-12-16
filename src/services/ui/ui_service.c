@@ -216,6 +216,7 @@ void ui_frame_update(UiContext* ui) {
     update_widget_bindings(ui->ui_root, ui->model);
     populate_widgets_from_layout(ui->layout_root, ui->widgets.items, ui->widgets.count);
     apply_widget_padding_scale(&ui->widgets, ui->ui_scale);
+    scroll_update(ui->scroll, 0.016f);
     scroll_apply_offsets(ui->scroll, ui->widgets.items, ui->widgets.count);
     DisplayList old_list = ui->display_list;
     ui->display_list = ui_compositor_build(ui->layout_root, ui->widgets.items, ui->widgets.count);

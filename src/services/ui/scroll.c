@@ -13,6 +13,7 @@ typedef struct ScrollArea {
     int has_viewport;
     int has_static_anchor;
     float offset;
+    float target_offset;
     struct ScrollArea* next;
 } ScrollArea;
 
@@ -48,6 +49,7 @@ static ScrollArea* ensure_area(ScrollArea** areas, const char* name) {
     if (!a) return NULL;
     a->name = platform_strdup(name);
     a->offset = 0.0f;
+    a->target_offset = 0.0f;
     a->has_bounds = 0;
     a->has_viewport = 0;
     a->has_static_anchor = 0;
@@ -257,8 +259,7 @@ void scroll_handle_event(ScrollContext* ctx, Widget* widgets, size_t widget_coun
         float viewport_h = target->has_viewport ? target->viewport.h : target->bounds.h;
         float max_offset = target->has_bounds ? (target->bounds.h - viewport_h) : 0.0f;
         if (max_offset < 0.0f) max_offset = 0.0f;
-        target->offset = clamp_scroll_offset(target->offset - (float)yoff * 120.0f, max_offset);
-        scroll_apply_offsets(ctx, widgets, widget_count);
+        target->target_offset = clamp_scroll_offset(target->target_offset - (float)yoff * 120.0f, max_offset);
     }
 }
 
@@ -305,6 +306,7 @@ int scroll_handle_mouse_button(ScrollContext* ctx, Widget* widgets, size_t widge
             if (!(mouse_y >= thumb.y && mouse_y <= thumb.y + thumb.h)) {
                 ctx->drag_grab_offset = thumb.h * 0.5f;
                 area->offset = offset_from_cursor(&track, thumb.h, max_offset, (float)mouse_y, ctx->drag_grab_offset);
+                area->target_offset = area->offset;
                 scroll_apply_offsets(ctx, widgets, widget_count);
             }
         }
@@ -323,6 +325,7 @@ void scroll_handle_cursor(ScrollContext* ctx, Widget* widgets, size_t widget_cou
     if (!compute_scrollbar_geometry(ctx->dragging_widget, &track, &thumb, &max_offset)) { ctx->dragging_area = NULL; ctx->dragging_widget = NULL; return; }
     float grab = ctx->drag_grab_offset > 0.0f ? ctx->drag_grab_offset : thumb.h * 0.5f;
     ctx->dragging_area->offset = offset_from_cursor(&track, thumb.h, max_offset, (float)mouse_y, grab);
+    ctx->dragging_area->target_offset = ctx->dragging_area->offset;
     scroll_apply_offsets(ctx, widgets, widget_count);
 }
 
@@ -348,6 +351,24 @@ void scroll_rebuild(ScrollContext* ctx, Widget* widgets, size_t widget_count, fl
 
     free_scroll_areas(old);
     scroll_apply_offsets(ctx, widgets, widget_count);
+}
+
+void scroll_update(ScrollContext* ctx, float dt) {
+    if (!ctx || !ctx->areas) return;
+    int changed = 0;
+    for (ScrollArea* a = ctx->areas; a; a = a->next) {
+        float diff = a->target_offset - a->offset;
+        if (fabsf(diff) > 0.1f) {
+            a->offset += diff * 10.0f * dt; // Simple lerp-like smoothing
+            if (fabsf(a->target_offset - a->offset) < 0.1f) {
+                a->offset = a->target_offset;
+            }
+            changed = 1;
+        }
+    }
+    if (changed) {
+        scroll_apply_offsets(ctx, ctx->widgets, ctx->widget_count);
+    }
 }
 
 void scroll_free(ScrollContext* ctx) {

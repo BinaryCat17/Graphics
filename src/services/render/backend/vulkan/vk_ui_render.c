@@ -630,6 +630,33 @@ static bool ensure_vtx_capacity(FrameCpuArena *cpu, size_t required)
     return ensure_cpu_vertex_capacity(cpu, cpu->background_capacity, cpu->text_capacity, required);
 }
 
+static bool is_cmd_clipped(const RenderContext *ctx, const RenderCommand *cmd) {
+    if (!cmd->has_clip) return false;
+
+    Vec2 min, max;
+    if (cmd->primitive == RENDER_PRIMITIVE_BACKGROUND) {
+        min = cmd->data.background.layout.device.origin;
+        max = (Vec2){min.x + cmd->data.background.layout.device.size.x, min.y + cmd->data.background.layout.device.size.y};
+    } else {
+        Vec2 device_min = coordinate_logical_to_screen(&ctx->coordinates, cmd->data.glyph.min);
+        Vec2 device_max = coordinate_logical_to_screen(&ctx->coordinates, cmd->data.glyph.max);
+        min = device_min;
+        max = device_max;
+    }
+
+    float cx0 = cmd->clip.device.origin.x;
+    float cy0 = cmd->clip.device.origin.y;
+    float cx1 = cx0 + cmd->clip.device.size.x;
+    float cy1 = cy0 + cmd->clip.device.size.y;
+
+    float x0 = fmaxf(min.x, cx0);
+    float y0 = fmaxf(min.y, cy0);
+    float x1 = fminf(max.x, cx1);
+    float y1 = fminf(max.y, cy1);
+
+    return (x1 <= x0 || y1 <= y0);
+}
+
 bool vk_build_vertices_from_widgets(VulkanRendererState* state, FrameResources *frame) {
     if (!frame) return false;
     frame->vertex_count = 0;
@@ -684,7 +711,7 @@ bool vk_build_vertices_from_widgets(VulkanRendererState* state, FrameResources *
         fprintf(stderr, "renderer_fill_vertices failed: %d\n", (int)build_res);
     }
 
-    size_t background_quad_idx = 0, text_quad_idx = 0, prim_idx = 0;
+    size_t background_quad_idx = 0, text_quad_idx = 0;
     size_t primitive_count = renderer.command_list.count;
     int min_layer = 0, max_layer = 0;
     if (primitive_count > 0) {
@@ -697,9 +724,15 @@ bool vk_build_vertices_from_widgets(VulkanRendererState* state, FrameResources *
     }
     Primitive *primitives = primitive_count > 0 ? calloc(primitive_count, sizeof(Primitive)) : NULL;
     if (primitives && success) {
+        size_t actual_primitive_count = 0;
         for (size_t c = 0; c < renderer.command_list.count; ++c) {
             const RenderCommand *cmd = &renderer.command_list.commands[c];
-            Primitive *p = &primitives[prim_idx++];
+            
+            if (is_cmd_clipped(&context, cmd)) {
+                continue;
+            }
+
+            Primitive *p = &primitives[actual_primitive_count++];
             p->order = cmd->key.ordinal;
             p->z = (float)cmd->key.layer;
 
@@ -717,7 +750,8 @@ bool vk_build_vertices_from_widgets(VulkanRendererState* state, FrameResources *
                 }
             }
         }
-
+        
+        primitive_count = actual_primitive_count;
         size_t total_vertices = primitive_count * 6;
         if (ensure_vtx_capacity(&frame->cpu, total_vertices)) {
             size_t cursor = 0;
