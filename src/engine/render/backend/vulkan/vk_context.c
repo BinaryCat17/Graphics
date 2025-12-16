@@ -1,5 +1,6 @@
 #include "vk_context.h"
 #include "vk_utils.h"
+#include "foundation/logger/logger.h"
 #include <stdio.h>
 #include <stdlib.h>
 
@@ -17,7 +18,7 @@ static void log_gpu_info(VkPhysicalDevice dev) {
     default: break;
     }
 
-    printf("Using GPU: %s (%s) vendor=0x%04x device=0x%04x driver=0x%x api=%u.%u.%u\n",
+    LOG_INFO("Using GPU: %s (%s) vendor=0x%04x device=0x%04x driver=0x%x api=%u.%u.%u",
            props.deviceName,
            type,
            props.vendorID,
@@ -41,9 +42,9 @@ void vk_create_instance(VulkanRendererState* state) {
     ici.enabledExtensionCount = extc; 
     ici.ppEnabledExtensionNames = exts;
     
-    double start = vk_now_ms();
+    // double start = vk_now_ms();
     state->res = vkCreateInstance(&ici, NULL, &state->instance);
-    vk_log_command(state, RENDER_LOG_INFO, "vkCreateInstance", "application", start);
+    LOG_TRACE("vkCreateInstance (application)");
     
     if (state->res != VK_SUCCESS) fatal_vk("vkCreateInstance", state->res);
 }
@@ -69,7 +70,7 @@ void vk_pick_physical_and_create_device(VulkanRendererState* state) {
         else if (props.deviceType == VK_PHYSICAL_DEVICE_TYPE_VIRTUAL_GPU) score = 50;
         else if (props.deviceType == VK_PHYSICAL_DEVICE_TYPE_CPU) score = 1;
 
-        printf("Candidate GPU [%u]: %s (Score: %d)\n", i, props.deviceName, score);
+        LOG_DEBUG("Candidate GPU [%u]: %s (Score: %d)", i, props.deviceName, score);
         
         if (score > best_score) {
             best_score = score;

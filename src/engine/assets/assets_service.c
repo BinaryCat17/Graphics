@@ -1,5 +1,6 @@
 #include "engine/assets/assets_service.h"
 #include "foundation/platform/platform.h"
+#include "foundation/logger/logger.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -46,14 +47,14 @@ bool assets_init(Assets* out_assets, const char* assets_dir, const char* ui_conf
     out_assets->font_path = join_path(assets_dir, "fonts/font.ttf");
 
     if (!out_assets->ui_path || !out_assets->vert_spv_path || !out_assets->frag_spv_path || !out_assets->font_path) {
-        fprintf(stderr, "Fatal: failed to compose asset paths for directory '%s'\n", assets_dir);
+        LOG_FATAL("Failed to compose asset paths for directory '%s'", assets_dir);
         assets_shutdown(out_assets);
         return false;
     }
 
     ConfigError err = {0};
     if (!load_config_document(out_assets->ui_path, CONFIG_FORMAT_YAML, &out_assets->ui_doc, &err)) {
-        fprintf(stderr, "Failed to load %s: %s\n", out_assets->ui_path, err.message);
+        LOG_ERROR("Failed to load %s: %s", out_assets->ui_path, err.message);
         assets_shutdown(out_assets);
         return false;
     }

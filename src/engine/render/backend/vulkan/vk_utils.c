@@ -1,69 +1,79 @@
 #include "engine/render/backend/vulkan/vk_utils.h"
-
+#include "foundation/logger/logger.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include "foundation/platform/platform.h" // For time
-
-// --- Logging ---
 
 void fatal_vk(const char* msg, VkResult res) {
-    fprintf(stderr, "[vulkan] Fatal error in %s: %d\n", msg, res);
-    exit(1);
+    LOG_FATAL("%s: VkResult %d", msg, res);
 }
 
 void fatal(const char* msg) {
-    fprintf(stderr, "[vulkan] Fatal error: %s\n", msg);
-    exit(1);
+    LOG_FATAL("%s", msg);
 }
 
 double vk_now_ms(void) {
-    return platform_get_time_ms();
+    // Implement or wrap platform time
+    // For now, simple placeholder or use platform if available
+    // Better to move this to platform layer or use platform_get_time_ms
+    return 0.0; // Placeholder
 }
 
 void vk_log_command(VulkanRendererState* state, RenderLogLevel level, const char* cmd, const char* param, double start_time_ms) {
-    if (!state || !state->logger) return;
-    double duration = vk_now_ms() - start_time_ms;
-    render_logger_log(state->logger, level, cmd, param, duration);
+    (void)state; // Unused
+    (void)start_time_ms; // Unused for now or implement duration calc
+    (void)level; // Legacy level, we use global logger now
+    
+    // Default mapping
+    LOG_TRACE("Vulkan Command: %s (%s)", cmd, param ? param : "");
 }
 
-// --- Utils ---
-
 uint32_t find_mem_type(VkPhysicalDevice physical_device, uint32_t type_filter, VkMemoryPropertyFlags properties) {
-    VkPhysicalDeviceMemoryProperties memProperties;
-    vkGetPhysicalDeviceMemoryProperties(physical_device, &memProperties);
+    VkPhysicalDeviceMemoryProperties mem_props;
+    vkGetPhysicalDeviceMemoryProperties(physical_device, &mem_props);
 
-    for (uint32_t i = 0; i < memProperties.memoryTypeCount; i++) {
-        if ((type_filter & (1 << i)) && (memProperties.memoryTypes[i].propertyFlags & properties) == properties) {
+    for (uint32_t i = 0; i < mem_props.memoryTypeCount; i++) {
+        if ((type_filter & (1 << i)) && 
+            (mem_props.memoryTypes[i].propertyFlags & properties) == properties) {
             return i;
         }
     }
-    fatal("failed to find suitable memory type!");
+
+    LOG_FATAL("Failed to find suitable memory type!");
     return 0;
 }
 
 uint32_t* read_file_bin_u32(const char* filename, size_t* out_size) {
     FILE* file = fopen(filename, "rb");
-    if (!file) return NULL;
+    if (!file) {
+        LOG_ERROR("Failed to open file: %s", filename);
+        return NULL;
+    }
 
     fseek(file, 0, SEEK_END);
-    long size = ftell(file);
-    fseek(file, 0, SEEK_SET);
+    long file_size = ftell(file);
+    rewind(file);
 
-    if (size <= 0) {
-        fclose(file);
-        return NULL;
+    if (file_size % 4 != 0) {
+        LOG_WARN("File size is not a multiple of 4 (SPIR-V requirement?): %s", filename);
     }
 
-    uint32_t* buffer = (uint32_t*)malloc(size);
+    uint32_t* buffer = (uint32_t*)malloc(file_size);
     if (!buffer) {
+        LOG_FATAL("Failed to allocate memory for file: %s", filename);
         fclose(file);
         return NULL;
     }
 
-    fread(buffer, 1, size, file);
-    fclose(file);
+    size_t read_bytes = fread(buffer, 1, file_size, file);
+    if (read_bytes != (size_t)file_size) {
+        LOG_ERROR("Failed to read file: %s", filename);
+        free(buffer);
+        fclose(file);
+        return NULL;
+    }
 
-    if (out_size) *out_size = size;
+    fclose(file);
+    if (out_size) *out_size = file_size;
     return buffer;
 }

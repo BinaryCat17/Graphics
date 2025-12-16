@@ -1,4 +1,5 @@
 #include "foundation/platform/glfw_platform.h"
+#include "foundation/logger/logger.h"
 #include <stdio.h>
 
 #define GLFW_INCLUDE_VULKAN
@@ -20,7 +21,7 @@ struct PlatformWindow {
 };
 
 static void glfw_error_callback(int error, const char* description) {
-    fprintf(stderr, "GLFW Error %d: %s\n", error, description);
+    LOG_ERROR("GLFW Error %d: %s", error, description);
 }
 
 static void on_glfw_framebuffer_size(GLFWwindow* window, int width, int height) {
@@ -50,7 +51,10 @@ static void on_glfw_cursor_pos(GLFWwindow* window, double x, double y) {
 
 bool platform_layer_init(void) {
     glfwSetErrorCallback(glfw_error_callback); // Set the error callback
-    if (!glfwInit()) return false;
+    if (!glfwInit()) {
+        LOG_FATAL("Failed to initialize GLFW");
+        return false;
+    }
     glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
     return true;
 }
@@ -65,7 +69,7 @@ PlatformWindow* platform_create_window(int width, int height, const char* title)
 
     window->handle = glfwCreateWindow(width, height, title, NULL, NULL);
     if (!window->handle) {
-        fprintf(stderr, "Failed to create GLFW window.\n"); // Added logging
+        LOG_FATAL("Failed to create GLFW window");
         free(window);
         return NULL;
     }
