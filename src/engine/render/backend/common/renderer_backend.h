@@ -6,7 +6,7 @@
 #include <stdio.h>
 
 #include "foundation/platform/platform.h"
-#include "engine/ui/ui_renderer.h"
+#include "engine/scene/scene_def.h"
 
 typedef struct CoordinateSystem2D CoordinateTransformer;
 
@@ -59,7 +59,7 @@ typedef struct RenderBackendInit {
     const char* vert_spv;
     const char* frag_spv;
     const char* font_path;
-    const CoordinateTransformer* transformer;
+    // const CoordinateTransformer* transformer; // Removed
     const RenderLoggerConfig* logger_config;
 } RenderBackendInit;
 
@@ -68,9 +68,13 @@ typedef struct RendererBackend {
     RenderLogger logger;
     void* state;
     bool (*init)(struct RendererBackend* backend, const RenderBackendInit* init);
-    void (*update_transformer)(struct RendererBackend* backend, const CoordinateTransformer* transformer);
-    void (*update_ui)(struct RendererBackend* backend, const UiDrawList* draw_list);
+    
+    // Unified Draw Call
+    void (*render_scene)(struct RendererBackend* backend, const Scene* scene);
+    
+    // Legacy generic draw (can be removed if render_scene covers it)
     void (*draw)(struct RendererBackend* backend);
+    
     void (*cleanup)(struct RendererBackend* backend);
 } RendererBackend;
 

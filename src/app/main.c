@@ -56,8 +56,10 @@ int main(int argc, char** argv) {
     
     // Create a test node to bind to
     MathNode* node = math_graph_add_node(&graph, MATH_NODE_SIN);
-    node->name = strdup("Test Sine Wave");
-    node->value = 0.5f;
+    node->name = strdup("Debug Node");
+    node->value = 0.0f;
+    node->id = 101;
+    node->dirty = 0;
 
     // 4. UI System (The View)
     UiDef* ui_def = ui_loader_load_from_file(ui_path);

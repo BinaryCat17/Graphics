@@ -17,6 +17,13 @@ typedef struct Vec3 {
     float z;
 } Vec3;
 
+typedef struct Vec4 {
+    float x;
+    float y;
+    float z;
+    float w;
+} Vec4;
+
 typedef struct Quat {
     float x;
     float y;

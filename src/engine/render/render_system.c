@@ -8,41 +8,33 @@
 #include "foundation/platform/platform.h"
 #include "engine/render/backend/common/renderer_backend.h"
 #include "engine/render/backend/vulkan/vulkan_renderer.h"
+#include "engine/ui/ui_scene_bridge.h"
 
 // --- Helper: Packet Management ---
 
 static void render_packet_free_resources(RenderFramePacket* packet) {
     if (!packet) return;
-    ui_draw_list_clear(&packet->ui_draw_list);
+    // ui_draw_list_clear(&packet->ui_draw_list); // Removed legacy
+    scene_clear(&packet->scene);
 }
 
 static void try_sync_packet(RenderSystem* sys) {
     if (!sys || !sys->ui_root_view) return;
     
-    // 1. Generate Draw Commands from UI View
-    // We do this on Main Thread (Logic Thread) directly into a temporary list,
-    // then swap it into the packet buffer.
-    
-    UiDrawList temp_list = {0};
-    PlatformWindowSize size = platform_get_framebuffer_size(sys->render_context.window);
-    int w = size.width;
-    int h = size.height;
-    
-    // Update Layout & Generate Commands
-    ui_render_view(sys->ui_root_view, &temp_list, (float)w, (float)h);
+    // 1. Unified Scene Generation
+    // We need to populate sys->packets[sys->back_packet_index].scene
     
     mtx_lock(&sys->packet_mutex);
     
     RenderFramePacket* dest = &sys->packets[sys->back_packet_index];
     
-    // Clear old data
+    // Clear old scene
     render_packet_free_resources(dest);
     
-    // Move ownership of the draw list to the packet
-    dest->ui_draw_list = temp_list;
-
-    // Copy Transformer
-    dest->transformer = sys->render_context.transformer;
+    // Bridge: Convert UI View to Scene Objects
+    if (sys->assets) {
+        ui_build_scene(sys->ui_root_view, &dest->scene, sys->assets);
+    }
 
     sys->packet_ready = true;
     mtx_unlock(&sys->packet_mutex);
@@ -71,7 +63,7 @@ static void try_bootstrap_renderer(RenderSystem* sys) {
     
     // Dependencies Check
     if (!sys->render_context.window) return;
-    if (!sys->assets || !sys->assets->vert_spv_path) return;
+    if (!sys->assets || !sys->assets->unified_vert_spv) return;
     // We don't strictly need UI bound to start renderer, but it helps.
     if (!sys->backend) return;
 
@@ -89,12 +81,12 @@ static void try_bootstrap_renderer(RenderSystem* sys) {
         .get_framebuffer_size = platform_get_framebuffer_size,
         .wait_events = platform_wait_events,
         .poll_events = platform_poll_events,
-        .vert_spv = sys->assets->vert_spv_path,
-        .frag_spv = sys->assets->frag_spv_path,
+        .vert_spv = sys->assets->unified_vert_spv,
+        .frag_spv = sys->assets->unified_frag_spv,
         .font_path = sys->assets->font_path,
         // .widgets = ... (Removed)
         // .display_list = ... (Removed)
-        .transformer = &sys->render_context.transformer,
+        // .transformer = ... (Removed from Init, passed in Frame/Scene)
         .logger_config = &sys->logger_config,
     };
 
@@ -179,8 +171,12 @@ void render_system_run(RenderSystem* sys) {
         
         // 2. Update UI Logic (Reactivity)
         if (sys->ui_root_view) {
+            ui_view_process_input(sys->ui_root_view, &sys->input);
             ui_view_update(sys->ui_root_view);
         }
+
+        // Reset frame events
+        sys->input.mouse_clicked = false;
 
         // 3. Render Prep
         render_system_update(sys); // Generates DrawList and pushes to packet
@@ -189,15 +185,9 @@ void render_system_run(RenderSystem* sys) {
         if (sys->renderer_ready && sys->backend) {
              const RenderFramePacket* packet = render_system_acquire_packet(sys);
              if (packet) {
-                if (sys->backend->update_transformer) {
-                    sys->backend->update_transformer(sys->backend, &packet->transformer);
+                if (sys->backend->render_scene) {
+                    sys->backend->render_scene(sys->backend, &packet->scene);
                 }
-                if (sys->backend->update_ui) {
-                    sys->backend->update_ui(sys->backend, &packet->ui_draw_list);
-                }
-                
-                if (sys->backend->draw)
-                    sys->backend->draw(sys->backend);
              }
         }
     }

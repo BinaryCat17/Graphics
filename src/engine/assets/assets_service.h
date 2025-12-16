@@ -2,13 +2,17 @@
 #define ASSETS_SYSTEM_H
 
 #include <stdbool.h>
-#include "foundation/config/config_document.h"
+#include "engine/scene/scene_def.h"
 
-// The data structure (Context)
 typedef struct Assets {
-    char* vert_spv_path;
-    char* frag_spv_path;
-    char* font_path;
+    // Paths (Legacy/Config)
+    const char* root_dir;
+    const char* unified_vert_spv;
+    const char* unified_frag_spv;
+    const char* font_path;
+    
+    // Built-in Resources
+    Mesh unit_quad;
 } Assets;
 
 // Public API

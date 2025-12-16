@@ -1,11 +1,12 @@
 #ifndef UI_RENDERER_H
 #define UI_RENDERER_H
 
-#include "engine/ui/ui_def.h"
+#include "ui_def.h"
 #include "foundation/math/coordinate_systems.h"
-#include "engine/render/backend/common/render_composition.h"
 
-// Simple command list for the backend
+typedef struct { float r, g, b, a; } Color;
+
+// --- Draw Commands ---
 typedef struct UiDrawCmd {
     int type; // 0=Rect, 1=Text
     Rect rect;

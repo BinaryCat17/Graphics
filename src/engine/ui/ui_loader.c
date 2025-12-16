@@ -75,6 +75,9 @@ UiDef* ui_loader_load_from_node(const void* node_ptr) {
     def->padding = parse_float(config_node_get_scalar(node, "padding"), 0.0f);
     def->spacing = parse_float(config_node_get_scalar(node, "spacing"), 0.0f);
 
+    def->min_value = parse_float(config_node_get_scalar(node, "min"), 0.0f);
+    def->max_value = parse_float(config_node_get_scalar(node, "max"), 1.0f);
+
     // 3. Data Binding
     const ConfigNode* text = config_node_get_scalar(node, "text");
     if (text) def->text = strdup_safe(text->scalar);

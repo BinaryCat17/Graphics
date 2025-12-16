@@ -7,8 +7,6 @@
 
 #include "foundation/math/coordinate_systems.h"
 #include "foundation/platform/platform.h"
-#include "engine/render/backend/common/render_composition.h"
-#include "engine/render/backend/common/ui_mesh_builder.h"
 #include "engine/render/backend/vulkan/vulkan_renderer.h"
 #include "engine/ui/ui_renderer.h"
 #include "stb_truetype.h"
@@ -34,11 +32,9 @@ typedef enum {
 } FrameStage;
 
 typedef struct {
-    UiVertex *background_vertices;
-    UiTextVertex *text_vertices;
+    // Legacy CPU vertex buffers (removed)
+    // We can keep Vtx *vertices for now if needed by font or other legacy parts not yet ported
     Vtx *vertices;
-    size_t background_capacity;
-    size_t text_capacity;
     size_t vertex_capacity;
 } FrameCpuArena;
 
@@ -55,7 +51,7 @@ typedef struct {
 typedef struct VulkanRendererState {
     PlatformWindow* window;
     PlatformSurface* platform_surface;
-    UiDrawList ui_draw_list;
+    // UiDrawList ui_draw_list; // Removed
     VkInstance instance;
     VkPhysicalDevice physical_device;
     VkDevice device;
@@ -98,6 +94,10 @@ typedef struct VulkanRendererState {
     VkDescriptorSet descriptor_set;
     CoordinateSystem2D transformer;
     RenderLogger* logger;
+    
+    // Unified Resources
+    VkBuffer unit_quad_buffer;
+    VkDeviceMemory unit_quad_memory;
     
     // Font state
     unsigned char* ttf_buffer;

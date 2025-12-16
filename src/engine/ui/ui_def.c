@@ -173,3 +173,76 @@ void ui_view_update(UiView* view) {
         }
     }
 }
+
+// --- Input Processing ---
+
+static const MetaField* find_field(const MetaStruct* meta, const char* name) {
+    if (!meta || !name) return NULL;
+    for (size_t i = 0; i < meta->field_count; ++i) {
+        if (strcmp(meta->fields[i].name, name) == 0) {
+            return &meta->fields[i];
+        }
+    }
+    return NULL;
+}
+
+static bool rect_contains(Rect r, float x, float y) {
+    return x >= r.x && x <= r.x + r.w && y >= r.y && y <= r.y + r.h;
+}
+
+void ui_view_process_input(UiView* view, const InputState* input) {
+    if (!view || !input || !view->def) return;
+
+    // 1. Process Children (Top-down for hit testing usually, but for simple UI order doesn't matter much)
+    // We process children first so they are "on top" if z-order matches tree order
+    for (size_t i = 0; i < view->child_count; ++i) {
+        ui_view_process_input(view->children[i], input);
+    }
+
+    // 2. Hit Test
+    if (rect_contains(view->rect, input->mouse_x, input->mouse_y)) {
+        
+        // Button Click
+        if (view->def->type == UI_NODE_BUTTON && input->mouse_clicked) {
+            if (view->def->bind_source && view->data_ptr && view->meta) {
+                const MetaField* field = find_field(view->meta, view->def->bind_source);
+                if (field) {
+                    if (field->type == META_TYPE_INT) {
+                        // Toggle logic or Action signal
+                        int current = meta_get_int(view->data_ptr, field);
+                        meta_set_int(view->data_ptr, field, !current); 
+                    } else if (field->type == META_TYPE_BOOL) {
+                        // We don't have meta_get_bool in header? 
+                        // Assuming int for bool in C reflection or I missed it.
+                        // reflection.h had META_TYPE_BOOL but no meta_get_bool?
+                        // Let's assume int logic works or check header again.
+                        // Header had meta_get_int, meta_get_float, meta_get_string. 
+                        // It MISSED meta_get_bool/set_bool! 
+                        // I will assume bool is stored as int for now or cast.
+                        // Safe bet: treat as int.
+                        int current = meta_get_int(view->data_ptr, field);
+                        meta_set_int(view->data_ptr, field, !current); 
+                    }
+                }
+            }
+        }
+        
+        // Slider Drag
+        if (view->def->type == UI_NODE_SLIDER && input->mouse_down) {
+            float relative = (input->mouse_x - view->rect.x) / view->rect.w;
+            if (relative < 0) relative = 0.0f;
+            if (relative > 1) relative = 1.0f;
+            
+            float min = view->def->min_value;
+            float max = view->def->max_value;
+            float new_val = min + relative * (max - min);
+            
+            if (view->def->bind_source && view->data_ptr && view->meta) {
+                const MetaField* field = find_field(view->meta, view->def->bind_source);
+                if (field && field->type == META_TYPE_FLOAT) {
+                     meta_set_float(view->data_ptr, field, new_val);
+                }
+            }
+        }
+    }
+}

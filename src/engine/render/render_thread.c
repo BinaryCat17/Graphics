@@ -10,39 +10,39 @@
 // --- Callbacks ---
 
 static void on_mouse_button(PlatformWindow* window, PlatformMouseButton button, PlatformInputAction action, int mods, void* user_data) {
+    (void)window; (void)mods;
     RenderSystem* sys = (RenderSystem*)user_data;
     if (!sys) return;
     
-    double x, y;
-    platform_get_cursor_pos(window, &x, &y);
-    
-    // In RenderContext, 'coordinates' is CoordinateSystem2D directly
-    Vec2 logical = coordinate_screen_to_logical(&sys->render_context.transformer, (Vec2){(float)x, (float)y});
-    
-    // TODO: Forward input to New UI System
+    if (button == PLATFORM_MOUSE_BUTTON_LEFT) {
+        if (action == PLATFORM_PRESS) {
+            sys->input.mouse_down = true;
+            sys->input.mouse_clicked = true;
+        } else if (action == PLATFORM_RELEASE) {
+            sys->input.mouse_down = false;
+        }
+    }
 }
 
 static void on_scroll(PlatformWindow* window, double xoff, double yoff, void* user_data) {
+    (void)window; (void)xoff; (void)yoff;
     RenderSystem* sys = (RenderSystem*)user_data;
     if (!sys) return;
-
-    double x, y;
-    platform_get_cursor_pos(window, &x, &y);
-    Vec2 logical = coordinate_screen_to_logical(&sys->render_context.transformer, (Vec2){(float)x, (float)y});
 
     // TODO: Forward scroll to New UI System
 }
 
 static void on_cursor_pos(PlatformWindow* window, double x, double y, void* user_data) {
+    (void)window;
     RenderSystem* sys = (RenderSystem*)user_data;
     if (!sys) return;
 
-    Vec2 logical = coordinate_screen_to_logical(&sys->render_context.transformer, (Vec2){(float)x, (float)y});
-
-    // TODO: Forward cursor to New UI System
+    sys->input.mouse_x = (float)x;
+    sys->input.mouse_y = (float)y;
 }
 
 static void on_framebuffer_size(PlatformWindow* window, int width, int height, void* user_data) {
+    (void)window; (void)width; (void)height;
     RenderSystem* sys = (RenderSystem*)user_data;
     if (!sys) return;
     render_thread_update_window_state(sys);

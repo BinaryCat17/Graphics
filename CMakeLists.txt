@@ -49,8 +49,8 @@ function(add_shader_compile FILE_NAME)
     set(SHADER_OUTPUTS ${SHADER_OUTPUTS} ${OUTPUT} PARENT_SCOPE)
 endfunction()
 
-add_shader_compile("shader.vert")
-add_shader_compile("shader.frag")
+add_shader_compile("unified.vert")
+add_shader_compile("unified.frag")
 
 add_custom_target(Shaders DEPENDS ${SHADER_OUTPUTS})
 
@@ -121,8 +121,6 @@ target_link_libraries(foundation_config PUBLIC foundation_platform foundation_lo
 # Note: merging backend/common, backend/vulkan, render_graph into one 'engine_render' lib for simplicity.
 # Or keeping them split but under engine_render umbrella.
 set(ENGINE_RENDER_SOURCES
-    "src/engine/render/backend/common/render_composition.c"
-    "src/engine/render/backend/common/ui_mesh_builder.c"
     "src/engine/render/backend/common/renderer_backend.c"
     "src/engine/render/backend/common/stb_impl.c"
     "src/engine/render/backend/vulkan/vulkan_renderer.c"
@@ -131,12 +129,11 @@ set(ENGINE_RENDER_SOURCES
     "src/engine/render/backend/vulkan/vk_swapchain.c"
     "src/engine/render/backend/vulkan/vk_pipeline.c"
     "src/engine/render/backend/vulkan/vk_resources.c"
-    "src/engine/render/backend/vulkan/vk_ui_render.c"
-    "src/engine/render/backend/vulkan/vk_render_graph.c"
-    "src/engine/render/render_graph/render_graph.c"
     # Runtime
     "src/engine/render/render_thread.c"
     "src/engine/render/render_system.c"
+    # Unified Scene
+    "src/engine/scene/scene.c"
 )
 add_library(engine_render STATIC ${ENGINE_RENDER_SOURCES})
 target_include_directories(engine_render PUBLIC "src/" ${Stb_INCLUDE_DIR})
@@ -153,26 +150,15 @@ target_link_libraries(engine_assets PUBLIC foundation_platform foundation_config
 set(ENGINE_UI_SOURCES
     "src/engine/ui/ui_renderer.c"
     "src/engine/ui/ui_loader.c"
-    "src/engine/ui/ui_def.c")
+    "src/engine/ui/ui_def.c"
+    "src/engine/ui/ui_scene_bridge.c")
 add_library(engine_ui STATIC ${ENGINE_UI_SOURCES})
 target_include_directories(engine_ui PUBLIC "src/" ${Stb_INCLUDE_DIR})
 target_link_libraries(engine_ui PUBLIC foundation_config engine_assets foundation_meta)
 
-# --- DOMAIN LAYER ---
-
-# CAD Model
-set(DOMAIN_CAD_SOURCES
-    "src/domains/cad_model/cad_scene.c"
-    "src/domains/cad_model/cad_scene_yaml.c"
-    "src/domains/cad_model/scene_service.c")
-add_library(domain_cad STATIC ${DOMAIN_CAD_SOURCES})
-target_include_directories(domain_cad PUBLIC "src/")
-target_link_libraries(domain_cad PUBLIC foundation_config engine_assets engine_ui)
-
 # Math Model
 set(DOMAIN_MATH_SOURCES
     "src/domains/math_model/math_scene.c"
-    "src/domains/math_model/math_mesh_builder.c"
     "src/domains/math_model/math_graph.c")
 add_library(domain_math STATIC ${DOMAIN_MATH_SOURCES})
 target_include_directories(domain_math PUBLIC "src/")
@@ -189,7 +175,6 @@ endif()
 add_executable(Graphics "src/app/main.c")
 target_include_directories(Graphics PRIVATE "src/" ${Vulkan_INCLUDE_DIRS} ${Stb_INCLUDE_DIR})
 target_link_libraries(Graphics PRIVATE
-    domain_cad
     domain_math
     engine_render
     engine_ui
@@ -215,10 +200,4 @@ endfunction()
 
 # Update test paths and libs
 add_graphics_test(transform_tests tests/transform_tests.c foundation_math engine_render)
-add_graphics_test(render_composition_tests tests/render_composition_tests.c foundation_math engine_render)
-add_graphics_test(ui_mesh_builder_tests tests/ui_mesh_builder_tests.c foundation_math engine_render)
-add_graphics_test(text_clip_integration_tests tests/text_clip_integration_tests.c foundation_math engine_render)
-add_graphics_test(scene_yaml_tests tests/scene_yaml_tests.c domain_cad foundation_config)
 add_graphics_test(math_scene_tests tests/math_scene_tests.c domain_math)
-add_graphics_test(math_mesh_tests tests/math_mesh_tests.c domain_math)
-add_graphics_test(render_graph_tests tests/render_graph_tests.c engine_render)

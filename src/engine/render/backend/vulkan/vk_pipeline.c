@@ -41,19 +41,20 @@ void vk_create_pipeline(VulkanRendererState* state, const char* vert_spv, const 
         {.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO, .stage = VK_SHADER_STAGE_FRAGMENT_BIT, .module = fs, .pName = "main" }
     };
     
-    /* vertex input binding */
-    VkVertexInputBindingDescription bind = { .binding = 0, .stride = sizeof(Vtx), .inputRate = VK_VERTEX_INPUT_RATE_VERTEX };
-    VkVertexInputAttributeDescription attr[4] = {
-        {.location = 0, .binding = 0, .format = VK_FORMAT_R32G32B32_SFLOAT, .offset = offsetof(Vtx,px) },
-        {.location = 1, .binding = 0, .format = VK_FORMAT_R32G32_SFLOAT, .offset = offsetof(Vtx,u) },
-        {.location = 2, .binding = 0, .format = VK_FORMAT_R32_SFLOAT, .offset = offsetof(Vtx,use_tex) },
-        {.location = 3, .binding = 0, .format = VK_FORMAT_R32G32B32A32_SFLOAT, .offset = offsetof(Vtx,r) }
+    /* vertex input binding - Unified: vec3 position only */
+    // Stride = 12 bytes (3 floats)
+    VkVertexInputBindingDescription bind = { .binding = 0, .stride = 3 * sizeof(float), .inputRate = VK_VERTEX_INPUT_RATE_VERTEX };
+    
+    // Attribute 0: Position (vec3)
+    VkVertexInputAttributeDescription attr[1] = {
+        {.location = 0, .binding = 0, .format = VK_FORMAT_R32G32B32_SFLOAT, .offset = 0 }
     };
+    
     VkPipelineVertexInputStateCreateInfo vxi = { 
         .sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO, 
         .vertexBindingDescriptionCount = 1, 
         .pVertexBindingDescriptions = &bind, 
-        .vertexAttributeDescriptionCount = 4, 
+        .vertexAttributeDescriptionCount = 1, 
         .pVertexAttributeDescriptions = attr 
     };
 
@@ -90,7 +91,10 @@ void vk_create_pipeline(VulkanRendererState* state, const char* vert_spv, const 
     };
     VkPipelineColorBlendStateCreateInfo cb = { .sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO, .attachmentCount = 1, .pAttachments = &cbatt };
     
-    VkPushConstantRange pcr = { .stageFlags = VK_SHADER_STAGE_VERTEX_BIT, .offset = 0, .size = sizeof(float) * 2 };
+    // Unified Push Constants:
+    // mat4 model (64) + mat4 view_proj (64) + vec4 color (16) = 144 bytes
+    VkPushConstantRange pcr = { .stageFlags = VK_SHADER_STAGE_VERTEX_BIT, .offset = 0, .size = 144 };
+    
     VkPipelineLayoutCreateInfo plci = { .sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO, .setLayoutCount = 1, .pSetLayouts = &state->descriptor_layout, .pushConstantRangeCount = 1, .pPushConstantRanges = &pcr };
     
     state->res = vkCreatePipelineLayout(state->device, &plci, NULL, &state->pipeline_layout);

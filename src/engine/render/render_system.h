@@ -25,6 +25,9 @@ typedef struct RenderSystem {
     RenderRuntimeContext render_context; // Thread context
     struct RendererBackend* backend;
     
+    // Input State
+    InputState input;
+    
     // Packet buffering
     RenderFramePacket packets[2];
     int front_packet_index;

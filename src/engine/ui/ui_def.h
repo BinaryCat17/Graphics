@@ -1,9 +1,16 @@
 #ifndef UI_DEF_H
 #define UI_DEF_H
 
+#include <stdbool.h>
 #include "foundation/meta/reflection.h"
 
 typedef struct { float x, y, w, h; } Rect;
+
+typedef struct InputState {
+    float mouse_x, mouse_y;
+    bool mouse_down;
+    bool mouse_clicked;
+} InputState;
 
 // --- UI DEFINITION (TEMPLATE) ---
 // This structure maps 1:1 to the YAML configuration. 
@@ -49,6 +56,10 @@ typedef struct UiDef {
     float width, height; // < 0 means auto/fill
     float padding;
     float spacing;
+
+    // Slider props
+    float min_value;
+    float max_value;
     
     // Children
     struct UiDef** children;
@@ -91,5 +102,8 @@ void ui_view_free(UiView* view);
 
 // The core function: Synchronizes View with Data
 void ui_view_update(UiView* view);
+
+// Process Input (Hit Testing & Interaction)
+void ui_view_process_input(UiView* view, const InputState* input);
 
 #endif // UI_DEF_H

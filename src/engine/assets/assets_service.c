@@ -22,11 +22,11 @@ static char* join_path(const char* dir, const char* leaf) {
 }
 
 static void free_paths(Assets* assets) {
-    free(assets->vert_spv_path);
-    free(assets->frag_spv_path);
-    free(assets->font_path);
-    assets->vert_spv_path = NULL;
-    assets->frag_spv_path = NULL;
+    free((void*)assets->unified_vert_spv);
+    free((void*)assets->unified_frag_spv);
+    free((void*)assets->font_path);
+    assets->unified_vert_spv = NULL;
+    assets->unified_frag_spv = NULL;
     assets->font_path = NULL;
 }
 
@@ -36,15 +36,32 @@ bool assets_init(Assets* out_assets, const char* assets_dir, const char* ui_conf
 
     memset(out_assets, 0, sizeof(*out_assets));
 
-    out_assets->vert_spv_path = join_path(assets_dir, "shaders/shader.vert.spv");
-    out_assets->frag_spv_path = join_path(assets_dir, "shaders/shader.frag.spv");
+    out_assets->unified_vert_spv = join_path(assets_dir, "shaders/unified.vert.spv");
+    out_assets->unified_frag_spv = join_path(assets_dir, "shaders/unified.frag.spv");
     out_assets->font_path = join_path(assets_dir, "fonts/font.ttf");
 
-    if (!out_assets->vert_spv_path || !out_assets->frag_spv_path || !out_assets->font_path) {
+    if (!out_assets->unified_vert_spv || !out_assets->unified_frag_spv || 
+        !out_assets->font_path) {
         LOG_FATAL("Failed to compose asset paths for directory '%s'", assets_dir);
         assets_shutdown(out_assets);
         return false;
     }
+
+    // Create Unit Quad (0,0 to 1,1)
+    static float quad_verts[] = {
+        0.0f, 0.0f, 0.0f,
+        1.0f, 0.0f, 0.0f,
+        1.0f, 1.0f, 0.0f,
+        0.0f, 1.0f, 0.0f
+    };
+    static unsigned int quad_indices[] = {
+        0, 1, 2, 0, 2, 3
+    };
+    
+    out_assets->unit_quad.positions = quad_verts;
+    out_assets->unit_quad.position_count = 12; 
+    out_assets->unit_quad.indices = quad_indices;
+    out_assets->unit_quad.index_count = 6;
 
     return true;
 }
