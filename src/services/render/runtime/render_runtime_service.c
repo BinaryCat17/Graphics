@@ -108,7 +108,7 @@ static void render_runtime_service_reset(RenderRuntimeServiceContext* context, A
 
     *context = (RenderRuntimeServiceContext){
         .render = services ? &services->render : NULL,
-        .assets = services ? &services->core.assets : NULL,
+        .assets = services ? &services->assets : NULL, // core.assets removed
         .ui = services ? &services->ui : NULL,
         .model = services ? services->core.model : NULL,
         .state_manager = services ? &services->state_manager : NULL,

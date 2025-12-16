@@ -278,19 +278,21 @@ static bool ui_service_init(void* ptr, const ServiceConfig* config) {
     
     UiServiceContext* context = ui_service_context();
     context->ui = &services->ui;
-    context->assets = &services->core.assets;
+    context->assets = &services->assets;
     context->scene = &services->core.scene;
-    context->model = services->core.model;
+    context->model = NULL;
     
     ui_context_init(&services->ui);
     return ui_service_subscribe(&services->ui, &services->state_manager, services->type_id_model);
 }
 
 static bool ui_service_start(void* ptr, const ServiceConfig* config) {
-    (void)ptr; // Ignore AppServices*
+    AppServices* services = (AppServices*)ptr; 
     (void)config;
     
     UiServiceContext* context = ui_service_context();
+    context->model = services->core.model;
+
     if (!context || !context->ui || !context->assets || !context->scene || !context->model) {
         fprintf(stderr, "UI service start missing context or dependencies.\n");
         return false;

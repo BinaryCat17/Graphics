@@ -6,6 +6,7 @@
 #include "services/core/core_context.h"
 #include "core/state/state_manager.h"
 #include "services/ui/ui_context.h"
+#include "services/assets/assets_service.h"
 #include "core/service_manager/service.h"
 
 bool ui_build(UiContext* ui, const Assets* assets, const Scene* scene, Model* model);

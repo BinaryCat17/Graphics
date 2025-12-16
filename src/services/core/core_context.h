@@ -1,7 +1,7 @@
 #ifndef APP_CONTEXT_CORE_CONTEXT_H
 #define APP_CONTEXT_CORE_CONTEXT_H
 
-#include "services/assets/assets_service.h"
+
 #include "services/scene/cad_scene.h"
 #include "core/config/module_yaml_loader.h"
 #include "services/ui/model_style.h"
@@ -12,7 +12,6 @@ typedef struct CoreContext {
     ModuleSchema global_schema;
 
     Scene scene;
-    Assets assets;
     Model* model;
 } CoreContext;
 

@@ -1,5 +1,7 @@
 #include "services/assets/assets_service.h"
 #include "core/platform/platform.h"
+#include "app/app_services.h"
+#include "core/service_manager/service_events.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -34,6 +36,11 @@ static void free_paths(Assets* assets) {
 int load_assets(const char* assets_dir, const char* ui_config_path, Assets* out_assets) {
     if (!out_assets) return 0;
 
+    // Do not memset 0 here if it's already initialized or if we want to preserve some state?
+    // Actually, clean slate is better.
+    // Ensure we don't leak if called twice (though start is called once).
+    free_paths(out_assets);
+    config_document_free(&out_assets->ui_doc);
     memset(out_assets, 0, sizeof(*out_assets));
 
     if (ui_config_path && ui_config_path[0]) {
@@ -65,4 +72,48 @@ void free_assets(Assets* assets) {
     free_paths(assets);
     config_document_free(&assets->ui_doc);
     memset(assets, 0, sizeof(*assets));
+}
+
+// --- Service Implementation ---
+
+static bool assets_service_init(void* ptr, const ServiceConfig* config) {
+    (void)ptr; (void)config;
+    return true; // Nothing to init strictly, memory is zeroed by manager usually
+}
+
+static bool assets_service_start(void* ptr, const ServiceConfig* config) {
+    AppServices* services = (AppServices*)ptr;
+    if (!services || !config || !config->assets_dir) return false;
+
+    // Use the context allocated in AppServices (GeneratedServicesContext)
+    Assets* assets_ctx = &services->assets;
+
+    if (!load_assets(config->assets_dir, config->ui_config_path, assets_ctx)) {
+        return false;
+    }
+
+    // Publish component
+    AssetsComponent comp = { .assets = assets_ctx };
+    state_manager_publish(&services->state_manager, STATE_EVENT_COMPONENT_ADDED, 
+                          services->type_id_assets, "active", &comp, sizeof(comp));
+
+    return true;
+}
+
+static void assets_service_stop(void* ptr) {
+    AppServices* services = (AppServices*)ptr;
+    if (!services) return;
+    free_assets(&services->assets);
+}
+
+static const ServiceDescriptor g_assets_service_descriptor = {
+    .name = "AssetsService",
+    .init = assets_service_init,
+    .start = assets_service_start,
+    .stop = assets_service_stop,
+    // Dependencies? None strictly (except config).
+};
+
+const ServiceDescriptor* assets_service_descriptor(void) {
+    return &g_assets_service_descriptor;
 }

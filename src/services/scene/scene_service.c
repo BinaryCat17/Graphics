@@ -28,9 +28,9 @@ static void free_schemas(CoreContext* core) {
     module_schema_free(&core->global_schema);
 }
 
-bool scene_service_load(CoreContext* core, StateManager* state_manager, int scene_type_id, int assets_type_id,
+bool scene_service_load(CoreContext* core, Assets* assets, StateManager* state_manager, int scene_type_id,
                         int model_type_id, const ServiceConfig* config) {
-    if (!core || !state_manager || !config || !config->assets_dir || !config->scene_path) {
+    if (!core || !assets || !state_manager || !config || !config->assets_dir || !config->scene_path) {
         fprintf(stderr, "Scene service load called with invalid arguments.\n");
         return false;
     }
@@ -81,13 +81,9 @@ bool scene_service_load(CoreContext* core, StateManager* state_manager, int scen
         return false;
     }
 
-    if (!load_assets(assets_dir, config->ui_config_path, &core->assets)) {
-        fprintf(stderr, "Failed to load assets from '%s'.\n", assets_dir);
-        scene_service_unload(core);
-        return false;
-    }
+    // Assets are already loaded by AssetsService. We just use them.
 
-    core->model = ui_config_load_model(&core->assets.ui_doc);
+    core->model = ui_config_load_model(&assets->ui_doc);
     if (core->model) {
         scene_ui_bind_model(core->model, &core->scene, scene_path);
     }
@@ -96,9 +92,7 @@ bool scene_service_load(CoreContext* core, StateManager* state_manager, int scen
     state_manager_publish(state_manager, STATE_EVENT_COMPONENT_ADDED, scene_type_id, "active",
                           &scene_component, sizeof(scene_component));
 
-    AssetsComponent assets_component = {.assets = &core->assets};
-    state_manager_publish(state_manager, STATE_EVENT_COMPONENT_ADDED, assets_type_id, "active",
-                          &assets_component, sizeof(assets_component));
+    // AssetsComponent is published by AssetsService now.
 
     ModelComponent model_component = {.model = core->model};
     state_manager_publish(state_manager, STATE_EVENT_COMPONENT_ADDED, model_type_id, "active",
@@ -115,7 +109,8 @@ void scene_service_unload(CoreContext* core) {
         core->model = NULL;
     }
 
-    free_assets(&core->assets);
+    // Do not free assets here, AssetsService owns them.
+    
     scene_dispose(&core->scene);
     free_schemas(core);
 }
@@ -129,8 +124,9 @@ static bool scene_service_init(void* ptr, const ServiceConfig* config) {
 
 static bool scene_service_start(void* ptr, const ServiceConfig* config) {
     AppServices* services = (AppServices*)ptr;
-    return scene_service_load(&services->core, &services->state_manager, services->type_id_scene,
-                              services->type_id_assets, services->type_id_model, config);
+    // Pass pointer to Assets context
+    return scene_service_load(&services->core, &services->assets, &services->state_manager, 
+                              services->type_id_scene, services->type_id_model, config);
 }
 
 static void scene_service_stop(void* ptr) {
@@ -138,10 +134,12 @@ static void scene_service_stop(void* ptr) {
     scene_service_unload(&services->core);
 }
 
+static const char* g_dependencies[] = {"AssetsService"};
+
 static const ServiceDescriptor g_scene_service_descriptor = {
     .name = "scene",
-    .dependencies = NULL,
-    .dependency_count = 0,
+    .dependencies = g_dependencies,
+    .dependency_count = 1,
     .init = scene_service_init,
     .start = scene_service_start,
     .stop = scene_service_stop,

@@ -1,7 +1,10 @@
 service:
   name: AssetsService
   header: services/assets/assets_service.h
-  runtime: false
+  runtime: true
+
+context:
+  - { name: assets, type: Assets }
 
 components:
   - name: AssetsComponent
