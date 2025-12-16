@@ -1,6 +1,0 @@
-type: component
-key: components/panelSecondaryScroll
-component:
-  type: scrollbar
-  style: panelSecondary
-  scrollbarWidth: 9

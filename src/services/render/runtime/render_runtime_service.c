@@ -12,6 +12,67 @@
 
 static ServiceDescriptor g_render_runtime_service_descriptor;
 
+static void render_packet_free_resources(RenderFramePacket* packet) {
+    if (!packet) return;
+    if (packet->display_list.items) {
+        free(packet->display_list.items);
+        packet->display_list.items = NULL;
+    }
+    packet->display_list.count = 0;
+}
+
+static void try_sync_packet(RenderRuntimeServiceContext* context) {
+    if (!context) return;
+    
+    mtx_lock(&context->packet_mutex);
+    
+    RenderFramePacket* dest = &context->packets[context->back_packet_index];
+    
+    // 1. Copy UI Data (Widgets)
+    dest->widgets = context->widgets;
+
+    // 2. Copy Display List (Deep Copy)
+    render_packet_free_resources(dest);
+    if (context->display_list.items && context->display_list.count > 0) {
+        dest->display_list.items = (DisplayItem*)malloc(context->display_list.count * sizeof(DisplayItem));
+        if (dest->display_list.items) {
+            memcpy(dest->display_list.items, context->display_list.items, context->display_list.count * sizeof(DisplayItem));
+            dest->display_list.count = context->display_list.count;
+        } else {
+            fprintf(stderr, "Render Packet: Failed to allocate display list.\n");
+        }
+    }
+
+    // 3. Copy Transformer
+    if (context->render) {
+        dest->transformer = context->render->transformer;
+    }
+
+    context->packet_ready = true;
+    mtx_unlock(&context->packet_mutex);
+}
+
+const RenderFramePacket* render_runtime_service_acquire_packet(RenderRuntimeServiceContext* context) {
+    if (!context) return NULL;
+
+    mtx_lock(&context->packet_mutex);
+    if (context->packet_ready) {
+        // Swap indices
+        int temp = context->front_packet_index;
+        context->front_packet_index = context->back_packet_index;
+        context->back_packet_index = temp;
+        
+        // Reset flag so we don't swap again until new data arrives
+        context->packet_ready = false;
+        
+        // Clear the new back buffer (old front) to be ready for writing? 
+        // Not strictly necessary if we overwrite everything, but good for safety.
+    }
+    mtx_unlock(&context->packet_mutex);
+
+    return &context->packets[context->front_packet_index];
+}
+
 static void render_runtime_free_display_list(RenderRuntimeServiceContext* context) {
     if (!context || !context->display_list.items) return;
     free(context->display_list.items);
@@ -40,6 +101,9 @@ static void render_runtime_copy_display_list(RenderRuntimeServiceContext* contex
 
 static void render_runtime_service_reset(RenderRuntimeServiceContext* context, AppServices* services) {
     if (!context) return;
+    
+    render_packet_free_resources(&context->packets[0]);
+    render_packet_free_resources(&context->packets[1]);
     render_runtime_free_display_list(context);
 
     *context = (RenderRuntimeServiceContext){
@@ -56,12 +120,24 @@ static void render_runtime_service_reset(RenderRuntimeServiceContext* context, A
         .render_ready = false,
         .backend = context->backend,
         .logger_config = context->logger_config,
+        .front_packet_index = 0,
+        .back_packet_index = 1,
+        .packet_ready = false
     };
+    // Re-init mutex after memset/reset? 
+    // Dangerous if reset is called during runtime. 
+    // Assuming reset is only called on stop/start.
+    mtx_init(&context->packet_mutex, mtx_plain);
 }
 
 static void try_bootstrap_renderer(RenderRuntimeServiceContext* context) {
-    if (!context || context->renderer_ready || !context->render_ready) return;
-    if (!context->render || !context->render->window || !context->assets || !context->widgets.items) return;
+    if (!context) return;
+    if (context->renderer_ready) return; // Already ready
+    
+    if (!context->render_ready) return;
+    if (!context->render || !context->render->window) return;
+    if (!context->assets) return;
+    if (!context->widgets.items) return;
     if (!context->backend) return;
 
     RenderBackendInit init = {
@@ -83,6 +159,10 @@ static void try_bootstrap_renderer(RenderRuntimeServiceContext* context) {
     };
 
     context->renderer_ready = context->backend->init(context->backend, &init);
+    
+    if (context->renderer_ready) {
+        try_sync_packet(context);
+    }
 }
 
 static void on_assets_event(const StateEvent* event, void* user_data) {
@@ -97,12 +177,17 @@ static void on_ui_event(const StateEvent* event, void* user_data) {
     RenderRuntimeServiceContext* context = (RenderRuntimeServiceContext*)user_data;
     if (!context || !event || !event->payload) return;
     const UiRuntimeComponent* component = (const UiRuntimeComponent*)event->payload;
+    
+    // Update Master State
     context->ui = component->ui;
     context->widgets = component->widgets;
     render_runtime_copy_display_list(context, component->display_list);
-    if (context->renderer_ready && context->backend && context->backend->update_ui) {
-        context->backend->update_ui(context->backend, context->widgets, context->display_list);
+    
+    // Sync to Render Thread (Back Buffer)
+    if (context->renderer_ready) {
+        try_sync_packet(context);
     }
+    
     try_bootstrap_renderer(context);
 }
 
@@ -117,13 +202,13 @@ static void on_render_ready_event(const StateEvent* event, void* user_data) {
     RenderRuntimeServiceContext* context = (RenderRuntimeServiceContext*)user_data;
     if (!context || !event || !event->payload) return;
     const RenderReadyComponent* component = (const RenderReadyComponent*)event->payload;
+    
+    // Only update render context and readiness flag. 
+    // Do NOT overwrite assets/ui/widgets as they might be stale in this event payload 
+    // compared to what we received directly from their respective services.
     context->render = component->render;
-    context->assets = component->assets;
-    context->ui = component->ui;
-    context->widgets = component->widgets;
-    render_runtime_copy_display_list(context, component->display_list);
-    context->model = component->model;
     context->render_ready = component->ready;
+    
     try_bootstrap_renderer(context);
 }
 
@@ -158,9 +243,9 @@ RenderRuntimeServiceContext* render_runtime_service_context(const ServiceDescrip
 void render_runtime_service_update_transformer(RenderRuntimeServiceContext* context, RenderRuntimeContext* render) {
     if (!context || !render) return;
     if (!context->renderer_ready) return;
-    if (context->backend && context->backend->update_transformer) {
-        context->backend->update_transformer(context->backend, &render->transformer);
-    }
+    
+    // Sync to Render Thread (Back Buffer)
+    try_sync_packet(context);
 }
 
 bool render_runtime_service_prepare(RenderRuntimeServiceContext* context) {

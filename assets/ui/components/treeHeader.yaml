@@ -1,0 +1,6 @@
+type: component
+key: components/treeHeader
+component:
+  type: label
+  style: treeHeader
+  padding: 8

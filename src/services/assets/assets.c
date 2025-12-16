@@ -39,11 +39,11 @@ int load_assets(const char* assets_dir, const char* ui_config_path, Assets* out_
     if (ui_config_path && ui_config_path[0]) {
         out_assets->ui_path = platform_strdup(ui_config_path);
     } else {
-        out_assets->ui_path = join_path(assets_dir, "ui/config/layout/ui.yaml");
+        out_assets->ui_path = join_path(assets_dir, "ui/ui.yaml");
     }
     out_assets->vert_spv_path = join_path(assets_dir, "shaders/shader.vert.spv");
     out_assets->frag_spv_path = join_path(assets_dir, "shaders/shader.frag.spv");
-    out_assets->font_path = join_path(assets_dir, "font.ttf");
+    out_assets->font_path = join_path(assets_dir, "fonts/font.ttf");
 
     if (!out_assets->ui_path || !out_assets->vert_spv_path || !out_assets->frag_spv_path || !out_assets->font_path) {
         fprintf(stderr, "Fatal: failed to compose asset paths for directory '%s'\n", assets_dir);

@@ -26,9 +26,27 @@ static void render_service_run_loop(RenderServiceContext* service) {
     while (service->running && !platform_window_should_close(context->render->window)) {
         state_manager_dispatch(context->state_manager, 0);
         platform_poll_events();
-        if (context->renderer_ready && context->ui && context->model && context->backend && context->backend->draw) {
-            ui_frame_update(context->ui);
-            context->backend->draw(context->backend);
+        
+        const RenderFramePacket* packet = render_runtime_service_acquire_packet(context);
+        
+        if (context->renderer_ready && context->backend && packet) {
+            // Safe execution on Render Thread
+            if (context->backend->update_transformer) {
+                context->backend->update_transformer(context->backend, &packet->transformer);
+            }
+            
+            if (context->backend->update_ui) {
+                context->backend->update_ui(context->backend, packet->widgets, packet->display_list);
+            }
+
+            // Note: ui_frame_update acts on shared UiContext. ideally this should move to UiService
+            if (context->ui) {
+                ui_frame_update(context->ui);
+            }
+
+            if (context->backend->draw) {
+                context->backend->draw(context->backend);
+            }
         }
     }
 }

@@ -41,8 +41,8 @@ bool scene_service_load(CoreContext* core, StateManager* state_manager, int scen
     ConfigError schema_err = {0};
 
     char* ui_dir = join_path(assets_dir, "ui");
-    char* global_config_path = join_path(assets_dir, "config/global.yaml");
-    char* ui_schema_path = join_path(ui_dir, "schema.yaml");
+    char* global_config_path = join_path(assets_dir, "config/app.yaml");
+    char* ui_schema_path = join_path(assets_dir, "config/ui_schema.yaml");
 
     if (!ui_dir || !global_config_path || !ui_schema_path) {
         fprintf(stderr, "Failed to allocate memory for schema paths.\n");
@@ -54,9 +54,7 @@ bool scene_service_load(CoreContext* core, StateManager* state_manager, int scen
 
     if (ui_schema_path && module_schema_load(ui_schema_path, &core->ui_schema, &schema_err)) {
         module_schema_register(state_manager, &core->ui_schema, NULL);
-        char* ui_config = join_path(ui_dir, "config/layout");
-        module_load_configs(&core->ui_schema, ui_config, state_manager);
-        free(ui_config);
+        module_load_configs(&core->ui_schema, ui_dir, state_manager);
     } else {
         fprintf(stderr, "UI schema error %s:%d:%d %s\n", ui_schema_path ? ui_schema_path : "(null)", schema_err.line,
                 schema_err.column, schema_err.message);

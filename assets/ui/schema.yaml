@@ -1,9 +1,0 @@
-namespace: ui
-stores:
-  - name: model
-    chunk_capacity: 4
-  - name: layout
-    chunk_capacity: 4
-    # Layout documents and component definitions share this store.
-  - name: styles
-    chunk_capacity: 4

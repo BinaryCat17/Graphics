@@ -6,3 +6,4 @@ vcpkg_installed
 worktmp/
 generated/
 __pycache__/
+CMakeFiles
