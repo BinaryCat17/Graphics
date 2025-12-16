@@ -3,8 +3,8 @@
 
 #include "test_framework.h"
 
-#include "core/platform/platform.h"
-#include "services/scene/cad_scene_yaml.h"
+#include "foundation/platform/platform.h"
+#include "domains/cad_model/cad_scene_yaml.h"
 
 static const char *write_temp(const char *name, const char *text)
 {

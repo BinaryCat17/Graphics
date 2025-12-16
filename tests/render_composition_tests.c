@@ -2,9 +2,9 @@
 
 #include "test_framework.h"
 
-#include "core/math/coordinate_systems.h"
-#include "services/render/backend/common/render_composition.h"
-#include "services/render/backend/common/ui_mesh_builder.h"
+#include "foundation/math/coordinate_systems.h"
+#include "engine/render/backend/common/render_composition.h"
+#include "engine/render/backend/common/ui_mesh_builder.h"
 
 static Renderer create_renderer(void)
 {

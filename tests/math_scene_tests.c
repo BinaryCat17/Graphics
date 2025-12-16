@@ -1,5 +1,5 @@
 #include "test_framework.h"
-#include "services/scene/math_scene.h"
+#include "domains/math_model/math_scene.h"
 
 #define M_PI 3.14159265358979323846
 

@@ -1,6 +1,6 @@
 #include "test_framework.h"
-#include "services/scene/math_scene.h"
-#include "services/scene/math_mesh_builder.h"
+#include "domains/math_model/math_scene.h"
+#include "domains/math_model/math_mesh_builder.h"
 
 // Test 1: Generate a simple plane z = x + y
 int test_mesh_generation() {

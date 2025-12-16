@@ -4,13 +4,13 @@
 
 #include "test_framework.h"
 
-#include "core/platform/platform.h"
-#include "services/ui/scene_ui.h"
-#include "core/config/config_io.h"
-#include "services/ui/model_style.h"
-#include "services/ui/ui_node.h"
-#include "services/ui/layout_tree.h"
-#include "services/ui/widget_list.h"
+#include "foundation/platform/platform.h"
+#include "engine/ui/scene_ui.h"
+#include "foundation/config/config_io.h"
+#include "engine/ui/model_style.h"
+#include "engine/ui/ui_node.h"
+#include "engine/ui/layout_tree.h"
+#include "engine/ui/widget_list.h"
 
 static UiNode* find_by_id(UiNode* node, const char* id)
 {

@@ -1,4 +1,0 @@
-service:
-  name: RenderService
-  header: services/render/render_service.h
-components: []

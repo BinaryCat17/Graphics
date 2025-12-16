@@ -3,8 +3,8 @@
 
 #include "test_framework.h"
 
-#include "core/math/coordinate_systems.h"
-#include "core/math/layout_geometry.h"
+#include "foundation/math/coordinate_systems.h"
+#include "foundation/math/layout_geometry.h"
 
 static int test_coordinate_round_trip(void) {
     CoordinateSystem2D system;

@@ -1,5 +1,5 @@
 #include "test_framework.h"
-#include "services/render/render_graph/render_graph.h"
+#include "engine/render/render_graph/render_graph.h"
 
 int test_rg_creation() {
     RgGraph* graph = rg_create();

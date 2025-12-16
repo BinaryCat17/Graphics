@@ -5,12 +5,12 @@
 
 #include "test_framework.h"
 
-#include "services/ui/model_style.h"
-#include "services/ui/ui_node.h"
-#include "services/ui/layout_tree.h"
-#include "services/ui/widget_list.h"
-#include "services/ui/scroll.h"
-#include "core/config/config_io.h"
+#include "engine/ui/model_style.h"
+#include "engine/ui/ui_node.h"
+#include "engine/ui/layout_tree.h"
+#include "engine/ui/widget_list.h"
+#include "engine/ui/scroll.h"
+#include "foundation/config/config_io.h"
 
 typedef struct {
     WidgetArray widgets;

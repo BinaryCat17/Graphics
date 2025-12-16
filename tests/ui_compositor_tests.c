@@ -4,13 +4,13 @@
 
 #include "test_framework.h"
 
-#include "services/ui/compositor.h"
-#include "services/ui/scroll.h"
-#include "services/ui/model_style.h"
-#include "services/ui/ui_node.h"
-#include "services/ui/layout_tree.h"
-#include "services/ui/widget_list.h"
-#include "services/ui/compositor.h"
+#include "engine/ui/compositor.h"
+#include "engine/ui/scroll.h"
+#include "engine/ui/model_style.h"
+#include "engine/ui/ui_node.h"
+#include "engine/ui/layout_tree.h"
+#include "engine/ui/widget_list.h"
+#include "engine/ui/compositor.h"
 
 static int test_popup_not_clipped(void) {
     UiNode popup = {.layout = UI_LAYOUT_NONE, .widget_type = W_PANEL, .has_w = 1, .has_h = 1, .has_x = 1, .has_y = 1};
