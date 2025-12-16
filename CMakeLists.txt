@@ -140,7 +140,7 @@ add_library(state_manager STATIC ${STATE_MANAGER_SOURCES})
 target_include_directories(state_manager PUBLIC "src/")
 
 # Assets Service Library
-set(ASSETS_SOURCES "src/services/assets/assets.c")
+set(ASSETS_SOURCES "src/services/assets/assets_service.c")
 add_library(assets STATIC ${ASSETS_SOURCES})
 target_include_directories(assets PUBLIC "src/")
 target_link_libraries(assets PUBLIC platform_layer)
@@ -189,7 +189,7 @@ target_link_libraries(service_render_runtime PUBLIC render_vulkan)
 add_dependencies(service_render_runtime GenerateServices)
 
 # Render Service (Descriptor)
-set(SERVICE_RENDER_SOURCES "src/services/render/service/render_service.c")
+set(SERVICE_RENDER_SOURCES "src/services/render/render_service.c")
 add_library(service_render STATIC ${SERVICE_RENDER_SOURCES})
 target_include_directories(service_render PUBLIC "src/" "${GENERATED_DIR}")
 add_dependencies(service_render GenerateServices)

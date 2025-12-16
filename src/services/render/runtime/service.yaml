@@ -4,7 +4,7 @@ service:
 
 includes:
   - "services/render/backend/common/render_context.h"
-  - "services/assets/assets.h"
+  - "services/assets/assets_service.h"
   - "services/ui/ui_context.h"
   - "services/ui/widget_list.h"
   - "services/render/backend/common/render_composition.h"

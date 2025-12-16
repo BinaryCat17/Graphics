@@ -6,7 +6,7 @@
 #include <threads.h>
 
 #include "app/app_services.h"
-#include "services/assets/assets.h"
+#include "services/assets/assets_service.h"
 #include "services/render/backend/common/renderer_backend.h"
 #include "services/render/backend/common/render_context.h"
 #include "core/service_manager/service.h"

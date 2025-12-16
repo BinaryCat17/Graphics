@@ -1,6 +1,6 @@
 service:
   name: AssetsService
-  header: services/assets/assets.h
+  header: services/assets/assets_service.h
   runtime: false
 
 components:
