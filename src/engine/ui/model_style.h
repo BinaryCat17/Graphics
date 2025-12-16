@@ -39,7 +39,6 @@ float model_get_number(const Model* model, const char* key, float fallback);
 const char* model_get_string(const Model* model, const char* key, const char* fallback);
 void model_set_number(Model* model, const char* key, float value);
 void model_set_string(Model* model, const char* key, const char* value);
-int save_model(const Model* model);
 void free_model(Model* model);
 void free_styles(Style* styles);
 

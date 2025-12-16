@@ -76,32 +76,6 @@ void model_set_string(Model* model, const char* key, const char* value) {
     e->is_string = 1;
 }
 
-int save_model(const Model* model) {
-    if (!model || !model->source_path) return 0;
-    FILE* f = platform_fopen(model->source_path, "wb");
-    if (!f) return 0;
-
-    const char* store = model->store ? model->store : "model";
-    const char* key = model->key ? model->key : "default";
-
-    fprintf(f, "store: %s\n", store);
-    fprintf(f, "key: %s\n", key);
-    fputs("data:\n  model:\n", f);
-
-    for (ModelEntry* e = model->entries; e; e = e->next) {
-        fprintf(f, "    %s: ", e->key);
-        if (e->is_string) {
-            fprintf(f, "\"%s\"", e->string_value ? e->string_value : "");
-        } else {
-            fprintf(f, "%g", e->number_value);
-        }
-        fputc('\n', f);
-    }
-
-    fclose(f);
-    return 1;
-}
-
 void free_model(Model* model) {
     if (!model) return;
     ModelEntry* e = model->entries;

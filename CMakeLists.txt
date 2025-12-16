@@ -155,8 +155,7 @@ set(ENGINE_UI_SOURCES
     "src/engine/ui/widget_list.c"
     "src/engine/ui/scene_ui.c"
     "src/engine/ui/ui_context.c"
-    "src/engine/ui/compositor.c"
-    "src/engine/ui/ui_service.c")
+    "src/engine/ui/compositor.c")
 add_library(engine_ui STATIC ${ENGINE_UI_SOURCES})
 target_include_directories(engine_ui PUBLIC "src/" ${Stb_INCLUDE_DIR})
 target_link_libraries(engine_ui PUBLIC foundation_config engine_assets foundation_meta)
