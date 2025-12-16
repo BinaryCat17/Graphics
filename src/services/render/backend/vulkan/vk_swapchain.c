@@ -159,6 +159,26 @@ void vk_create_swapchain_and_views(VulkanRendererState* state, VkSwapchainKHR ol
     VkImageUsageFlags usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
     if (!(caps.supportedUsageFlags & usage)) fatal("swapchain color usage unsupported");
 
+    VkPresentModeKHR present_mode = VK_PRESENT_MODE_FIFO_KHR;
+    uint32_t mode_count = 0;
+    vkGetPhysicalDeviceSurfacePresentModesKHR(state->physical_device, state->surface, &mode_count, NULL);
+    if (mode_count > 0) {
+        VkPresentModeKHR* modes = malloc(sizeof(VkPresentModeKHR) * mode_count);
+        vkGetPhysicalDeviceSurfacePresentModesKHR(state->physical_device, state->surface, &mode_count, modes);
+        for (uint32_t i = 0; i < mode_count; i++) {
+            if (modes[i] == VK_PRESENT_MODE_MAILBOX_KHR) {
+                present_mode = VK_PRESENT_MODE_MAILBOX_KHR;
+                break;
+            }
+            if (modes[i] == VK_PRESENT_MODE_IMMEDIATE_KHR && present_mode != VK_PRESENT_MODE_MAILBOX_KHR) {
+                present_mode = VK_PRESENT_MODE_IMMEDIATE_KHR;
+            }
+        }
+        free(modes);
+    }
+    printf("Selected Present Mode: %d (FIFO=%d, MAILBOX=%d, IMMEDIATE=%d)\n", 
+           present_mode, VK_PRESENT_MODE_FIFO_KHR, VK_PRESENT_MODE_MAILBOX_KHR, VK_PRESENT_MODE_IMMEDIATE_KHR);
+
     VkSwapchainCreateInfoKHR sci = { 
         .sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR, 
         .surface = state->surface, 
@@ -171,7 +191,7 @@ void vk_create_swapchain_and_views(VulkanRendererState* state, VkSwapchainKHR ol
         .imageSharingMode = VK_SHARING_MODE_EXCLUSIVE, 
         .preTransform = caps.currentTransform, 
         .compositeAlpha = comp_alpha, 
-        .presentMode = VK_PRESENT_MODE_FIFO_KHR, 
+        .presentMode = present_mode, 
         .clipped = VK_TRUE, 
         .oldSwapchain = old_swapchain 
     };

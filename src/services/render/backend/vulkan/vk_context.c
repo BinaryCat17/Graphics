@@ -68,6 +68,8 @@ void vk_pick_physical_and_create_device(VulkanRendererState* state) {
         else if (props.deviceType == VK_PHYSICAL_DEVICE_TYPE_INTEGRATED_GPU) score = 100;
         else if (props.deviceType == VK_PHYSICAL_DEVICE_TYPE_VIRTUAL_GPU) score = 50;
         else if (props.deviceType == VK_PHYSICAL_DEVICE_TYPE_CPU) score = 1;
+
+        printf("Candidate GPU [%u]: %s (Score: %d)\n", i, props.deviceName, score);
         
         if (score > best_score) {
             best_score = score;
