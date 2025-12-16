@@ -8,8 +8,9 @@
 
 #include "core/config/config_io.h"
 #include "core/platform/fs.h"
-#include "stb_truetype.h"
 #include "services/ui/scene_ui.h"
+
+// --- Helper Functions ---
 
 static int ascii_strcasecmp(const char* a, const char* b) {
     if (a == b) return 0;
@@ -28,7 +29,7 @@ static int ascii_strcasecmp(const char* a, const char* b) {
 static char* basename_no_ext(const char* path) {
     if (!path) return NULL;
     const char* slash = strrchr(path, '/');
-    if (!slash) slash = strrchr(path, '\\');
+    if (!slash) slash = strrchr(path, '\');
     const char* name = slash ? slash + 1 : path;
     const char* dot = strrchr(name, '.');
     size_t len = dot ? (size_t)(dot - name) : strlen(name);
@@ -42,7 +43,7 @@ static char* basename_no_ext(const char* path) {
 static char* dirname_dup(const char* path) {
     if (!path) return NULL;
     const char* slash = strrchr(path, '/');
-    if (!slash) slash = strrchr(path, '\\');
+    if (!slash) slash = strrchr(path, '\');
     if (!slash) return NULL;
     size_t len = (size_t)(slash - path);
     char* out = (char*)malloc(len + 1);
@@ -55,7 +56,7 @@ static char* dirname_dup(const char* path) {
 static char* join_path(const char* dir, const char* leaf) {
     if (!dir || !leaf) return NULL;
     size_t dir_len = strlen(dir);
-    while (dir_len > 0 && (dir[dir_len - 1] == '/' || dir[dir_len - 1] == '\\')) dir_len--;
+    while (dir_len > 0 && (dir[dir_len - 1] == '/' || dir[dir_len - 1] == '\')) dir_len--;
     size_t leaf_len = strlen(leaf);
     size_t total = dir_len + 1 + leaf_len + 1;
     char* out = (char*)malloc(total);
@@ -83,7 +84,15 @@ static int parse_scalar_bool(const ConfigNode* node, int fallback) {
     return fallback;
 }
 
-/* Default style mirrors the vivid palette defined in assets/ui/config/layout/ui.yaml to avoid a grayscale fallback. */
+static const char* scalar_text(const ConfigNode* node) {
+    if (!node || node->type != CONFIG_NODE_SCALAR) return NULL;
+    return node->scalar;
+}
+
+static UiNode* parse_ui_node_config(const ConfigNode* obj);
+
+// --- Style Defaults ---
+
 static const Style DEFAULT_STYLE = {
     .name = NULL,
     .background = {0.12f, 0.16f, 0.24f, 0.96f},
@@ -99,93 +108,7 @@ static const Style DEFAULT_STYLE = {
 };
 static const Style ROOT_STYLE = { .name = NULL, .background = {0.0f, 0.0f, 0.0f, 0.0f}, .text = {1.0f, 1.0f, 1.0f, 1.0f}, .border_color = {1.0f, 1.0f, 1.0f, 0.0f}, .scrollbar_track_color = {0.6f, 0.6f, 0.6f, 0.4f}, .scrollbar_thumb_color = {1.0f, 1.0f, 1.0f, 0.7f}, .padding = 0.0f, .border_thickness = 0.0f, .scrollbar_width = 0.0f, .has_scrollbar_width = 0, .next = NULL };
 
-static unsigned char* g_font_buffer = NULL;
-static stbtt_fontinfo g_font_info;
-static float g_font_scale = 0.0f;
-static int g_font_ascent = 0;
-static int g_font_descent = 0;
-static int g_font_ready = 0;
-
-static float fallback_line_height(void) {
-    float line = (float)(g_font_ascent - g_font_descent);
-    return line > 0.0f ? line : 18.0f;
-}
-
-static const char* scalar_text(const ConfigNode* node) {
-    if (!node || node->type != CONFIG_NODE_SCALAR) return NULL;
-    return node->scalar;
-}
-
-static UiNode* parse_ui_node_config(const ConfigNode* obj);
-
-static int ensure_font_metrics(const char* font_path) {
-    if (g_font_ready) return 1;
-    if (!font_path) return 0;
-
-    FILE* f = platform_fopen(font_path, "rb");
-    if (!f) {
-        fprintf(stderr, "Warning: unable to open font at %s\n", font_path);
-        return 0;
-    }
-
-    fseek(f, 0, SEEK_END);
-    long sz = ftell(f);
-    fseek(f, 0, SEEK_SET);
-    if (sz <= 0) { fclose(f); return 0; }
-
-    g_font_buffer = (unsigned char*)malloc((size_t)sz);
-    if (!g_font_buffer) { fclose(f); return 0; }
-    fread(g_font_buffer, 1, (size_t)sz, f);
-    fclose(f);
-
-    if (!stbtt_InitFont(&g_font_info, g_font_buffer, 0)) {
-        fprintf(stderr, "Warning: failed to init font metrics\n");
-        free(g_font_buffer); g_font_buffer = NULL;
-        return 0;
-    }
-
-    g_font_scale = stbtt_ScaleForPixelHeight(&g_font_info, 32.0f);
-    int ascent = 0, descent = 0, gap = 0;
-    stbtt_GetFontVMetrics(&g_font_info, &ascent, &descent, &gap);
-    g_font_ascent = (int)roundf((float)ascent * g_font_scale);
-    g_font_descent = (int)roundf((float)descent * g_font_scale);
-    g_font_ready = 1;
-    return 1;
-}
-
-static int utf8_decode(const char* s, int* out_advance) {
-    unsigned char c = (unsigned char)*s;
-    if (c < 0x80) { *out_advance = 1; return c; }
-    if ((c >> 5) == 0x6) { *out_advance = 2; return ((int)(c & 0x1F) << 6) | ((int)(s[1] & 0x3F)); }
-    if ((c >> 4) == 0xE) { *out_advance = 3; return ((int)(c & 0x0F) << 12) | (((int)s[1] & 0x3F) << 6) | ((int)(s[2] & 0x3F)); }
-    if ((c >> 3) == 0x1E) { *out_advance = 4; return ((int)(c & 0x07) << 18) | (((int)s[1] & 0x3F) << 12) |
-                                        (((int)s[2] & 0x3F) << 6) | ((int)(s[3] & 0x3F)); }
-    *out_advance = 1;
-    return '?';
-}
-
-static void measure_text(const char* text, float* out_w, float* out_h) {
-    float width = 0.0f;
-    float height = fallback_line_height();
-
-    if (g_font_ready && text && *text) {
-        int prev = 0;
-        for (const char* c = text; *c; ) {
-            int adv = 0;
-            int ch = utf8_decode(c, &adv);
-            if (adv <= 0) break;
-            int advance = 0, lsb = 0;
-            stbtt_GetCodepointHMetrics(&g_font_info, ch, &advance, &lsb);
-            width += advance * g_font_scale;
-            if (prev) width += stbtt_GetCodepointKernAdvance(&g_font_info, prev, ch) * g_font_scale;
-            prev = ch;
-            c += adv;
-        }
-    }
-
-    if (out_w) *out_w = width;
-    if (out_h) *out_h = height;
-}
+// --- Prototypes & Components ---
 
 typedef struct Prototype {
     char* name;
@@ -314,6 +237,8 @@ static void gather_component_prototypes(const ConfigDocument* layout_doc, Protot
     free(base_dir);
 }
 
+// --- Model Loading ---
+
 static ModelEntry* model_find_entry(Model* model, const char* key) {
     for (ModelEntry* e = model ? model->entries : NULL; e; e = e->next) {
         if (strcmp(e->key, key) == 0) return e;
@@ -366,89 +291,46 @@ void model_set_string(Model* model, const char* key, const char* value) {
     e->is_string = 1;
 }
 
-static ConfigNode* config_node_new_map(void) {
-    ConfigNode* n = (ConfigNode*)calloc(1, sizeof(ConfigNode));
-    if (!n) return NULL;
-    n->type = CONFIG_NODE_MAP;
-    n->scalar_type = CONFIG_SCALAR_STRING;
-    return n;
-}
+Model* ui_config_load_model(const ConfigDocument* doc) {
+    if (!doc || !doc->root) return NULL;
 
-static ConfigNode* config_node_from_string(const char* value, ConfigScalarType type) {
-    ConfigNode* n = (ConfigNode*)calloc(1, sizeof(ConfigNode));
-    if (!n) return NULL;
-    n->type = CONFIG_NODE_SCALAR;
-    n->scalar_type = type;
-    if (value) n->scalar = platform_strdup(value);
-    return n;
-}
+    const ConfigNode* store_node = config_node_get_scalar(doc->root, "store");
+    const ConfigNode* key_node = config_node_get_scalar(doc->root, "key");
+    const ConfigNode* model_node = config_node_get_map(doc->root, "model");
 
-static int config_map_reserve(ConfigNode* map, size_t desired) {
-    if (!map || map->type != CONFIG_NODE_MAP) return 0;
-    if (desired <= map->pair_capacity) return 1;
-    size_t new_cap = map->pair_capacity == 0 ? 4 : map->pair_capacity;
-    while (new_cap < desired) new_cap *= 2;
-    ConfigPair* resized = (ConfigPair*)realloc(map->pairs, new_cap * sizeof(ConfigPair));
-    if (!resized) return 0;
-    map->pairs = resized;
-    map->pair_capacity = new_cap;
-    return 1;
-}
-
-static int config_map_set(ConfigNode* map, const char* key, ConfigNode* value) {
-    if (!map || map->type != CONFIG_NODE_MAP || !key) return 0;
-    for (size_t i = 0; i < map->pair_count; ++i) {
-        if (map->pairs[i].key && strcmp(map->pairs[i].key, key) == 0) {
-            config_node_free(map->pairs[i].value);
-            map->pairs[i].value = value;
-            return 1;
-        }
-    }
-    if (!config_map_reserve(map, map->pair_count + 1)) return 0;
-    map->pairs[map->pair_count].key = platform_strdup(key);
-    map->pairs[map->pair_count].value = value;
-    map->pair_count++;
-    return 1;
-}
-
-static ConfigNode* config_map_get_mut(ConfigNode* map, const char* key) {
-    if (!map || map->type != CONFIG_NODE_MAP || !key) return NULL;
-    for (size_t i = 0; i < map->pair_count; ++i) {
-        if (map->pairs[i].key && strcmp(map->pairs[i].key, key) == 0) return map->pairs[i].value;
-    }
-    return NULL;
-}
-
-static ConfigNode* ensure_map_entry(ConfigNode* map, const char* key) {
-    ConfigNode* existing = config_map_get_mut(map, key);
-    if (existing && existing->type == CONFIG_NODE_MAP) return existing;
-    ConfigNode* fresh = config_node_new_map();
-    if (!fresh) return NULL;
-    if (!config_map_set(map, key, fresh)) {
-        config_node_free(fresh);
+    if (!model_node) {
+        fprintf(stderr, "Error: model section missing in UI config %s\n", doc->source_path ? doc->source_path : "(unknown)");
         return NULL;
     }
-    return fresh;
+
+    Model* model = (Model*)calloc(1, sizeof(Model));
+    if (!model) return NULL;
+
+    char* derived_key = key_node && key_node->scalar ? NULL : basename_no_ext(doc->source_path);
+    model->store = platform_strdup(store_node && store_node->scalar ? store_node->scalar : "layout");
+    model->key = platform_strdup(key_node && key_node->scalar ? key_node->scalar : (derived_key ? derived_key : "default"));
+    model->source_path = platform_strdup(doc->source_path ? doc->source_path : "model.yaml");
+
+    if (!model->store || !model->key || !model->source_path) { free_model(model); return NULL; }
+
+    for (size_t i = 0; i < model_node->pair_count; ++i) {
+        const ConfigPair* pair = &model_node->pairs[i];
+        if (!pair->key || !pair->value) continue;
+        const ConfigNode* val = pair->value;
+        if (val->type != CONFIG_NODE_SCALAR) continue;
+        if (val->scalar_type == CONFIG_SCALAR_STRING) {
+            model_set_string(model, pair->key, val->scalar ? val->scalar : "");
+        } else {
+            model_set_number(model, pair->key, parse_scalar_number(val, 0.0f));
+        }
+    }
+
+    model->source_doc = doc;
+    free(derived_key);
+    return model;
 }
 
-static void config_map_clear(ConfigNode* map) {
-    if (!map || map->type != CONFIG_NODE_MAP) return;
-    for (size_t i = 0; i < map->pair_count; ++i) {
-        free(map->pairs[i].key);
-        config_node_free(map->pairs[i].value);
-    }
-    free(map->pairs);
-    map->pairs = NULL;
-    map->pair_count = 0;
-    map->pair_capacity = 0;
-}
-
-static Style* style_find(const Style* styles, const char* name) {
-    for (const Style* s = styles; s; s = s->next) {
-        if (strcmp(s->name, name) == 0) return (Style*)s;
-    }
-    return NULL;
-}
+// --- Style Loading ---
 
 static void read_color_node(Color* out, const ConfigNode* node) {
     if (!out || !node) return;
@@ -462,6 +344,55 @@ static void read_color_node(Color* out, const ConfigNode* node) {
     }
     out->r = cols[0]; out->g = cols[1]; out->b = cols[2]; out->a = cols[3];
 }
+
+Style* ui_config_load_styles(const ConfigNode* root) {
+    const ConfigNode* styles_node = config_node_get_map(root, "styles");
+    if (!styles_node || styles_node->type != CONFIG_NODE_MAP) {
+        fprintf(stderr, "Error: styles section missing in UI config\n");
+        return NULL;
+    }
+
+    Style* styles = NULL;
+    for (size_t i = 0; i < styles_node->pair_count; ++i) {
+        const ConfigPair* pair = &styles_node->pairs[i];
+        const ConfigNode* val = pair->value;
+        if (!pair->key || !val || val->type != CONFIG_NODE_MAP) continue;
+        Style* st = (Style*)calloc(1, sizeof(Style));
+        if (!st) break;
+        st->name = platform_strdup(pair->key);
+        st->background = DEFAULT_STYLE.background;
+        st->text = DEFAULT_STYLE.text;
+        st->border_color = DEFAULT_STYLE.border_color;
+        st->padding = DEFAULT_STYLE.padding;
+        st->border_thickness = DEFAULT_STYLE.border_thickness;
+        st->scrollbar_track_color = DEFAULT_STYLE.scrollbar_track_color;
+        st->scrollbar_thumb_color = DEFAULT_STYLE.scrollbar_thumb_color;
+        st->scrollbar_width = DEFAULT_STYLE.scrollbar_width;
+        st->has_scrollbar_width = DEFAULT_STYLE.has_scrollbar_width;
+        st->next = styles;
+        styles = st;
+
+        for (size_t j = 0; j < val->pair_count; ++j) {
+            const ConfigPair* field = &val->pairs[j];
+            const char* fname = field->key;
+            const ConfigNode* fval = field->value;
+            if (!fname || !fval) continue;
+            if (strcmp(fname, "color") == 0) { read_color_node(&st->background, fval); continue; }
+            if (strcmp(fname, "textColor") == 0) { read_color_node(&st->text, fval); continue; }
+            if (strcmp(fname, "borderColor") == 0) { read_color_node(&st->border_color, fval); continue; }
+            if (strcmp(fname, "padding") == 0) { st->padding = parse_scalar_number(fval, st->padding); continue; }
+            if (strcmp(fname, "borderThickness") == 0) { st->border_thickness = parse_scalar_number(fval, st->border_thickness); continue; }
+            if (strcmp(fname, "scrollbarTrackColor") == 0) { read_color_node(&st->scrollbar_track_color, fval); continue; }
+            if (strcmp(fname, "scrollbarThumbColor") == 0) { read_color_node(&st->scrollbar_thumb_color, fval); continue; }
+            if (strcmp(fname, "scrollbarWidth") == 0) { st->scrollbar_width = parse_scalar_number(fval, st->scrollbar_width); st->has_scrollbar_width = 1; continue; }
+            fprintf(stderr, "Error: unknown style field '%s' in style '%s'\n", fname, st->name);
+        }
+    }
+
+    return styles;
+}
+
+// --- Layout Parsing ---
 
 static UiNode* create_node(void) {
     UiNode* node = (UiNode*)calloc(1, sizeof(UiNode));
@@ -541,6 +472,7 @@ static UiNode* parse_ui_node_config(const ConfigNode* obj) {
         const ConfigNode* val = pair->value;
         if (!key || !val) continue;
         const char* sval = scalar_text(val);
+        printf("DEBUG: Parsing key='%s' sval='%s'\n", key, sval ? sval : "(null)");
         if (strcmp(key, "type") == 0 && sval) { node->type = platform_strdup(sval); continue; }
         if (strcmp(key, "style") == 0 && sval) { node->style_name = platform_strdup(sval); continue; }
         if (strcmp(key, "x") == 0) { node->rect.x = parse_scalar_number(val, node->rect.x); node->has_x = 1; continue; }
@@ -565,12 +497,10 @@ static UiNode* parse_ui_node_config(const ConfigNode* obj) {
         if (strcmp(key, "maxHeight") == 0) { node->max_h = parse_scalar_number(val, node->max_h); node->has_max_h = 1; continue; }
         if (strcmp(key, "scrollArea") == 0 && sval) { node->scroll_area = platform_strdup(sval); continue; }
         if (strcmp(key, "scrollStatic") == 0) {
-            fprintf(stderr, "Warning: 'scrollStatic' is deprecated; wrap the node in a 'scrollbar' container instead.\n");
             node->scroll_static = parse_scalar_bool(val, node->scroll_static);
             continue;
         }
         if (strcmp(key, "scrollbar") == 0) {
-            fprintf(stderr, "Warning: 'scrollbar' boolean is deprecated; use a 'scrollbar' wrapper node instead.\n");
             node->scrollbar_enabled = parse_scalar_bool(val, node->scrollbar_enabled);
             continue;
         }
@@ -628,76 +558,6 @@ static const Prototype* find_prototype(const Prototype* list, const char* name) 
         if (strcmp(p->name, name) == 0) return p;
     }
     return NULL;
-}
-
-static UiNode* clone_node(const UiNode* src);
-
-static void merge_node(UiNode* node, const UiNode* proto) {
-    if (!node || !proto) return;
-    if (!node->type && proto->type) node->type = platform_strdup(proto->type);
-    if (!node->style_name && proto->style_name) node->style_name = platform_strdup(proto->style_name);
-    if (!node->use && proto->use) node->use = platform_strdup(proto->use);
-    if (node->layout == UI_LAYOUT_NONE && proto->layout != UI_LAYOUT_NONE) node->layout = proto->layout;
-    if (node->widget_type == W_PANEL && proto->widget_type != W_PANEL && proto->type) node->widget_type = proto->widget_type;
-    if (!node->has_x && proto->has_x) { node->rect.x = proto->rect.x; node->has_x = 1; }
-    if (!node->has_y && proto->has_y) { node->rect.y = proto->rect.y; node->has_y = 1; }
-    if (!node->has_w && proto->has_w) { node->rect.w = proto->rect.w; node->has_w = 1; }
-    if (!node->has_h && proto->has_h) { node->rect.h = proto->rect.h; node->has_h = 1; }
-    if (!node->has_z_index && proto->has_z_index) { node->z_index = proto->z_index; node->has_z_index = 1; }
-    if (!node->has_z_group && proto->has_z_group) { node->z_group = proto->z_group; node->has_z_group = 1; }
-    if (!node->has_spacing && proto->has_spacing) { node->spacing = proto->spacing; node->has_spacing = 1; }
-    if (!node->has_columns && proto->has_columns) { node->columns = proto->columns; node->has_columns = 1; }
-    if (node->style == &DEFAULT_STYLE && proto->style) node->style = proto->style;
-    if (!node->has_padding_override && proto->has_padding_override) { node->padding_override = proto->padding_override; node->has_padding_override = 1; }
-    if (!node->has_border_thickness && proto->has_border_thickness) { node->border_thickness = proto->border_thickness; node->has_border_thickness = 1; }
-    if (!node->has_border_color && proto->has_border_color) { node->border_color = proto->border_color; node->has_border_color = 1; }
-    if (!node->has_color && proto->has_color) { node->color = proto->color; node->has_color = 1; }
-    if (!node->has_text_color && proto->has_text_color) { node->text_color = proto->text_color; node->has_text_color = 1; }
-    if (!node->has_scrollbar_width && proto->has_scrollbar_width) { node->scrollbar_width = proto->scrollbar_width; node->has_scrollbar_width = 1; }
-    if (!node->has_scrollbar_track_color && proto->has_scrollbar_track_color) { node->scrollbar_track_color = proto->scrollbar_track_color; node->has_scrollbar_track_color = 1; }
-    if (!node->has_scrollbar_thumb_color && proto->has_scrollbar_thumb_color) { node->scrollbar_thumb_color = proto->scrollbar_thumb_color; node->has_scrollbar_thumb_color = 1; }
-    if (!node->has_clip_to_viewport && proto->has_clip_to_viewport) { node->clip_to_viewport = proto->clip_to_viewport; node->has_clip_to_viewport = 1; }
-    if (!proto->scrollbar_enabled) node->scrollbar_enabled = 0;
-    if (!node->id && proto->id) node->id = platform_strdup(proto->id);
-    if (!node->text && proto->text) node->text = platform_strdup(proto->text);
-    if (!node->text_binding && proto->text_binding) node->text_binding = platform_strdup(proto->text_binding);
-    if (!node->value_binding && proto->value_binding) node->value_binding = platform_strdup(proto->value_binding);
-    if (!node->click_binding && proto->click_binding) node->click_binding = platform_strdup(proto->click_binding);
-    if (!node->click_value && proto->click_value) node->click_value = platform_strdup(proto->click_value);
-    if (!node->has_min && proto->has_min) { node->minv = proto->minv; node->has_min = 1; }
-    if (!node->has_max && proto->has_max) { node->maxv = proto->maxv; node->has_max = 1; }
-    if (!node->has_value && proto->has_value) { node->value = proto->value; node->has_value = 1; }
-    if (!node->has_min_w && proto->has_min_w) { node->min_w = proto->min_w; node->has_min_w = 1; }
-    if (!node->has_min_h && proto->has_min_h) { node->min_h = proto->min_h; node->has_min_h = 1; }
-    if (!node->has_max_w && proto->has_max_w) { node->max_w = proto->max_w; node->has_max_w = 1; }
-    if (!node->has_max_h && proto->has_max_h) { node->max_h = proto->max_h; node->has_max_h = 1; }
-    if (!node->has_floating_rect && proto->has_floating_rect) { node->floating_rect = proto->floating_rect; node->has_floating_rect = 1; }
-    if (!node->has_floating_min && proto->has_floating_min) {
-        node->floating_min_w = proto->floating_min_w;
-        node->floating_min_h = proto->floating_min_h;
-        node->has_floating_min = 1;
-    }
-    if (!node->has_floating_max && proto->has_floating_max) {
-        node->floating_max_w = proto->floating_max_w;
-        node->floating_max_h = proto->floating_max_h;
-        node->has_floating_max = 1;
-    }
-    if (!node->scroll_area && proto->scroll_area) node->scroll_area = platform_strdup(proto->scroll_area);
-    if (!node->scroll_static && proto->scroll_static) node->scroll_static = 1;
-    if (!node->docking && proto->docking) node->docking = platform_strdup(proto->docking);
-    if (!node->has_resizable && proto->has_resizable) { node->resizable = proto->resizable; node->has_resizable = 1; }
-    if (!node->has_draggable && proto->has_draggable) { node->draggable = proto->draggable; node->has_draggable = 1; }
-    if (!node->has_modal && proto->has_modal) { node->modal = proto->modal; node->has_modal = 1; }
-    if (!node->on_focus && proto->on_focus) node->on_focus = platform_strdup(proto->on_focus);
-
-    if (node->child_count == 0 && proto->child_count > 0) {
-        node->children = (UiNode*)calloc(proto->child_count, sizeof(UiNode));
-        node->child_count = proto->child_count;
-        for (size_t i = 0; i < proto->child_count; i++) {
-            UiNode* c = clone_node(&proto->children[i]);
-            if (c) { node->children[i] = *c; free(c); }
-        }
-    }
 }
 
 static UiNode* clone_node(const UiNode* src) {
@@ -950,92 +810,6 @@ void update_widget_bindings(UiNode* root, const Model* model) {
     bind_model_values_to_nodes(root, model);
 }
 
-Model* ui_config_load_model(const ConfigDocument* doc) {
-    if (!doc || !doc->root) return NULL;
-
-    const ConfigNode* store_node = config_node_get_scalar(doc->root, "store");
-    const ConfigNode* key_node = config_node_get_scalar(doc->root, "key");
-    const ConfigNode* model_node = config_node_get_map(doc->root, "model");
-
-    if (!model_node) {
-        fprintf(stderr, "Error: model section missing in UI config %s\n", doc->source_path ? doc->source_path : "(unknown)");
-        return NULL;
-    }
-
-    Model* model = (Model*)calloc(1, sizeof(Model));
-    if (!model) return NULL;
-
-    char* derived_key = key_node && key_node->scalar ? NULL : basename_no_ext(doc->source_path);
-    model->store = platform_strdup(store_node && store_node->scalar ? store_node->scalar : "layout");
-    model->key = platform_strdup(key_node && key_node->scalar ? key_node->scalar : (derived_key ? derived_key : "default"));
-    model->source_path = platform_strdup(doc->source_path ? doc->source_path : "model.yaml");
-
-    if (!model->store || !model->key || !model->source_path) { free_model(model); return NULL; }
-
-    for (size_t i = 0; i < model_node->pair_count; ++i) {
-        const ConfigPair* pair = &model_node->pairs[i];
-        if (!pair->key || !pair->value) continue;
-        const ConfigNode* val = pair->value;
-        if (val->type != CONFIG_NODE_SCALAR) continue;
-        if (val->scalar_type == CONFIG_SCALAR_STRING) {
-            model_set_string(model, pair->key, val->scalar ? val->scalar : "");
-        } else {
-            model_set_number(model, pair->key, parse_scalar_number(val, 0.0f));
-        }
-    }
-
-    model->source_doc = doc;
-    free(derived_key);
-    return model;
-}
-
-Style* ui_config_load_styles(const ConfigNode* root) {
-    const ConfigNode* styles_node = config_node_get_map(root, "styles");
-    if (!styles_node || styles_node->type != CONFIG_NODE_MAP) {
-        fprintf(stderr, "Error: styles section missing in UI config\n");
-        return NULL;
-    }
-
-    Style* styles = NULL;
-    for (size_t i = 0; i < styles_node->pair_count; ++i) {
-        const ConfigPair* pair = &styles_node->pairs[i];
-        const ConfigNode* val = pair->value;
-        if (!pair->key || !val || val->type != CONFIG_NODE_MAP) continue;
-        Style* st = (Style*)calloc(1, sizeof(Style));
-        if (!st) break;
-        st->name = platform_strdup(pair->key);
-        st->background = DEFAULT_STYLE.background;
-        st->text = DEFAULT_STYLE.text;
-        st->border_color = DEFAULT_STYLE.border_color;
-        st->padding = DEFAULT_STYLE.padding;
-        st->border_thickness = DEFAULT_STYLE.border_thickness;
-        st->scrollbar_track_color = DEFAULT_STYLE.scrollbar_track_color;
-        st->scrollbar_thumb_color = DEFAULT_STYLE.scrollbar_thumb_color;
-        st->scrollbar_width = DEFAULT_STYLE.scrollbar_width;
-        st->has_scrollbar_width = DEFAULT_STYLE.has_scrollbar_width;
-        st->next = styles;
-        styles = st;
-
-        for (size_t j = 0; j < val->pair_count; ++j) {
-            const ConfigPair* field = &val->pairs[j];
-            const char* fname = field->key;
-            const ConfigNode* fval = field->value;
-            if (!fname || !fval) continue;
-            if (strcmp(fname, "color") == 0) { read_color_node(&st->background, fval); continue; }
-            if (strcmp(fname, "textColor") == 0) { read_color_node(&st->text, fval); continue; }
-            if (strcmp(fname, "borderColor") == 0) { read_color_node(&st->border_color, fval); continue; }
-            if (strcmp(fname, "padding") == 0) { st->padding = parse_scalar_number(fval, st->padding); continue; }
-            if (strcmp(fname, "borderThickness") == 0) { st->border_thickness = parse_scalar_number(fval, st->border_thickness); continue; }
-            if (strcmp(fname, "scrollbarTrackColor") == 0) { read_color_node(&st->scrollbar_track_color, fval); continue; }
-            if (strcmp(fname, "scrollbarThumbColor") == 0) { read_color_node(&st->scrollbar_thumb_color, fval); continue; }
-            if (strcmp(fname, "scrollbarWidth") == 0) { st->scrollbar_width = parse_scalar_number(fval, st->scrollbar_width); st->has_scrollbar_width = 1; continue; }
-            fprintf(stderr, "Error: unknown style field '%s' in style '%s'\n", fname, st->name);
-        }
-    }
-
-    return styles;
-}
-
 UiNode* ui_config_load_layout(const ConfigDocument* doc, const Model* model, const Style* styles, const char* font_path, const Scene* scene) {
     if (!doc || !doc->root) return NULL;
 
@@ -1048,7 +822,8 @@ UiNode* ui_config_load_layout(const ConfigDocument* doc, const Model* model, con
         return NULL;
     }
 
-    ensure_font_metrics(font_path);
+    // Removed direct ensure_font_metrics call since it belongs to layout phase
+    (void)font_path; 
 
     Prototype* prototypes = NULL;
     gather_component_prototypes(doc, &prototypes);
@@ -1094,240 +869,3 @@ UiNode* ui_config_load_layout(const ConfigDocument* doc, const Model* model, con
     free_prototypes(prototypes);
     return root_node;
 }
-
-static LayoutNode* build_layout_tree_recursive(const UiNode* node) {
-    if (!node) return NULL;
-    LayoutNode* l = (LayoutNode*)calloc(1, sizeof(LayoutNode));
-    if (!l) return NULL;
-    l->source = node;
-    l->child_count = node->child_count;
-    if (node->child_count > 0) {
-        l->children = (LayoutNode*)calloc(node->child_count, sizeof(LayoutNode));
-        if (!l->children) { free(l); return NULL; }
-        for (size_t i = 0; i < node->child_count; i++) {
-            LayoutNode* child = build_layout_tree_recursive(&node->children[i]);
-            if (child) {
-                l->children[i] = *child;
-                free(child);
-            }
-        }
-    }
-    return l;
-}
-
-LayoutNode* build_layout_tree(const UiNode* root) {
-    return build_layout_tree_recursive(root);
-}
-
-static void free_layout_node(LayoutNode* root) {
-    if (!root) return;
-    for (size_t i = 0; i < root->child_count; i++) {
-        free_layout_node(&root->children[i]);
-    }
-    free(root->children);
-}
-
-void free_layout_tree(LayoutNode* root) {
-    if (!root) return;
-    free_layout_node(root);
-    free(root);
-}
-
-static void measure_node(LayoutNode* node) {
-    if (!node || !node->source) return;
-    float padding = node->source->has_padding_override ? node->source->padding_override : (node->source->style ? node->source->style->padding : DEFAULT_STYLE.padding);
-    float border = node->source->border_thickness;
-    for (size_t i = 0; i < node->child_count; i++) measure_node(&node->children[i]);
-
-    if (node->source->layout == UI_LAYOUT_ROW) {
-        float content_w = 0.0f;
-        float content_h = 0.0f;
-        for (size_t i = 0; i < node->child_count; i++) {
-            LayoutNode* ch = &node->children[i];
-            content_w += ch->rect.w;
-            if (i + 1 < node->child_count) content_w += node->source->spacing;
-            if (ch->rect.h > content_h) content_h = ch->rect.h;
-        }
-        node->rect.w = content_w + padding * 2.0f + border * 2.0f;
-        node->rect.h = content_h + padding * 2.0f + border * 2.0f;
-        if (node->source->has_max_w && node->rect.w > node->source->max_w) node->rect.w = node->source->max_w;
-    } else if (node->source->layout == UI_LAYOUT_COLUMN) {
-        float content_w = 0.0f;
-        float content_h = 0.0f;
-        for (size_t i = 0; i < node->child_count; i++) {
-            LayoutNode* ch = &node->children[i];
-            if (ch->rect.w > content_w) content_w = ch->rect.w;
-            content_h += ch->rect.h;
-            if (i + 1 < node->child_count) content_h += node->source->spacing;
-        }
-        node->rect.w = content_w + padding * 2.0f + border * 2.0f;
-        node->rect.h = content_h + padding * 2.0f + border * 2.0f;
-        if (node->source->has_max_h && node->rect.h > node->source->max_h) node->rect.h = node->source->max_h;
-    } else if (node->source->layout == UI_LAYOUT_TABLE && node->source->columns > 0) {
-        int cols = node->source->columns;
-        int rows = (int)((node->child_count + (size_t)cols - 1) / (size_t)cols);
-        float* col_w = (float*)calloc((size_t)cols, sizeof(float));
-        float* row_h = (float*)calloc((size_t)rows, sizeof(float));
-        if (col_w && row_h) {
-            for (size_t i = 0; i < node->child_count; i++) {
-                int col = (int)(i % (size_t)cols);
-                int row = (int)(i / (size_t)cols);
-                LayoutNode* ch = &node->children[i];
-                if (ch->rect.w > col_w[col]) col_w[col] = ch->rect.w;
-                if (ch->rect.h > row_h[row]) row_h[row] = ch->rect.h;
-            }
-            float content_w = 0.0f;
-            float content_h = 0.0f;
-            for (int c = 0; c < cols; c++) {
-                content_w += col_w[c];
-                if (c + 1 < cols) content_w += node->source->spacing;
-            }
-            for (int r = 0; r < rows; r++) {
-                content_h += row_h[r];
-                if (r + 1 < rows) content_h += node->source->spacing;
-            }
-            node->rect.w = content_w + padding * 2.0f + border * 2.0f;
-            node->rect.h = content_h + padding * 2.0f + border * 2.0f;
-        }
-        free(col_w);
-        free(row_h);
-    } else if (node->child_count > 0) { /* absolute container */
-        float max_w = 0.0f, max_h = 0.0f;
-        for (size_t i = 0; i < node->child_count; i++) {
-            LayoutNode* ch = &node->children[i];
-            float child_x = ch->rect.x;
-            float child_y = ch->rect.y;
-            if (ch->source) {
-                if (ch->source->has_x) child_x = ch->source->rect.x;
-                if (ch->source->has_y) child_y = ch->source->rect.y;
-            }
-
-            float right = child_x + ch->rect.w;
-            float bottom = child_y + ch->rect.h;
-            if (right > max_w) max_w = right;
-            if (bottom > max_h) max_h = bottom;
-        }
-        node->rect.w = max_w + padding * 2.0f + border * 2.0f;
-        node->rect.h = max_h + padding * 2.0f + border * 2.0f;
-    } else {
-        if (node->source->widget_type == W_SPACER) {
-            node->rect.w = node->source->has_w ? node->source->rect.w : 0.0f;
-            node->rect.h = node->source->has_h ? node->source->rect.h : 0.0f;
-        } else {
-            float text_w = 0.0f, text_h = fallback_line_height();
-            if (node->source->text) {
-                measure_text(node->source->text, &text_w, &text_h);
-            }
-            node->rect.w = node->source->has_w ? node->source->rect.w : text_w + padding * 2.0f + border * 2.0f;
-            node->rect.h = node->source->has_h ? node->source->rect.h : text_h + padding * 2.0f + border * 2.0f;
-        }
-    }
-
-    if (node->source->has_floating_rect) {
-        if (node->source->floating_rect.w > 0.0f) node->rect.w = node->source->floating_rect.w;
-        if (node->source->floating_rect.h > 0.0f) node->rect.h = node->source->floating_rect.h;
-    }
-
-    if (node->source->has_min_w && node->rect.w < node->source->min_w) node->rect.w = node->source->min_w;
-    if (node->source->has_min_h && node->rect.h < node->source->min_h) node->rect.h = node->source->min_h;
-    if (node->source->has_w) node->rect.w = node->source->rect.w;
-    if (node->source->has_h) node->rect.h = node->source->rect.h;
-    if (node->source->has_max_w && node->rect.w > node->source->max_w) node->rect.w = node->source->max_w;
-    if (node->source->has_max_h && node->rect.h > node->source->max_h) node->rect.h = node->source->max_h;
-
-    if (node->source->has_floating_min) {
-        if (node->rect.w < node->source->floating_min_w) node->rect.w = node->source->floating_min_w;
-        if (node->rect.h < node->source->floating_min_h) node->rect.h = node->source->floating_min_h;
-    }
-    if (node->source->has_floating_max) {
-        if (node->rect.w > node->source->floating_max_w) node->rect.w = node->source->floating_max_w;
-        if (node->rect.h > node->source->floating_max_h) node->rect.h = node->source->floating_max_h;
-    }
-}
-
-void measure_layout(LayoutNode* root) { measure_node(root); }
-
-static void layout_node(LayoutNode* node, float origin_x, float origin_y, const Vec2* parent_transform) {
-    if (!node || !node->source) return;
-    float padding = node->source->has_padding_override ? node->source->padding_override : (node->source->style ? node->source->style->padding : DEFAULT_STYLE.padding);
-    float border = node->source->border_thickness;
-    float local_x = 0.0f;
-    float local_y = 0.0f;
-    if (node->source->has_floating_rect) {
-        local_x = node->source->floating_rect.x;
-        local_y = node->source->floating_rect.y;
-    } else {
-        if (node->source->has_x) local_x = node->source->rect.x;
-        if (node->source->has_y) local_y = node->source->rect.y;
-    }
-    float base_x = origin_x + local_x;
-    float base_y = origin_y + local_y;
-    node->rect.x = base_x;
-    node->rect.y = base_y;
-    node->local_rect = (Rect){0.0f, 0.0f, node->rect.w, node->rect.h};
-    node->transform = parent_transform ? (Vec2){parent_transform->x + base_x, parent_transform->y + base_y} : (Vec2){base_x, base_y};
-    node->wants_clip = node->source->clip_to_viewport;
-
-    if (node->source->layout == UI_LAYOUT_ROW) {
-        float cursor_x = base_x + padding + border;
-        float cursor_y = base_y + padding + border;
-        for (size_t i = 0; i < node->child_count; i++) {
-            layout_node(&node->children[i], cursor_x, cursor_y, &node->transform);
-            cursor_x += node->children[i].rect.w + node->source->spacing;
-        }
-    } else if (node->source->layout == UI_LAYOUT_COLUMN) {
-        float cursor_x = base_x + padding + border;
-        float cursor_y = base_y + padding + border;
-        for (size_t i = 0; i < node->child_count; i++) {
-            layout_node(&node->children[i], cursor_x, cursor_y, &node->transform);
-            cursor_y += node->children[i].rect.h + node->source->spacing;
-        }
-    } else if (node->source->layout == UI_LAYOUT_TABLE && node->source->columns > 0) {
-        int cols = node->source->columns;
-        int rows = (int)((node->child_count + (size_t)cols - 1) / (size_t)cols);
-        float* col_w = (float*)calloc((size_t)cols, sizeof(float));
-        float* row_h = (float*)calloc((size_t)rows, sizeof(float));
-        if (col_w && row_h) {
-            for (size_t i = 0; i < node->child_count; i++) {
-                int col = (int)(i % (size_t)cols);
-                int row = (int)(i / (size_t)cols);
-                LayoutNode* ch = &node->children[i];
-                if (ch->rect.w > col_w[col]) col_w[col] = ch->rect.w;
-                if (ch->rect.h > row_h[row]) row_h[row] = ch->rect.h;
-            }
-            float y = base_y + padding + border;
-            size_t idx = 0;
-            for (int r = 0; r < rows; r++) {
-                float x = base_x + padding + border;
-                for (int c = 0; c < cols && idx < node->child_count; c++, idx++) {
-                    layout_node(&node->children[idx], x, y, &node->transform);
-                    x += col_w[c] + node->source->spacing;
-                }
-                y += row_h[r] + node->source->spacing;
-            }
-        }
-        free(col_w);
-        free(row_h);
-    } else if (node->child_count > 0) {
-        float offset_x = base_x + padding;
-        float offset_y = base_y + padding;
-        for (size_t i = 0; i < node->child_count; i++) {
-            layout_node(&node->children[i], offset_x, offset_y, &node->transform);
-        }
-    }
-}
-
-void assign_layout(LayoutNode* root, float origin_x, float origin_y) {
-    layout_node(root, origin_x, origin_y, NULL);
-}
-
-static void copy_base_rect(LayoutNode* node) {
-    if (!node) return;
-    node->base_rect = node->rect;
-    for (size_t i = 0; i < node->child_count; i++) copy_base_rect(&node->children[i]);
-}
-
-void capture_layout_base(LayoutNode* root) { copy_base_rect(root); }
-// UI tree cleanup (free_ui_tree) is implemented in ui_node.c to keep a single
-// deallocation routine and avoid multiple versions being linked accidentally.
-

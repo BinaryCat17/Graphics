@@ -82,7 +82,7 @@ static void add_area_bounds(ScrollArea* a, const Widget* w) {
         a->bounds.h = new_maxy - new_miny;
     }
 
-    if (w->scroll_static) {
+    if (w->type == W_SCROLLBAR) {
         float new_area = w->rect.w * w->rect.h;
         float old_area = a->has_viewport ? a->viewport.w * a->viewport.h : -1.0f;
         if (!a->has_viewport || new_area > old_area) {
@@ -99,9 +99,11 @@ static float clamp_scroll_offset(float offset, float max_offset) {
 }
 
 static int compute_scrollbar_geometry(const Widget* w, Rect* out_track, Rect* out_thumb, float* out_max_offset) {
-    if (!w || w->type != W_SCROLLBAR || !w->scrollbar_enabled || !w->show_scrollbar || w->scroll_viewport <= 0.0f) return 0;
-    float max_offset = w->scroll_content - w->scroll_viewport;
+    if (!w || w->type != W_SCROLLBAR || !w->data.scroll.enabled || !w->data.scroll.show || w->data.scroll.viewport_size <= 0.0f) return 0;
+    
+    float max_offset = w->data.scroll.content_size - w->data.scroll.viewport_size;
     if (max_offset <= 1.0f) return 0;
+    
     Rect inner_rect = w->rect;
     if (w->border_thickness > 0.0f) {
         inner_rect.x += w->border_thickness;
@@ -111,16 +113,20 @@ static int compute_scrollbar_geometry(const Widget* w, Rect* out_track, Rect* ou
         if (inner_rect.w < 0.0f) inner_rect.w = 0.0f;
         if (inner_rect.h < 0.0f) inner_rect.h = 0.0f;
     }
-    float track_w = w->scrollbar_width > 0.0f ? w->scrollbar_width : fmaxf(4.0f, inner_rect.w * 0.02f);
+    
+    float track_w = w->data.scroll.width > 0.0f ? w->data.scroll.width : fmaxf(4.0f, inner_rect.w * 0.02f);
     float track_h = inner_rect.h - w->padding * 2.0f;
     if (track_h <= 0.0f) return 0;
+    
     float track_x = inner_rect.x + inner_rect.w - track_w - w->padding * 0.5f;
     float track_y = inner_rect.y + w->padding;
-    float thumb_ratio = w->scroll_viewport / w->scroll_content;
+    float thumb_ratio = w->data.scroll.viewport_size / w->data.scroll.content_size;
     float thumb_h = fmaxf(track_h * thumb_ratio, 12.0f);
+    
     float clamped_offset = clamp_scroll_offset(w->scroll_offset, max_offset);
     float offset_t = (max_offset != 0.0f) ? (clamped_offset / max_offset) : 0.0f;
     float thumb_y = track_y + offset_t * (track_h - thumb_h);
+    
     if (out_track) *out_track = (Rect){ track_x, track_y, track_w, track_h };
     if (out_thumb) *out_thumb = (Rect){ track_x, thumb_y, track_w, thumb_h };
     if (out_max_offset) *out_max_offset = max_offset;
@@ -153,7 +159,7 @@ static void build_scroll_areas(ScrollContext* ctx, Widget* widgets, size_t widge
         if (!w->scroll_area) continue;
         ScrollArea* area = ensure_area(&ctx->areas, w->scroll_area);
         if (!area) continue;
-        if (w->scroll_static) area->has_static_anchor = 1;
+        if (w->type == W_SCROLLBAR) area->has_static_anchor = 1;
         add_area_bounds(area, w);
     }
 }
@@ -174,7 +180,9 @@ void scroll_apply_offsets(ScrollContext* ctx, Widget* widgets, size_t widget_cou
     for (size_t i = 0; i < widget_count; i++) {
         Widget* w = &widgets[i];
         w->scroll_offset = 0.0f;
-        w->show_scrollbar = 0;
+        // w->show_scrollbar = 0; // Removed common field
+        if(w->type == W_SCROLLBAR) w->data.scroll.show = 0;
+
         w->has_clip = 0;
         if (!w->scroll_area) continue;
         ScrollArea* a = find_area(ctx->areas, w->scroll_area);
@@ -204,20 +212,21 @@ void scroll_apply_offsets(ScrollContext* ctx, Widget* widgets, size_t widget_cou
         float overflow = content_h - viewport_h;
         if (overflow < 0.0f) overflow = 0.0f;
         a->offset = clamp_scroll_offset(a->offset, overflow);
+        
         if (w->type == W_SCROLLBAR) {
-            w->scroll_viewport = viewport_h;
-            w->scroll_content = content_h;
+            w->data.scroll.viewport_size = viewport_h;
+            w->data.scroll.content_size = content_h;
             w->scroll_offset = a->offset;
-            w->show_scrollbar = w->scrollbar_enabled && overflow > 1.0f;
+            w->data.scroll.show = w->data.scroll.enabled && overflow > 1.0f;
             w->has_clip = 1;
             w->clip = viewport;
         } else {
-            w->scroll_offset = w->scroll_static ? 0.0f : a->offset;
-            if (w->scroll_static) {
-                w->scroll_viewport = viewport_h;
-                w->scroll_content = content_h;
-            }
-            int should_clip = (!w->scroll_static) && w->clip_to_viewport;
+            w->scroll_offset = w->type == W_SCROLLBAR ? 0.0f : a->offset;
+            // Removed common fields from normal widgets
+            // w->scroll_viewport = viewport_h;
+            // w->scroll_content = content_h;
+            
+            int should_clip = (w->type != W_SCROLLBAR) && w->clip_to_viewport;
             if (should_clip && (a->has_viewport || a->has_bounds)) {
                 w->has_clip = 1;
                 w->clip = viewport;
@@ -237,7 +246,7 @@ void scroll_handle_event(ScrollContext* ctx, Widget* widgets, size_t widget_coun
         if (!w->scroll_area) continue;
         ScrollArea* area = find_area(ctx->areas, w->scroll_area);
         if (!area || !area->has_bounds) continue;
-        Rect bounds = w->has_clip ? w->clip : (Rect){ w->rect.x, w->rect.y + (w->scroll_static ? 0.0f : w->scroll_offset), w->rect.w, w->rect.h };
+        Rect bounds = w->has_clip ? w->clip : (Rect){ w->rect.x, w->rect.y + (w->type == W_SCROLLBAR ? 0.0f : w->scroll_offset), w->rect.w, w->rect.h };
         if (mouse_x < bounds.x || mouse_x > bounds.x + bounds.w || mouse_y < bounds.y || mouse_y > bounds.y + bounds.h) continue;
         if (!target || w->z_index > best_z) {
             target = area;
@@ -334,7 +343,7 @@ void scroll_rebuild(ScrollContext* ctx, Widget* widgets, size_t widget_count, fl
         ScrollArea* prev = find_area(old, w->scroll_area);
         if (prev) area->offset = prev->offset * offset_scale;
         add_area_bounds(area, w);
-        if (w->scroll_static) area->has_static_anchor = 1;
+        if (w->type == W_SCROLLBAR) area->has_static_anchor = 1;
     }
 
     free_scroll_areas(old);

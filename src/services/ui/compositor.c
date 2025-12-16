@@ -69,7 +69,7 @@ static void traverse_layout(const LayoutNode* node, Widget* widgets, size_t widg
         pushed_layout_clip = 1;
     }
 
-    int has_widget = (node->source->layout == UI_LAYOUT_NONE || node->source->scroll_static);
+    int has_widget = (node->source->layout == UI_LAYOUT_NONE || node->source->widget_type == W_SCROLLBAR);
     int pushed_widget_clip = 0;
     Widget* widget = NULL;
     if (has_widget && widget_cursor && widgets && *widget_cursor < widget_count) {

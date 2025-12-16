@@ -65,7 +65,6 @@ typedef struct UiNode {
     float floating_max_w, floating_max_h;
     int has_floating_min, has_floating_max;
     char* scroll_area;
-    int scroll_static;
     int scrollbar_enabled;
     float scrollbar_width;
     int has_scrollbar_width;

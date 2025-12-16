@@ -179,7 +179,7 @@ static bool normalize_display_items(VulkanRendererState* state, const DisplayLis
         node.scrollbar_z = (widget->z_index + UI_Z_ORDER_SCALE) * LAYER_STRIDE;
         node.text_z = node.base_z + Z_LAYER_TEXT;
 
-        float scroll_offset = widget->scroll_static ? 0.0f : widget->scroll_offset;
+        float scroll_offset = widget->type == W_SCROLLBAR ? 0.0f : widget->scroll_offset;
         float snapped_scroll_pixels = -snap_to_pixel(scroll_offset * state->transformer.dpi_scale);
         node.effective_scroll = snapped_scroll_pixels / state->transformer.dpi_scale;
 
@@ -390,7 +390,8 @@ static bool emit_border_view_models(const UiRenderNode *node, ViewModelBuffer *b
     const Rect *clip_bounds = node_clip_rect(node);
     const LayoutResult *border_clip_ptr = NULL;
     if (clip_bounds) {
-        border_clip = (Rect){
+        border_clip = (
+            Rect){
             clip_bounds->x - widget->border_thickness,
             clip_bounds->y - widget->border_thickness,
             clip_bounds->w + widget->border_thickness * 2.0f,
@@ -414,14 +415,16 @@ static bool emit_scrollbar_thumb(const UiRenderNode *node, const Rect *track_rec
 {
     const Widget *widget = node->widget;
     const Rect *clip_rect = node_clip_rect(node);
-    if (!widget->scrollbar_enabled || !widget->show_scrollbar || widget->scroll_viewport <= 0.0f ||
-        widget->scroll_content <= widget->scroll_viewport + 1.0f) {
+    
+    // Updated to access nested scroll data
+    if (!widget->data.scroll.enabled || !widget->data.scroll.show || widget->data.scroll.viewport_size <= 0.0f ||
+        widget->data.scroll.content_size <= widget->data.scroll.viewport_size + 1.0f) {
         return true;
     }
 
-    float thumb_ratio = widget->scroll_viewport / widget->scroll_content;
+    float thumb_ratio = widget->data.scroll.viewport_size / widget->data.scroll.content_size;
     float thumb_h = fmaxf(track_rect->h * thumb_ratio, 12.0f);
-    float max_offset = widget->scroll_content - widget->scroll_viewport;
+    float max_offset = widget->data.scroll.content_size - widget->data.scroll.viewport_size;
     float clamped_offset = widget->scroll_offset;
     if (clamped_offset < 0.0f) clamped_offset = 0.0f;
     if (clamped_offset > max_offset) clamped_offset = max_offset;
@@ -430,7 +433,7 @@ static bool emit_scrollbar_thumb(const UiRenderNode *node, const Rect *track_rec
 
     Rect thumb_rect = { track_rect->x, thumb_y, track_rect->w, thumb_h };
     return append_rect_view_model(node, &thumb_rect, node->scrollbar_z + Z_LAYER_SCROLLBAR_THUMB, RENDER_PHASE_BACKGROUND, 
-                                  widget->scrollbar_thumb_color, clip_rect, node_clip_device(node), buffer, ordinal);
+                                  widget->data.scroll.thumb_color, clip_rect, node_clip_device(node), buffer, ordinal);
 }
 
 static bool emit_widget_fill(const UiRenderNode *node, ViewModelBuffer *buffer, size_t *ordinal)
@@ -442,13 +445,13 @@ static bool emit_widget_fill(const UiRenderNode *node, ViewModelBuffer *buffer, 
     Color fill_color = widget->color;
 
     if (widget->type == W_SCROLLBAR) {
-        float track_w = widget->scrollbar_width > 0.0f ? widget->scrollbar_width : fmaxf(4.0f, node->inner_rect.w * 0.02f);
+        float track_w = widget->data.scroll.width > 0.0f ? widget->data.scroll.width : fmaxf(4.0f, node->inner_rect.w * 0.02f);
         float track_h = node->inner_rect.h - widget->padding * 2.0f;
         float track_x = node->inner_rect.x + node->inner_rect.w - track_w - widget->padding * 0.5f;
         float track_y = node->inner_rect.y + widget->padding;
         fill_rect = (Rect){ track_x, track_y, track_w, track_h };
         layer = node->base_z + Z_LAYER_FILL;
-        fill_color = widget->scrollbar_track_color;
+        fill_color = widget->data.scroll.track_color;
     }
 
     if (!append_rect_view_model(node, &fill_rect, layer, RENDER_PHASE_BACKGROUND, fill_color, clip_rect, node_clip_device(node),
@@ -472,8 +475,8 @@ static bool emit_slider(const UiRenderNode *node, ViewModelBuffer *buffer, size_
     float track_y = node->inner_rect.y + (node->inner_rect.h - track_height) * 0.5f;
     float track_x = node->inner_rect.x;
     float track_w = node->inner_rect.w;
-    float denom = widget->maxv - widget->minv;
-    float t = denom != 0.0f ? (widget->value - widget->minv) / denom : 0.0f;
+    float denom = widget->data.slider.min - widget->data.slider.max;
+    float t = denom != 0.0f ? (widget->data.slider.value - widget->data.slider.min) / denom : 0.0f;
     if (t < 0.0f) t = 0.0f; else if (t > 1.0f) t = 1.0f;
 
     Color track_color = widget->color;
@@ -498,7 +501,7 @@ static bool emit_slider(const UiRenderNode *node, ViewModelBuffer *buffer, size_
     if (knob_x > knob_max) knob_x = knob_max;
     float knob_h = track_height * 1.5f;
     float knob_y = track_y + (track_height - knob_h) * 0.5f;
-    Color knob_color = widget->text_color;
+    Color knob_color = widget->data.slider.knob_color;
     if (knob_color.a <= 0.0f) knob_color = (Color){1.0f, 1.0f, 1.0f, 1.0f};
     Rect knob_rect = { knob_x, knob_y, knob_w, knob_h };
     return append_rect_view_model(node, &knob_rect, node->base_z + Z_LAYER_SLIDER_KNOB, RENDER_PHASE_BACKGROUND, knob_color, 
@@ -508,10 +511,24 @@ static bool emit_slider(const UiRenderNode *node, ViewModelBuffer *buffer, size_
 static bool emit_text_glyphs(VulkanRendererState* state, const UiRenderNode *node, GlyphQuadArray *glyph_quads, size_t *ordinal)
 {
     const Widget *widget = node->widget;
+    const char* text_ptr = NULL;
+    Color text_color = {0};
+
+    // Determine text and color based on widget type
+    if (widget->type == W_LABEL || widget->type == W_BUTTON) {
+        text_ptr = widget->data.label.text;
+        text_color = widget->data.label.color;
+    } else if (widget->type == W_CHECKBOX) {
+        text_ptr = widget->data.checkbox.text;
+        text_color = widget->data.checkbox.color;
+    }
+    
+    if (!text_ptr || !*text_ptr) return true;
+
     float pen_x = widget->rect.x + widget->padding;
     float pen_y = widget->rect.y + node->effective_scroll + widget->padding + (float)state->ascent;
 
-    for (const char *c = widget->text; c && *c; ) {
+    for (const char *c = text_ptr; c && *c; ) {
         int adv = 0;
         int codepoint = utf8_decode(c, &adv);
         if (adv <= 0) break;
@@ -525,7 +542,7 @@ static bool emit_text_glyphs(VulkanRendererState* state, const UiRenderNode *nod
         float y0 = snapped_pen_y + g->yoff;
         Rect glyph_rect = { x0, y0, g->w, g->h };
 
-        if (!append_glyph_quad(node, &glyph_rect, (Vec2){g->u0, g->v0}, (Vec2){g->u1, g->v1}, widget->text_color,
+        if (!append_glyph_quad(node, &glyph_rect, (Vec2){g->u0, g->v0}, (Vec2){g->u1, g->v1}, text_color,
                                glyph_quads, ordinal)) {
             return false;
         }
@@ -557,7 +574,15 @@ static bool build_render_items_from_nodes(VulkanRendererState* state, const UiRe
             if (!emit_widget_fill(node, view_models, ordinal)) return false;
         }
 
-        if (widget->text && *widget->text) {
+        // Generic text check helper
+        int has_text = 0;
+        if (widget->type == W_LABEL || widget->type == W_BUTTON) {
+            has_text = (widget->data.label.text && *widget->data.label.text);
+        } else if (widget->type == W_CHECKBOX) {
+            has_text = (widget->data.checkbox.text && *widget->data.checkbox.text);
+        }
+
+        if (has_text) {
             if (!emit_text_glyphs(state, node, glyph_quads, ordinal)) return false;
         }
     }

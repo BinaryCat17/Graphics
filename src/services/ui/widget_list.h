@@ -3,28 +3,75 @@
 
 #include "services/ui/layout_tree.h"
 
+// --- Specific Widget Data Structures ---
+
+typedef struct WidgetTextData {
+    char* text;
+    char* text_binding;
+    Color color; // text_color
+    char* click_binding;
+    char* click_value;
+} WidgetTextData;
+
+typedef struct WidgetValueData {
+    float min, max, value;
+    Color knob_color; // Was text_color
+    char* value_binding;
+} WidgetValueData;
+
+typedef struct WidgetScrollData {
+    int enabled;           // scrollbar_enabled
+    float width;           // scrollbar_width
+    Color track_color;     // scrollbar_track_color
+    Color thumb_color;     // scrollbar_thumb_color
+    int show;              // show_scrollbar
+    float viewport_size;   // scroll_viewport
+    float content_size;    // scroll_content
+} WidgetScrollData;
+
+typedef struct WidgetCheckboxData {
+    char* text; // label
+    Color color; // text_color
+    float value; // 0.0 or 1.0
+    char* value_binding;
+    char* click_binding;
+    char* click_value;
+} WidgetCheckboxData;
+
+// --- Main Widget Structure ---
+
 typedef struct Widget {
+    // -- Common Identity & Layout --
     WidgetType type;
+    char* id;
     Rect rect;
     Rect floating_rect;
-    float scroll_offset;
+    int has_floating_rect;
+    
+    // -- Common Rendering --
     int z_index;
     int base_z_index;
     int z_group;
-    Color color;
-    Color text_color;
+    Color color;            // Background color
+    
+    // -- Common Styling --
     float base_padding;
     float padding;
     float base_border_thickness;
     float border_thickness;
     Color border_color;
-    char* text; /* for labels/buttons */
-    char* text_binding;
-    char* value_binding;
-    char* click_binding;
-    char* click_value;
-    float minv, maxv, value;
-    char* id;
+    
+    // -- Common Scroll Context --
+    char* scroll_area;
+    float scroll_offset;    // Current offset applied to this widget
+    
+    // -- Common Clipping --
+    int has_clip;
+    Rect clip;
+    int clip_to_viewport;
+    int has_clip_to_viewport;
+
+    // -- Common Interaction Flags --
     char* docking;
     int resizable;
     int draggable;
@@ -32,24 +79,19 @@ typedef struct Widget {
     int has_resizable;
     int has_draggable;
     int has_modal;
-    int has_floating_rect;
+    int has_floating_min, has_floating_max;
     float floating_min_w, floating_min_h;
     float floating_max_w, floating_max_h;
-    int has_floating_min, has_floating_max;
     char* on_focus;
-    char* scroll_area;
-    int scroll_static;
-    int scrollbar_enabled;
-    float scrollbar_width;
-    Color scrollbar_track_color;
-    Color scrollbar_thumb_color;
-    int has_clip;
-    Rect clip;
-    int clip_to_viewport;
-    int has_clip_to_viewport;
-    float scroll_viewport;
-    float scroll_content;
-    int show_scrollbar;
+
+    // -- Polymorphic Data --
+    union {
+        WidgetTextData label;      // Label, Button
+        WidgetValueData slider;    // Slider, Progress
+        WidgetCheckboxData checkbox; // Checkbox
+        WidgetScrollData scroll;   // Scrollbar
+    } data;
+    
 } Widget;
 
 typedef struct WidgetArray {

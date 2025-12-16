@@ -36,19 +36,22 @@ static void scale_layout(LayoutNode* node, float scale) {
 }
 
 static void apply_slider_action(Widget* w, Model* model, float mx) {
-    if (!w) return;
+    if (!w || w->type != W_HSLIDER) return;
+    
     float local_t = (float)((mx - w->rect.x) / w->rect.w);
     local_t = clamp01(local_t);
-    float denom = (w->maxv - w->minv);
-    float new_val = denom != 0.0f ? (w->minv + local_t * denom) : w->minv;
-    w->value = new_val;
-    if (w->value_binding) {
-        model_set_number(model, w->value_binding, new_val);
+    float denom = (w->data.slider.max - w->data.slider.min);
+    float new_val = denom != 0.0f ? (w->data.slider.min + local_t * denom) : w->data.slider.min;
+    
+    w->data.slider.value = new_val;
+    
+    if (w->data.slider.value_binding) {
+        model_set_number(model, w->data.slider.value_binding, new_val);
     }
     if (w->id) {
         char buf[64];
         snprintf(buf, sizeof(buf), "%s: %.0f%%", w->id,
-                 clamp01((new_val - w->minv) / (denom != 0.0f ? denom : 1.0f)) * 100.0f);
+                 clamp01((new_val - w->data.slider.min) / (denom != 0.0f ? denom : 1.0f)) * 100.0f);
         model_set_string(model, "sliderState", buf);
     }
 }
@@ -56,7 +59,7 @@ static void apply_slider_action(Widget* w, Model* model, float mx) {
 static int point_in_widget(const Widget* w, double mx, double my) {
     if (!w) return 0;
     float x = w->rect.x;
-    float y_offset = w->scroll_static ? 0.0f : w->scroll_offset;
+    float y_offset = w->type == W_SCROLLBAR ? 0.0f : w->scroll_offset;
     float y = w->rect.y + y_offset;
     return mx >= x && mx <= x + w->rect.w && my >= y && my <= y + w->rect.h;
 }
@@ -84,20 +87,23 @@ static Widget* pick_widget_at(const UiContext* ui, double mx, double my) {
 
 static void apply_click_action(Widget* w, Model* model) {
     if (!w || !model) return;
-    if (w->type == W_BUTTON && w->click_binding) {
-        const char* payload = w->click_value ? w->click_value : (w->id ? w->id : w->text);
-        if (payload) model_set_string(model, w->click_binding, payload);
-    }
-    if (w->type == W_CHECKBOX) {
-        float new_val = (w->value > 0.5f) ? 0.0f : 1.0f;
-        w->value = new_val;
-        if (w->value_binding) {
-            model_set_number(model, w->value_binding, new_val);
+    
+    if (w->type == W_BUTTON) {
+        if (w->data.label.click_binding) {
+            const char* payload = w->data.label.click_value ? w->data.label.click_value : (w->id ? w->id : w->data.label.text);
+            if (payload) model_set_string(model, w->data.label.click_binding, payload);
         }
-        if (w->click_binding) {
-            const char* on_payload = w->click_value ? w->click_value : "On";
+    } else if (w->type == W_CHECKBOX) {
+        float new_val = (w->data.checkbox.value > 0.5f) ? 0.0f : 1.0f;
+        w->data.checkbox.value = new_val;
+        
+        if (w->data.checkbox.value_binding) {
+            model_set_number(model, w->data.checkbox.value_binding, new_val);
+        }
+        if (w->data.checkbox.click_binding) {
+            const char* on_payload = w->data.checkbox.click_value ? w->data.checkbox.click_value : "On";
             const char* payload = (new_val > 0.5f) ? on_payload : "Off";
-            model_set_string(model, w->click_binding, payload);
+            model_set_string(model, w->data.checkbox.click_binding, payload);
         }
     }
 }
