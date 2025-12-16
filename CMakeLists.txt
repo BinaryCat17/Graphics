@@ -70,6 +70,7 @@ target_link_libraries(core PUBLIC system_libs)
 
 # Render Backend Common
 set(RENDER_COMMON_SOURCES
+        "src/services/render/render_graph/render_graph.c"
         "src/services/render/backend/common/render_composition.c"
         "src/services/render/backend/common/ui_mesh_builder.c"
         "src/services/render/backend/common/renderer_backend.c"
@@ -111,6 +112,7 @@ add_custom_target(Shaders DEPENDS ${SHADER_OUTPUTS})
 
 # Vulkan Renderer Backend
 set(RENDER_VULKAN_SOURCES
+    "src/services/render/backend/vulkan/vk_render_graph.c"
     "src/services/render/backend/vulkan/vulkan_renderer.c"
     "src/services/render/backend/vulkan/vk_utils.c"
     "src/services/render/backend/vulkan/vk_context.c"
@@ -243,3 +245,4 @@ add_graphics_test(text_clip_integration_tests tests/text_clip_integration_tests.
 add_graphics_test(scene_yaml_tests tests/scene_yaml_tests.c service_scene config)
 add_graphics_test(math_scene_tests tests/math_scene_tests.c service_scene)
 add_graphics_test(math_mesh_tests tests/math_mesh_tests.c service_scene)
+add_graphics_test(render_graph_tests tests/render_graph_tests.c render_common)

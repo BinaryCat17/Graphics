@@ -1,5 +1,6 @@
 #define _POSIX_C_SOURCE 200809L
 #include "services/render/backend/vulkan/vulkan_renderer.h"
+#include "services/render/backend/vulkan/vk_render_graph.h"
 
 #include "services/render/backend/vulkan/vk_types.h"
 #include "services/render/backend/vulkan/vk_context.h"
@@ -15,31 +16,44 @@
 
 static RendererBackend g_vulkan_backend;
 
-static void record_cmdbuffer(VulkanRendererState* state, uint32_t idx, const FrameResources *frame) {
-    VkCommandBuffer cb = state->cmdbuffers[idx];
-    vkResetCommandBuffer(cb, 0);
-    VkCommandBufferBeginInfo binfo = { .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO };
-    vkBeginCommandBuffer(cb, &binfo);
+typedef struct UiPassData {
+    VulkanRendererState* state;
+    uint32_t image_index;
+    const FrameResources* frame;
+} UiPassData;
+
+static void ui_pass_execute(RgCmdBuffer* rg_cmd, void* user_data) {
+    UiPassData* data = (UiPassData*)user_data;
+    VulkanRendererState* state = data->state;
+    VkCommandBuffer cb = (VkCommandBuffer)rg_cmd->backend_cmd; // Cast depends on backend implementation
 
     VkClearValue clr[2];
     clr[0].color = (VkClearColorValue){{0.9f,0.9f,0.9f,1.0f}};
     clr[1].depthStencil = (VkClearDepthStencilValue){1.0f, 0};
-    VkRenderPassBeginInfo rpbi = { .sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO, .renderPass = state->render_pass, .framebuffer = state->framebuffers[idx], .renderArea = {.offset = {0,0}, .extent = state->swapchain_extent }, .clearValueCount = 2, .pClearValues = clr };
+    
+    VkRenderPassBeginInfo rpbi = { 
+        .sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO, 
+        .renderPass = state->render_pass, 
+        .framebuffer = state->framebuffers[data->image_index], 
+        .renderArea = {.offset = {0,0}, .extent = state->swapchain_extent }, 
+        .clearValueCount = 2, 
+        .pClearValues = clr 
+    };
+    
     vkCmdBeginRenderPass(cb, &rpbi, VK_SUBPASS_CONTENTS_INLINE);
 
     vkCmdBindPipeline(cb, VK_PIPELINE_BIND_POINT_GRAPHICS, state->pipeline);
     ViewConstants pc = { .viewport = { (float)state->swapchain_extent.width, (float)state->swapchain_extent.height } };
     vkCmdPushConstants(cb, state->pipeline_layout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(ViewConstants), &pc);
     vkCmdBindDescriptorSets(cb, VK_PIPELINE_BIND_POINT_GRAPHICS, state->pipeline_layout, 0, 1, &state->descriptor_set, 0, NULL);
-    if (frame && frame->vertex_buffer != VK_NULL_HANDLE && frame->vertex_count > 0) {
+    
+    if (data->frame && data->frame->vertex_buffer != VK_NULL_HANDLE && data->frame->vertex_count > 0) {
         VkDeviceSize offset = 0;
-        vkCmdBindVertexBuffers(cb, 0, 1, &frame->vertex_buffer, &offset);
-        /* simple draw: vertices are triangles (every 3 vertices) */
-        vkCmdDraw(cb, (uint32_t)frame->vertex_count, 1, 0, 0);
+        vkCmdBindVertexBuffers(cb, 0, 1, &data->frame->vertex_buffer, &offset);
+        vkCmdDraw(cb, (uint32_t)data->frame->vertex_count, 1, 0, 0);
     }
 
     vkCmdEndRenderPass(cb);
-    vkEndCommandBuffer(cb);
 }
 
 static bool recover_device_loss(VulkanRendererState* state) {
@@ -83,10 +97,7 @@ static void draw_frame(VulkanRendererState* state) {
         vk_cleanup_swapchain(state, true); 
         
         vk_create_swapchain_and_views(state, old_swapchain);
-        if (!state->swapchain) {
-             if (old_swapchain) vkDestroySwapchainKHR(state->device, old_swapchain, NULL);
-             return; 
-        }
+        if (!state->swapchain) { if (old_swapchain) vkDestroySwapchainKHR(state->device, old_swapchain, NULL); return; }
         vk_create_depth_resources(state);
         vk_create_render_pass(state);
         vk_create_pipeline(state, state->vert_spv, state->frag_spv);
@@ -140,7 +151,68 @@ static void draw_frame(VulkanRendererState* state) {
     if (!vk_upload_vertices(state, frame)) {
         frame->vertex_count = 0;
     }
-    record_cmdbuffer(state, img_idx, frame);
+
+    // --- RENDER GRAPH EXECUTION ---
+    
+    VkCommandBuffer cb = state->cmdbuffers[img_idx];
+    vkResetCommandBuffer(cb, 0);
+    VkCommandBufferBeginInfo binfo = { .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO };
+    vkBeginCommandBuffer(cb, &binfo);
+
+    RgGraph* graph = rg_create();
+    
+    // Import Backbuffer
+    // Note: We need the actual VkImage for the current swapchain index.
+    // We assume state->swapchain_imgs was populated.
+    RgResourceHandle backbuffer = rg_import_texture(graph, "Backbuffer", 
+        (void*)state->swapchain_imgs[img_idx], 
+        state->swapchain_extent.width, state->swapchain_extent.height, 
+        RG_FORMAT_B8G8R8A8_UNORM); // Assume format matches swapchain
+
+    // Define UI Pass
+    UiPassData* pass_data;
+    RgPassBuilder* ui_pass = rg_add_pass(graph, "UI Pass", sizeof(UiPassData), (void**)&pass_data);
+    pass_data->state = state;
+    pass_data->image_index = img_idx;
+    pass_data->frame = frame;
+    
+    // UI writes to backbuffer (color) and clears it
+    rg_pass_write(ui_pass, backbuffer, RG_LOAD_OP_CLEAR, RG_STORE_OP_STORE);
+    rg_pass_set_execution(ui_pass, ui_pass_execute);
+    
+    rg_compile(graph);
+    
+    VkRenderGraphContext ctx = {
+        .state = state,
+        .cmd = cb,
+        .current_frame_index = img_idx
+    };
+    vk_rg_execute(graph, &ctx);
+    
+    rg_destroy(graph);
+
+    // Transition backbuffer to Present Source (handled by graph? yes, if usage set correctly)
+    // In vk_render_graph.c we set barrier to layout from usage. 
+    // Usage was RG_USAGE_COLOR_ATTACHMENT. Layout -> COLOR_ATTACHMENT_OPTIMAL.
+    // But vkQueuePresent requires PRESENT_SRC_KHR.
+    // We need a transition.
+    
+    VkImageMemoryBarrier barrier = {
+        .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
+        .oldLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+        .newLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR,
+        .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+        .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+        .image = state->swapchain_imgs[img_idx],
+        .subresourceRange = { VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1 },
+        .srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT,
+        .dstAccessMask = 0
+    };
+    vkCmdPipelineBarrier(cb, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, 0, 0, NULL, 0, NULL, 1, &barrier);
+
+    vkEndCommandBuffer(cb);
+
+    // --- SUBMIT ---
 
     VkPipelineStageFlags waitStage = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
     VkSubmitInfo si = { .sType = VK_STRUCTURE_TYPE_SUBMIT_INFO, .waitSemaphoreCount = 1, .pWaitSemaphores = &state->sem_img_avail, .pWaitDstStageMask = &waitStage, .commandBufferCount = 1, .pCommandBuffers = &state->cmdbuffers[img_idx], .signalSemaphoreCount = 1, .pSignalSemaphores = &state->sem_render_done };
