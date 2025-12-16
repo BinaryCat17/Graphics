@@ -1,6 +1,0 @@
-type: component
-key: components/chip
-component:
-  type: label
-  style: chip
-  padding: 7

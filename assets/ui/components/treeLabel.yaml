@@ -1,6 +1,0 @@
-type: component
-key: components/treeLabel
-component:
-  type: label
-  style: treeItem
-  padding: 6

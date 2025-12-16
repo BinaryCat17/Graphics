@@ -1,6 +1,0 @@
-type: component
-key: components/sectionHeader
-component:
-  type: label
-  style: header
-  padding: 10

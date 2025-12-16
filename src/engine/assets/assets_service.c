@@ -22,11 +22,9 @@ static char* join_path(const char* dir, const char* leaf) {
 }
 
 static void free_paths(Assets* assets) {
-    free(assets->ui_path);
     free(assets->vert_spv_path);
     free(assets->frag_spv_path);
     free(assets->font_path);
-    assets->ui_path = NULL;
     assets->vert_spv_path = NULL;
     assets->frag_spv_path = NULL;
     assets->font_path = NULL;
@@ -34,36 +32,25 @@ static void free_paths(Assets* assets) {
 
 bool assets_init(Assets* out_assets, const char* assets_dir, const char* ui_config_path) {
     if (!out_assets) return false;
+    (void)ui_config_path; // Unused in modern system
 
     memset(out_assets, 0, sizeof(*out_assets));
 
-    if (ui_config_path && ui_config_path[0]) {
-        out_assets->ui_path = platform_strdup(ui_config_path);
-    } else {
-        out_assets->ui_path = join_path(assets_dir, "ui/ui.yaml");
-    }
     out_assets->vert_spv_path = join_path(assets_dir, "shaders/shader.vert.spv");
     out_assets->frag_spv_path = join_path(assets_dir, "shaders/shader.frag.spv");
     out_assets->font_path = join_path(assets_dir, "fonts/font.ttf");
 
-    if (!out_assets->ui_path || !out_assets->vert_spv_path || !out_assets->frag_spv_path || !out_assets->font_path) {
+    if (!out_assets->vert_spv_path || !out_assets->frag_spv_path || !out_assets->font_path) {
         LOG_FATAL("Failed to compose asset paths for directory '%s'", assets_dir);
         assets_shutdown(out_assets);
         return false;
     }
 
-    ConfigError err = {0};
-    if (!load_config_document(out_assets->ui_path, CONFIG_FORMAT_YAML, &out_assets->ui_doc, &err)) {
-        LOG_ERROR("Failed to load %s: %s", out_assets->ui_path, err.message);
-        assets_shutdown(out_assets);
-        return false;
-    }
     return true;
 }
 
 void assets_shutdown(Assets* assets) {
     if (!assets) return;
     free_paths(assets);
-    config_document_free(&assets->ui_doc);
     memset(assets, 0, sizeof(*assets));
 }

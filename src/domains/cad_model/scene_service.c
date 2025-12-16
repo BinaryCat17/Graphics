@@ -1,4 +1,5 @@
 #include "domains/cad_model/scene_service.h"
+#include "foundation/logger/logger.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -13,7 +14,7 @@ bool scene_load(Scene* scene, const char* path, Assets* assets) {
 
     SceneError scene_err = {0};
     if (!parse_scene_yaml(path, scene, &scene_err)) {
-        fprintf(stderr, "Failed to load scene %s:%d:%d %s\n", path, scene_err.line, scene_err.column,
+        LOG_ERROR("Failed to load scene %s:%d:%d %s", path, scene_err.line, scene_err.column,
                 scene_err.message);
         return false;
     }

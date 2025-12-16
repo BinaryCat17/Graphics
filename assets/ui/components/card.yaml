@@ -1,7 +1,0 @@
-type: component
-key: components/card
-component:
-  type: label
-  style: borderedCard
-  padding: 14
-  w: 400

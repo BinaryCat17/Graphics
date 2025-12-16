@@ -6,12 +6,9 @@
 
 // The data structure (Context)
 typedef struct Assets {
-    char* ui_path;
     char* vert_spv_path;
     char* frag_spv_path;
     char* font_path;
-
-    ConfigDocument ui_doc;
 } Assets;
 
 // Public API
