@@ -257,7 +257,7 @@ void scroll_handle_event(ScrollContext* ctx, Widget* widgets, size_t widget_coun
         float viewport_h = target->has_viewport ? target->viewport.h : target->bounds.h;
         float max_offset = target->has_bounds ? (target->bounds.h - viewport_h) : 0.0f;
         if (max_offset < 0.0f) max_offset = 0.0f;
-        target->offset = clamp_scroll_offset(target->offset - (float)yoff * 24.0f, max_offset);
+        target->offset = clamp_scroll_offset(target->offset - (float)yoff * 120.0f, max_offset);
         scroll_apply_offsets(ctx, widgets, widget_count);
     }
 }

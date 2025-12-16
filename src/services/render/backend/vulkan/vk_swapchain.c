@@ -71,7 +71,7 @@ void vk_create_swapchain_and_views(VulkanRendererState* state, VkSwapchainKHR ol
             have_blend_only = VK_TRUE;
         }
 
-        if (fmts[i].format == VK_FORMAT_B8G8R8A8_SRGB && fmts[i].colorSpace == VK_COLOR_SPACE_SRGB_NONLINEAR_KHR) {
+        if (fmts[i].format == VK_FORMAT_B8G8R8A8_UNORM) {
             srgb_choice = fmts[i];
             srgb_support = support;
             have_srgb = VK_TRUE;
@@ -160,22 +160,6 @@ void vk_create_swapchain_and_views(VulkanRendererState* state, VkSwapchainKHR ol
     if (!(caps.supportedUsageFlags & usage)) fatal("swapchain color usage unsupported");
 
     VkPresentModeKHR present_mode = VK_PRESENT_MODE_FIFO_KHR;
-    uint32_t mode_count = 0;
-    vkGetPhysicalDeviceSurfacePresentModesKHR(state->physical_device, state->surface, &mode_count, NULL);
-    if (mode_count > 0) {
-        VkPresentModeKHR* modes = malloc(sizeof(VkPresentModeKHR) * mode_count);
-        vkGetPhysicalDeviceSurfacePresentModesKHR(state->physical_device, state->surface, &mode_count, modes);
-        for (uint32_t i = 0; i < mode_count; i++) {
-            if (modes[i] == VK_PRESENT_MODE_MAILBOX_KHR) {
-                present_mode = VK_PRESENT_MODE_MAILBOX_KHR;
-                break;
-            }
-            if (modes[i] == VK_PRESENT_MODE_IMMEDIATE_KHR && present_mode != VK_PRESENT_MODE_MAILBOX_KHR) {
-                present_mode = VK_PRESENT_MODE_IMMEDIATE_KHR;
-            }
-        }
-        free(modes);
-    }
     printf("Selected Present Mode: %d (FIFO=%d, MAILBOX=%d, IMMEDIATE=%d)\n", 
            present_mode, VK_PRESENT_MODE_FIFO_KHR, VK_PRESENT_MODE_MAILBOX_KHR, VK_PRESENT_MODE_IMMEDIATE_KHR);
 
