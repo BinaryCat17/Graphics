@@ -68,8 +68,6 @@ static void test_scrollbar_not_clipped(void) {
     UiNode scrollbar = {
         .layout = UI_LAYOUT_NONE,
         .widget_type = W_SCROLLBAR,
-        .scroll_area = "area",
-        .scroll_static = 1,
         .has_w = 1,
         .has_h = 1,
         .child_count = 1,
@@ -108,7 +106,7 @@ static void test_scrollbar_not_clipped(void) {
     }
     assert(content_item && scrollbar_item);
     assert(content_item->clip_depth > 0);
-    assert(scrollbar_item->clip_depth > 0);
+    assert(scrollbar_item->clip_depth == 0);
 
     ui_compositor_free(list);
     scroll_free(scroll);

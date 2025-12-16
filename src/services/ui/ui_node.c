@@ -339,15 +339,9 @@ static UiNode* parse_ui_node_config(const ConfigNode* obj) {
         if (strcmp(key, "maxWidth") == 0) { node->max_w = parse_scalar_number(val, node->max_w); node->has_max_w = 1; continue; }
         if (strcmp(key, "maxHeight") == 0) { node->max_h = parse_scalar_number(val, node->max_h); node->has_max_h = 1; continue; }
         if (strcmp(key, "scrollArea") == 0 && sval) { node->scroll_area = platform_strdup(sval); continue; }
-        if (strcmp(key, "scrollStatic") == 0) {
-            fprintf(stderr, "Warning: 'scrollStatic' is deprecated; wrap the node in a 'scrollbar' container instead.\n");
-            node->scroll_static = parse_scalar_bool(val, node->scroll_static);
-            continue;
-        }
-        if (strcmp(key, "scrollbar") == 0) {
-            fprintf(stderr, "Warning: 'scrollbar' boolean is deprecated; use a 'scrollbar' wrapper node instead.\n");
-            node->scrollbar_enabled = parse_scalar_bool(val, node->scrollbar_enabled);
-            continue;
+        if (strcmp(key, "scrollbar") == 0) { 
+            node->scrollbar_enabled = parse_scalar_bool(val, node->scrollbar_enabled); 
+            continue; 
         }
         if (strcmp(key, "scrollbarWidth") == 0) { node->scrollbar_width = parse_scalar_number(val, node->scrollbar_width); node->has_scrollbar_width = 1; continue; }
         if (strcmp(key, "spacing") == 0) { node->spacing = parse_scalar_number(val, node->spacing); node->has_spacing = 1; continue; }
@@ -405,7 +399,70 @@ static const Prototype* find_prototype(const Prototype* list, const char* name) 
     return NULL;
 }
 
-static UiNode* clone_node(const UiNode* src);
+static UiNode* clone_node(const UiNode* src) {
+    if (!src) return NULL;
+    UiNode* n = create_node();
+    if (!n) return NULL;
+    n->type = src->type ? platform_strdup(src->type) : NULL;
+    n->layout = src->layout;
+    n->widget_type = src->widget_type;
+    n->rect = src->rect;
+    n->has_x = src->has_x; n->has_y = src->has_y; n->has_w = src->has_w; n->has_h = src->has_h;
+    n->z_index = src->z_index; n->has_z_index = src->has_z_index;
+    n->z_group = src->z_group; n->has_z_group = src->has_z_group;
+    n->spacing = src->spacing; n->has_spacing = src->has_spacing;
+    n->columns = src->columns; n->has_columns = src->has_columns;
+    n->style = src->style;
+    n->padding_override = src->padding_override; n->has_padding_override = src->has_padding_override;
+    n->color = src->color; n->text_color = src->text_color;
+    n->has_color = src->has_color; n->has_text_color = src->has_text_color;
+    n->scrollbar_enabled = src->scrollbar_enabled;
+    n->scrollbar_width = src->scrollbar_width;
+    n->has_scrollbar_width = src->has_scrollbar_width;
+    n->scrollbar_track_color = src->scrollbar_track_color;
+    n->scrollbar_thumb_color = src->scrollbar_thumb_color;
+    n->has_scrollbar_track_color = src->has_scrollbar_track_color;
+    n->has_scrollbar_thumb_color = src->has_scrollbar_thumb_color;
+    n->clip_to_viewport = src->clip_to_viewport;
+    n->has_clip_to_viewport = src->has_clip_to_viewport;
+    n->style_name = src->style_name ? platform_strdup(src->style_name) : NULL;
+    n->use = src->use ? platform_strdup(src->use) : NULL;
+    n->id = src->id ? platform_strdup(src->id) : NULL;
+    n->text = src->text ? platform_strdup(src->text) : NULL;
+    n->text_binding = src->text_binding ? platform_strdup(src->text_binding) : NULL;
+    n->value_binding = src->value_binding ? platform_strdup(src->value_binding) : NULL;
+    n->click_binding = src->click_binding ? platform_strdup(src->click_binding) : NULL;
+    n->click_value = src->click_value ? platform_strdup(src->click_value) : NULL;
+    n->minv = src->minv; n->maxv = src->maxv; n->value = src->value;
+    n->has_min = src->has_min; n->has_max = src->has_max; n->has_value = src->has_value;
+    n->min_w = src->min_w; n->min_h = src->min_h;
+    n->has_min_w = src->has_min_w; n->has_min_h = src->has_min_h;
+    n->max_w = src->max_w; n->max_h = src->max_h;
+    n->has_max_w = src->has_max_w; n->has_max_h = src->has_max_h;
+    n->floating_rect = src->floating_rect; n->has_floating_rect = src->has_floating_rect;
+    n->floating_min_w = src->floating_min_w; n->floating_min_h = src->floating_min_h;
+    n->floating_max_w = src->floating_max_w; n->floating_max_h = src->floating_max_h;
+    n->has_floating_min = src->has_floating_min; n->has_floating_max = src->has_floating_max;
+    n->scroll_area = src->scroll_area ? platform_strdup(src->scroll_area) : NULL;
+    n->docking = src->docking ? platform_strdup(src->docking) : NULL;
+    n->resizable = src->resizable;
+    n->has_resizable = src->has_resizable;
+    n->draggable = src->draggable;
+    n->has_draggable = src->has_draggable;
+    n->modal = src->modal;
+    n->has_modal = src->has_modal;
+    n->on_focus = src->on_focus ? platform_strdup(src->on_focus) : NULL;
+
+    if (src->child_count > 0) {
+        n->children = (UiNode*)calloc(src->child_count, sizeof(UiNode));
+        n->child_count = src->child_count;
+        for (size_t i = 0; i < src->child_count; i++) {
+            UiNode* c = clone_node(&src->children[i]);
+            if (c) { n->children[i] = *c; free(c); }
+        }
+    }
+    return n;
+}
 
 static void merge_node(UiNode* node, const UiNode* proto) {
     if (!node || !proto) return;
@@ -458,7 +515,6 @@ static void merge_node(UiNode* node, const UiNode* proto) {
         node->has_floating_max = 1;
     }
     if (!node->scroll_area && proto->scroll_area) node->scroll_area = platform_strdup(proto->scroll_area);
-    if (!node->scroll_static && proto->scroll_static) node->scroll_static = 1;
     if (!node->docking && proto->docking) node->docking = platform_strdup(proto->docking);
     if (!node->has_resizable && proto->has_resizable) { node->resizable = proto->resizable; node->has_resizable = 1; }
     if (!node->has_draggable && proto->has_draggable) { node->draggable = proto->draggable; node->has_draggable = 1; }
@@ -473,72 +529,6 @@ static void merge_node(UiNode* node, const UiNode* proto) {
             if (c) { node->children[i] = *c; free(c); }
         }
     }
-}
-
-static UiNode* clone_node(const UiNode* src) {
-    if (!src) return NULL;
-    UiNode* n = create_node();
-    if (!n) return NULL;
-    n->type = src->type ? platform_strdup(src->type) : NULL;
-    n->layout = src->layout;
-    n->widget_type = src->widget_type;
-    n->rect = src->rect;
-    n->has_x = src->has_x; n->has_y = src->has_y; n->has_w = src->has_w; n->has_h = src->has_h;
-    n->z_index = src->z_index; n->has_z_index = src->has_z_index;
-    n->z_group = src->z_group; n->has_z_group = src->has_z_group;
-    n->spacing = src->spacing; n->has_spacing = src->has_spacing;
-    n->columns = src->columns; n->has_columns = src->has_columns;
-    n->style = src->style;
-    n->padding_override = src->padding_override; n->has_padding_override = src->has_padding_override;
-    n->color = src->color; n->text_color = src->text_color;
-    n->has_color = src->has_color; n->has_text_color = src->has_text_color;
-    n->scrollbar_enabled = src->scrollbar_enabled;
-    n->scrollbar_width = src->scrollbar_width;
-    n->has_scrollbar_width = src->has_scrollbar_width;
-    n->scrollbar_track_color = src->scrollbar_track_color;
-    n->scrollbar_thumb_color = src->scrollbar_thumb_color;
-    n->has_scrollbar_track_color = src->has_scrollbar_track_color;
-    n->has_scrollbar_thumb_color = src->has_scrollbar_thumb_color;
-    n->clip_to_viewport = src->clip_to_viewport;
-    n->has_clip_to_viewport = src->has_clip_to_viewport;
-    n->style_name = src->style_name ? platform_strdup(src->style_name) : NULL;
-    n->use = src->use ? platform_strdup(src->use) : NULL;
-    n->id = src->id ? platform_strdup(src->id) : NULL;
-    n->text = src->text ? platform_strdup(src->text) : NULL;
-    n->text_binding = src->text_binding ? platform_strdup(src->text_binding) : NULL;
-    n->value_binding = src->value_binding ? platform_strdup(src->value_binding) : NULL;
-    n->click_binding = src->click_binding ? platform_strdup(src->click_binding) : NULL;
-    n->click_value = src->click_value ? platform_strdup(src->click_value) : NULL;
-    n->minv = src->minv; n->maxv = src->maxv; n->value = src->value;
-    n->has_min = src->has_min; n->has_max = src->has_max; n->has_value = src->has_value;
-    n->min_w = src->min_w; n->min_h = src->min_h;
-    n->has_min_w = src->has_min_w; n->has_min_h = src->has_min_h;
-    n->max_w = src->max_w; n->max_h = src->max_h;
-    n->has_max_w = src->has_max_w; n->has_max_h = src->has_max_h;
-    n->floating_rect = src->floating_rect; n->has_floating_rect = src->has_floating_rect;
-    n->floating_min_w = src->floating_min_w; n->floating_min_h = src->floating_min_h;
-    n->floating_max_w = src->floating_max_w; n->floating_max_h = src->floating_max_h;
-    n->has_floating_min = src->has_floating_min; n->has_floating_max = src->has_floating_max;
-    n->scroll_area = src->scroll_area ? platform_strdup(src->scroll_area) : NULL;
-    n->scroll_static = src->scroll_static;
-    n->docking = src->docking ? platform_strdup(src->docking) : NULL;
-    n->resizable = src->resizable;
-    n->has_resizable = src->has_resizable;
-    n->draggable = src->draggable;
-    n->has_draggable = src->has_draggable;
-    n->modal = src->modal;
-    n->has_modal = src->has_modal;
-    n->on_focus = src->on_focus ? platform_strdup(src->on_focus) : NULL;
-
-    if (src->child_count > 0) {
-        n->children = (UiNode*)calloc(src->child_count, sizeof(UiNode));
-        n->child_count = src->child_count;
-        for (size_t i = 0; i < src->child_count; i++) {
-            UiNode* c = clone_node(&src->children[i]);
-            if (c) { n->children[i] = *c; free(c); }
-        }
-    }
-    return n;
 }
 
 static LayoutType type_to_layout(const char* type) {
@@ -582,6 +572,13 @@ static void resolve_styles_and_defaults(UiNode* node, const Style* styles, int* 
         node->layout = inferred;
     }
     node->widget_type = type_to_widget_type(node->type);
+    if (node->scrollbar_enabled) {
+        node->widget_type = W_SCROLLBAR;
+    }
+    if (node->widget_type == W_SCROLLBAR) {
+        node->scrollbar_enabled = 1;
+    }
+
     if (!node->has_spacing) {
         node->spacing = (node->layout == UI_LAYOUT_NONE) ? 0.0f : 8.0f;
         node->has_spacing = 1;
@@ -613,93 +610,6 @@ static void resolve_styles_and_defaults(UiNode* node, const Style* styles, int* 
 
     for (size_t i = 0; i < node->child_count; i++) {
         resolve_styles_and_defaults(&node->children[i], styles, missing_styles);
-    }
-}
-
-static char* next_scroll_area_name(int* counter) {
-    if (!counter) return NULL;
-    char buf[32];
-    snprintf(buf, sizeof(buf), "scrollArea%d", *counter);
-    *counter += 1;
-    return platform_strdup(buf);
-}
-
-static void wrap_node_with_scrollbar(UiNode* node, int* counter) {
-    if (!node) return;
-    UiNode content = *node;
-    char* original_scroll_area = content.scroll_area;
-    UiNode* defaults = create_node();
-    if (!defaults) return;
-    *node = *defaults;
-    free(defaults);
-
-    node->type = platform_strdup("scrollbar");
-    node->widget_type = W_SCROLLBAR;
-    node->layout = UI_LAYOUT_NONE;
-    node->style = content.style;
-    node->style_name = content.style_name ? platform_strdup(content.style_name) : NULL;
-    node->rect = content.rect;
-    node->has_x = content.has_x; node->has_y = content.has_y;
-    node->has_w = content.has_w; node->has_h = content.has_h;
-    node->has_min_w = content.has_min_w; node->min_w = content.min_w;
-    node->has_min_h = content.has_min_h; node->min_h = content.min_h;
-    node->has_max_w = content.has_max_w; node->max_w = content.max_w;
-    node->has_max_h = content.has_max_h; node->max_h = content.max_h;
-    node->has_z_index = content.has_z_index; node->z_index = content.z_index;
-    node->has_z_group = content.has_z_group; node->z_group = content.z_group;
-    node->padding_override = content.padding_override; node->has_padding_override = content.has_padding_override;
-    node->border_thickness = content.border_thickness; node->has_border_thickness = content.has_border_thickness;
-    node->border_color = content.border_color; node->has_border_color = content.has_border_color;
-    node->color = content.color; node->has_color = content.has_color;
-    node->text_color = content.text_color; node->has_text_color = content.has_text_color;
-    node->clip_to_viewport = content.clip_to_viewport;
-    node->has_clip_to_viewport = content.has_clip_to_viewport;
-    node->scrollbar_enabled = content.scrollbar_enabled;
-    node->scrollbar_width = content.scrollbar_width; node->has_scrollbar_width = content.has_scrollbar_width;
-    node->scrollbar_track_color = content.scrollbar_track_color; node->has_scrollbar_track_color = content.has_scrollbar_track_color;
-    node->scrollbar_thumb_color = content.scrollbar_thumb_color; node->has_scrollbar_thumb_color = content.has_scrollbar_thumb_color;
-    node->children = (UiNode*)calloc(1, sizeof(UiNode));
-    node->child_count = 1;
-    content.scroll_static = 0;
-    content.scrollbar_enabled = 0;
-    node->children[0] = content;
-
-    if (!node->scroll_area) {
-        node->scroll_area = original_scroll_area ? platform_strdup(original_scroll_area) : next_scroll_area_name(counter);
-    }
-    node->scroll_static = 1;
-    node->scrollbar_enabled = 1;
-    free(node->children[0].scroll_area);
-    node->children[0].scroll_area = node->scroll_area ? platform_strdup(node->scroll_area) : NULL;
-    free(original_scroll_area);
-}
-
-static void normalize_scrollbars(UiNode* node, int* counter) {
-    if (!node || !counter) return;
-
-    for (size_t i = 0; i < node->child_count; ++i) {
-        normalize_scrollbars(&node->children[i], counter);
-    }
-
-    int legacy_scroll = node->scroll_static || node->scroll_area || node->has_scrollbar_width || node->has_scrollbar_track_color || node->has_scrollbar_thumb_color;
-    if (node->widget_type != W_SCROLLBAR && (legacy_scroll || node->scrollbar_enabled)) {
-        wrap_node_with_scrollbar(node, counter);
-        return;
-    }
-
-    if (node->widget_type == W_SCROLLBAR) {
-        node->scroll_static = 1;
-        node->scrollbar_enabled = 1;
-        if (!node->scroll_area) node->scroll_area = next_scroll_area_name(counter);
-        if (node->child_count > 0) {
-            for (size_t i = 0; i < node->child_count; ++i) {
-                free(node->children[i].scroll_area);
-                node->children[i].scroll_area = node->scroll_area ? platform_strdup(node->scroll_area) : NULL;
-                node->children[i].scroll_static = 0;
-            }
-        } else {
-            fprintf(stderr, "Warning: scrollbar node declared without a child; scrolling will be disabled.\n");
-        }
     }
 }
 
@@ -812,6 +722,25 @@ Style* ui_config_load_styles(const ConfigNode* root) {
     return styles;
 }
 
+static void assign_automatic_scroll_areas(UiNode* node, const char* current_area, int* counter) {
+    if (!node) return;
+
+    if (node->widget_type == W_SCROLLBAR) {
+        if (!node->scroll_area) {
+             char buf[32];
+             snprintf(buf, sizeof(buf), "scrollArea%d", (*counter)++);
+             node->scroll_area = platform_strdup(buf);
+        }
+        current_area = node->scroll_area;
+    } else if (current_area && !node->scroll_area) {
+        node->scroll_area = platform_strdup(current_area);
+    }
+
+    for (size_t i = 0; i < node->child_count; ++i) {
+        assign_automatic_scroll_areas(&node->children[i], current_area, counter);
+    }
+}
+
 UiNode* ui_config_load_layout(const ConfigDocument* doc, const Model* model, const Style* styles, const Scene* scene) {
     if (!doc || !doc->root) return NULL;
 
@@ -863,8 +792,10 @@ UiNode* ui_config_load_layout(const ConfigDocument* doc, const Model* model, con
         return NULL;
     }
     bind_model_values_to_nodes(root_node, model);
+    
     int scroll_counter = 0;
-    normalize_scrollbars(root_node, &scroll_counter);
+    assign_automatic_scroll_areas(root_node, NULL, &scroll_counter);
+
     free_prototypes(prototypes);
     return root_node;
 }
