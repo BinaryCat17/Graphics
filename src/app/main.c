@@ -12,11 +12,13 @@ int main(int argc, char** argv) {
     const char* assets_dir = "assets";
     const char* scene_path = "assets/scenes/gear_reducer.yaml"; // Default
     const char* ui_path = NULL;
+    bool render_log = false;
 
     for (int i = 1; i < argc; ++i) {
         if (strcmp(argv[i], "--assets") == 0 && i + 1 < argc) assets_dir = argv[++i];
-        if (strcmp(argv[i], "--scene") == 0 && i + 1 < argc) scene_path = argv[++i];
-        if (strcmp(argv[i], "--ui") == 0 && i + 1 < argc) ui_path = argv[++i];
+        else if (strcmp(argv[i], "--scene") == 0 && i + 1 < argc) scene_path = argv[++i];
+        else if (strcmp(argv[i], "--ui") == 0 && i + 1 < argc) ui_path = argv[++i];
+        else if (strcmp(argv[i], "--render-log") == 0) render_log = true;
     }
 
     printf("Initializing Graphics Engine...\n");
@@ -31,8 +33,6 @@ int main(int argc, char** argv) {
     Model* model = scene_load(&scene, scene_path, &assets);
     if (!model) {
         fprintf(stderr, "Failed to load scene/model.\n");
-        // Don't return, maybe we can run without scene? 
-        // For now fail.
         return 1;
     }
 
@@ -41,7 +41,7 @@ int main(int argc, char** argv) {
     if (!ui_system_build(&ui, &assets, &scene, model)) return 1;
 
     RenderSystem render = {0};
-    RenderSystemConfig render_config = { .backend_type = "vulkan", .render_log_enabled = true };
+    RenderSystemConfig render_config = { .backend_type = "vulkan", .render_log_enabled = render_log };
     if (!render_system_init(&render, &render_config)) return 1;
 
     // 3. Bindings

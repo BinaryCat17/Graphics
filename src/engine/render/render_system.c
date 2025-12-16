@@ -7,6 +7,7 @@
 #include "foundation/platform/platform.h"
 #include "engine/render/backend/common/renderer_backend.h"
 #include "engine/render/backend/vulkan/vulkan_renderer.h"
+#include "engine/ui/ui_service.h"
 
 // --- Helper: Packet Management ---
 
@@ -206,7 +207,11 @@ void render_system_run(RenderSystem* sys) {
     while (sys->running && !platform_window_should_close(sys->render_context.window)) {
         platform_poll_events(); // Main thread poll
         
-        render_system_update(sys); // Sync UI data
+        if (sys->ui) {
+            ui_system_update(sys->ui, 0.016f); // Update UI logic (scroll, animations)
+        }
+
+        render_system_update(sys); // Sync UI data to render packet
         
         // Draw (Immediate)
         if (sys->renderer_ready && sys->backend) {
