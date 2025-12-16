@@ -1,4 +1,5 @@
 #include "engine/render/render_system.h"
+#include "foundation/logger/logger.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -112,7 +113,7 @@ bool render_system_init(RenderSystem* sys, const RenderSystemConfig* config) {
     const char* backend_id = config ? config->backend_type : "vulkan";
     sys->backend = renderer_backend_get(backend_id);
     if (!sys->backend) {
-        fprintf(stderr, "RenderSystem: Failed to load backend '%s'\n", backend_id);
+        LOG_ERROR("RenderSystem: Failed to load backend '%s'", backend_id);
         return false;
     }
 
@@ -188,12 +189,12 @@ void render_system_run(RenderSystem* sys) {
         if (sys->renderer_ready && sys->backend) {
              const RenderFramePacket* packet = render_system_acquire_packet(sys);
              if (packet) {
-                // We need to update backend to accept new packet format
-                // For now, assume backend->draw() handles everything if we pass data via some other channel
-                // or we need to update backend API.
-                
-                // TODO: Update Backend Interface to accept RenderFramePacket or UiDrawList
-                // sys->backend->submit_frame(sys->backend, packet);
+                if (sys->backend->update_transformer) {
+                    sys->backend->update_transformer(sys->backend, &packet->transformer);
+                }
+                if (sys->backend->update_ui) {
+                    sys->backend->update_ui(sys->backend, &packet->ui_draw_list);
+                }
                 
                 if (sys->backend->draw)
                     sys->backend->draw(sys->backend);
