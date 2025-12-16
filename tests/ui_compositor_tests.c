@@ -1,7 +1,8 @@
-#include <assert.h>
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
+
+#include "test_framework.h"
 
 #include "services/ui/compositor.h"
 #include "services/ui/scroll.h"
@@ -11,7 +12,7 @@
 #include "services/ui/widget_list.h"
 #include "services/ui/compositor.h"
 
-static void test_popup_not_clipped(void) {
+static int test_popup_not_clipped(void) {
     UiNode popup = {.layout = UI_LAYOUT_NONE, .widget_type = W_PANEL, .has_w = 1, .has_h = 1, .has_x = 1, .has_y = 1};
     popup.rect = (Rect){150.0f, 10.0f, 80.0f, 30.0f};
     popup.id = "popup";
@@ -28,15 +29,15 @@ static void test_popup_not_clipped(void) {
     root.child_count = sizeof(children) / sizeof(children[0]);
 
     LayoutNode* layout = build_layout_tree(&root);
-    assert(layout);
+    TEST_ASSERT(layout);
     measure_layout(layout, NULL);
     assign_layout(layout, 0.0f, 0.0f);
 
     WidgetArray widgets = materialize_widgets(layout);
-    assert(widgets.count == 2);
+    TEST_ASSERT_INT_EQ(2, widgets.count);
 
     DisplayList list = ui_compositor_build(layout, widgets.items, widgets.count);
-    assert(list.count == 2);
+    TEST_ASSERT_INT_EQ(2, list.count);
 
     size_t popup_idx = 0;
     for (size_t i = 0; i < list.count; ++i) {
@@ -45,14 +46,15 @@ static void test_popup_not_clipped(void) {
             break;
         }
     }
-    assert(list.items[popup_idx].clip_depth == 0);
+    TEST_ASSERT_INT_EQ(0, list.items[popup_idx].clip_depth);
 
     ui_compositor_free(list);
     free_widgets(widgets);
     free_layout_tree(layout);
+    return 1;
 }
 
-static void test_scrollbar_not_clipped(void) {
+static int test_scrollbar_not_clipped(void) {
     UiNode content = {
         .layout = UI_LAYOUT_NONE,
         .widget_type = W_PANEL,
@@ -82,20 +84,20 @@ static void test_scrollbar_not_clipped(void) {
     root.child_count = 1;
 
     LayoutNode* layout = build_layout_tree(&root);
-    assert(layout);
+    TEST_ASSERT(layout);
     measure_layout(layout, NULL);
     assign_layout(layout, 0.0f, 0.0f);
 
     WidgetArray widgets = materialize_widgets(layout);
-    assert(widgets.count == 2);
+    TEST_ASSERT_INT_EQ(2, widgets.count);
     apply_widget_padding_scale(&widgets, 1.0f);
 
     ScrollContext* scroll = scroll_init(widgets.items, widgets.count);
-    assert(scroll);
+    TEST_ASSERT(scroll);
     scroll_apply_offsets(scroll, widgets.items, widgets.count);
 
     DisplayList list = ui_compositor_build(layout, widgets.items, widgets.count);
-    assert(list.count == 2);
+    TEST_ASSERT_INT_EQ(2, list.count);
 
     const DisplayItem* content_item = NULL;
     const DisplayItem* scrollbar_item = NULL;
@@ -104,19 +106,21 @@ static void test_scrollbar_not_clipped(void) {
         if (list.items[i].widget->id && strcmp(list.items[i].widget->id, "content") == 0) content_item = &list.items[i];
         if (list.items[i].widget->type == W_SCROLLBAR) scrollbar_item = &list.items[i];
     }
-    assert(content_item && scrollbar_item);
-    assert(content_item->clip_depth > 0);
-    assert(scrollbar_item->clip_depth == 0);
+    TEST_ASSERT(content_item && scrollbar_item);
+    TEST_ASSERT(content_item->clip_depth > 0);
+    TEST_ASSERT_INT_EQ(0, scrollbar_item->clip_depth);
 
     ui_compositor_free(list);
     scroll_free(scroll);
     free_widgets(widgets);
     free_layout_tree(layout);
+    return 1;
 }
 
 int main(void) {
-    test_popup_not_clipped();
-    test_scrollbar_not_clipped();
-    return 0;
+    RUN_TEST(test_popup_not_clipped);
+    RUN_TEST(test_scrollbar_not_clipped);
+    
+    printf("Tests Run: %d, Failed: %d\n", g_tests_run, g_tests_failed);
+    return g_tests_failed > 0 ? 1 : 0;
 }
-

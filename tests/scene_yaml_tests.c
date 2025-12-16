@@ -1,8 +1,9 @@
-#include <assert.h>
-#include "core/platform/platform.h"
 #include <stdio.h>
 #include <string.h>
 
+#include "test_framework.h"
+
+#include "core/platform/platform.h"
 #include "services/scene/cad_scene_yaml.h"
 
 static const char *write_temp(const char *name, const char *text)
@@ -14,9 +15,9 @@ static const char *write_temp(const char *name, const char *text)
     return name;
 }
 
-static void test_valid_scene()
+static int test_valid_scene(void)
 {
-    const char *path = write_temp("/tmp/scene_valid.yaml",
+    const char *path = write_temp("scene_valid.yaml",
         "version: 1\n"
         "materials:\n"
         "  - id: steel_45\n"
@@ -52,24 +53,29 @@ static void test_valid_scene()
         "    profile:\n"
         "      type: trapezoid\n"
     );
-    assert(path);
+    TEST_ASSERT(path != NULL);
     Scene scene;
     SceneError err = {0};
     int ok = parse_scene_yaml(path, &scene, &err);
-    assert(ok);
-    assert(scene.material_count == 1);
-    assert(scene.part_count == 1);
-    assert(scene.joint_count == 1);
-    assert(scene.analysis_count == 1);
-    assert(scene.motion_count == 1);
-    assert(scene.parts[0].material == &scene.materials[0]);
-    assert(scene.motion_profiles[0].joint == &scene.joints[0]);
+    if (!ok) {
+        fprintf(stderr, "Scene parse error: %s\n", err.message);
+    }
+    TEST_ASSERT(ok);
+    TEST_ASSERT_INT_EQ(1, scene.material_count);
+    TEST_ASSERT_INT_EQ(1, scene.part_count);
+    TEST_ASSERT_INT_EQ(1, scene.joint_count);
+    TEST_ASSERT_INT_EQ(1, scene.analysis_count);
+    TEST_ASSERT_INT_EQ(1, scene.motion_count);
+    TEST_ASSERT(scene.parts[0].material == &scene.materials[0]);
+    TEST_ASSERT(scene.motion_profiles[0].joint == &scene.joints[0]);
     scene_dispose(&scene);
+    remove("scene_valid.yaml");
+    return 1;
 }
 
-static void test_invalid_reference()
+static int test_invalid_reference(void)
 {
-    const char *path = write_temp("/tmp/scene_invalid.yaml",
+    const char *path = write_temp("scene_invalid.yaml",
         "version: 1\n"
         "materials:\n"
         "  - id: steel_45\n"
@@ -78,17 +84,21 @@ static void test_invalid_reference()
         "  - id: base\n"
         "    material: missing\n"
     );
-    assert(path);
+    TEST_ASSERT(path != NULL);
     Scene scene;
     SceneError err = {0};
     int ok = parse_scene_yaml(path, &scene, &err);
-    assert(!ok);
-    assert(err.message[0] != '\0');
+    TEST_ASSERT(!ok);
+    TEST_ASSERT(err.message[0] != '\0');
+    remove("scene_invalid.yaml");
+    return 1;
 }
 
 int main(void)
 {
-    test_valid_scene();
-    test_invalid_reference();
-    return 0;
+    RUN_TEST(test_valid_scene);
+    RUN_TEST(test_invalid_reference);
+    
+    printf("Tests Run: %d, Failed: %d\n", g_tests_run, g_tests_failed);
+    return g_tests_failed > 0 ? 1 : 0;
 }

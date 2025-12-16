@@ -1,7 +1,8 @@
-#include <assert.h>
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
+
+#include "test_framework.h"
 
 #include "core/platform/platform.h"
 #include "services/ui/scene_ui.h"
@@ -60,50 +61,50 @@ static Scene make_sample_scene(void)
     return scene;
 }
 
-static void test_tree_population(void)
+static int test_tree_population(void)
 {
-    const char* styles = "{\"styles\":{\"panelPrimary\":{\"padding\":4},\"panelSecondary\":{\"padding\":4},"
-                          "\"divider\":{\"padding\":1},\"treeItem\":{\"padding\":4},\"treeHeader\":{\"padding\":4}}}";
+    const char* styles = "{\"styles\":{\"panelPrimary\":{\"padding\":4},\"panelSecondary\":{\"padding\":4},\"divider\":{\"padding\":1},\"treeItem\":{\"padding\":4},\"treeHeader\":{\"padding\":4}}}";
     const char* layout = "{\"layout\":{\"type\":\"column\",\"children\":[{\"type\":\"column\",\"id\":\"sceneHierarchy\"}]}}";
 
     Scene scene = make_sample_scene();
     ConfigNode* styles_root = NULL;
     ConfigNode* config_layout_root = NULL;
     ConfigError err = {0};
-    assert(parse_config_text(styles, CONFIG_FORMAT_JSON, &styles_root, &err));
+    TEST_ASSERT(parse_config_text(styles, CONFIG_FORMAT_JSON, &styles_root, &err));
     err = (ConfigError){0};
-    assert(parse_config_text(layout, CONFIG_FORMAT_JSON, &config_layout_root, &err));
+    TEST_ASSERT(parse_config_text(layout, CONFIG_FORMAT_JSON, &config_layout_root, &err));
     Style* parsed_styles = ui_config_load_styles(styles_root);
     ConfigDocument layout_doc = {.format = CONFIG_FORMAT_JSON, .root = config_layout_root,
                                  .source_path = "assets/ui/config/layout/ui.yaml"};
     UiNode* root = ui_config_load_layout(&layout_doc, NULL, parsed_styles, &scene);
     config_node_free(styles_root);
     config_node_free(config_layout_root);
-    assert(root);
+    TEST_ASSERT(root);
 
     UiNode* tree = find_by_id(root, "sceneHierarchy");
-    assert(tree);
+    TEST_ASSERT(tree);
     /* header (3) + materials (2) + parts (2) + joints (2) + assemblies (1) + analysis (1) + motion (1) */
-    assert(tree->child_count == 12);
+    TEST_ASSERT_INT_EQ(12, tree->child_count);
 
     UiNode* first_row = &tree->children[0];
-    assert(first_row->child_count >= 2);
-    assert(strcmp(first_row->children[1].text, "Сцена: Demo") == 0);
+    TEST_ASSERT(first_row->child_count >= 2);
+    TEST_ASSERT_STR_EQ("Сцена: Demo", first_row->children[1].text);
 
     LayoutNode* layout_root = build_layout_tree(root);
     measure_layout(layout_root, NULL);
     assign_layout(layout_root, 0.0f, 0.0f);
     WidgetArray widgets = materialize_widgets(layout_root);
-    assert(widgets.count >= tree->child_count);
+    TEST_ASSERT(widgets.count >= tree->child_count);
 
     free_widgets(widgets);
     free_layout_tree(layout_root);
     free_ui_tree(root);
     free_styles(parsed_styles);
     scene_dispose(&scene);
+    return 1;
 }
 
-static void test_yaml_layout_parsing(void)
+static int test_yaml_layout_parsing(void)
 {
     const char* styles_yaml =
         "styles:\n"
@@ -122,16 +123,16 @@ static void test_yaml_layout_parsing(void)
     ConfigNode* styles_root = NULL;
     ConfigNode* layout_root = NULL;
     ConfigError err = {0};
-    assert(parse_config_text(styles_yaml, CONFIG_FORMAT_YAML, &styles_root, &err));
+    TEST_ASSERT(parse_config_text(styles_yaml, CONFIG_FORMAT_YAML, &styles_root, &err));
     err = (ConfigError){0};
-    assert(parse_config_text(layout_yaml, CONFIG_FORMAT_YAML, &layout_root, &err));
+    TEST_ASSERT(parse_config_text(layout_yaml, CONFIG_FORMAT_YAML, &layout_root, &err));
 
     Style* parsed_styles = ui_config_load_styles(styles_root);
-    assert(parsed_styles);
+    TEST_ASSERT(parsed_styles);
     ConfigDocument layout_doc = {.format = CONFIG_FORMAT_YAML, .root = layout_root,
                                  .source_path = "assets/ui/config/layout/ui.yaml"};
     UiNode* root = ui_config_load_layout(&layout_doc, NULL, parsed_styles, NULL);
-    assert(root);
+    TEST_ASSERT(root);
     
     // Unwrap the root absolute container
     UiNode* layout_node = root;
@@ -140,25 +141,27 @@ static void test_yaml_layout_parsing(void)
     }
     
     // Verify column
-    assert(layout_node->type && strcmp(layout_node->type, "column") == 0);
-    assert(layout_node->child_count == 1);
+    TEST_ASSERT(layout_node->type && strcmp(layout_node->type, "column") == 0);
+    TEST_ASSERT_INT_EQ(1, layout_node->child_count);
 
     // Verify label
     UiNode* child = &layout_node->children[0];
-    assert(child->type && strcmp(child->type, "label") == 0);
-    assert(child->text && strcmp(child->text, "Example") == 0);
-    assert(child->style_name && strcmp(child->style_name, "base") == 0);
+    TEST_ASSERT(child->type && strcmp(child->type, "label") == 0);
+    TEST_ASSERT(child->text && strcmp(child->text, "Example") == 0);
+    TEST_ASSERT(child->style_name && strcmp(child->style_name, "base") == 0);
 
     free_ui_tree(root);
     free_styles(parsed_styles);
     config_node_free(styles_root);
     config_node_free(layout_root);
+    return 1;
 }
 
 int main(void)
 {
-    test_tree_population();
-    test_yaml_layout_parsing();
-    printf("scene_ui_tests passed\n");
-    return 0;
+    RUN_TEST(test_tree_population);
+    RUN_TEST(test_yaml_layout_parsing);
+    
+    printf("Tests Run: %d, Failed: %d\n", g_tests_run, g_tests_failed);
+    return g_tests_failed > 0 ? 1 : 0;
 }

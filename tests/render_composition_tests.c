@@ -1,5 +1,6 @@
-#include <assert.h>
 #include <stdio.h>
+
+#include "test_framework.h"
 
 #include "core/math/coordinate_systems.h"
 #include "services/render/backend/common/render_composition.h"
@@ -18,7 +19,7 @@ static Renderer create_renderer(void)
     return renderer;
 }
 
-int main(void)
+static int test_render_sort_order(void)
 {
     Renderer renderer = create_renderer();
 
@@ -32,8 +33,8 @@ int main(void)
     };
 
     RenderBuildResult result = renderer_build_commands(&renderer, views, 2, glyphs, 1);
-    assert(result == RENDER_BUILD_OK);
-    assert(renderer.command_list.count == 3);
+    TEST_ASSERT(result == RENDER_BUILD_OK);
+    TEST_ASSERT_INT_EQ(3, renderer.command_list.count);
 
     size_t background_count = 0;
     size_t glyph_count = 0;
@@ -46,7 +47,11 @@ int main(void)
             (curr->layer == prev->layer && curr->widget_order >= prev->widget_order &&
              (curr->widget_order != prev->widget_order || curr->phase >= prev->phase) &&
              (curr->widget_order != prev->widget_order || curr->phase != prev->phase || curr->ordinal >= prev->ordinal));
-        assert(non_decreasing);
+        
+        if (!non_decreasing) {
+            fprintf(stderr, "Sorting error at index %zu vs %zu\n", i, i-1);
+            return 0;
+        }
     }
 
     for (size_t i = 0; i < renderer.command_list.count; ++i) {
@@ -57,11 +62,17 @@ int main(void)
         }
     }
 
-    assert(background_count == 2);
-    assert(glyph_count == 1);
+    TEST_ASSERT_INT_EQ(2, background_count);
+    TEST_ASSERT_INT_EQ(1, glyph_count);
 
     renderer_dispose(&renderer);
-    printf("render_composition_tests passed\n");
-    return 0;
+    return 1;
 }
 
+int main(void)
+{
+    RUN_TEST(test_render_sort_order);
+    
+    printf("Tests Run: %d, Failed: %d\n", g_tests_run, g_tests_failed);
+    return g_tests_failed > 0 ? 1 : 0;
+}

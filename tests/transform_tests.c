@@ -1,15 +1,12 @@
-#include <assert.h>
 #include <math.h>
 #include <stdio.h>
+
+#include "test_framework.h"
 
 #include "core/math/coordinate_systems.h"
 #include "core/math/layout_geometry.h"
 
-static int nearly_equal(float a, float b) {
-    return fabsf(a - b) < 0.0001f;
-}
-
-static void test_coordinate_round_trip(void) {
+static int test_coordinate_round_trip(void) {
     CoordinateSystem2D system;
     coordinate_system2d_init(&system, 2.0f, 1.5f, (Vec2){300.0f, 200.0f});
 
@@ -17,14 +14,14 @@ static void test_coordinate_round_trip(void) {
     Vec2 logical = coordinate_world_to_logical(&system, world);
     Vec2 screen = coordinate_world_to_screen(&system, world);
 
-    assert(nearly_equal(logical.x, 15.0f));
-    assert(nearly_equal(logical.y, 30.0f));
-    assert(nearly_equal(screen.x, 30.0f));
-    assert(nearly_equal(screen.y, 60.0f));
+    TEST_ASSERT_FLOAT_EQ(15.0f, logical.x, 0.0001f);
+    TEST_ASSERT_FLOAT_EQ(30.0f, logical.y, 0.0001f);
+    TEST_ASSERT_FLOAT_EQ(30.0f, screen.x, 0.0001f);
+    TEST_ASSERT_FLOAT_EQ(60.0f, screen.y, 0.0001f);
 
     Vec2 roundtrip_world = coordinate_screen_to_world(&system, screen);
-    assert(nearly_equal(roundtrip_world.x, world.x));
-    assert(nearly_equal(roundtrip_world.y, world.y));
+    TEST_ASSERT_FLOAT_EQ(world.x, roundtrip_world.x, 0.0001f);
+    TEST_ASSERT_FLOAT_EQ(world.y, roundtrip_world.y, 0.0001f);
 
     Mat4 projection = mat4_identity();
     RenderContext ctx;
@@ -32,16 +29,17 @@ static void test_coordinate_round_trip(void) {
 
     LayoutBox logical_box = {{5.0f, 5.0f}, {10.0f, 10.0f}};
     LayoutResult layout = layout_resolve(&logical_box, &ctx);
-    assert(nearly_equal(layout.device.size.x, 20.0f));
-    assert(nearly_equal(layout.device.size.y, 20.0f));
+    TEST_ASSERT_FLOAT_EQ(20.0f, layout.device.size.x, 0.0001f);
+    TEST_ASSERT_FLOAT_EQ(20.0f, layout.device.size.y, 0.0001f);
 
     Vec2 inside = {7.0f, 7.0f};
     Vec2 outside = {40.0f, 3.0f};
-    assert(layout_hit_test(&layout, inside));
-    assert(!layout_hit_test(&layout, outside));
+    TEST_ASSERT(layout_hit_test(&layout, inside));
+    TEST_ASSERT(!layout_hit_test(&layout, outside));
+    return 1;
 }
 
-static void test_local_to_world(void) {
+static int test_local_to_world(void) {
     Transform2D local = {
         .translation = {2.0f, -1.0f},
         .rotation_radians = 0.25f,
@@ -50,11 +48,12 @@ static void test_local_to_world(void) {
     Vec2 local_point = {1.0f, 1.0f};
     Vec2 world = coordinate_local_to_world_2d(&local, local_point);
     Vec2 back = coordinate_world_to_local_2d(&local, world);
-    assert(nearly_equal(back.x, local_point.x));
-    assert(nearly_equal(back.y, local_point.y));
+    TEST_ASSERT_FLOAT_EQ(local_point.x, back.x, 0.0001f);
+    TEST_ASSERT_FLOAT_EQ(local_point.y, back.y, 0.0001f);
+    return 1;
 }
 
-static void test_3d_projection(void) {
+static int test_3d_projection(void) {
     Transform3D local = {
         .translation = {1.0f, 2.0f, -3.0f},
         .scale = {1.0f, 2.0f, 1.0f},
@@ -63,9 +62,9 @@ static void test_3d_projection(void) {
     Vec3 local_point = {0.5f, -0.25f, 1.0f};
     Vec3 world = coordinate_local_to_world_3d(&local, local_point);
     Vec3 back = coordinate_world_to_local_3d(&local, world);
-    assert(nearly_equal(back.x, local_point.x));
-    assert(nearly_equal(back.y, local_point.y));
-    assert(nearly_equal(back.z, local_point.z));
+    TEST_ASSERT_FLOAT_EQ(local_point.x, back.x, 0.0001f);
+    TEST_ASSERT_FLOAT_EQ(local_point.y, back.y, 0.0001f);
+    TEST_ASSERT_FLOAT_EQ(local_point.z, back.z, 0.0001f);
 
     Mat4 view = mat4_identity();
     Mat4 projection = mat4_orthographic(-2.0f, 2.0f, -2.0f, 2.0f, 0.1f, 10.0f);
@@ -73,16 +72,17 @@ static void test_3d_projection(void) {
     projection3d_init(&clipper, &view, &projection);
     Vec3 clip = coordinate_world_to_clip(&clipper, world);
     Vec3 restored = coordinate_clip_to_world(&clipper, clip);
-    assert(nearly_equal(restored.x, world.x));
-    assert(nearly_equal(restored.y, world.y));
-    assert(nearly_equal(restored.z, world.z));
+    TEST_ASSERT_FLOAT_EQ(world.x, restored.x, 0.0001f);
+    TEST_ASSERT_FLOAT_EQ(world.y, restored.y, 0.0001f);
+    TEST_ASSERT_FLOAT_EQ(world.z, restored.z, 0.0001f);
+    return 1;
 }
 
 int main(void) {
-    test_coordinate_round_trip();
-    test_local_to_world();
-    test_3d_projection();
-    printf("transform_tests passed\n");
-    return 0;
+    RUN_TEST(test_coordinate_round_trip);
+    RUN_TEST(test_local_to_world);
+    RUN_TEST(test_3d_projection);
+    
+    printf("Tests Run: %d, Failed: %d\n", g_tests_run, g_tests_failed);
+    return g_tests_failed > 0 ? 1 : 0;
 }
-
