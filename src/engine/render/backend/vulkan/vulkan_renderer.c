@@ -79,7 +79,7 @@ static bool recover_device_loss(VulkanRendererState* state) {
     vk_create_descriptor_pool_and_set(state);
     for (size_t i = 0; i < 2; ++i) {
         state->frame_resources[i].stage = FRAME_AVAILABLE;
-        if (vk_build_vertices_from_widgets(state, &state->frame_resources[i])) {
+        if (vk_build_vertices_from_draw_list(state, &state->frame_resources[i], &state->ui_draw_list)) {
             vk_upload_vertices(state, &state->frame_resources[i]);
         }
     }
@@ -143,7 +143,7 @@ static void draw_frame(VulkanRendererState* state) {
     }
     frame->stage = FRAME_FILLING;
 
-    bool built = vk_build_vertices_from_widgets(state, frame);
+    bool built = vk_build_vertices_from_draw_list(state, frame, &state->ui_draw_list);
     if (!built) {
         frame->vertex_count = 0;
     }
@@ -276,8 +276,6 @@ static bool vk_backend_init(RendererBackend* backend, const RenderBackendInit* i
     state->destroy_surface = (void (*)(VkInstance, const VkAllocationCallbacks*, PlatformSurface*))init->destroy_surface;
     state->get_framebuffer_size = init->get_framebuffer_size;
     state->wait_events = init->wait_events;
-    state->widgets = init->widgets;
-    state->display_list = init->display_list;
     state->vert_spv = init->vert_spv;
     state->frag_spv = init->frag_spv;
     state->font_path = init->font_path;
@@ -318,10 +316,10 @@ static bool vk_backend_init(RendererBackend* backend, const RenderBackendInit* i
     vk_build_font_atlas(state);
     vk_create_font_texture(state);
     vk_create_descriptor_pool_and_set(state);
+    // Initial dummy frame
     for (size_t i = 0; i < 2; ++i) {
         state->frame_resources[i].stage = FRAME_AVAILABLE;
-        vk_build_vertices_from_widgets(state, &state->frame_resources[i]);
-        vk_upload_vertices(state, &state->frame_resources[i]);
+        state->frame_resources[i].vertex_count = 0;
     }
     return true;
 }
@@ -333,11 +331,10 @@ static void vk_backend_update_transformer(RendererBackend* backend, const Coordi
     state->transformer.viewport_size = (Vec2){(float)state->swapchain_extent.width, (float)state->swapchain_extent.height};
 }
 
-static void vk_backend_update_ui(RendererBackend* backend, WidgetArray widgets, DisplayList display_list) {
-    if (!backend || !backend->state) return;
+static void vk_backend_update_ui(RendererBackend* backend, const UiDrawList* draw_list) {
+    if (!backend || !backend->state || !draw_list) return;
     VulkanRendererState* state = (VulkanRendererState*)backend->state;
-    state->widgets = widgets;
-    state->display_list = display_list;
+    state->ui_draw_list = *draw_list;
 }
 
 static void vk_backend_draw(RendererBackend* backend) {

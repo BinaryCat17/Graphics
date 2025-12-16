@@ -10,7 +10,7 @@
 #include "engine/render/backend/common/render_composition.h"
 #include "engine/render/backend/common/ui_mesh_builder.h"
 #include "engine/render/backend/vulkan/vulkan_renderer.h"
-#include "engine/ui/compositor.h"
+#include "engine/ui/ui_renderer.h"
 #include "stb_truetype.h"
 
 typedef struct { float viewport[2]; } ViewConstants;
@@ -55,8 +55,7 @@ typedef struct {
 typedef struct VulkanRendererState {
     PlatformWindow* window;
     PlatformSurface* platform_surface;
-    WidgetArray widgets;
-    DisplayList display_list;
+    UiDrawList ui_draw_list;
     VkInstance instance;
     VkPhysicalDevice physical_device;
     VkDevice device;

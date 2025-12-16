@@ -6,7 +6,7 @@
 #include <stdio.h>
 
 #include "foundation/platform/platform.h"
-#include "engine/ui/compositor.h"
+#include "engine/ui/ui_renderer.h"
 
 typedef struct CoordinateSystem2D CoordinateTransformer;
 
@@ -59,8 +59,6 @@ typedef struct RenderBackendInit {
     const char* vert_spv;
     const char* frag_spv;
     const char* font_path;
-    WidgetArray widgets;
-    DisplayList display_list;
     const CoordinateTransformer* transformer;
     const RenderLoggerConfig* logger_config;
 } RenderBackendInit;
@@ -71,7 +69,7 @@ typedef struct RendererBackend {
     void* state;
     bool (*init)(struct RendererBackend* backend, const RenderBackendInit* init);
     void (*update_transformer)(struct RendererBackend* backend, const CoordinateTransformer* transformer);
-    void (*update_ui)(struct RendererBackend* backend, WidgetArray widgets, DisplayList display_list);
+    void (*update_ui)(struct RendererBackend* backend, const UiDrawList* draw_list);
     void (*draw)(struct RendererBackend* backend);
     void (*cleanup)(struct RendererBackend* backend);
 } RendererBackend;

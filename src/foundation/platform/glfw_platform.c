@@ -1,4 +1,5 @@
 #include "foundation/platform/glfw_platform.h"
+#include <stdio.h>
 
 #define GLFW_INCLUDE_VULKAN
 #include <GLFW/glfw3.h>
@@ -17,6 +18,10 @@ struct PlatformWindow {
     PlatformWindowCallbacks callbacks;
     void* user_pointer;
 };
+
+static void glfw_error_callback(int error, const char* description) {
+    fprintf(stderr, "GLFW Error %d: %s\n", error, description);
+}
 
 static void on_glfw_framebuffer_size(GLFWwindow* window, int width, int height) {
     PlatformWindow* platform_window = (PlatformWindow*)glfwGetWindowUserPointer(window);
@@ -44,6 +49,7 @@ static void on_glfw_cursor_pos(GLFWwindow* window, double x, double y) {
 }
 
 bool platform_layer_init(void) {
+    glfwSetErrorCallback(glfw_error_callback); // Set the error callback
     if (!glfwInit()) return false;
     glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
     return true;
@@ -59,6 +65,7 @@ PlatformWindow* platform_create_window(int width, int height, const char* title)
 
     window->handle = glfwCreateWindow(width, height, title, NULL, NULL);
     if (!window->handle) {
+        fprintf(stderr, "Failed to create GLFW window.\n"); // Added logging
         free(window);
         return NULL;
     }
@@ -112,7 +119,7 @@ void platform_get_cursor_pos(PlatformWindow* window, double* x, double* y) {
     glfwGetCursorPos(window->handle, x, y);
 }
 
-void platform_set_framebuffer_size_callback(PlatformWindow* window, PlatformFramebufferSizeCallback callback,
+void platform_set_framebuffer_size_callback(PlatformWindow* window, PlatformFramebufferSizeCallback callback, 
                                             void* user_data) {
     if (!window) return;
     window->callbacks.framebuffer_size = callback;
@@ -182,4 +189,3 @@ void platform_destroy_vulkan_surface(void* instance, const void* allocation_call
     vkDestroySurfaceKHR(vk_instance, (VkSurfaceKHR)surface->handle, vk_alloc);
     surface->handle = NULL;
 }
-

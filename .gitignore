@@ -7,3 +7,4 @@ worktmp/
 generated/
 __pycache__/
 CMakeFiles
+CMakeCache.txt

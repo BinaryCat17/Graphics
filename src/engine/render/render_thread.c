@@ -1,149 +1,101 @@
-#include "engine/render/render_thread.h"
+#include "render_thread.h"
 
-#include <math.h>
-#include <stdbool.h>
 #include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
 
-#include "foundation/platform/platform.h"
 #include "engine/render/render_system.h"
-#include "engine/ui/ui_service.h"
+#include "foundation/platform/platform.h"
 
-static bool get_logical_cursor(PlatformWindow* window, double* x, double* y, Vec2* logical_out) {
-    RenderSystem* sys = NULL;
-    double mx = 0.0, my = 0.0;
-    Vec2 screen = {0};
-    if (!window || !logical_out) return false;
+// --- Callbacks ---
 
-    sys = (RenderSystem*)platform_get_window_user_pointer(window);
-    if (!sys) return false;
-
-    if (x && y) {
-        mx = *x;
-        my = *y;
-    } else {
-        platform_get_cursor_pos(window, &mx, &my);
-    }
-
-    screen = (Vec2){(float)(mx * sys->render_context.transformer.dpi_scale),
-                    (float)(my * sys->render_context.transformer.dpi_scale)};
-    *logical_out = coordinate_screen_to_logical(&sys->render_context.transformer, screen);
-
-    return true;
-}
-
-static void on_mouse_button(PlatformWindow* window, PlatformMouseButton button, PlatformInputAction action, int mods,
-                            void* user_data) {
+static void on_mouse_button(PlatformWindow* window, PlatformMouseButton button, PlatformInputAction action, int mods, void* user_data) {
     RenderSystem* sys = (RenderSystem*)user_data;
-    Vec2 logical = {0};
-    (void)mods;
-    if (!get_logical_cursor(window, NULL, NULL, &logical)) return;
-
-    if (sys->ui) {
-        ui_system_handle_mouse(sys->ui, logical.x, logical.y, (int)button, (int)action);
-    }
+    if (!sys) return;
+    
+    double x, y;
+    platform_get_cursor_pos(window, &x, &y);
+    
+    // In RenderContext, 'coordinates' is CoordinateSystem2D directly
+    Vec2 logical = coordinate_screen_to_logical(&sys->render_context.transformer, (Vec2){(float)x, (float)y});
+    
+    // TODO: Forward input to New UI System
 }
 
 static void on_scroll(PlatformWindow* window, double xoff, double yoff, void* user_data) {
     RenderSystem* sys = (RenderSystem*)user_data;
-    Vec2 logical = {0};
-    (void)xoff;
-    if (!get_logical_cursor(window, NULL, NULL, &logical)) return;
+    if (!sys) return;
 
-    if (sys->ui) {
-        ui_system_handle_scroll(sys->ui, logical.x, logical.y, yoff);
-    }
+    double x, y;
+    platform_get_cursor_pos(window, &x, &y);
+    Vec2 logical = coordinate_screen_to_logical(&sys->render_context.transformer, (Vec2){(float)x, (float)y});
+
+    // TODO: Forward scroll to New UI System
 }
 
 static void on_cursor_pos(PlatformWindow* window, double x, double y, void* user_data) {
     RenderSystem* sys = (RenderSystem*)user_data;
-    Vec2 logical = {0};
-    if (!get_logical_cursor(window, &x, &y, &logical)) return;
+    if (!sys) return;
 
-    if (sys->ui) {
-        ui_system_handle_cursor(sys->ui, logical.x, logical.y);
-    }
+    Vec2 logical = coordinate_screen_to_logical(&sys->render_context.transformer, (Vec2){(float)x, (float)y});
+
+    // TODO: Forward cursor to New UI System
 }
 
 static void on_framebuffer_size(PlatformWindow* window, int width, int height, void* user_data) {
     RenderSystem* sys = (RenderSystem*)user_data;
-    PlatformWindowSize logical_size = {0};
-    (void)width;
-    (void)height;
-
-    if (!sys || !sys->ui) return;
-
-    logical_size = platform_get_window_size(window);
-    if (logical_size.width <= 0 || logical_size.height <= 0) return;
-
-    float new_scale = ui_compute_scale(sys->ui, (float)logical_size.width, (float)logical_size.height);
-    ui_system_refresh_layout(sys->ui, new_scale);
-    
-    // Update transformer
-    RenderRuntimeContext* render = &sys->render_context;
-    PlatformWindowSize framebuffer_size = platform_get_framebuffer_size(render->window);
-    
-    float dpi_scale = 1.0f; // Simplified DPI
-    
-    float ui_scale = sys->ui->ui_scale;
-    coordinate_system2d_init(&render->transformer, dpi_scale, ui_scale,
-                             (Vec2){(float)framebuffer_size.width, (float)framebuffer_size.height});
-                             
-    render_system_update_transformer(sys);
+    if (!sys) return;
+    render_thread_update_window_state(sys);
 }
+
+// --- Internal ---
+
+void render_thread_update_window_state(RenderSystem* sys) {
+    if (!sys || !sys->render_context.window) return;
+
+    PlatformWindowSize size = platform_get_framebuffer_size(sys->render_context.window);
+    int w = size.width;
+    int h = size.height;
+    if (w == 0 || h == 0) return;
+
+    PlatformWindowSize logical_size = platform_get_window_size(sys->render_context.window);
+    float dpi_scale = (float)w / (float)logical_size.width;
+    
+    float ui_scale = 1.0f; // Default
+
+    coordinate_system2d_init(&sys->render_context.transformer, dpi_scale, ui_scale, (Vec2){(float)w, (float)h});
+}
+
+// --- Init/Shutdown ---
 
 bool runtime_init(RenderSystem* sys) {
     if (!sys) return false;
-    RenderRuntimeContext* context = &sys->render_context;
 
-    if (!platform_layer_init()) {
-        fprintf(stderr, "Fatal: platform init\n");
-        return false;
-    }
-    if (!platform_vulkan_supported()) {
-        fprintf(stderr, "Fatal: Vulkan not supported\n");
-        return false;
-    }
+    // Window Creation
+    float target_w = 1024.0f;
+    float target_h = 768.0f;
 
-    int window_w = 1024;
-    int window_h = 768;
-    
-    // Hint from UI?
-    if (sys->ui) {
-        float target_w = sys->ui->base_w;
-        float target_h = sys->ui->base_h;
-        // ... logic ...
-        window_w = (int)target_w;
-        window_h = (int)target_h;
-    }
-
-    context->window = platform_create_window(window_w, window_h, "vk_gui (Vulkan)");
-    if (!context->window) {
-        fprintf(stderr, "Fatal: platform create window\n");
+    sys->render_context.window = platform_create_window((int)target_w, (int)target_h, "Graphics Engine");
+    if (!sys->render_context.window) {
+        fprintf(stderr, "Failed to create window.\n");
         return false;
     }
 
-    platform_set_window_user_pointer(context->window, sys);
-    platform_set_framebuffer_size_callback(context->window, on_framebuffer_size, sys);
-    platform_set_scroll_callback(context->window, on_scroll, sys);
-    platform_set_mouse_button_callback(context->window, on_mouse_button, sys);
-    platform_set_cursor_pos_callback(context->window, on_cursor_pos, sys);
+    platform_set_window_user_pointer(sys->render_context.window, sys);
+    platform_set_framebuffer_size_callback(sys->render_context.window, on_framebuffer_size, sys);
+    platform_set_mouse_button_callback(sys->render_context.window, on_mouse_button, sys);
+    platform_set_scroll_callback(sys->render_context.window, on_scroll, sys);
+    platform_set_cursor_pos_callback(sys->render_context.window, on_cursor_pos, sys);
 
-    // Initial Transformer
-    if (sys->ui) {
-        PlatformWindowSize logical_size = platform_get_window_size(context->window);
-        float ui_scale = ui_compute_scale(sys->ui, (float)logical_size.width, (float)logical_size.height);
-        ui_system_prepare_runtime(sys->ui, ui_scale); 
-        // Main.c calls prepare_runtime separately.
-    }
+    render_thread_update_window_state(sys);
 
     return true;
 }
 
-void runtime_shutdown(RenderRuntimeContext* context) {
-    if (!context) return;
-    if (context->window) {
-        platform_destroy_window(context->window);
-        context->window = NULL;
+void runtime_shutdown(RenderRuntimeContext* ctx) {
+    if (!ctx) return;
+    if (ctx->window) {
+        platform_destroy_window(ctx->window);
+        ctx->window = NULL;
     }
-    platform_layer_shutdown();
 }

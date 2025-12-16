@@ -18,4 +18,7 @@ typedef struct RenderSystem RenderSystem;
 bool runtime_init(RenderSystem* sys);
 void runtime_shutdown(RenderRuntimeContext* context);
 
+// Force update of window state (resize, dpi, transformer)
+void render_thread_update_window_state(RenderSystem* sys);
+
 #endif // RENDER_THREAD_H

@@ -7,43 +7,38 @@
 #include "foundation/platform/platform.h"
 #include "engine/render/backend/common/renderer_backend.h"
 #include "engine/render/backend/vulkan/vulkan_renderer.h"
-#include "engine/ui/ui_service.h"
 
 // --- Helper: Packet Management ---
 
 static void render_packet_free_resources(RenderFramePacket* packet) {
     if (!packet) return;
-    if (packet->display_list.items) {
-        free(packet->display_list.items);
-        packet->display_list.items = NULL;
-    }
-    packet->display_list.count = 0;
+    ui_draw_list_clear(&packet->ui_draw_list);
 }
 
 static void try_sync_packet(RenderSystem* sys) {
-    if (!sys) return;
+    if (!sys || !sys->ui_root_view) return;
+    
+    // 1. Generate Draw Commands from UI View
+    // We do this on Main Thread (Logic Thread) directly into a temporary list,
+    // then swap it into the packet buffer.
+    
+    UiDrawList temp_list = {0};
+    PlatformWindowSize size = platform_get_framebuffer_size(sys->render_context.window);
+    int w = size.width;
+    int h = size.height;
+    
+    // Update Layout & Generate Commands
+    ui_render_view(sys->ui_root_view, &temp_list, (float)w, (float)h);
     
     mtx_lock(&sys->packet_mutex);
     
     RenderFramePacket* dest = &sys->packets[sys->back_packet_index];
     
-    // Copy UI Data
-    dest->widgets = sys->widgets; // Shallow copy of container, data owned by UI system?
-    // Wait, UI System owns widgets array memory. Is it thread safe?
-    // UI updates widgets on Main Thread. Render reads on Render Thread.
-    // We need a deep copy or double buffering of widgets array.
-    // For now: assume Main Thread is blocked while we sync? No.
-    // The previous implementation did shallow copy of structure.
-    
-    // Deep copy Display List
+    // Clear old data
     render_packet_free_resources(dest);
-    if (sys->display_list.items && sys->display_list.count > 0) {
-        dest->display_list.items = (DisplayItem*)malloc(sys->display_list.count * sizeof(DisplayItem));
-        if (dest->display_list.items) {
-            memcpy(dest->display_list.items, sys->display_list.items, sys->display_list.count * sizeof(DisplayItem));
-            dest->display_list.count = sys->display_list.count;
-        }
-    }
+    
+    // Move ownership of the draw list to the packet
+    dest->ui_draw_list = temp_list;
 
     // Copy Transformer
     dest->transformer = sys->render_context.transformer;
@@ -76,13 +71,14 @@ static void try_bootstrap_renderer(RenderSystem* sys) {
     // Dependencies Check
     if (!sys->render_context.window) return;
     if (!sys->assets || !sys->assets->vert_spv_path) return;
-    if (!sys->ui) return; // Need widgets/display list initial state
+    // We don't strictly need UI bound to start renderer, but it helps.
     if (!sys->backend) return;
 
-    // Use current UI state for init
-    sys->widgets = sys->ui->widgets;
-    sys->display_list = sys->ui->display_list;
-
+    // Create init config
+    // Note: Old backend might expect WidgetArray. We need to update backend interface too!
+    // For now, we are breaking the backend interface. I will need to update vulkan backend next.
+    // I will pass NULL/Empty for now to avoid compilation errors on old structs if they persist.
+    
     RenderBackendInit init = {
         .window = sys->render_context.window,
         .surface = &sys->render_context.surface,
@@ -95,17 +91,13 @@ static void try_bootstrap_renderer(RenderSystem* sys) {
         .vert_spv = sys->assets->vert_spv_path,
         .frag_spv = sys->assets->frag_spv_path,
         .font_path = sys->assets->font_path,
-        .widgets = sys->widgets,
-        .display_list = sys->display_list,
+        // .widgets = ... (Removed)
+        // .display_list = ... (Removed)
         .transformer = &sys->render_context.transformer,
         .logger_config = &sys->logger_config,
     };
 
     sys->renderer_ready = sys->backend->init(sys->backend, &init);
-    
-    if (sys->renderer_ready) {
-        try_sync_packet(sys);
-    }
 }
 
 bool render_system_init(RenderSystem* sys, const RenderSystemConfig* config) {
@@ -128,11 +120,9 @@ bool render_system_init(RenderSystem* sys, const RenderSystemConfig* config) {
         sys->logger_config.level = config->log_level;
         sys->logger_config.sink_type = RENDER_LOG_SINK_STDOUT;
     } else {
-        sys->logger_config.level = RENDER_LOG_INFO; // Default
+        sys->logger_config.level = RENDER_LOG_INFO;
     }
 
-    // Init runtime thread context (window creation usually happens here or in runtime_init)
-    // Note: runtime_init actually creates the window.
     if (!runtime_init(sys)) {
         return false;
     }
@@ -159,70 +149,52 @@ void render_system_bind_assets(RenderSystem* sys, Assets* assets) {
     try_bootstrap_renderer(sys);
 }
 
-void render_system_bind_ui(RenderSystem* sys, UiContext* ui) {
-    sys->ui = ui;
+void render_system_bind_ui(RenderSystem* sys, UiView* root_view) {
+    sys->ui_root_view = root_view;
     try_bootstrap_renderer(sys);
 }
 
-void render_system_bind_model(RenderSystem* sys, Model* model) {
-    sys->model = model;
+void render_system_bind_math_graph(RenderSystem* sys, MathGraph* graph) {
+    sys->math_graph = graph;
 }
 
 void render_system_update(RenderSystem* sys) {
     if (!sys || !sys->renderer_ready) return;
-    
-    // Pull data from UI
-    if (sys->ui) {
-        sys->widgets = sys->ui->widgets;
-        sys->display_list = sys->ui->display_list;
-    }
-    
     try_sync_packet(sys);
 }
-
-void render_system_update_transformer(RenderSystem* sys) {
-    if (!sys) return;
-    try_sync_packet(sys);
-}
-
-// Thread Loop (Unused for now, running on main thread)
-/*
-static int render_thread_func(void* arg) {
-    RenderSystem* sys = (RenderSystem*)arg;
-    
-    while (sys->running && !platform_window_should_close(sys->render_context.window)) {
-        // ...
-    }
-    return 0;
-}
-*/
 
 void render_system_run(RenderSystem* sys) {
     if (!sys) return;
     
     sys->running = true;
     
-    // For now, run on main thread to avoid GLFW threading issues until we fix platform layer
-    // (GLFW requires poll on main thread).
-    // The previous architecture had a complex event loop.
-    
     while (sys->running && !platform_window_should_close(sys->render_context.window)) {
-        platform_poll_events(); // Main thread poll
+        platform_poll_events();
         
-        if (sys->ui) {
-            ui_system_update(sys->ui, 0.016f); // Update UI logic (scroll, animations)
+        // 1. Update Domain Logic
+        if (sys->math_graph) {
+             // math_graph_update(sys->math_graph);
+        }
+        
+        // 2. Update UI Logic (Reactivity)
+        if (sys->ui_root_view) {
+            ui_view_update(sys->ui_root_view);
         }
 
-        render_system_update(sys); // Sync UI data to render packet
+        // 3. Render Prep
+        render_system_update(sys); // Generates DrawList and pushes to packet
         
-        // Draw (Immediate)
+        // 4. Draw
         if (sys->renderer_ready && sys->backend) {
              const RenderFramePacket* packet = render_system_acquire_packet(sys);
              if (packet) {
-                if (sys->backend->update_transformer) 
-                    sys->backend->update_transformer(sys->backend, &packet->transformer);
-                if (sys->backend->update_ui)
-                    sys->backend->update_ui(sys->backend, packet->widgets, packet->display_list);
+                // We need to update backend to accept new packet format
+                // For now, assume backend->draw() handles everything if we pass data via some other channel
+                // or we need to update backend API.
+                
+                // TODO: Update Backend Interface to accept RenderFramePacket or UiDrawList
+                // sys->backend->submit_frame(sys->backend, packet);
+                
                 if (sys->backend->draw)
                     sys->backend->draw(sys->backend);
              }

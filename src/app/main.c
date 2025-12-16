@@ -3,74 +3,93 @@
 
 #include "foundation/platform/platform.h"
 #include "engine/assets/assets_service.h"
-#include "engine/ui/ui_service.h"
+#include "engine/ui/ui_loader.h"
+#include "engine/ui/ui_def.h"
 #include "engine/render/render_system.h"
-#include "domains/cad_model/scene_service.h"
+#include "domains/math_model/math_graph.h"
+#include "foundation/meta/reflection.h"
 
 int main(int argc, char** argv) {
     // 1. Config
     const char* assets_dir = "assets";
-    const char* scene_path = "assets/scenes/gear_reducer.yaml"; // Default
-    const char* ui_path = NULL;
+    const char* ui_path = "assets/ui/test_binding.yaml"; // New default
     RenderLogLevel log_level = RENDER_LOG_INFO;
 
     for (int i = 1; i < argc; ++i) {
         if (strcmp(argv[i], "--assets") == 0 && i + 1 < argc) {
             assets_dir = argv[++i];
-        } else if (strcmp(argv[i], "--scene") == 0 && i + 1 < argc) {
-            scene_path = argv[++i];
         } else if (strcmp(argv[i], "--ui") == 0 && i + 1 < argc) {
             ui_path = argv[++i];
         } else if (strcmp(argv[i], "--log-level") == 0 && i + 1 < argc) {
             const char* level_str = argv[++i];
-            if (strcmp(level_str, "none") == 0) log_level = RENDER_LOG_NONE;
-            else if (strcmp(level_str, "info") == 0) log_level = RENDER_LOG_INFO;
-            else if (strcmp(level_str, "verbose") == 0) log_level = RENDER_LOG_VERBOSE;
+            if (strcmp(level_str, "none") == 0) {
+                log_level = RENDER_LOG_NONE;
+            } else if (strcmp(level_str, "info") == 0) {
+                log_level = RENDER_LOG_INFO;
+            } else if (strcmp(level_str, "verbose") == 0) {
+                log_level = RENDER_LOG_VERBOSE;
+            }
         }
     }
 
-    printf("Initializing Graphics Engine...\n");
+    puts("Initializing Graphics Engine (MVVM-C Architecture)...");
     printf("Assets: %s\n", assets_dir);
-    printf("Scene: %s\n", scene_path);
-    printf("Log Level: %d\n", log_level);
+    printf("UI: %s\n", ui_path);
 
     // 2. Systems
     Assets assets = {0};
-    if (!assets_init(&assets, assets_dir, ui_path)) return 1;
+    // Note: assets_init old UI loading part is now ignored/redundant but harmless
+    if (!assets_init(&assets, assets_dir, NULL)) return 1;
 
-    Scene scene = {0};
-    Model* model = scene_load(&scene, scene_path, &assets);
-    if (!model) {
-        fprintf(stderr, "Failed to load scene/model.\n");
+    // 3. Domain Data (The Model)
+    MathGraph graph;
+    math_graph_init(&graph);
+    
+    // Create a test node to bind to
+    MathNode* node = math_graph_add_node(&graph, MATH_NODE_SIN);
+    node->name = strdup("Test Sine Wave");
+    node->value = 0.5f;
+
+    // 4. UI System (The View)
+    UiDef* ui_def = ui_loader_load_from_file(ui_path);
+    if (!ui_def) {
+        fprintf(stderr, "Failed to load UI definition from %s\n", ui_path);
         return 1;
     }
 
-    UiContext ui = {0};
-    if (!ui_system_init(&ui)) return 1;
-    if (!ui_system_build(&ui, &assets, &scene, model)) return 1;
+    // Create View bound to the Node
+    const MetaStruct* node_meta = meta_get_struct("MathNode");
+    if (!node_meta) {
+        fprintf(stderr, "Fatal: Reflection metadata for 'MathNode' not found.\n");
+        return 1;
+    }
+    
+    UiView* root_view = ui_view_create(ui_def, node, node_meta);
+    if (!root_view) {
+        fprintf(stderr, "Failed to create UI View.\n");
+        return 1;
+    }
 
+    // 5. Render System
     RenderSystem render = {0};
     RenderSystemConfig render_config = { .backend_type = "vulkan", .log_level = log_level };
     if (!render_system_init(&render, &render_config)) return 1;
 
-    // 3. Bindings
+    // 6. Bindings
     render_system_bind_assets(&render, &assets);
-    render_system_bind_ui(&render, &ui);
-    render_system_bind_model(&render, model);
+    render_system_bind_ui(&render, root_view);
+    render_system_bind_math_graph(&render, &graph);
 
-    // 4. Run
-    ui_system_prepare_runtime(&ui, 1.0f);
-    render_thread_update_window_state(&render);
-
-    printf("Starting Main Loop...\n");
+    // 7. Run
+    puts("Starting Main Loop...");
     render_system_run(&render);
 
-    // 5. Shutdown
+    // 8. Shutdown
     render_system_shutdown(&render);
-    ui_system_shutdown(&ui);
-    scene_unload(&scene);
+    ui_view_free(root_view);
+    ui_def_free(ui_def);
+    math_graph_dispose(&graph);
     assets_shutdown(&assets);
-    if (model) free_model(model);
 
     return 0;
 }

@@ -5,24 +5,21 @@
 #include <threads.h>
 
 #include "engine/assets/assets_service.h"
-#include "engine/ui/ui_context.h"
+#include "engine/ui/ui_def.h"
+#include "engine/ui/ui_renderer.h"
+#include "domains/math_model/math_graph.h"
 #include "engine/render/backend/common/renderer_backend.h"
 #include "engine/render/render_thread.h"
+#include "engine/render/render_packet.h"
 
 // Forward decl
 struct RendererBackend;
 
-typedef struct RenderFramePacket {
-    WidgetArray widgets;
-    DisplayList display_list;
-    CoordinateSystem2D transformer;
-} RenderFramePacket;
-
 typedef struct RenderSystem {
     // Dependencies (Injectable)
     Assets* assets;
-    UiContext* ui;
-    Model* model;
+    UiView* ui_root_view;
+    MathGraph* math_graph;
 
     // Internal State
     RenderRuntimeContext render_context; // Thread context
@@ -35,10 +32,6 @@ typedef struct RenderSystem {
     bool packet_ready;
     mtx_t packet_mutex;
     
-    // UI Cache
-    WidgetArray widgets;
-    DisplayList display_list; // Persistent allocation
-    
     // Config
     RenderLoggerConfig logger_config;
     
@@ -50,7 +43,7 @@ typedef struct RenderSystem {
 
 typedef struct RenderSystemConfig {
     const char* backend_type; // "vulkan"
-    RenderLogLevel log_level; // Changed from bool to level
+    RenderLogLevel log_level;
 } RenderSystemConfig;
 
 bool render_system_init(RenderSystem* sys, const RenderSystemConfig* config);
@@ -58,13 +51,12 @@ void render_system_shutdown(RenderSystem* sys);
 
 // Connect dependencies
 void render_system_bind_assets(RenderSystem* sys, Assets* assets);
-void render_system_bind_ui(RenderSystem* sys, UiContext* ui);
-void render_system_bind_model(RenderSystem* sys, Model* model);
+void render_system_bind_ui(RenderSystem* sys, UiView* root_view);
+void render_system_bind_math_graph(RenderSystem* sys, MathGraph* graph);
 
 // Runtime
 void render_system_update(RenderSystem* sys); // Called on main thread
-void render_system_update_transformer(RenderSystem* sys);
-void render_system_run(RenderSystem* sys);    // Called on main thread (blocking loop) or starts thread
+void render_system_run(RenderSystem* sys);    // Called on main thread (blocking loop)
 
 const RenderFramePacket* render_system_acquire_packet(RenderSystem* sys);
 

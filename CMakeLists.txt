@@ -54,7 +54,28 @@ add_shader_compile("shader.frag")
 
 add_custom_target(Shaders DEPENDS ${SHADER_OUTPUTS})
 
+# --- CODE GENERATION ---
+
+find_package(Python3 REQUIRED)
+set(GENERATED_DIR "${CMAKE_CURRENT_SOURCE_DIR}/src/generated")
+set(REFLECTION_REGISTRY "${GENERATED_DIR}/reflection_registry.c")
+
+add_custom_command(
+    OUTPUT ${REFLECTION_REGISTRY}
+    COMMAND ${Python3_EXECUTABLE} "${CMAKE_CURRENT_SOURCE_DIR}/tools/codegen.py" "${CMAKE_CURRENT_SOURCE_DIR}/src" "${REFLECTION_REGISTRY}"
+    DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/tools/codegen.py"
+    COMMENT "Generating reflection metadata..."
+)
+
 # --- FOUNDATION LAYER ---
+
+# Meta (Reflection)
+set(FOUNDATION_META_SOURCES
+    "src/foundation/meta/reflection.c"
+    ${REFLECTION_REGISTRY}
+)
+add_library(foundation_meta STATIC ${FOUNDATION_META_SOURCES})
+target_include_directories(foundation_meta PUBLIC "src/")
 
 # Platform
 set(FOUNDATION_PLATFORM_SOURCES
@@ -70,6 +91,9 @@ set(FOUNDATION_MATH_SOURCES
     "src/foundation/math/layout_geometry.c")
 add_library(foundation_math STATIC ${FOUNDATION_MATH_SOURCES})
 target_include_directories(foundation_math PUBLIC "src/")
+if(UNIX)
+    target_link_libraries(foundation_math PUBLIC m)
+endif()
 
 # Memory
 set(FOUNDATION_MEMORY_SOURCES "src/foundation/memory/buffer.c")
@@ -79,17 +103,11 @@ target_include_directories(foundation_memory PUBLIC "src/")
 # Config
 set(FOUNDATION_CONFIG_SOURCES
     "src/foundation/config/simple_yaml.c"
-    "src/foundation/config/module_yaml_loader.c"
     "src/foundation/config/config_document.c"
     "src/foundation/config/config_io.c")
 add_library(foundation_config STATIC ${FOUNDATION_CONFIG_SOURCES})
 target_include_directories(foundation_config PUBLIC "src/")
 target_link_libraries(foundation_config PUBLIC foundation_platform)
-
-# State (Event Bus)
-set(FOUNDATION_STATE_SOURCES "src/foundation/state/state_manager.c")
-add_library(foundation_state STATIC ${FOUNDATION_STATE_SOURCES})
-target_include_directories(foundation_state PUBLIC "src/")
 
 # --- ENGINE LAYER ---
 
@@ -116,7 +134,7 @@ set(ENGINE_RENDER_SOURCES
 )
 add_library(engine_render STATIC ${ENGINE_RENDER_SOURCES})
 target_include_directories(engine_render PUBLIC "src/" ${Stb_INCLUDE_DIR})
-target_link_libraries(engine_render PUBLIC foundation_platform foundation_math foundation_memory Vulkan::Vulkan glfw Threads::Threads foundation_state foundation_config engine_ui engine_assets)
+target_link_libraries(engine_render PUBLIC foundation_platform foundation_math foundation_memory Vulkan::Vulkan glfw Threads::Threads foundation_config engine_ui engine_assets)
 # Note: circular dependency UI <-> Render might exist in legacy code.
 
 # Assets
@@ -127,6 +145,9 @@ target_link_libraries(engine_assets PUBLIC foundation_platform foundation_config
 
 # UI
 set(ENGINE_UI_SOURCES
+    "src/engine/ui/ui_renderer.c"
+    "src/engine/ui/ui_loader.c"
+    "src/engine/ui/ui_def.c"
     "src/engine/ui/scroll.c"
     "src/engine/ui/model_style.c"
     "src/engine/ui/ui_node.c"
@@ -138,7 +159,7 @@ set(ENGINE_UI_SOURCES
     "src/engine/ui/ui_service.c")
 add_library(engine_ui STATIC ${ENGINE_UI_SOURCES})
 target_include_directories(engine_ui PUBLIC "src/" ${Stb_INCLUDE_DIR})
-target_link_libraries(engine_ui PUBLIC foundation_config engine_assets)
+target_link_libraries(engine_ui PUBLIC foundation_config engine_assets foundation_meta)
 
 # --- DOMAIN LAYER ---
 
@@ -154,10 +175,14 @@ target_link_libraries(domain_cad PUBLIC foundation_config engine_assets engine_u
 # Math Model
 set(DOMAIN_MATH_SOURCES
     "src/domains/math_model/math_scene.c"
-    "src/domains/math_model/math_mesh_builder.c")
+    "src/domains/math_model/math_mesh_builder.c"
+    "src/domains/math_model/math_graph.c")
 add_library(domain_math STATIC ${DOMAIN_MATH_SOURCES})
 target_include_directories(domain_math PUBLIC "src/")
 target_link_libraries(domain_math PUBLIC foundation_math)
+if(UNIX)
+    target_link_libraries(domain_math PUBLIC m)
+endif()
 
 # --- APP ---
 
@@ -172,9 +197,9 @@ target_link_libraries(Graphics PRIVATE
     engine_render
     engine_ui
     engine_assets
-    foundation_state
     foundation_config
     foundation_platform
+    foundation_meta
     foundation_math
     foundation_memory
     glfw
