@@ -1,7 +1,6 @@
 #ifndef UI_DEF_H
 #define UI_DEF_H
 
-#include "engine/ui/model_style.h"
 #include "foundation/meta/reflection.h"
 
 typedef struct { float x, y, w, h; } Rect;

@@ -147,15 +147,7 @@ target_link_libraries(engine_assets PUBLIC foundation_platform foundation_config
 set(ENGINE_UI_SOURCES
     "src/engine/ui/ui_renderer.c"
     "src/engine/ui/ui_loader.c"
-    "src/engine/ui/ui_def.c"
-    "src/engine/ui/scroll.c"
-    "src/engine/ui/model_style.c"
-    "src/engine/ui/ui_node.c"
-    "src/engine/ui/layout_tree.c"
-    "src/engine/ui/widget_list.c"
-    "src/engine/ui/scene_ui.c"
-    "src/engine/ui/ui_context.c"
-    "src/engine/ui/compositor.c")
+    "src/engine/ui/ui_def.c")
 add_library(engine_ui STATIC ${ENGINE_UI_SOURCES})
 target_include_directories(engine_ui PUBLIC "src/" ${Stb_INCLUDE_DIR})
 target_link_libraries(engine_ui PUBLIC foundation_config engine_assets foundation_meta)
@@ -216,9 +208,6 @@ function(add_graphics_test TEST_NAME SOURCE_FILE)
 endfunction()
 
 # Update test paths and libs
-add_graphics_test(layout_tests tests/layout_tests.c engine_ui foundation_config foundation_platform engine_render)
-add_graphics_test(ui_compositor_tests tests/ui_compositor_tests.c engine_ui foundation_config foundation_platform engine_render)
-add_graphics_test(scene_ui_tests tests/scene_ui_tests.c engine_ui domain_cad foundation_config foundation_platform engine_render)
 add_graphics_test(transform_tests tests/transform_tests.c foundation_math engine_render)
 add_graphics_test(render_composition_tests tests/render_composition_tests.c foundation_math engine_render)
 add_graphics_test(ui_mesh_builder_tests tests/ui_mesh_builder_tests.c foundation_math engine_render)

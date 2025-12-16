@@ -5,22 +5,20 @@
 #include <string.h>
 
 #include "domains/cad_model/cad_scene_yaml.h"
-#include "engine/ui/ui_config.h" 
 
 // Removing AppServices and ServiceManager dependencies
 
-Model* scene_load(Scene* scene, const char* path, Assets* assets) {
-    if (!scene || !path || !assets) return NULL;
+bool scene_load(Scene* scene, const char* path, Assets* assets) {
+    if (!scene || !path || !assets) return false;
 
     SceneError scene_err = {0};
     if (!parse_scene_yaml(path, scene, &scene_err)) {
         fprintf(stderr, "Failed to load scene %s:%d:%d %s\n", path, scene_err.line, scene_err.column,
                 scene_err.message);
-        return NULL;
+        return false;
     }
 
-    // Load Model from UI Config (which defines bindings)
-    return ui_config_load_model(&assets->ui_doc);
+    return true;
 }
 
 void scene_unload(Scene* scene) {
