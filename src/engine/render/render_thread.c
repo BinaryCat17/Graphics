@@ -71,6 +71,11 @@ void render_thread_update_window_state(RenderSystem* sys) {
 bool runtime_init(RenderSystem* sys) {
     if (!sys) return false;
 
+    if (!platform_layer_init()) {
+        fprintf(stderr, "Fatal: Failed to initialize platform layer (GLFW).\n");
+        return false;
+    }
+
     // Window Creation
     float target_w = 1024.0f;
     float target_h = 768.0f;
@@ -98,4 +103,5 @@ void runtime_shutdown(RenderRuntimeContext* ctx) {
         platform_destroy_window(ctx->window);
         ctx->window = NULL;
     }
+    platform_layer_shutdown();
 }
