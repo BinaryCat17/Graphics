@@ -450,7 +450,7 @@ static bool emit_widget_fill(const UiRenderNode *node, ViewModelBuffer *buffer, 
         float track_x = node->inner_rect.x + node->inner_rect.w - track_w - widget->padding * 0.5f;
         float track_y = node->inner_rect.y + widget->padding;
         fill_rect = (Rect){ track_x, track_y, track_w, track_h };
-        layer = node->base_z + Z_LAYER_FILL;
+        layer = node->scrollbar_z + Z_LAYER_SCROLLBAR_TRACK;
         fill_color = widget->data.scroll.track_color;
     }
 
