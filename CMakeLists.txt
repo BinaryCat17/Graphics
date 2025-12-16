@@ -153,6 +153,8 @@ target_link_libraries(service_manager_lib PUBLIC Threads::Threads)
 set(SERVICE_SCENE_SOURCES
     "src/services/scene/cad_scene.c"
     "src/services/scene/cad_scene_yaml.c"
+    "src/services/scene/math_scene.c"
+    "src/services/scene/math_mesh_builder.c"
     "src/services/scene/scene_service.c")
 add_library(service_scene STATIC ${SERVICE_SCENE_SOURCES})
 target_include_directories(service_scene PUBLIC "src/")
@@ -239,3 +241,5 @@ add_graphics_test(render_composition_tests tests/render_composition_tests.c core
 add_graphics_test(ui_mesh_builder_tests tests/ui_mesh_builder_tests.c core render_common)
 add_graphics_test(text_clip_integration_tests tests/text_clip_integration_tests.c core render_common)
 add_graphics_test(scene_yaml_tests tests/scene_yaml_tests.c service_scene config)
+add_graphics_test(math_scene_tests tests/math_scene_tests.c service_scene)
+add_graphics_test(math_mesh_tests tests/math_mesh_tests.c service_scene)
