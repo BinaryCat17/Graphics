@@ -1,5 +1,6 @@
 #include "foundation/logger/logger.h"
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 
 #include "foundation/platform/platform.h"
@@ -41,6 +42,9 @@ int main(int argc, char** argv) {
             } else if (strcmp(level_str, "fatal") == 0) {
                 logger_set_level(LOG_LEVEL_FATAL);
             }
+        } else if (strcmp(argv[i], "--log-interval") == 0 && i + 1 < argc) {
+            double interval = atof(argv[++i]);
+            logger_set_trace_interval(interval);
         }
     }
 

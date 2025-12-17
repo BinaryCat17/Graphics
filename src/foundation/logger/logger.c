@@ -112,6 +112,16 @@ LogLevel logger_get_level(void) {
     return g_console_level;
 }
 
+static double g_trace_interval = 5.0; // Default 5s
+
+void logger_set_trace_interval(double seconds) {
+    g_trace_interval = seconds;
+}
+
+double logger_get_trace_interval(void) {
+    return g_trace_interval;
+}
+
 void logger_log(LogLevel level, const char* file, int line, const char* fmt, ...) {
     // Quick check before lock (optimization)
     // Note: Technically racy but harmless for logging levels

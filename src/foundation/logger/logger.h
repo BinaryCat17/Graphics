@@ -20,6 +20,8 @@ void logger_shutdown(void);
 void logger_set_level(LogLevel level); // Sets Console Level (Backwards Compatibility)
 void logger_set_console_level(LogLevel level);
 void logger_set_file_level(LogLevel level);
+void logger_set_trace_interval(double seconds);
+double logger_get_trace_interval(void);
 
 LogLevel logger_get_level(void); // Gets Console Level
 

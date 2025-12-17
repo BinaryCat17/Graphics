@@ -131,17 +131,17 @@ static void traverse_ui(const UiView* view, Scene* scene, const Assets* assets, 
 void ui_build_scene(const UiView* root, Scene* scene, const Assets* assets) {
     if (!root || !scene || !assets) return;
     
-    // Layout Pass
-    ui_layout_root((UiView*)root, 1280.0f, 720.0f); 
-    
     static double last_log_time = -1.0; // Use -1.0 to ensure initial log
     bool debug_frame = false;
 
     double current_time = platform_get_time_ms();
-    if (last_log_time < 0 || (current_time - last_log_time) / 1000.0 >= 5.0) {
+    if (last_log_time < 0 || (current_time - last_log_time) / 1000.0 >= logger_get_trace_interval()) {
         debug_frame = true;
         last_log_time = current_time;
     }
+
+    // Layout Pass
+    ui_layout_root((UiView*)root, 1280.0f, 720.0f, scene->frame_number, debug_frame); 
     
     if (debug_frame) {
         LOG_TRACE("UI Build Scene [Frame %llu]: %zu objects generated. Root Rect: %.1f, %.1f, %.1f, %.1f", 

@@ -1,8 +1,10 @@
 #include "ui_layout.h"
 #include "foundation/logger/logger.h"
 #include <stddef.h>
+#include <stdint.h>
+#include <stdbool.h>
 
-static void layout_recursive(UiView* view, Rect available) {
+static void layout_recursive(UiView* view, Rect available, uint64_t frame_number, bool log_debug) {
     if (!view || !view->def) return;
 
     // Determine size
@@ -39,9 +41,12 @@ static void layout_recursive(UiView* view, Rect available) {
     view->rect.w = w;
     view->rect.h = h;
 
-    LOG_TRACE("Layout Node id='%s': Rect(%.1f, %.1f, %.1f, %.1f)", 
-        view->def->id ? view->def->id : "(anon)",
-        view->rect.x, view->rect.y, view->rect.w, view->rect.h);
+    if (log_debug) {
+        LOG_TRACE("[Frame %llu] Layout Node id='%s': Rect(%.1f, %.1f, %.1f, %.1f)", 
+            (unsigned long long)frame_number,
+            view->def->id ? view->def->id : "(anon)",
+            view->rect.x, view->rect.y, view->rect.w, view->rect.h);
+    }
 
     // Layout Children
     Rect content = {
@@ -67,7 +72,7 @@ static void layout_recursive(UiView* view, Rect available) {
             content.h - (cursor_y - content.y) 
         };
         
-        layout_recursive(child, child_avail);
+        layout_recursive(child, child_avail, frame_number, log_debug);
 
         if (view->def->layout == UI_LAYOUT_COLUMN) {
             cursor_y += child->rect.h + view->def->spacing;
@@ -78,8 +83,8 @@ static void layout_recursive(UiView* view, Rect available) {
     }
 }
 
-void ui_layout_root(UiView* root, float window_w, float window_h) {
+void ui_layout_root(UiView* root, float window_w, float window_h, uint64_t frame_number, bool log_debug) {
     if (!root) return;
     Rect screen_rect = {0, 0, window_w, window_h};
-    layout_recursive(root, screen_rect);
+    layout_recursive(root, screen_rect, frame_number, log_debug);
 }
