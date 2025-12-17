@@ -44,6 +44,11 @@ void ui_def_free(UiDef* def) {
     free(def->data_source);
     free(def->count_source);
     
+    free(def->x_source); free(def->y_source);
+    free(def->w_source); free(def->h_source);
+    free(def->u1_source); free(def->v1_source);
+    free(def->u2_source); free(def->v2_source);
+    
     if (def->item_template) ui_def_free(def->item_template);
     
     if (def->children) {
@@ -168,11 +173,45 @@ static void resolve_text_binding(UiView* view) {
     }
 }
 
+static void resolve_geometry_bindings(UiView* view) {
+    if (!view || !view->data_ptr || !view->meta) return;
+
+    if (view->def->x_source) {
+        const MetaField* f = find_field(view->meta, view->def->x_source);
+        if (f) {
+            if (f->type == META_TYPE_FLOAT) view->rect.x = meta_get_float(view->data_ptr, f);
+            else if (f->type == META_TYPE_INT) view->rect.x = (float)meta_get_int(view->data_ptr, f);
+        }
+    }
+    if (view->def->y_source) {
+        const MetaField* f = find_field(view->meta, view->def->y_source);
+        if (f) {
+            if (f->type == META_TYPE_FLOAT) view->rect.y = meta_get_float(view->data_ptr, f);
+            else if (f->type == META_TYPE_INT) view->rect.y = (float)meta_get_int(view->data_ptr, f);
+        }
+    }
+    if (view->def->w_source) {
+        const MetaField* f = find_field(view->meta, view->def->w_source);
+        if (f) {
+            if (f->type == META_TYPE_FLOAT) view->rect.w = meta_get_float(view->data_ptr, f);
+            else if (f->type == META_TYPE_INT) view->rect.w = (float)meta_get_int(view->data_ptr, f);
+        }
+    }
+    if (view->def->h_source) {
+        const MetaField* f = find_field(view->meta, view->def->h_source);
+        if (f) {
+            if (f->type == META_TYPE_FLOAT) view->rect.h = meta_get_float(view->data_ptr, f);
+            else if (f->type == META_TYPE_INT) view->rect.h = (float)meta_get_int(view->data_ptr, f);
+        }
+    }
+}
+
 void ui_view_update(UiView* view) {
     if (!view) return;
     
     // 1. Resolve Bindings
     resolve_text_binding(view);
+    resolve_geometry_bindings(view);
     
     // 2. Update Children
     if (view->def->type == UI_NODE_LIST) {

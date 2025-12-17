@@ -8,11 +8,8 @@ struct GpuInstanceData {
     vec4 color;
     vec4 uv_rect;
     vec4 params;
-    vec4 pad; // Explicit padding to match C struct (128 bytes)
+    vec4 extra; // Used for Curve Data (P0, P3)
 };
-
-// Set 0: Texture (Sampler)
-// Set 1: Instances (SSBO)
 
 layout(std140, set = 1, binding = 0) readonly buffer InstanceBuffer {
     GpuInstanceData objects[];
@@ -25,6 +22,7 @@ layout(push_constant) uniform Push {
 layout(location = 0) out vec4 fragColor;
 layout(location = 1) out vec2 fragUV;
 layout(location = 2) out vec4 fragParams;
+layout(location = 3) out vec4 fragExtra;
 
 void main() {
     GpuInstanceData obj = instances.objects[gl_InstanceIndex];
@@ -32,6 +30,7 @@ void main() {
     gl_Position = pc.view_proj * obj.model * vec4(inPosition, 1.0);
     fragColor = obj.color;
     fragParams = obj.params;
+    fragExtra = obj.extra;
     
     // Transform UV
     fragUV = inUV * obj.uv_rect.zw + obj.uv_rect.xy;

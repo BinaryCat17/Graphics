@@ -31,7 +31,7 @@ typedef struct {
     float color[4];  // 16 bytes
     float uv_rect[4]; // 16 bytes
     float params[4]; // 16 bytes
-    float pad[4];    // 16 bytes -> Total 128 bytes
+    float extra[4];  // 16 bytes -> Total 128 bytes
 } GpuInstanceData;
 
 // --- Helpers ---
@@ -187,25 +187,45 @@ static void draw_frame_scene(VulkanRendererState* state, const Scene* scene) {
             
             memcpy(data[idx].model, model.m, sizeof(float)*16);
             
-            data[idx].color[0] = obj->color.x;
             data[idx].color[1] = obj->color.y;
             data[idx].color[2] = obj->color.z;
             data[idx].color[3] = obj->color.w;
             
-            if (obj->uv_rect.z == 0.0f && obj->uv_rect.w == 0.0f) {
-                 data[idx].uv_rect[0] = 0.0f; data[idx].uv_rect[1] = 0.0f;
-                 data[idx].uv_rect[2] = 1.0f; data[idx].uv_rect[3] = 1.0f;
+            // Handle Primitives
+            float prim_type = (float)obj->prim_type; // 0=Quad, 1=Curve
+            
+            if (obj->prim_type == SCENE_PRIM_CURVE) {
+                // For curves, uv_rect in SceneObject holds P0 and P3
+                data[idx].extra[0] = obj->uv_rect.x; // P0.x
+                data[idx].extra[1] = obj->uv_rect.y; // P0.y
+                data[idx].extra[2] = obj->uv_rect.z; // P3.x
+                data[idx].extra[3] = obj->uv_rect.w; // P3.y
+                
+                // Reset UV for the quad itself (cover full area)
+                data[idx].uv_rect[0] = 0.0f; data[idx].uv_rect[1] = 0.0f;
+                data[idx].uv_rect[2] = 1.0f; data[idx].uv_rect[3] = 1.0f;
             } else {
-                 data[idx].uv_rect[0] = obj->uv_rect.x; data[idx].uv_rect[1] = obj->uv_rect.y;
-                 data[idx].uv_rect[2] = obj->uv_rect.z; data[idx].uv_rect[3] = obj->uv_rect.w;
+                // Standard Quad
+                data[idx].extra[0] = 0; data[idx].extra[1] = 0;
+                data[idx].extra[2] = 0; data[idx].extra[3] = 0;
+
+                if (obj->uv_rect.z == 0.0f && obj->uv_rect.w == 0.0f) {
+                     data[idx].uv_rect[0] = 0.0f; data[idx].uv_rect[1] = 0.0f;
+                     data[idx].uv_rect[2] = 1.0f; data[idx].uv_rect[3] = 1.0f;
+                } else {
+                     data[idx].uv_rect[0] = obj->uv_rect.x; data[idx].uv_rect[1] = obj->uv_rect.y;
+                     data[idx].uv_rect[2] = obj->uv_rect.z; data[idx].uv_rect[3] = obj->uv_rect.w;
+                }
             }
             
-            data[idx].params[0] = obj->params.x;
-            data[idx].params[1] = 0; data[idx].params[2] = 0; data[idx].params[3] = 0;
+            data[idx].params[0] = obj->params.x; // use_texture
+            data[idx].params[1] = prim_type;     // prim_type
+            data[idx].params[2] = obj->params.z; // thickness (if curve)
+            data[idx].params[3] = 0;
             
             if (debug_frame && idx < 2) {
-                LOG_TRACE("[Frame %llu] Single[%zu]: Pos(%.2f, %.2f) UV(%.2f,%.2f,%.2f,%.2f)",
-                        (unsigned long long)scene->frame_number, idx,
+                LOG_TRACE("[Frame %llu] Single[%zu]: Type=%.0f Pos(%.2f, %.2f) UV(%.2f,%.2f,%.2f,%.2f)",
+                        (unsigned long long)scene->frame_number, idx, prim_type,
                         obj->position.x, obj->position.y,
                         obj->uv_rect.x, obj->uv_rect.y, obj->uv_rect.z, obj->uv_rect.w);
             }

@@ -19,7 +19,8 @@ typedef struct MathNode {
     int id; // REFLECT
     MathNodeType type; // REFLECT
     float value; // REFLECT(Observable)
-    float x, y;  // REFLECT(Observable)
+    float x;     // REFLECT(Observable)
+    float y;     // REFLECT(Observable)
     int dirty;   // REFLECT
     
     // Inputs (dependencies)
@@ -30,10 +31,18 @@ typedef struct MathNode {
     char* name; // REFLECT
 } MathNode;
 
+typedef struct VisualWire {
+    float x, y, width, height; // REFLECT
+    float u1, v1, u2, v2;      // REFLECT
+} VisualWire;
+
 typedef struct MathGraph {
     MathNode** nodes; // REFLECT
     int node_count;   // REFLECT
     int node_capacity;
+    
+    VisualWire* wires; // REFLECT
+    int wire_count;    // REFLECT
 } MathGraph;
 
 void math_graph_init(MathGraph* graph);
@@ -46,5 +55,8 @@ float math_graph_evaluate(MathNode* node);
 
 // Propagates dirty flags and recomputes values
 void math_graph_update(MathGraph* graph);
+
+// Updates VisualWire array based on node connections
+void math_graph_update_visuals(MathGraph* graph);
 
 #endif // MATH_GRAPH_H

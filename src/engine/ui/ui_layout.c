@@ -19,6 +19,10 @@ static void layout_recursive(UiView* view, Rect available, uint64_t frame_number
     // Determine size
     float w = view->def->width;
     float h = view->def->height;
+    
+    // Override with bound values if present
+    if (view->def->w_source) w = view->rect.w;
+    if (view->def->h_source) h = view->rect.h;
 
     // Auto-width logic
     if (w < 0) {
@@ -69,8 +73,18 @@ static void layout_recursive(UiView* view, Rect available, uint64_t frame_number
         if (view->child_count > 0) h -= view->def->spacing;
     }
 
-    view->rect.x = available.x;
-    view->rect.y = available.y;
+    if (view->def->x_source) {
+        view->rect.x = available.x + view->rect.x; // Add relative offset
+    } else {
+        view->rect.x = available.x;
+    }
+    
+    if (view->def->y_source) {
+        view->rect.y = available.y + view->rect.y;
+    } else {
+        view->rect.y = available.y;
+    }
+
     view->rect.w = w;
     view->rect.h = h;
 

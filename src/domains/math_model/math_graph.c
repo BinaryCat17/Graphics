@@ -105,13 +105,78 @@ float math_graph_evaluate(MathNode* node) {
 
 void math_graph_update(MathGraph* graph) {
     if (!graph) return;
-    // In a real dependency graph, we would topologically sort or propagate dirty flags.
-    // Here we just re-evaluate everything that is dirty, assuming tree structure or manual dirty propagation.
-    // For a proper graph, we need to invalidate children when parents change. 
-    // This simple implementation pulls from outputs, but doesn't push dirty flags down.
-    // To make it fully reactive, setting a value should mark all outputs as dirty.
+    for (int i = 0; i < graph->node_count; ++i) {
+        if (graph->nodes[i]) {
+            // Evaluate dirty nodes (simple propagation)
+            math_graph_evaluate(graph->nodes[i]);
+        }
+    }
+}
+
+void math_graph_update_visuals(MathGraph* graph) {
+    if (!graph) return;
     
-    // For now, let's just force re-evaluation of everything or let the user pull.
-    // Actually, 'evaluate_node' handles the pull.
-    // We just need to reset dirty if we want to support push updates later.
+    // 1. Count Wires
+    int count = 0;
+    for (int i = 0; i < graph->node_count; ++i) {
+        if (graph->nodes[i]) {
+            count += (int)graph->nodes[i]->input_count;
+        }
+    }
+    
+    // 2. Reallocate if needed
+    if (count != graph->wire_count) {
+        free(graph->wires);
+        graph->wires = (count > 0) ? (VisualWire*)malloc(sizeof(VisualWire) * count) : NULL;
+        graph->wire_count = count;
+    }
+    
+    if (count == 0) return;
+    
+    // 3. Populate
+    int idx = 0;
+    const float node_w = 100.0f;
+    const float port_y_off = 30.0f;
+    const float port_spacing = 20.0f;
+    
+    for (int i = 0; i < graph->node_count; ++i) {
+        MathNode* target = graph->nodes[i];
+        if (!target) continue;
+        
+        for (size_t k = 0; k < target->input_count; ++k) {
+            MathNode* source = target->inputs[k];
+            if (source) {
+                // Calculate endpoints
+                // Source (Output): Right side, middle-ish
+                float sx = source->x + node_w;
+                float sy = source->y + port_y_off; 
+                
+                // Target (Input): Left side, stacked
+                float tx = target->x;
+                float ty = target->y + port_y_off + (k * port_spacing);
+                
+                // Bounding Box
+                float min_x = (sx < tx ? sx : tx) - 50.0f; // Padding for curve
+                float min_y = (sy < ty ? sy : ty) - 50.0f;
+                float max_x = (sx > tx ? sx : tx) + 50.0f;
+                float max_y = (sy > ty ? sy : ty) + 50.0f;
+                
+                float w = max_x - min_x;
+                float h = max_y - min_y;
+                
+                graph->wires[idx].x = min_x;
+                graph->wires[idx].y = min_y;
+                graph->wires[idx].width = w;
+                graph->wires[idx].height = h;
+                
+                // UVs (Normalized 0..1 in BBox)
+                graph->wires[idx].u1 = (sx - min_x) / w;
+                graph->wires[idx].v1 = (sy - min_y) / h;
+                graph->wires[idx].u2 = (tx - min_x) / w;
+                graph->wires[idx].v2 = (ty - min_y) / h;
+                
+                idx++;
+            }
+        }
+    }
 }

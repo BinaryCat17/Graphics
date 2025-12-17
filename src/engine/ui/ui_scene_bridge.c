@@ -18,14 +18,43 @@ static void traverse_ui(const UiView* view, Scene* scene, const Assets* assets, 
     if (view->rect.w > 0 && view->rect.h > 0) {
         SceneObject obj = {0};
         obj.layer = LAYER_UI_BACKGROUND; // Background layer
-        obj.position = (Vec3){view->rect.x, view->rect.y, 0.1f}; // Z=0.1 (Slightly behind text)
+        obj.position = (Vec3){view->rect.x, view->rect.y, 0.1f}; // Z=0.1
         obj.scale = (Vec3){view->rect.w, view->rect.h, 1.0f};
         obj.rotation = (Vec3){0, 0, 0};
         obj.mesh = &assets->unit_quad;
         obj.params.x = 0.0f; // No texture
         
         // Color based on type
-        if (view->def->type == UI_NODE_PANEL) {
+        if (view->def->type == UI_NODE_CURVE) {
+            obj.prim_type = SCENE_PRIM_CURVE;
+            obj.color = (Vec4){0.8f, 0.8f, 0.8f, 1.0f}; // Grey wire
+            obj.params.z = 0.02f; // Default thickness
+            
+            // Resolve Curve Bindings
+            if (view->data_ptr && view->meta) {
+                 float u1=0, v1=0, u2=1, v2=1;
+                 
+                 // Inline helper logic
+                 #define GET_VAL(src, var) \
+                    if (view->def->src) { \
+                        for(size_t k=0; k<view->meta->field_count; ++k) { \
+                            if (strcmp(view->meta->fields[k].name, view->def->src)==0) { \
+                                if (view->meta->fields[k].type == META_TYPE_FLOAT) var = meta_get_float(view->data_ptr, &view->meta->fields[k]); \
+                                break; \
+                            } \
+                        } \
+                    }
+                 
+                 GET_VAL(u1_source, u1);
+                 GET_VAL(v1_source, v1);
+                 GET_VAL(u2_source, u2);
+                 GET_VAL(v2_source, v2);
+                 
+                 obj.uv_rect.x = u1; obj.uv_rect.y = v1;
+                 obj.uv_rect.z = u2; obj.uv_rect.w = v2;
+            }
+            
+        } else if (view->def->type == UI_NODE_PANEL) {
             obj.color = (Vec4){0.2f, 0.2f, 0.2f, 1.0f};
         } else if (view->def->type == UI_NODE_BUTTON) {
             if (view->is_pressed) {

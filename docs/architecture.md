@@ -1,50 +1,39 @@
 # Graphics Engine Architecture: The Reactive Unified Vision
 
 ## Core Philosophy
-1.  **Unified Visual Space:** There is no "UI Layer" separate from the "3D World". A node in the graph editor and a particle in the simulation are both `SceneObject` entities, rendered by the same pipeline.
-2.  **Data-Oriented Truth:** The state of the application lives in C structs (`MathGraph`, `Node`, `Tensor`). The visuals are merely a projection of this data.
-3.  **Visual Programming:** Users describe logic via a Node Graph. This graph is **transpiled** to GPU Shaders, ensuring professional-grade performance.
+1.  **Unified Visual Space:** There is no "UI Layer" separate from the "3D World". A node in the graph editor, a particle in the simulation, and a connection wire are all `SceneObject` entities, rendered by the same pipeline.
+2.  **Data-Oriented Truth:** The state of the application lives in C structs (`MathGraph`, `Node`, `VisualWire`). The visuals are merely a projection of this data.
+3.  **Declarative Over Imperative:** We reject `draw_line()` or `custom_paint()`. Instead, we describe *what* to draw via data attributes and let the engine handle the *how*.
 
 ---
 
 ## 1. The Reactive UI Framework
-We reject the "Custom Widget" approach (black boxes of logic). Instead, we adopt a **Data-Driven Template System** inspired by ECS and modern web frameworks (Vue/Solid), but implemented in high-performance C.
+We adopt a **Data-Driven Template System** (Pure MVVM).
 
-### The "Repeater" Pattern
-Instead of hardcoding a `GraphEditorWidget`, the UI system defines generic primitives that react to data arrays.
+### The "Dual Repeater" Pattern (Editor Architecture)
+The Node Graph Editor is not a monolithic widget. It is composed of two overlaid `Repeater` lists:
 
-*   **The Data:** A generic `Array<Node>` in C memory.
-*   **The Template:** A YAML description of how *one* node looks (Rect + Text + Ports).
-*   **The Binding:** The UI system monitors the `Array`.
-    *   Item added? -> Instantiate Template.
-    *   Item removed? -> Destroy UI instance.
-    *   Item changed? -> Update UI properties via Reflection.
+1.  **Layer 1 (Wires):** A repeater bound to `Array<VisualWire>`.
+    *   **Template:** `UI_NODE_CURVE` (Primitive).
+    *   **Binding:** Binds to start/end coordinates of the wire.
+2.  **Layer 2 (Nodes):** A repeater bound to `Array<MathNode>`.
+    *   **Template:** `UI_NODE_PANEL` (Composite).
+    *   **Binding:** Binds to `Node.x`, `Node.y`.
 
-### The Observer System (Reflected Signals)
-We will upgrade `codegen.py` to generate "Observable" accessors.
-*   **Input:** `struct Node { float x; // REFLECT }`
-*   **Generated:** `node_set_x(node, 10.0f)` -> Triggers `Event(NODE_UPDATED, node)`.
-*   **Result:** The UI updates only when data changes. No polling.
+### The ViewModel Layer
+The UI is "dumb". It does not calculate where lines go.
+*   **C-Side Logic:** A specific system (ViewModel) iterates the logical `MathGraph`, calculates connection coordinates (based on node positions and port offsets), and populates a flat `VisualWire` array.
+*   **UI-Side:** Simply renders the `VisualWire` array.
 
 ---
 
-## 2. The Shader Graph Pipeline (The Engine)
-The core value proposition: **"Draw with Math, Execute on GPU."**
+## 2. The Unified Scene Primitives
+To support the UI without custom rendering code, the `Unified Scene` supports distinct primitives handled by the Uber-Shader (`unified.frag`).
 
-### A. The Graph (CPU)
-The user builds a dependency graph using the Visual Editor.
-*   **Nodes:** `Sin`, `Time`, `Position`, `Add`, `TextureSample`.
-*   **Edges:** Data flow.
-
-### B. The Transpiler (Compiler)
-Before execution, the engine traverses the CPU Graph and generates GLSL code.
-*   *Input:* Node A (Time) -> Node B (Sin) -> Node C (Output).
-*   *Output GLSL:* `vec3 result = vec3(sin(u_time));`
-
-### C. The Execution (GPU)
-1.  The generated GLSL is compiled into a **Compute Shader** (SPIR-V) at runtime.
-2.  **Compute Pass:** Calculates positions/colors for 1,000,000+ elements. Writes to a GPU Storage Buffer.
-3.  **Render Pass:** Uses **Hardware Instancing** to draw meshes (cubes/points), reading position data directly from the Storage Buffer.
+### Primitive Types
+*   **SCENE_PRIM_QUAD:** Standard textured rectangle (UI panels, text, sprites).
+*   **SCENE_PRIM_CURVE:** Procedural Bezier curve (SDF-based). Used for node connections.
+*   **SCENE_PRIM_LINE:** Simple line segments (Grid lines, debug gizmos).
 
 ---
 

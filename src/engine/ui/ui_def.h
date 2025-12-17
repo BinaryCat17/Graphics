@@ -24,7 +24,7 @@ typedef enum UiNodeType {
     UI_NODE_CHECKBOX,
     UI_NODE_LIST,      // New: For iterating over arrays
     UI_NODE_CONTAINER, // For grouping without rendering
-    UI_NODE_CUSTOM     // For custom rendering callbacks
+    UI_NODE_CURVE      // SDF Bezier Curve (replaces CUSTOM)
 } UiNodeType;
 
 typedef enum UiLayoutType {
@@ -50,6 +50,18 @@ typedef struct UiDef {
     char* data_source; // For Lists/Containers: property name to use as context
     char* count_source; // For Lists: property name for the item count
     
+    // Geometry Bindings (Overrides layout props if set)
+    char* x_source;
+    char* y_source;
+    char* w_source;
+    char* h_source;
+    
+    // Curve Bindings (P0=Start, P3=End)
+    char* u1_source;
+    char* v1_source;
+    char* u2_source;
+    char* v2_source;
+
     // List specific
     struct UiDef* item_template; // Template for list items
     

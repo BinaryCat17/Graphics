@@ -25,7 +25,7 @@ static UiNodeType parse_node_type(const char* type_str) {
     if (strcmp(type_str, "checkbox") == 0) return UI_NODE_CHECKBOX;
     if (strcmp(type_str, "list") == 0) return UI_NODE_LIST;
     if (strcmp(type_str, "container") == 0) return UI_NODE_CONTAINER;
-    if (strcmp(type_str, "custom") == 0) return UI_NODE_CUSTOM;
+    if (strcmp(type_str, "curve") == 0) return UI_NODE_CURVE;
     return UI_NODE_PANEL;
 }
 
@@ -105,6 +105,26 @@ UiDef* ui_loader_load_from_node(const void* node_ptr) {
 
     const ConfigNode* count = config_node_get_scalar(node, "count");
     if (count) def->count_source = strdup_safe(count->scalar);
+
+    // Geometry Bindings
+    const ConfigNode* bx = config_node_get_scalar(node, "bind_x");
+    if (bx) def->x_source = strdup_safe(bx->scalar);
+    const ConfigNode* by = config_node_get_scalar(node, "bind_y");
+    if (by) def->y_source = strdup_safe(by->scalar);
+    const ConfigNode* bw = config_node_get_scalar(node, "bind_w");
+    if (bw) def->w_source = strdup_safe(bw->scalar);
+    const ConfigNode* bh = config_node_get_scalar(node, "bind_h");
+    if (bh) def->h_source = strdup_safe(bh->scalar);
+
+    // Curve Bindings
+    const ConfigNode* bu1 = config_node_get_scalar(node, "bind_u1");
+    if (bu1) def->u1_source = strdup_safe(bu1->scalar);
+    const ConfigNode* bv1 = config_node_get_scalar(node, "bind_v1");
+    if (bv1) def->v1_source = strdup_safe(bv1->scalar);
+    const ConfigNode* bu2 = config_node_get_scalar(node, "bind_u2");
+    if (bu2) def->u2_source = strdup_safe(bu2->scalar);
+    const ConfigNode* bv2 = config_node_get_scalar(node, "bind_v2");
+    if (bv2) def->v2_source = strdup_safe(bv2->scalar);
 
     // 4. List Template
     if (type == UI_NODE_LIST) {

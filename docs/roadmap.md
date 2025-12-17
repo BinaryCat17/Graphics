@@ -25,17 +25,18 @@
     *   *Pending:* Add Drag-and-Drop support mapped to Data Events.
 
 ## Phase 3: The Visual Editor (The Interface)
-*Goal: Use the Reactive UI to build the Node Graph Editor.*
+*Goal: Use the Pure Data approach to build the Node Graph Editor.*
 
-1.  **Graph Data Model**
-    *   [DONE] Refine `MathGraph` to support UI metadata (position) via Reflection.
-    *   [TODO] Implement Node Selection state and logic.
-2.  **The Canvas**
-    *   [TODO] Construct the Node Graph UI using `Repeater` (for Nodes).
-    *   [TODO] Implement `ConnectionRenderer` (custom draw primitive for wires).
-    *   [TODO] Implement node dragging and port linking interaction.
-3.  **Property Inspector**
-    *   [TODO] Build an automatic side-panel that generates controls (Sliders, Fields) based on the selected Node's reflection data.
+1.  **Scene Primitives (No Custom Drawing)**
+    *   [TODO] Extend `SceneObject` with `type` (Quad/Curve/Line).
+    *   [TODO] Update `unified.frag` to render Bezier curves via SDF.
+    *   [TODO] Add `UI_NODE_CURVE` to the UI Definition and Bridge.
+2.  **Graph ViewModel**
+    *   [TODO] Create `VisualWire` struct in `MathGraph`.
+    *   [TODO] Implement `math_graph_update_visuals()` to calculate wire coordinates from node links.
+3.  **The Editor UI**
+    *   [TODO] Create `editor.yaml` using the Dual Repeater pattern (Wires Layer + Nodes Layer).
+    *   [TODO] Implement Node Dragging logic (View -> C-Struct -> Event -> View Update).
 
 ## Phase 4: The Brain (Transpilation)
 *Goal: Turn the Visual Graph into executable GPU code.*

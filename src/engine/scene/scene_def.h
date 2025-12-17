@@ -28,9 +28,15 @@ typedef struct SceneCamera {
     // Viewport rect?
 } SceneCamera;
 
+typedef enum ScenePrimitiveType {
+    SCENE_PRIM_QUAD = 0, // Standard Mesh/Quad
+    SCENE_PRIM_CURVE = 1 // SDF Bezier Curve
+} ScenePrimitiveType;
+
 typedef struct SceneObject {
     int id;
     RenderLayer layer;
+    ScenePrimitiveType prim_type;
     
     // Transform
     Vec3 position;
