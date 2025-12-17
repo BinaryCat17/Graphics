@@ -13,6 +13,7 @@ TYPE_MAP = {
     'float': 'META_TYPE_FLOAT',
     'char*': 'META_TYPE_STRING',
     'bool': 'META_TYPE_BOOL',
+    'size_t': 'META_TYPE_INT',
     'MathNodeType': 'META_TYPE_INT', # Enums as ints for now
 }
 
@@ -72,10 +73,12 @@ def parse_header(file_path):
                         name = name[1:]
                     
                     meta_type = TYPE_MAP.get(type_str, 'META_TYPE_STRUCT')
-                    # Heuristic for pointers to structs
+                    
+                    # Heuristic for pointers to structs (handle **, *** etc)
                     if type_str.endswith('*') and meta_type == 'META_TYPE_STRUCT' and type_str != 'char*':
                         meta_type = 'META_TYPE_POINTER'
-                        type_str = type_str[:-1] # Remove * for type name
+                        while type_str.endswith('*'):
+                            type_str = type_str[:-1].strip()
 
                     current_struct['fields'].append({
                         'name': name,

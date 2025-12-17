@@ -30,9 +30,9 @@ typedef struct MathNode {
 } MathNode;
 
 typedef struct MathGraph {
-    MathNode** nodes;
-    size_t node_count;
-    size_t node_capacity;
+    MathNode** nodes; // REFLECT
+    int node_count;   // REFLECT
+    int node_capacity;
 } MathGraph;
 
 void math_graph_init(MathGraph* graph);

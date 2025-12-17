@@ -48,6 +48,7 @@ typedef struct UiDef {
     char* text; 
     char* bind_source; // For Sliders/Inputs: property name to bind to
     char* data_source; // For Lists/Containers: property name to use as context
+    char* count_source; // For Lists: property name for the item count
     
     // List specific
     struct UiDef* item_template; // Template for list items

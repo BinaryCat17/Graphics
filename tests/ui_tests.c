@@ -197,6 +197,61 @@ int test_overlay_layout() {
     ui_def_free(root);
     return 1;
 }
+
+#include "domains/math_model/math_graph.h"
+
+int test_repeater() {
+    // 1. Setup Data Model
+    MathGraph graph = {0};
+    graph.node_count = 3;
+    graph.nodes = (MathNode**)calloc(3, sizeof(MathNode*));
+    for(int i=0; i<3; ++i) {
+        graph.nodes[i] = (MathNode*)calloc(1, sizeof(MathNode));
+        graph.nodes[i]->id = i + 1;
+        graph.nodes[i]->value = (float)i * 10.0f;
+    }
+
+    // 2. Setup UI Definition
+    // Root (List)
+    UiDef* list_def = create_def(UI_NODE_LIST, UI_LAYOUT_COLUMN, 200.0f, -1.0f, "list");
+    list_def->data_source = strdup("nodes");
+    list_def->count_source = strdup("node_count");
+    
+    // Item Template (Label)
+    UiDef* item_def = create_def(UI_NODE_LABEL, UI_LAYOUT_COLUMN, -1.0f, -1.0f, "item");
+    item_def->text = strdup("Node {id}"); // Bind to ID
+    list_def->item_template = item_def;
+
+    // 3. Create View
+    const MetaStruct* graph_meta = meta_get_struct("MathGraph");
+    TEST_ASSERT(graph_meta != NULL);
+    
+    UiView* view = ui_view_create(list_def, &graph, graph_meta);
+    TEST_ASSERT(view != NULL);
+    
+    // 4. Update (Triggers repeater logic)
+    ui_view_update(view);
+
+    // 5. Verify
+    TEST_ASSERT_INT_EQ(3, view->child_count);
+    
+    UiView* child0 = view->children[0];
+    TEST_ASSERT(child0 != NULL);
+    
+    // Check binding resolution
+    // Note: resolve_text_binding runs in ui_view_update.
+    TEST_ASSERT_STR_EQ("Node 1", child0->cached_text);
+    
+    // Cleanup
+    ui_view_free(view);
+    ui_def_free(list_def); 
+    
+    for(int i=0; i<3; ++i) free(graph.nodes[i]);
+    free(graph.nodes);
+    
+    return 1;
+}
+
 int main() {
     printf("--- Running UI Tests ---\n");
 
@@ -204,6 +259,7 @@ int main() {
     RUN_TEST(test_row_layout_auto_width);
     RUN_TEST(test_nested_auto_size);
     RUN_TEST(test_overlay_layout);
+    RUN_TEST(test_repeater);
     
     if (g_tests_failed > 0) {
         printf(TERM_RED "\n%d TESTS FAILED\n" TERM_RESET, g_tests_failed);

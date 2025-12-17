@@ -220,4 +220,4 @@ endfunction()
 # Update test paths and libs
 add_graphics_test(transform_tests tests/transform_tests.c foundation_math engine_render)
 add_graphics_test(math_scene_tests tests/math_scene_tests.c domain_math)
-add_graphics_test(ui_tests tests/ui_tests.c engine_ui foundation_logger)
+add_graphics_test(ui_tests tests/ui_tests.c engine_ui foundation_logger domain_math)

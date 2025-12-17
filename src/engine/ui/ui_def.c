@@ -13,6 +13,16 @@ static char* strdup_safe(const char* s) {
     return copy;
 }
 
+static const MetaField* find_field(const MetaStruct* meta, const char* name) {
+    if (!meta || !name) return NULL;
+    for (size_t i = 0; i < meta->field_count; ++i) {
+        if (strcmp(meta->fields[i].name, name) == 0) {
+            return &meta->fields[i];
+        }
+    }
+    return NULL;
+}
+
 // --- UiDef Implementation ---
 
 UiDef* ui_def_create(UiNodeType type) {
@@ -32,6 +42,7 @@ void ui_def_free(UiDef* def) {
     free(def->text);
     free(def->bind_source);
     free(def->data_source);
+    free(def->count_source);
     
     if (def->item_template) ui_def_free(def->item_template);
     
@@ -165,8 +176,73 @@ void ui_view_update(UiView* view) {
     
     // 2. Update Children
     if (view->def->type == UI_NODE_LIST) {
-        // Reconciliation logic for lists would go here
-        // Check array size -> create/destroy child views
+        // Reconciliation logic for lists
+        int count = 0;
+        void* array_base = NULL;
+        const MetaStruct* item_meta = NULL;
+
+        if (view->def->count_source && view->def->data_source && view->data_ptr && view->meta) {
+            const MetaField* count_field = find_field(view->meta, view->def->count_source);
+            const MetaField* array_field = find_field(view->meta, view->def->data_source);
+            
+            if (count_field && count_field->type == META_TYPE_INT) {
+                count = meta_get_int(view->data_ptr, count_field);
+            }
+            
+            if (array_field && array_field->type == META_TYPE_POINTER) {
+                void* field_addr = meta_get_field_ptr(view->data_ptr, array_field);
+                if (field_addr) {
+                    array_base = *(void**)field_addr;
+                    item_meta = meta_get_struct(array_field->type_name);
+                }
+            }
+        }
+
+        // Resize Children Array
+        if (view->child_capacity < (size_t)count) {
+            size_t new_cap = (size_t)count;
+            UiView** new_children = (UiView**)realloc(view->children, sizeof(UiView*) * new_cap);
+            if (new_children) {
+                view->children = new_children;
+                // Init new slots to NULL
+                for (size_t i = view->child_capacity; i < new_cap; ++i) view->children[i] = NULL;
+                view->child_capacity = new_cap;
+            } else {
+                count = (int)view->child_capacity; // Allocation failed, cap count
+            }
+        }
+
+        // Update / Create Loop
+        if (array_base && item_meta) {
+            void** ptrs = (void**)array_base; // Assume array of pointers
+            for (int i = 0; i < count; ++i) {
+                void* item_ptr = ptrs[i];
+                
+                if (!view->children[i]) {
+                    // Create new
+                    if (view->def->item_template) {
+                        view->children[i] = ui_view_create(view->def->item_template, item_ptr, item_meta);
+                        if (view->children[i]) view->children[i]->parent = view;
+                    }
+                } else {
+                    // Update Context
+                    view->children[i]->data_ptr = item_ptr;
+                    view->children[i]->meta = item_meta;
+                }
+                
+                if (view->children[i]) {
+                    ui_view_update(view->children[i]);
+                }
+            }
+        }
+
+        // Cleanup excess
+        for (size_t i = (size_t)count; i < view->child_count; ++i) {
+            ui_view_free(view->children[i]);
+            view->children[i] = NULL;
+        }
+        view->child_count = (size_t)count;
+
     } else {
         for (size_t i = 0; i < view->child_count; ++i) {
             ui_view_update(view->children[i]);
@@ -175,16 +251,6 @@ void ui_view_update(UiView* view) {
 }
 
 // --- Input Processing ---
-
-static const MetaField* find_field(const MetaStruct* meta, const char* name) {
-    if (!meta || !name) return NULL;
-    for (size_t i = 0; i < meta->field_count; ++i) {
-        if (strcmp(meta->fields[i].name, name) == 0) {
-            return &meta->fields[i];
-        }
-    }
-    return NULL;
-}
 
 static bool rect_contains(Rect r, float x, float y) {
     return x >= r.x && x <= r.x + r.w && y >= r.y && y <= r.y + r.h;

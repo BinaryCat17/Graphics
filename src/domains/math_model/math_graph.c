@@ -18,7 +18,7 @@ static void free_node(MathNode* node) {
 
 void math_graph_dispose(MathGraph* graph) {
     if (!graph) return;
-    for (size_t i = 0; i < graph->node_count; ++i) {
+    for (int i = 0; i < graph->node_count; ++i) {
         free_node(graph->nodes[i]);
     }
     free(graph->nodes);
