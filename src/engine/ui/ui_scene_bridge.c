@@ -28,7 +28,11 @@ static void traverse_ui(const UiView* view, Scene* scene, const Assets* assets, 
         if (view->def->type == UI_NODE_CURVE) {
             obj.prim_type = SCENE_PRIM_CURVE;
             obj.color = (Vec4){0.8f, 0.8f, 0.8f, 1.0f}; // Grey wire
-            obj.params.z = 0.02f; // Default thickness
+            
+            // Aspect Corrected SDF params
+            float h = (view->rect.h > 0.1f) ? view->rect.h : 1.0f;
+            obj.params.z = 3.0f / h; // 3px thickness
+            obj.params.w = view->rect.w / h; // Aspect Ratio
             
             // Resolve Curve Bindings
             if (view->data_ptr && view->meta) {

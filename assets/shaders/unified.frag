@@ -70,22 +70,25 @@ void main() {
         }
     } 
     else if (inParams.y > 0.5) { // Curve (PrimType == 1)
-        // SDF Rendering
-        // inUV is 0..1 covering the bounding box
-        // inExtra.xy = Start Point in UV space
-        // inExtra.zw = End Point in UV space
+        // Aspect Ratio Correction
+        float ar = (inParams.w > 0.0) ? inParams.w : 1.0;
+        vec2 scale = vec2(ar, 1.0);
         
-        float dist = sdWire(inUV, inExtra.xy, inExtra.zw);
+        vec2 p = inUV * scale;
+        vec2 a = inExtra.xy * scale;
+        vec2 b = inExtra.zw * scale;
+        
+        float dist = sdWire(p, a, b);
         
         // Add round caps (circles at endpoints)
-        dist = min(dist, length(inUV - inExtra.xy));
-        dist = min(dist, length(inUV - inExtra.zw));
+        dist = min(dist, length(p - a));
+        dist = min(dist, length(p - b));
         
         // Anti-aliased stroke
-        // Thickness = 0.01 (in UV space) - depends on scale. 
-        // Ideally pass thickness in params.z. Let's assume params.z
+        // Thickness passed in params.z (already relative to height)
         float thickness = (inParams.z > 0.0) ? inParams.z : 0.01;
-        float aa = 0.005; 
+        float aa = 0.005; // Fixed AA feather
+        // Ideally AA should depend on dFdx/dFdy but fixed is okay for 2D UI
         
         alpha = 1.0 - smoothstep(thickness - aa, thickness + aa, dist);
         
