@@ -191,17 +191,17 @@ static void draw_frame_scene(VulkanRendererState* state, const Scene* scene) {
             // Log 1st object (Background) and 2nd object (First Letter)
             if (debug_frame) {
                 if (i == 0) {
-                    LOG_INFO("Obj[0] (Bg): Pos(%.2f, %.2f) Scale(%.2f, %.2f) Tex(%.1f)",
+                    LOG_TRACE("Obj[0] (Bg): Pos(%.2f, %.2f) Scale(%.2f, %.2f) Tex(%.1f)",
                         obj->position.x, obj->position.y, obj->scale.x, obj->scale.y, obj->params.x);
                 } else if (i == 1) {
-                    LOG_INFO("Obj[1] (Txt): Pos(%.2f, %.2f) Scale(%.2f, %.2f) Tex(%.1f) UV(%.2f,%.2f,%.2f,%.2f)",
+                    LOG_TRACE("Obj[1] (Txt): Pos(%.2f, %.2f) Scale(%.2f, %.2f) Tex(%.1f) UV(%.2f,%.2f,%.2f,%.2f)",
                         obj->position.x, obj->position.y, obj->scale.x, obj->scale.y, obj->params.x,
                         obj->uv_rect.x, obj->uv_rect.y, obj->uv_rect.z, obj->uv_rect.w);
                 }
             }
         }
     } else if (debug_frame) {
-        LOG_INFO("Scene is empty or NULL");
+        LOG_TRACE("Scene is empty or NULL");
     }
 
     VkCommandBuffer cb = state->cmdbuffers[img_idx];
@@ -248,7 +248,7 @@ static void draw_frame_scene(VulkanRendererState* state, const Scene* scene) {
     Mat4 view_proj = mat4_multiply(&proj, &view);
     
     if (debug_frame) {
-        LOG_INFO("ViewProj: W=%.1f H=%.1f Proj[0]=%.4f Proj[5]=%.4f Proj[10]=%.4f Proj[12]=%.4f Proj[13]=%.4f Proj[14]=%.4f", 
+        LOG_TRACE("ViewProj: W=%.1f H=%.1f Proj[0]=%.4f Proj[5]=%.4f Proj[10]=%.4f Proj[12]=%.4f Proj[13]=%.4f Proj[14]=%.4f", 
             w, h, proj.m[0], proj.m[5], proj.m[10], proj.m[12], proj.m[13], proj.m[14]);
     }
     
@@ -264,7 +264,7 @@ static void draw_frame_scene(VulkanRendererState* state, const Scene* scene) {
         
         // INSTANCED DRAW CALL
         if (debug_frame) {
-            LOG_INFO("Issuing DrawInstanced: VertexCount=6, InstanceCount=%zu", scene->object_count);
+            LOG_TRACE("Issuing DrawInstanced: VertexCount=6, InstanceCount=%zu", scene->object_count);
         }
         vkCmdDraw(cb, 6, scene->object_count, 0, 0); 
     }

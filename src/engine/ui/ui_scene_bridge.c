@@ -46,7 +46,7 @@ static void traverse_ui(const UiView* view, Scene* scene, const Assets* assets, 
         scene_add_object(scene, obj);
 
         if (debug_frame) {
-            LOG_INFO("GenPanel id='%s' Type=%d Rect(%.1f, %.1f, %.1f, %.1f) Color(%.2f, %.2f, %.2f, %.2f)",
+            LOG_TRACE("GenPanel id='%s' Type=%d Rect(%.1f, %.1f, %.1f, %.1f) Color(%.2f, %.2f, %.2f, %.2f)",
                 view->def->id ? view->def->id : "(anon)",
                 view->def->type,
                 view->rect.x, view->rect.y, view->rect.w, view->rect.h,
@@ -76,7 +76,7 @@ static void traverse_ui(const UiView* view, Scene* scene, const Assets* assets, 
             }
             
             if (debug_frame) {
-                LOG_INFO("GenText '%s': Start(%.1f, %.1f) Rect(%.1f, %.1f, %.1f, %.1f)", 
+                LOG_TRACE("GenText '%s': Start(%.1f, %.1f) Rect(%.1f, %.1f, %.1f, %.1f)", 
                     view->cached_text, cursor_x, cursor_y,
                     view->rect.x, view->rect.y, view->rect.w, view->rect.h);
             }
@@ -110,7 +110,7 @@ static void traverse_ui(const UiView* view, Scene* scene, const Assets* assets, 
                     scene_add_object(scene, char_obj);
                     
                     if (debug_frame && char_count == 0) {
-                        LOG_INFO("  First Char '%c': Pos(%.1f, %.1f) Sz(%.1f, %.1f) UV(%.3f,%.3f)",
+                        LOG_TRACE("  First Char '%c': Pos(%.1f, %.1f) Sz(%.1f, %.1f) UV(%.3f,%.3f)",
                             *ptr, x_pos, y_pos, g.w, g.h, g.u0, g.v0);
                     }
                     
@@ -144,7 +144,7 @@ void ui_build_scene(const UiView* root, Scene* scene, const Assets* assets) {
     }
     
     if (debug_frame) {
-        LOG_INFO("UI Build Scene: %zu objects generated. Root Rect: %.1f, %.1f, %.1f, %.1f", 
+        LOG_TRACE("UI Build Scene: %zu objects generated. Root Rect: %.1f, %.1f, %.1f, %.1f", 
             scene->object_count, root->rect.x, root->rect.y, root->rect.w, root->rect.h);
     }
     
