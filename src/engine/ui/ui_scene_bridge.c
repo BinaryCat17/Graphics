@@ -44,6 +44,20 @@ static void traverse_ui(const UiView* view, Scene* scene, const Assets* assets, 
         
         // Add to scene
         scene_add_object(scene, obj);
+
+        if (debug_frame) {
+            LOG_INFO("GenPanel id='%s' Type=%d Rect(%.1f, %.1f, %.1f, %.1f) Color(%.2f, %.2f, %.2f, %.2f)",
+                view->def->id ? view->def->id : "(anon)",
+                view->def->type,
+                view->rect.x, view->rect.y, view->rect.w, view->rect.h,
+                (double)obj.color.x, (double)obj.color.y, (double)obj.color.z, (double)obj.color.w);
+        }
+    } else {
+        if (debug_frame) {
+             LOG_WARN("Skipping Panel id='%s' due to invalid rect(%.1f, %.1f, %.1f, %.1f)",
+                view->def->id ? view->def->id : "(anon)",
+                view->rect.x, view->rect.y, view->rect.w, view->rect.h);
+        }
     }
 
     // Text Rendering

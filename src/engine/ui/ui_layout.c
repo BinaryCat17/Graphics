@@ -1,4 +1,5 @@
 #include "ui_layout.h"
+#include "foundation/logger/logger.h"
 #include <stddef.h>
 
 static void layout_recursive(UiView* view, Rect available) {
@@ -37,6 +38,10 @@ static void layout_recursive(UiView* view, Rect available) {
     view->rect.y = available.y;
     view->rect.w = w;
     view->rect.h = h;
+
+    LOG_TRACE("Layout Node id='%s': Rect(%.1f, %.1f, %.1f, %.1f)", 
+        view->def->id ? view->def->id : "(anon)",
+        view->rect.x, view->rect.y, view->rect.w, view->rect.h);
 
     // Layout Children
     Rect content = {

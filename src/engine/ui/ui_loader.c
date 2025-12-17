@@ -1,5 +1,6 @@
 #include "ui_loader.h"
 #include "foundation/config/config_document.h"
+#include "foundation/logger/logger.h"
 #include <string.h>
 #include <stdlib.h>
 #include <stdio.h>
@@ -51,14 +52,20 @@ UiDef* ui_loader_load_from_node(const void* node_ptr) {
     if (!node || node->type != CONFIG_NODE_MAP) return NULL;
 
     const ConfigNode* type_node = config_node_get_scalar(node, "type");
-    UiNodeType type = parse_node_type(type_node ? type_node->scalar : "panel");
+    const char* type_str = type_node ? type_node->scalar : "panel";
+    UiNodeType type = parse_node_type(type_str);
+
+    // Identity & Style (Pre-load for logging)
+    const ConfigNode* id_node = config_node_get_scalar(node, "id");
+    const char* id_str = id_node ? id_node->scalar : "(anon)";
+
+    LOG_DEBUG("UiLoader: Loading node type='%s' id='%s'", type_str, id_str);
 
     UiDef* def = ui_def_create(type);
     if (!def) return NULL;
 
     // 1. Identity & Style
-    const ConfigNode* id = config_node_get_scalar(node, "id");
-    if (id) def->id = strdup_safe(id->scalar);
+    if (id_node) def->id = strdup_safe(id_node->scalar);
 
     const ConfigNode* style = config_node_get_scalar(node, "style");
     if (style) def->style_name = strdup_safe(style->scalar);
@@ -115,10 +122,12 @@ UiDef* ui_loader_load_from_node(const void* node_ptr) {
 UiDef* ui_loader_load_from_file(const char* path) {
     if (!path) return NULL;
 
+    LOG_INFO("UiLoader: Loading UI definition from file: %s", path);
+
     ConfigError err;
     ConfigDocument doc;
     if (!load_config_document(path, CONFIG_FORMAT_YAML, &doc, &err)) {
-        fprintf(stderr, "UiLoader: Failed to load %s: %s (line %d)\n", path, err.message, err.line);
+        LOG_ERROR("UiLoader: Failed to load %s: %s (line %d)", path, err.message, err.line);
         return NULL;
     }
 

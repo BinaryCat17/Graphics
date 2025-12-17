@@ -241,13 +241,15 @@ static void draw_frame_scene(VulkanRendererState* state, const Scene* scene) {
     // near=-1.0, far=1.0. 
     // Z=0.0 maps to 0.5 (Mid). Z=0.1 maps to 0.55.
     // Objects must be in [-1, 1].
-    Mat4 proj = mat4_orthographic(0, w, 0, h, -1.0f, 1.0f);
+    // UPDATE: We use near=1.0, far=-1.0 so that Z_ndc = Z.
+    // This maps input Z=[0, 1] to NDC=[0, 1], which matches Vulkan clip volume.
+    Mat4 proj = mat4_orthographic(0, w, 0, h, 1.0f, -1.0f);
     Mat4 view = mat4_identity(); 
     Mat4 view_proj = mat4_multiply(&proj, &view);
     
     if (debug_frame) {
-        LOG_INFO("ViewProj: W=%.1f H=%.1f Proj[0]=%.4f Proj[5]=%.4f Proj[12]=%.4f Proj[13]=%.4f", 
-            w, h, proj.m[0], proj.m[5], proj.m[12], proj.m[13]);
+        LOG_INFO("ViewProj: W=%.1f H=%.1f Proj[0]=%.4f Proj[5]=%.4f Proj[10]=%.4f Proj[12]=%.4f Proj[13]=%.4f Proj[14]=%.4f", 
+            w, h, proj.m[0], proj.m[5], proj.m[10], proj.m[12], proj.m[13], proj.m[14]);
     }
     
     UnifiedPushConstants pc;
