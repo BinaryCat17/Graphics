@@ -1,53 +1,28 @@
-# Состояние проекта "Graphics"
-**Дата:** 16 Декабря 2025
-**Версия:** Alpha (Prototype)
+# Current State: "Graphics" Engine
+**Version:** 0.2.0 (The Foundation)
+**Date:** December 17, 2025
 
-## 1. Архитектурный обзор
-Проект построен на языке C (C11) с использованием архитектурного паттерна **MVVM-C** (Model-View-ViewModel-Controller), адаптированного для процедурного программирования.
+## 1. Executive Summary
+The project has successfully transitioned from a prototype to a cohesive **Unified Visual Engine**. The core architectural distinction between "2D UI" and "3D World" has been abolished at the rendering level. Everything visible—from a button to a mathematical surface—is a `SceneObject`.
 
-### Основные подсистемы:
-1.  **Foundation:** Базовые сервисы (логгер, файловая система, математика векторов/матриц, рефлексия).
-2.  **Engine (Core):**
-    *   **Assets:** Управление ресурсами (шейдеры, шрифты).
-    *   **UI:** Собственная система интерфейса (Retained Mode, Flexbox-like layout).
-    *   **Render:** Абстрагированный рендерер (текущий бэкенд: Vulkan/DZN), работающий в отдельном потоке.
-3.  **Domains (Logic):**
-    *   **Math Model:** Граф математических функций.
-    *   **CAD Model:** Представление геометрических данных (Mesh).
+While the architectural skeleton is strong (Data-Oriented, Vulkan-backed), the engine is currently "silent" and "static". It lacks text rendering and interactivity, making it a powerful renderer of colored rectangles, but not yet a usable application.
 
----
+## 2. Technical Architecture (Existing)
 
-## 2. Детальный разбор подсистем
+### Core Systems
+*   **Unified Scene (`src/engine/scene`):** A flat, data-oriented array of `SceneObject` structs. This is the single source of truth for the renderer.
+*   **Vulkan Backend (`src/engine/render/backend/vulkan`):** A modern, decoupled renderer. It consumes the `Scene` snapshot and renders it in a single pass using a unified shader (`unified.vert/frag`).
+*   **Meta-System (`src/foundation/meta`):** A powerful reflection engine powered by `tools/codegen.py`. It parses C headers and generates memory layout descriptions (`MetaStruct`), enabling generic data manipulation.
+*   **UI Loader (`src/engine/ui`):** A YAML-based loader that instantiates `UiView` hierarchies. Currently, it relies on a "Push" model (updating the view every frame) rather than a reactive model.
 
-### A. Math Engine (MathGraph)
-*   **Структура:** Направленный граф (DAG). Узлы (`MathNode`) содержат операцию (Add, Mul, Sin) и ссылки на входные узлы.
-*   **Данные:** Оперирует исключительно скалярными значениями `float`.
-*   **Исполнение:** Рекурсивный обход графа на CPU (`math_node_eval`).
-*   **Визуализация:**
-    *   Реализован `MathMeshBuilder` для построения поверхностей.
-    *   **Критическая проблема:** Генерация меша происходит на CPU. Для сетки $N \times M$ граф вычисляется $N \times M$ раз *каждый кадр*. Это блокирует основной поток и не масштабируется.
+### Domain Model
+*   **Math Graph (`src/domains/math_model`):** A basic directed graph structure exists in C. It is currently disconnected from the renderer and runs solely on the CPU.
 
-### B. Render System
-*   **Архитектура:** Data-Driven. Основной поток формирует `RenderPacket` (копии данных), поток рендера потребляет их.
-*   **Синхронизация:** Double Buffering пакетов.
-*   **Backend:** Vulkan (через слой абстракции). Поддерживает загрузку SPIR-V шейдеров.
-*   **Отрисовка UI:** Отдельный проход, генерирующий вершинный буфер для UI-элементов.
+## 3. Critical Gaps
+1.  **Text Rendering (The Voice):** The system cannot render text. All UI widgets are blank. This is the top priority blocker.
+2.  **Reactivity (The Nervous System):** The UI does not "react" to data changes; it merely polls them or requires manual updates.
+3.  **GPU Compute (The Muscle):** Mathematical calculations happen on the CPU. There is no mechanism yet to offload massive number-crunching to Compute Shaders.
+4.  **Interactivity:** No mouse picking, drag-and-drop, or camera control.
 
-### C. UI System
-*   **Определение:** Декларативное описание в YAML (`assets/ui/*.yaml`).
-*   **Layout:** Flexbox-подобный (Row/Column, Padding, Spacing).
-*   **Binding:** Привязка данных через Reflection (строковые пути `{value}`).
-*   **Input:** Реализована базовая поддержка мыши (Click, Drag для слайдеров).
-*   **Ограничения:** Отсутствует поддержка кастомной отрисовки (Canvas), скроллинга областей, зума и визуальных редакторов.
-
----
-
-## 3. Ключевые проблемы (Bottlenecks)
-
-1.  **CPU-Bound Math:** Вычисление математики на процессоре делает невозможным работу с плотными сетками или сложными функциями в реальном времени.
-2.  **Scalar-Only:** Отсутствие поддержки векторов и матриц в графе ограничивает математические возможности (нет линейной алгебры).
-3.  **Static UI:** Текущая система UI не позволяет создать Node Editor (редактор графов), так как нет примитивов для рисования линий/кривых и управления свободным пространством (Pan/Zoom).
-4.  **Data Transfer:** Передача сгенерированной геометрии (Mesh) каждый кадр с CPU на GPU является узким местом шины.
-
-## 4. Итог
-Проект имеет надежный, чистый фундамент (Memory Management, Reflection, Render Threading), но математическое ядро требует полной переработки архитектуры исполнения (перенос на GPU) для достижения заявленных целей "Grand Math Engine".
+## 4. Conclusion
+The foundation is solid A-grade C code. The project is ready for the "Brain Transplant": moving from static YAML interfaces to a dynamic, user-programmable environment.
