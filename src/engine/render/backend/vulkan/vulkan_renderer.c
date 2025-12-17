@@ -21,6 +21,8 @@ typedef struct {
     float model[16];
     float view_proj[16];
     float color[4];
+    float uv_rect[4];
+    float params[4]; // x = use_texture
 } UnifiedPushConstants;
 
 // --- Helpers ---
@@ -29,10 +31,6 @@ static bool vk_create_and_upload_buffer(VulkanRendererState* state, VkBufferUsag
     // 1. Staging Buffer
     VkBuffer staging_buf;
     VkDeviceMemory staging_mem;
-    
-    // Using vk_create_buffer from vk_resources.c
-    // We assume it's available (non-static in vk_resources.c)
-    // Note: vk_resources.c: vk_create_buffer(state, size, usage, props, buf, mem)
     
     vk_create_buffer(state, size, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, 
         VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, 
@@ -49,10 +47,6 @@ static bool vk_create_and_upload_buffer(VulkanRendererState* state, VkBufferUsag
         out_buf, out_mem);
         
     // 3. Copy
-    // Use immediate submit helper (needs to be exposed or re-implemented)
-    // vk_resources.c has static begin_single_time_commands. 
-    // We'll re-implement simple version here.
-    
     VkCommandBufferAllocateInfo ai = { .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO, .commandPool = state->cmdpool, .level = VK_COMMAND_BUFFER_LEVEL_PRIMARY, .commandBufferCount = 1 };
     VkCommandBuffer cb;
     vkAllocateCommandBuffers(state->device, &ai, &cb);
@@ -96,10 +90,6 @@ static bool recover_device_loss(VulkanRendererState* state) {
     vk_create_cmds_and_sync(state);
     vk_create_font_texture(state);
     vk_create_descriptor_pool_and_set(state);
-    
-    // Re-upload unit quad
-    // (Assume we have unit quad data available? It was passed in init. 
-    // We should store it or re-fetch. For now, hardcode or ignore re-upload on recovery for this prototype)
     
     return true;
 }
@@ -152,30 +142,28 @@ static void draw_frame_scene(VulkanRendererState* state, const Scene* scene) {
     // 3. Bind Pipeline & Global Resources
     vkCmdBindPipeline(cb, VK_PIPELINE_BIND_POINT_GRAPHICS, state->pipeline);
     
-    // View Projection Matrix (Ortho for UI)
+    if (state->descriptor_set) {
+        vkCmdBindDescriptorSets(cb, VK_PIPELINE_BIND_POINT_GRAPHICS, state->pipeline_layout, 0, 1, &state->descriptor_set, 0, NULL);
+    }
+    
     float w = (float)state->swapchain_extent.width;
     float h = (float)state->swapchain_extent.height;
     Mat4 proj = mat4_orthographic(0, w, 0, h, -1.0f, 1.0f);
-    Mat4 view = mat4_identity(); // Camera at origin
+    Mat4 view = mat4_identity(); 
     Mat4 view_proj = mat4_multiply(&proj, &view);
 
-    // Bind Vertex Buffer (Unit Quad)
     if (state->unit_quad_buffer) {
         VkDeviceSize offset = 0;
         vkCmdBindVertexBuffers(cb, 0, 1, &state->unit_quad_buffer, &offset);
         
-        // 4. Draw Scene Objects
         if (scene) {
             for (size_t i = 0; i < scene->object_count; ++i) {
                 SceneObject* obj = &scene->objects[i];
                 
-                // Model Matrix
                 Mat4 T = mat4_translation(obj->position);
                 Mat4 S = mat4_scale(obj->scale);
-                // Mat4 R = mat4_rotation_... (TODO)
                 Mat4 model = mat4_multiply(&T, &S);
                 
-                // Push Constants
                 UnifiedPushConstants pc;
                 memcpy(pc.model, model.m, sizeof(float)*16);
                 memcpy(pc.view_proj, view_proj.m, sizeof(float)*16);
@@ -184,39 +172,19 @@ static void draw_frame_scene(VulkanRendererState* state, const Scene* scene) {
                 pc.color[2] = obj->color.z;
                 pc.color[3] = obj->color.w;
                 
-                vkCmdPushConstants(cb, state->pipeline_layout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(UnifiedPushConstants), &pc);
+                // UV Rect (Default to 0,0,1,1 if 0)
+                if (obj->uv_rect.z == 0.0f && obj->uv_rect.w == 0.0f) {
+                     pc.uv_rect[0] = 0.0f; pc.uv_rect[1] = 0.0f;
+                     pc.uv_rect[2] = 1.0f; pc.uv_rect[3] = 1.0f;
+                } else {
+                     pc.uv_rect[0] = obj->uv_rect.x; pc.uv_rect[1] = obj->uv_rect.y;
+                     pc.uv_rect[2] = obj->uv_rect.z; pc.uv_rect[3] = obj->uv_rect.w;
+                }
                 
-                // Draw Quad (6 indices)
-                // Note: We use vkCmdDraw because we didn't upload indices to a buffer yet.
-                // Wait, unit_quad in assets has indices. 
-                // But creating index buffer adds complexity.
-                // Let's assume non-indexed draw for unit quad (we need 6 vertices unrolled).
-                // Or we upload index buffer.
-                // Simpler: Draw 6 vertices. 
-                // Ah, assets->unit_quad.positions has 12 floats (4 vertices).
-                // I need 6 vertices for 2 triangles if drawing non-indexed.
-                // OR upload index buffer.
-                // Let's assume NON-INDEXED for now and just draw 4 vertices as Triangle Strip?
-                // Or I re-generate unit quad as 6 vertices in init.
-                // Let's change init logic slightly later. 
-                // Current asset has 4 verts + indices.
-                // I'll stick to non-indexed TRIANGLE_STRIP for quad if I change mesh?
-                // The pipeline topology is TRIANGLE_LIST.
-                // So I should draw 6 vertices.
-                // But I only uploaded 4 vertices.
-                // I NEED Index Buffer.
+                pc.params[0] = obj->params.x;
                 
-                // Hack: Just draw 3 vertices for now to verify triangle :)
-                // No, I want full quad.
-                // I will add Index Buffer support in init quickly.
+                vkCmdPushConstants(cb, state->pipeline_layout, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(UnifiedPushConstants), &pc);
                 
-                // TODO: Index Buffer.
-                // For now, I only assume vertex buffer bound.
-                // I'll assume VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST.
-                // If I call vkCmdDraw(cb, 6, ...), it reads 6 vertices.
-                // My buffer has 4. Segfault or GPU hang.
-                
-                // Quick Fix: I will modify vk_backend_init to generate 6 vertices for the quad buffer.
                 vkCmdDraw(cb, 6, 1, 0, 0); 
             }
         }
@@ -232,6 +200,26 @@ static void draw_frame_scene(VulkanRendererState* state, const Scene* scene) {
 
     VkPresentInfoKHR pi = { .sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR, .waitSemaphoreCount = 1, .pWaitSemaphores = &state->sem_render_done, .swapchainCount = 1, .pSwapchains = &state->swapchain, .pImageIndices = &img_idx };
     vkQueuePresentKHR(state->queue, &pi);
+}
+
+static bool vk_backend_get_glyph(RendererBackend* backend, uint32_t codepoint, RenderGlyph* out_glyph) {
+    if (!backend || !backend->state || !out_glyph) return false;
+    VulkanRendererState* state = (VulkanRendererState*)backend->state;
+    
+    if (codepoint >= GLYPH_CAPACITY || !state->glyph_valid[codepoint]) return false;
+    
+    Glyph* g = &state->glyphs[codepoint];
+    out_glyph->u0 = g->u0;
+    out_glyph->v0 = g->v0;
+    out_glyph->u1 = g->u1;
+    out_glyph->v1 = g->v1;
+    out_glyph->w = g->w;
+    out_glyph->h = g->h;
+    out_glyph->xoff = g->xoff;
+    out_glyph->yoff = g->yoff;
+    out_glyph->advance = g->advance;
+    
+    return true;
 }
 
 static void vk_backend_render_scene(RendererBackend* backend, const Scene* scene) {
@@ -297,17 +285,18 @@ static bool vk_backend_init(RendererBackend* backend, const RenderBackendInit* i
     vk_create_descriptor_pool_and_set(state);
 
     // Create Unit Quad Buffer (6 vertices for list)
-    // Vertices: [x, y, z]
+    // Vertices: [x, y, z, u, v] (stride 20)
     // 0,0 - 1,0 - 1,1
     // 0,0 - 1,1 - 0,1
     float quad_verts[] = {
-        0.0f, 0.0f, 0.0f,
-        1.0f, 0.0f, 0.0f,
-        1.0f, 1.0f, 0.0f,
+        // Pos(3)       // UV(2)
+        0.0f, 0.0f, 0.0f,  0.0f, 0.0f,
+        1.0f, 0.0f, 0.0f,  1.0f, 0.0f,
+        1.0f, 1.0f, 0.0f,  1.0f, 1.0f,
         
-        0.0f, 0.0f, 0.0f,
-        1.0f, 1.0f, 0.0f,
-        0.0f, 1.0f, 0.0f
+        0.0f, 0.0f, 0.0f,  0.0f, 0.0f,
+        1.0f, 1.0f, 0.0f,  1.0f, 1.0f,
+        0.0f, 1.0f, 0.0f,  0.0f, 1.0f
     };
     vk_create_and_upload_buffer(state, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, quad_verts, sizeof(quad_verts), &state->unit_quad_buffer, &state->unit_quad_memory);
 
@@ -319,6 +308,7 @@ RendererBackend* vulkan_renderer_backend(void) {
     g_vulkan_backend.state = NULL;
     g_vulkan_backend.init = vk_backend_init;
     g_vulkan_backend.render_scene = vk_backend_render_scene;
+    g_vulkan_backend.get_glyph = vk_backend_get_glyph;
     g_vulkan_backend.draw = vk_backend_draw;
     g_vulkan_backend.cleanup = vk_backend_cleanup;
     return &g_vulkan_backend;

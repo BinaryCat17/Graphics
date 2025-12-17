@@ -41,6 +41,8 @@ typedef struct SceneObject {
     const Mesh* mesh; // Geometry
     // Material* material; // TODO: Define Material struct
     Vec4 color; // Simple color support
+    Vec4 uv_rect; // Texture Subset: xy = offset, zw = scale. Default: (0,0,1,1)
+    Vec4 params; // Shader params: x = use_texture (0.0 or 1.0)
     
     // Instancing (Data-Driven Visualization)
     // If instance_count > 0, this object is a template
