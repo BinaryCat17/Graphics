@@ -237,6 +237,10 @@ static void resolve_geometry_bindings(UiView* view) {
     }
 }
 
+#include "foundation/logger/logger.h"
+
+// ... (existing includes)
+
 void ui_view_update(UiView* view) {
     if (!view) return;
     
@@ -257,6 +261,8 @@ void ui_view_update(UiView* view) {
             
             if (count_field && count_field->type == META_TYPE_INT) {
                 count = meta_get_int(view->data_ptr, count_field);
+            } else {
+                LOG_WARN("UI List: Count field '%s' not found or not INT", view->def->count_source);
             }
             
             if (array_field && array_field->type == META_TYPE_POINTER) {
@@ -265,7 +271,6 @@ void ui_view_update(UiView* view) {
                     array_base = *(void**)field_addr;
                     
                     // Strip pointers from type name to find struct meta
-                    // e.g. "MathNode**" -> "MathNode"
                     char clean_name[64];
                     strncpy(clean_name, array_field->type_name, sizeof(clean_name)-1);
                     clean_name[sizeof(clean_name)-1] = 0;
@@ -273,7 +278,7 @@ void ui_view_update(UiView* view) {
                     char* ptr = strchr(clean_name, '*');
                     if (ptr) *ptr = 0;
                     
-                    // Remove trailing spaces if any
+                    // Remove trailing spaces
                     size_t len = strlen(clean_name);
                     while(len > 0 && clean_name[len-1] == ' ') {
                         clean_name[len-1] = 0;
@@ -281,8 +286,15 @@ void ui_view_update(UiView* view) {
                     }
                     
                     item_meta = meta_get_struct(clean_name);
+                    if (!item_meta) {
+                        LOG_ERROR("UI List: Struct metadata '%s' not found for field '%s'", clean_name, view->def->data_source);
+                    }
                 }
+            } else {
+                 LOG_WARN("UI List: Array field '%s' not found or not POINTER", view->def->data_source);
             }
+        } else {
+             LOG_WARN("UI List: Missing bindings or data ptr");
         }
 
         // Resize Children Array

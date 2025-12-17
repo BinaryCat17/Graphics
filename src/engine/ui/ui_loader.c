@@ -102,9 +102,14 @@ UiDef* ui_loader_load_from_node(const void* node_ptr) {
     const ConfigNode* bind = config_node_get_scalar(node, "bind");
     if (bind) def->bind_source = strdup_safe(bind->scalar);
     
-    // "items" or "data_context" for lists
+    // "items", "data", or "data_context" for lists
     const ConfigNode* items = config_node_get_scalar(node, "items");
-    if (items) def->data_source = strdup_safe(items->scalar);
+    if (items) {
+        def->data_source = strdup_safe(items->scalar);
+    } else {
+        const ConfigNode* data = config_node_get_scalar(node, "data");
+        if (data) def->data_source = strdup_safe(data->scalar);
+    }
 
     const ConfigNode* count = config_node_get_scalar(node, "count");
     if (count) def->count_source = strdup_safe(count->scalar);

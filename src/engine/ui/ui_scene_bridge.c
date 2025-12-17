@@ -55,7 +55,7 @@ static void traverse_ui(const UiView* view, Scene* scene, const Assets* assets, 
             }
             
         } else if (view->def->type == UI_NODE_PANEL) {
-            obj.color = (Vec4){0.2f, 0.2f, 0.2f, 1.0f};
+            obj.color = (Vec4){0.3f, 0.3f, 0.3f, 1.0f}; // Brighter grey
         } else if (view->def->type == UI_NODE_BUTTON) {
             if (view->is_pressed) {
                 obj.color = (Vec4){0.2f, 0.4f, 0.7f, 1.0f};
@@ -66,7 +66,7 @@ static void traverse_ui(const UiView* view, Scene* scene, const Assets* assets, 
             }
         } else if (view->def->type == UI_NODE_SLIDER) {
             obj.color = (Vec4){0.4f, 0.4f, 0.4f, 1.0f};
-        } else if (view->def->type == UI_NODE_LABEL) {
+        } else if (view->def->type == UI_NODE_LABEL || view->def->type == UI_NODE_LIST || view->def->type == UI_NODE_CONTAINER) {
              obj.color = (Vec4){0, 0, 0, 0}; // Transparent
         } else {
             obj.color = (Vec4){1.0f, 0.0f, 1.0f, 1.0f}; // Debug magenta
