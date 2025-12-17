@@ -91,6 +91,16 @@ typedef struct VulkanRendererState {
     VkDescriptorSet instance_set;
     size_t instance_capacity; // In element count
 
+    // Compute Target (Visualization)
+    VkImage compute_target_image;
+    VkDeviceMemory compute_target_memory;
+    VkImageView compute_target_view;
+    VkDescriptorSet compute_target_descriptor; // Set 2 (Sampling)
+    VkDescriptorSet compute_write_descriptor;  // Set 0 (Compute Writing)
+    VkDescriptorSetLayout compute_write_layout;
+    int compute_width;
+    int compute_height;
+
     bool (*get_required_instance_extensions)(const char*** names, uint32_t* count);
     bool (*create_surface)(PlatformWindow* window, VkInstance instance, const VkAllocationCallbacks* alloc,
                            PlatformSurface* out_surface);

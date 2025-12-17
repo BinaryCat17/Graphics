@@ -76,6 +76,7 @@ typedef struct RendererBackend {
     
     // Compute (Prototype)
     float (*run_compute)(struct RendererBackend* backend, const char* glsl_source);
+    void (*run_compute_image)(struct RendererBackend* backend, const char* glsl_source, int width, int height);
 } RendererBackend;
 
 bool render_logger_init(RenderLogger* logger, const RenderLoggerConfig* config, const char* backend_id);

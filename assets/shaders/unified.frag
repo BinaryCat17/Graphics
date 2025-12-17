@@ -5,7 +5,8 @@ layout(location = 1) in vec2 inUV;
 layout(location = 2) in vec4 inParams; // x=use_tex, y=prim_type
 layout(location = 3) in vec4 inExtra;  // xy=start_uv, zw=end_uv
 
-layout(set = 0, binding = 0) uniform sampler2D texSampler;
+layout(set = 0, binding = 0) uniform sampler2D texSampler; // Font/Atlas
+layout(set = 2, binding = 0) uniform sampler2D userTex;    // Compute/User
 
 layout(location = 0) out vec4 outColor;
 
@@ -55,9 +56,18 @@ void main() {
     vec4 color = inColor;
     float alpha = color.a;
     
-    if (inParams.x > 0.5) { // Textured Quad
-        float texAlpha = texture(texSampler, inUV).r;
-        alpha *= texAlpha;
+    if (inParams.x > 0.5) { 
+        if (inParams.x < 1.5) {
+             // Textured Quad (Font) - Param 1.0
+             float texAlpha = texture(texSampler, inUV).r;
+             alpha *= texAlpha;
+        } else {
+             // User Texture (Compute) - Param 2.0
+             // Sample fully
+             vec4 texColor = texture(userTex, inUV);
+             color = texColor; // Replace color with texture
+             alpha = texColor.a;
+        }
     } 
     else if (inParams.y > 0.5) { // Curve (PrimType == 1)
         // SDF Rendering

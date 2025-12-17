@@ -2,10 +2,13 @@
 #define TRANSPILER_H
 
 #include "math_graph.h"
+#include <stdbool.h>
 
-// Compiles the math graph into a GLSL function body.
-// The generated code assumes standard GLSL math functions (sin, cos, etc.) are available.
-// Returns a heap-allocated string that must be freed by the caller.
-char* math_graph_transpile_glsl(const MathGraph* graph);
+typedef enum TranspilerMode {
+    TRANSPILE_MODE_BUFFER_1D = 0, // Output: float result (Compute Buffer)
+    TRANSPILE_MODE_IMAGE_2D   // Output: image2D (Storage Image)
+} TranspilerMode;
+
+char* math_graph_transpile_glsl(const MathGraph* graph, TranspilerMode mode);
 
 #endif // TRANSPILER_H

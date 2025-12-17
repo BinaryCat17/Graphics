@@ -7,6 +7,7 @@ void vk_create_buffer(VulkanRendererState* state, VkDeviceSize size, VkBufferUsa
 bool vk_create_vertex_buffer(VulkanRendererState* state, FrameResources *frame, size_t bytes);
 void vk_create_font_texture(VulkanRendererState* state);
 void vk_create_descriptor_pool_and_set(VulkanRendererState* state);
+void vk_ensure_compute_target(VulkanRendererState* state, int width, int height);
 
 void vk_destroy_device_resources(VulkanRendererState* state);
 

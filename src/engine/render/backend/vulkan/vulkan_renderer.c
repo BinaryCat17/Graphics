@@ -28,6 +28,12 @@ static float vk_backend_run_compute(RendererBackend* backend, const char* glsl_s
     return vk_run_compute_graph_oneshot(state, glsl_source);
 }
 
+static void vk_backend_run_compute_image(RendererBackend* backend, const char* glsl_source, int width, int height) {
+    if (!backend || !backend->state || !glsl_source) return;
+    VulkanRendererState* state = (VulkanRendererState*)backend->state;
+    vk_run_compute_graph_image(state, glsl_source, width, height);
+}
+
 // Unified Push Constants layout (Global per pass)
 typedef struct {
     float view_proj[16];
@@ -292,6 +298,10 @@ static void draw_frame_scene(VulkanRendererState* state, const Scene* scene) {
     if (state->descriptor_set) {
         vkCmdBindDescriptorSets(cb, VK_PIPELINE_BIND_POINT_GRAPHICS, state->pipeline_layout, 0, 1, &state->descriptor_set, 0, NULL);
     }
+    
+    if (state->compute_target_descriptor) {
+         vkCmdBindDescriptorSets(cb, VK_PIPELINE_BIND_POINT_GRAPHICS, state->pipeline_layout, 2, 1, &state->compute_target_descriptor, 0, NULL);
+    }
 
     // DRAW SINGLES
     if (single_count > 0 && state->unit_quad_buffer) {
@@ -459,5 +469,6 @@ RendererBackend* vulkan_renderer_backend(void) {
     g_vulkan_backend.render_scene = vk_backend_render_scene;
     g_vulkan_backend.cleanup = vk_backend_cleanup;
     g_vulkan_backend.run_compute = vk_backend_run_compute;
+    g_vulkan_backend.run_compute_image = vk_backend_run_compute_image;
     return &g_vulkan_backend;
 }

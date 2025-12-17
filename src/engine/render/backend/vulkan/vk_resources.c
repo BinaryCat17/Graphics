@@ -167,9 +167,86 @@ void vk_create_descriptor_pool_and_set(VulkanRendererState* state) {
     
     // Note: Instance Buffer is not bound here because it's dynamic (resizable).
     // It is bound in ensure_instance_buffer().
+
+    // Set 2: User Texture (Compute Target)
+    VkDescriptorSetAllocateInfo dsai2 = { .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO, .descriptorPool = state->descriptor_pool, .descriptorSetCount = 1, .pSetLayouts = &state->descriptor_layout }; // Same layout as Set 0
+    state->res = vkAllocateDescriptorSets(state->device, &dsai2, &state->compute_target_descriptor);
+    if (state->res != VK_SUCCESS) fatal_vk("vkAllocateDescriptorSets (Set 2)", state->res);
+    
+    // Bind placeholder (font) initially so it's valid
+    VkDescriptorImageInfo dii2 = { .sampler = state->font_sampler, .imageView = state->font_image_view, .imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL };
+    VkWriteDescriptorSet w2 = { .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET, .dstSet = state->compute_target_descriptor, .dstBinding = 0, .descriptorCount = 1, .descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, .pImageInfo = &dii2 };
+    vkUpdateDescriptorSets(state->device, 1, &w2, 0, NULL);
 }
 
+void vk_ensure_compute_target(VulkanRendererState* state, int width, int height) {
+    if (state->compute_width == width && state->compute_height == height && state->compute_target_image) return;
 
+    // Cleanup old
+    if (state->compute_target_view) { vkDestroyImageView(state->device, state->compute_target_view, NULL); state->compute_target_view = VK_NULL_HANDLE; }
+    if (state->compute_target_image) { vkDestroyImage(state->device, state->compute_target_image, NULL); state->compute_target_image = VK_NULL_HANDLE; }
+    if (state->compute_target_memory) { vkFreeMemory(state->device, state->compute_target_memory, NULL); state->compute_target_memory = VK_NULL_HANDLE; }
+
+    if (width <= 0 || height <= 0) return;
+
+    state->compute_width = width;
+    state->compute_height = height;
+
+    VkImageCreateInfo ici = { 
+        .sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO, 
+        .imageType = VK_IMAGE_TYPE_2D, 
+        .format = VK_FORMAT_R8G8B8A8_UNORM, // Standard RGBA
+        .extent = { (uint32_t)width, (uint32_t)height, 1 }, 
+        .mipLevels = 1, 
+        .arrayLayers = 1, 
+        .samples = VK_SAMPLE_COUNT_1_BIT, 
+        .tiling = VK_IMAGE_TILING_OPTIMAL, 
+        .usage = VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT, // Storage + Sampled
+        .sharingMode = VK_SHARING_MODE_EXCLUSIVE, 
+        .initialLayout = VK_IMAGE_LAYOUT_UNDEFINED 
+    }; 
+    
+    state->res = vkCreateImage(state->device, &ici, NULL, &state->compute_target_image);
+    if (state->res != VK_SUCCESS) fatal_vk("vkCreateImage (compute)", state->res);
+
+    VkMemoryRequirements mr; vkGetImageMemoryRequirements(state->device, state->compute_target_image, &mr);
+    VkMemoryAllocateInfo mai = { .sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO, .allocationSize = mr.size, .memoryTypeIndex = find_mem_type(state->physical_device, mr.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT) };
+    state->res = vkAllocateMemory(state->device, &mai, NULL, &state->compute_target_memory);
+    if (state->res != VK_SUCCESS) fatal_vk("vkAllocateMemory (compute)", state->res);
+    vkBindImageMemory(state->device, state->compute_target_image, state->compute_target_memory, 0);
+
+    // Create View
+    VkImageViewCreateInfo ivci = { 
+        .sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO, 
+        .image = state->compute_target_image, 
+        .viewType = VK_IMAGE_VIEW_TYPE_2D, 
+        .format = VK_FORMAT_R8G8B8A8_UNORM, 
+        .subresourceRange = { .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT, .baseMipLevel = 0, .levelCount = 1, .baseArrayLayer = 0, .layerCount = 1 } 
+    };
+    state->res = vkCreateImageView(state->device, &ivci, NULL, &state->compute_target_view);
+    if (state->res != VK_SUCCESS) fatal_vk("vkCreateImageView (compute)", state->res);
+
+    // Transition to General (ready for compute write)
+    transition_image_layout(state, state->compute_target_image, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_GENERAL);
+    
+    // Update Descriptor Set 2 to point to this new view
+    if (state->compute_target_descriptor) {
+        VkDescriptorImageInfo dii = { 
+            .sampler = state->font_sampler, // Reuse sampler
+            .imageView = state->compute_target_view, 
+            .imageLayout = VK_IMAGE_LAYOUT_GENERAL // We will read from General layout for simplicity in MVP
+        };
+        VkWriteDescriptorSet w = { 
+            .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET, 
+            .dstSet = state->compute_target_descriptor, 
+            .dstBinding = 0, 
+            .descriptorCount = 1, 
+            .descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 
+            .pImageInfo = &dii 
+        };
+        vkUpdateDescriptorSets(state->device, 1, &w, 0, NULL);
+    }
+}
 
 void vk_destroy_device_resources(VulkanRendererState* state) {
     vk_cleanup_swapchain(state, false);
@@ -181,6 +258,12 @@ void vk_destroy_device_resources(VulkanRendererState* state) {
     if (state->font_image_view) { vkDestroyImageView(state->device, state->font_image_view, NULL); state->font_image_view = VK_NULL_HANDLE; }
     if (state->font_image) { vkDestroyImage(state->device, state->font_image, NULL); state->font_image = VK_NULL_HANDLE; }
     if (state->font_image_mem) { vkFreeMemory(state->device, state->font_image_mem, NULL); state->font_image_mem = VK_NULL_HANDLE; }
+    
+    // Cleanup Compute
+    if (state->compute_target_view) { vkDestroyImageView(state->device, state->compute_target_view, NULL); state->compute_target_view = VK_NULL_HANDLE; }
+    if (state->compute_target_image) { vkDestroyImage(state->device, state->compute_target_image, NULL); state->compute_target_image = VK_NULL_HANDLE; }
+    if (state->compute_target_memory) { vkFreeMemory(state->device, state->compute_target_memory, NULL); state->compute_target_memory = VK_NULL_HANDLE; }
+    
     for (size_t i = 0; i < 2; ++i) {
         if (state->frame_resources[i].vertex_buffer) { vkDestroyBuffer(state->device, state->frame_resources[i].vertex_buffer, NULL); state->frame_resources[i].vertex_buffer = VK_NULL_HANDLE; }
         if (state->frame_resources[i].vertex_memory) { vkFreeMemory(state->device, state->frame_resources[i].vertex_memory, NULL); state->frame_resources[i].vertex_memory = VK_NULL_HANDLE; }

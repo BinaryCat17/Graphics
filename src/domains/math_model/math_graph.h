@@ -11,6 +11,9 @@ typedef enum MathNodeType {
     MATH_NODE_DIV,
     MATH_NODE_SIN,
     MATH_NODE_COS,
+    MATH_NODE_TIME, // New: u_time
+    MATH_NODE_UV,   // New: coordinates
+    MATH_NODE_OUTPUT, // New: Explicit Output
     // Add more types as needed
     MATH_NODE_SURFACE_GRID // Generates geometry
 } MathNodeType;

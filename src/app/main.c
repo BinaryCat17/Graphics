@@ -61,17 +61,27 @@ int main(int argc, char** argv) {
     MathGraph graph;
     math_graph_init(&graph);
     
-    // Create Test Nodes
-    MathNode* n1 = math_graph_add_node(&graph, MATH_NODE_VALUE);
-    n1->name = strdup("Input");
-    n1->value = 1.0f;
-    n1->x = 100; n1->y = 100;
+    // Create Test Nodes (Visualizer Graph)
+    MathNode* uv = math_graph_add_node(&graph, MATH_NODE_UV);
+    uv->name = strdup("UV.x");
+    uv->x = 50; uv->y = 100;
+
+    MathNode* freq = math_graph_add_node(&graph, MATH_NODE_VALUE);
+    freq->name = strdup("Frequency");
+    freq->value = 20.0f;
+    freq->x = 50; freq->y = 250;
     
-    MathNode* n2 = math_graph_add_node(&graph, MATH_NODE_SIN);
-    n2->name = strdup("Sin(x)");
-    n2->x = 400; n2->y = 150;
+    MathNode* mul = math_graph_add_node(&graph, MATH_NODE_MUL);
+    mul->name = strdup("Multiply");
+    mul->x = 250; mul->y = 175;
     
-    math_graph_connect(n2, 0, n1);
+    MathNode* s = math_graph_add_node(&graph, MATH_NODE_SIN);
+    s->name = strdup("Sin");
+    s->x = 450; s->y = 175;
+    
+    math_graph_connect(mul, 0, uv);
+    math_graph_connect(mul, 1, freq);
+    math_graph_connect(s, 0, mul);
 
     // 4. UI System (The View)
     UiDef* ui_def = ui_loader_load_from_file(ui_path);

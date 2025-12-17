@@ -41,6 +41,18 @@ static void try_sync_packet(RenderSystem* sys) {
         ui_build_scene(sys->ui_root_view, &dest->scene, sys->assets);
     }
 
+    // DEBUG: Compute Result Visualization
+    if (sys->show_compute_result) {
+        SceneObject quad = {0};
+        quad.id = 9999;
+        quad.position = (Vec3){600.0f, 100.0f, 0.0f};
+        quad.scale = (Vec3){512.0f, 512.0f, 1.0f};
+        quad.color = (Vec4){1.0f, 1.0f, 1.0f, 1.0f};
+        quad.params.x = 2.0f; // User Texture
+        quad.uv_rect = (Vec4){0.0f, 0.0f, 1.0f, 1.0f};
+        scene_add_object(&dest->scene, quad);
+    }
+
     // DEBUG: Add Hello World Text
     // Center of screen approx (400, 300) for 800x600 default
     scene_add_text(&dest->scene, "Hello Graphics Engine", (Vec3){100.0f, 100.0f, 0.0f}, 1.0f, (Vec4){1.0f, 1.0f, 1.0f, 1.0f});
@@ -205,15 +217,16 @@ void render_system_run(RenderSystem* sys) {
         bool key_c_curr = platform_get_key(sys->render_context.window, KEY_C);
         if (key_c_curr && !key_c_prev) {
              if (sys->math_graph) {
-                LOG_INFO("Transpiling & Running Compute Graph...");
-                char* glsl = math_graph_transpile_glsl(sys->math_graph);
+                LOG_INFO("Transpiling & Running Compute Graph (Image Mode)...");
+                char* glsl = math_graph_transpile_glsl(sys->math_graph, TRANSPILE_MODE_IMAGE_2D);
                 if (glsl) {
                     LOG_INFO("Generated GLSL:\n%s", glsl);
-                    if (sys->backend->run_compute) {
-                        float res = sys->backend->run_compute(sys->backend, glsl);
-                        LOG_INFO("Compute Result: %f", res);
+                    if (sys->backend->run_compute_image) {
+                        sys->backend->run_compute_image(sys->backend, glsl, 512, 512);
+                        sys->show_compute_result = true;
+                        LOG_INFO("Compute Dispatched.");
                     } else {
-                        LOG_WARN("Backend does not support run_compute");
+                        LOG_WARN("Backend does not support run_compute_image");
                     }
                     free(glsl);
                 }

@@ -122,10 +122,10 @@ void vk_create_pipeline(VulkanRendererState* state, const char* vert_spv, const 
     // Unified Push Constants: view_proj only (64 bytes)
     VkPushConstantRange pcr = { .stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, .offset = 0, .size = 64 };
     
-    // Layouts: Set 0 (Tex), Set 1 (Inst)
-    VkDescriptorSetLayout layouts[] = { state->descriptor_layout, state->instance_layout };
+    // Layouts: Set 0 (Tex), Set 1 (Inst), Set 2 (User Tex)
+    VkDescriptorSetLayout layouts[] = { state->descriptor_layout, state->instance_layout, state->descriptor_layout };
     
-    VkPipelineLayoutCreateInfo plci = { .sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO, .setLayoutCount = 2, .pSetLayouts = layouts, .pushConstantRangeCount = 1, .pPushConstantRanges = &pcr };
+    VkPipelineLayoutCreateInfo plci = { .sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO, .setLayoutCount = 3, .pSetLayouts = layouts, .pushConstantRangeCount = 1, .pPushConstantRanges = &pcr };
     
     state->res = vkCreatePipelineLayout(state->device, &plci, NULL, &state->pipeline_layout);
     if (state->res != VK_SUCCESS) fatal_vk("vkCreatePipelineLayout", state->res);

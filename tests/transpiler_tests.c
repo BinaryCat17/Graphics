@@ -24,7 +24,7 @@ int test_transpiler_simple_add() {
     math_graph_connect(n_add, 0, n1);
     math_graph_connect(n_add, 1, n2);
     
-    char* glsl = math_graph_transpile_glsl(&graph);
+    char* glsl = math_graph_transpile_glsl(&graph, TRANSPILE_MODE_BUFFER_1D);
     TEST_ASSERT(glsl != NULL);
     
     printf("\n--- Generated GLSL ---\n%s\n----------------------\n", glsl);
