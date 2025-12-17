@@ -12,7 +12,7 @@
 
 int main(int argc, char** argv) {
     // 0. Logging Init
-    logger_init("graphics.log");
+    logger_init("logs/graphics.log");
 
     // 1. Config
     const char* assets_dir = "assets";

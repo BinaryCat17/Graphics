@@ -7,6 +7,13 @@
 #include <pthread.h>
 #include <stdbool.h>
 
+#ifdef _WIN32
+#include <direct.h>
+#else
+#include <sys/stat.h>
+#include <sys/types.h>
+#endif
+
 static LogLevel g_console_level = LOG_LEVEL_INFO;
 static LogLevel g_file_level = LOG_LEVEL_TRACE;
 
@@ -29,6 +36,36 @@ static const char* level_colors[] = {
 
 static const char* reset_color = "\033[0m";
 
+static void create_dir_if_needed(const char* path) {
+    char temp[256];
+    char* p = NULL;
+    size_t len;
+
+    if (!path) return;
+    
+    // Copy path to temp
+    len = strlen(path);
+    if (len >= sizeof(temp)) return; // Too long
+    strncpy(temp, path, sizeof(temp));
+    temp[sizeof(temp) - 1] = 0;
+
+    // Remove file name
+    p = strrchr(temp, '/');
+    if (!p) p = strrchr(temp, '\\');
+    if (p) {
+        *p = 0; // Truncate to directory
+    } else {
+        return; // No directory part
+    }
+
+    // Attempt create
+#ifdef _WIN32
+    _mkdir(temp);
+#else
+    mkdir(temp, 0755);
+#endif
+}
+
 void logger_init(const char* log_file_path) {
     pthread_mutex_lock(&g_log_mutex);
     if (g_initialized) {
@@ -37,6 +74,7 @@ void logger_init(const char* log_file_path) {
     }
 
     if (log_file_path) {
+        create_dir_if_needed(log_file_path);
         g_log_file = fopen(log_file_path, "w");
         if (!g_log_file) {
             fprintf(stderr, "Logger: Failed to open log file '%s'\n", log_file_path);

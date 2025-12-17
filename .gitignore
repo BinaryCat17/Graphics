@@ -8,5 +8,4 @@ generated/
 __pycache__/
 CMakeFiles
 CMakeCache.txt
-*.log
-logs
+logs/
