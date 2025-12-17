@@ -251,13 +251,7 @@ void render_system_run(RenderSystem* sys) {
         sys->input.mouse_clicked = sys->input.mouse_down && !last_down;
         last_down = sys->input.mouse_down;
         
-        // 1. Update Domain Logic
-        if (sys->math_graph) {
-             math_graph_update(sys->math_graph);
-             math_graph_update_visuals(sys->math_graph, log_debug);
-        }
-        
-        // 2. Update UI Logic (Reactivity)
+        // 1. Update UI Logic (Reactivity)
         if (sys->ui_root_view) {
             ui_view_process_input(sys->ui_root_view, &sys->input);
             ui_view_update(sys->ui_root_view);
@@ -267,6 +261,13 @@ void render_system_run(RenderSystem* sys) {
             // We pass debug=false here, logging controlled by trace interval inside ui_build_scene if needed, 
             // but layout happens here every frame.
             ui_layout_root(sys->ui_root_view, (float)size.width, (float)size.height, sys->frame_count, log_debug);
+        }
+
+        // 2. Update Domain Logic
+        // Moved after UI Input so visuals track the dragged nodes in the same frame (fixes lag)
+        if (sys->math_graph) {
+             math_graph_update(sys->math_graph);
+             math_graph_update_visuals(sys->math_graph, log_debug);
         }
 
         // 3. Render Prep

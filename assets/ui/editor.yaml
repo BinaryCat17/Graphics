@@ -7,6 +7,7 @@ children:
   - type: list
     data: wires
     count: wire_count
+    layout: overlay
     item_template:
       type: curve
       bind_x: x
@@ -22,6 +23,7 @@ children:
   - type: list
     data: nodes
     count: node_count
+    layout: overlay
     item_template:
       type: panel
       draggable: true
