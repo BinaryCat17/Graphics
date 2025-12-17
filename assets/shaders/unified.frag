@@ -80,15 +80,15 @@ void main() {
         
         float dist = sdWire(p, a, b);
         
-        // Add round caps (circles at endpoints)
-        dist = min(dist, length(p - a));
-        dist = min(dist, length(p - b));
-        
         // Anti-aliased stroke
         // Thickness passed in params.z (already relative to height)
         float thickness = (inParams.z > 0.0) ? inParams.z : 0.01;
         float aa = 0.005; // Fixed AA feather
-        // Ideally AA should depend on dFdx/dFdy but fixed is okay for 2D UI
+
+        // Add round caps (Ports)
+        // Make them larger (Radius = 2 * thickness) to look like connection points
+        dist = min(dist, length(p - a) - thickness);
+        dist = min(dist, length(p - b) - thickness);
         
         alpha = 1.0 - smoothstep(thickness - aa, thickness + aa, dist);
         
