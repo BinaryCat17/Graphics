@@ -3,11 +3,9 @@
 
 #include "engine/render/backend/vulkan/vk_types.h"
 
-// Error handling
+// Helper to log fatal error and exit (or abort)
 void fatal_vk(const char* msg, VkResult res);
-void fatal(const char* msg);
 
-// Time
 double vk_now_ms(void);
 
 // Logging

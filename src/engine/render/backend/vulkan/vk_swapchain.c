@@ -1,5 +1,6 @@
 #include "vk_swapchain.h"
 #include "vk_utils.h"
+#include "foundation/logger/logger.h"
 #include <stdlib.h>
 
 typedef struct {
@@ -41,7 +42,7 @@ void vk_create_swapchain_and_views(VulkanRendererState* state, VkSwapchainKHR ol
     /* choose format */
     uint32_t fc = 0; 
     vkGetPhysicalDeviceSurfaceFormatsKHR(state->physical_device, state->surface, &fc, NULL); 
-    if (fc == 0) fatal("no surface formats");
+    if (fc == 0) LOG_FATAL("no surface formats");
     
     VkSurfaceFormatKHR* fmts = malloc(sizeof(VkSurfaceFormatKHR) * fc); 
     vkGetPhysicalDeviceSurfaceFormatsKHR(state->physical_device, state->surface, &fc, fmts);
@@ -97,7 +98,7 @@ void vk_create_swapchain_and_views(VulkanRendererState* state, VkSwapchainKHR ol
         chosen_support = blend_support;
     }
 
-    if (!chosen_support.color_attachment) fatal("no color attachment format for swapchain");
+    if (!chosen_support.color_attachment) LOG_FATAL("no color attachment format for swapchain");
 
     if (chosen_fmt.format == VK_FORMAT_UNDEFINED) {
         chosen_fmt.format = VK_FORMAT_B8G8R8A8_UNORM;
@@ -105,7 +106,7 @@ void vk_create_swapchain_and_views(VulkanRendererState* state, VkSwapchainKHR ol
     
     // Check support again for the chosen (possibly defaulted) format
     chosen_support = get_format_support(state->physical_device, chosen_fmt.format);
-    if (!chosen_support.color_attachment) fatal("swapchain format lacks color attachment support");
+    if (!chosen_support.color_attachment) LOG_FATAL("swapchain format lacks color attachment support");
     
     state->swapchain_supports_blend = chosen_support.blend;
     state->swapchain_format = chosen_fmt.format;
@@ -157,7 +158,7 @@ void vk_create_swapchain_and_views(VulkanRendererState* state, VkSwapchainKHR ol
     }
 
     VkImageUsageFlags usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
-    if (!(caps.supportedUsageFlags & usage)) fatal("swapchain color usage unsupported");
+    if (!(caps.supportedUsageFlags & usage)) LOG_FATAL("swapchain color usage unsupported");
 
     VkPresentModeKHR present_mode = VK_PRESENT_MODE_FIFO_KHR;
     printf("Selected Present Mode: %d (FIFO=%d, MAILBOX=%d, IMMEDIATE=%d)\n", 
@@ -224,7 +225,7 @@ void vk_create_depth_resources(VulkanRendererState* state) {
 
     state->depth_format = choose_depth_format(state->physical_device);
     if (state->depth_format == VK_FORMAT_UNDEFINED) {
-        fatal("No supported depth format found");
+        LOG_FATAL("No supported depth format found");
     }
 
     VkImageCreateInfo image_info = {
@@ -253,7 +254,7 @@ void vk_create_depth_resources(VulkanRendererState* state) {
         if ((mem_req.memoryTypeBits & (1u << i)) && (mem_props.memoryTypes[i].propertyFlags & VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT)) {
             mem_type = i; break; }
     }
-    if (mem_type == UINT32_MAX) fatal("No suitable memory type for depth buffer");
+    if (mem_type == UINT32_MAX) LOG_FATAL("No suitable memory type for depth buffer");
     alloc_info.memoryTypeIndex = mem_type;
     state->res = vkAllocateMemory(state->device, &alloc_info, NULL, &state->depth_memory);
     if (state->res != VK_SUCCESS) fatal_vk("vkAllocateMemory (depth)", state->res);
@@ -274,7 +275,7 @@ void vk_create_depth_resources(VulkanRendererState* state) {
 void vk_create_render_pass(VulkanRendererState* state) {
     if (state->depth_format == VK_FORMAT_UNDEFINED) {
         state->depth_format = choose_depth_format(state->physical_device);
-        if (state->depth_format == VK_FORMAT_UNDEFINED) fatal("No supported depth format found");
+        if (state->depth_format == VK_FORMAT_UNDEFINED) LOG_FATAL("No supported depth format found");
     }
 
     VkAttachmentDescription attachments[2] = {

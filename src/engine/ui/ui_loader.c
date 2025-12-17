@@ -103,6 +103,9 @@ UiDef* ui_loader_load_from_node(const void* node_ptr) {
     const ConfigNode* items = config_node_get_scalar(node, "items");
     if (items) def->data_source = strdup_safe(items->scalar);
 
+    const ConfigNode* count = config_node_get_scalar(node, "count");
+    if (count) def->count_source = strdup_safe(count->scalar);
+
     // 4. List Template
     if (type == UI_NODE_LIST) {
         const ConfigNode* item_template = config_map_get(node, "item_template");

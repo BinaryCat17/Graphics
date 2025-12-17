@@ -110,7 +110,7 @@ bool vk_create_vertex_buffer(VulkanRendererState* state, FrameResources *frame, 
 void vk_create_font_texture(VulkanRendererState* state) {
     const FontAtlas* atlas = font_get_atlas();
     if (!atlas || !atlas->pixels) {
-        fatal("Font atlas not available from Font Module");
+        LOG_FATAL("Font atlas not available from Font Module");
     }
 
     VkImageCreateInfo ici = { .sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO, .imageType = VK_IMAGE_TYPE_2D, .format = VK_FORMAT_R8_UNORM, .extent = { (uint32_t)atlas->width, (uint32_t)atlas->height, 1 }, .mipLevels = 1, .arrayLayers = 1, .samples = VK_SAMPLE_COUNT_1_BIT, .tiling = VK_IMAGE_TILING_OPTIMAL, .usage = VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, .sharingMode = VK_SHARING_MODE_EXCLUSIVE, .initialLayout = VK_IMAGE_LAYOUT_UNDEFINED }; 

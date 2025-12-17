@@ -37,7 +37,7 @@ void vk_create_instance(VulkanRendererState* state) {
     uint32_t extc = 0; 
     const char** exts = NULL;
     if (!state->get_required_instance_extensions || !state->get_required_instance_extensions(&exts, &extc)) {
-        fatal("Failed to query platform Vulkan extensions");
+        LOG_FATAL("Failed to query platform Vulkan extensions");
     }
     ici.enabledExtensionCount = extc; 
     ici.ppEnabledExtensionNames = exts;
@@ -52,7 +52,7 @@ void vk_create_instance(VulkanRendererState* state) {
 void vk_pick_physical_and_create_device(VulkanRendererState* state) {
     uint32_t pc = 0; 
     vkEnumeratePhysicalDevices(state->instance, &pc, NULL); 
-    if (pc == 0) fatal("No physical dev");
+    if (pc == 0) LOG_FATAL("No physical dev");
     
     VkPhysicalDevice* list = malloc(sizeof(VkPhysicalDevice) * pc); 
     vkEnumeratePhysicalDevices(state->instance, &pc, list);
@@ -96,7 +96,7 @@ void vk_pick_physical_and_create_device(VulkanRendererState* state) {
     }
     free(qprops);
 
-    if (found < 0) fatal("No suitable queue family");
+    if (found < 0) LOG_FATAL("No suitable queue family");
     state->graphics_family = (uint32_t)found;
 
     float prio = 1.0f;
@@ -126,7 +126,7 @@ void vk_recreate_instance_and_surface(VulkanRendererState* state) {
     
     if (!state->create_surface || !state->platform_surface ||
         !state->create_surface(state->window, state->instance, NULL, state->platform_surface)) {
-        fatal("Failed to recreate platform surface");
+        LOG_FATAL("Failed to recreate platform surface");
     }
     state->surface = (VkSurfaceKHR)(state->platform_surface ? state->platform_surface->handle : NULL);
 }

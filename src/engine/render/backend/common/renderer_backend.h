@@ -71,9 +71,6 @@ typedef struct RendererBackend {
     // Unified Draw Call
     void (*render_scene)(struct RendererBackend* backend, const Scene* scene);
     
-    // Legacy generic draw (can be removed if render_scene covers it)
-    void (*draw)(struct RendererBackend* backend);
-    
     void (*cleanup)(struct RendererBackend* backend);
 } RendererBackend;
 

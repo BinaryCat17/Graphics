@@ -1,17 +1,29 @@
 #include "vk_pipeline.h"
 #include "vk_utils.h"
+#include "foundation/logger/logger.h"
 #include <stdlib.h>
 #include <stddef.h>
 
 static VkShaderModule create_shader_module_from_spv(VulkanRendererState* state, const char* path) {
-    size_t code_size_bytes = 0; 
-    uint32_t* code = read_file_bin_u32(path, &code_size_bytes);
-    if (!code) fatal("read spv");
+    size_t size;
+    uint32_t* code = read_file_bin_u32(path, &size);
+    if (!code) {
+        LOG_FATAL("Failed to read SPV file: %s", path);
+        return VK_NULL_HANDLE;
+    }
     
-    VkShaderModuleCreateInfo smci = { .sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO, .codeSize = code_size_bytes, .pCode = code };
+    VkShaderModuleCreateInfo ci = { 
+        .sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO,
+        .codeSize = size,
+        .pCode = code
+    };
+    
     VkShaderModule mod; 
-    state->res = vkCreateShaderModule(state->device, &smci, NULL, &mod);
-    if (state->res != VK_SUCCESS) fatal_vk("vkCreateShaderModule", state->res);
+    state->res = vkCreateShaderModule(state->device, &ci, NULL, &mod);
+    if (state->res != VK_SUCCESS) {
+        LOG_FATAL("vkCreateShaderModule failed: %d", state->res);
+    }
+    
     free(code); 
     return mod;
 }
@@ -52,7 +64,7 @@ void vk_create_pipeline(VulkanRendererState* state, const char* vert_spv, const 
     VkShaderModule vs = create_shader_module_from_spv(state, vert_spv);
     VkShaderModule fs = create_shader_module_from_spv(state, frag_spv);
     
-    // ... (stages, vertex input - UNCHANGED) ...
+    // ... (stages, vertex input) ...
     VkPipelineShaderStageCreateInfo stages[2] = {
         {.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO, .stage = VK_SHADER_STAGE_VERTEX_BIT, .module = vs, .pName = "main" },
         {.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO, .stage = VK_SHADER_STAGE_FRAGMENT_BIT, .module = fs, .pName = "main" }

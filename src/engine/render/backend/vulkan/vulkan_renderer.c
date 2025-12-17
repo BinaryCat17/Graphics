@@ -287,25 +287,12 @@ static void draw_frame_scene(VulkanRendererState* state, const Scene* scene) {
 
     vkCmdEndRenderPass(cb);
     vkEndCommandBuffer(cb);
-
-    // 5. Submit
-    VkPipelineStageFlags waitStage = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
-    VkSubmitInfo si = { .sType = VK_STRUCTURE_TYPE_SUBMIT_INFO, .waitSemaphoreCount = 1, .pWaitSemaphores = &state->sem_img_avail, .pWaitDstStageMask = &waitStage, .commandBufferCount = 1, .pCommandBuffers = &cb, .signalSemaphoreCount = 1, .pSignalSemaphores = &state->sem_render_done };
-    vkQueueSubmit(state->queue, 1, &si, state->fences[img_idx]);
-
-    VkPresentInfoKHR pi = { .sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR, .waitSemaphoreCount = 1, .pWaitSemaphores = &state->sem_render_done, .swapchainCount = 1, .pSwapchains = &state->swapchain, .pImageIndices = &img_idx };
-    vkQueuePresentKHR(state->queue, &pi);
 }
 
 static void vk_backend_render_scene(RendererBackend* backend, const Scene* scene) {
     if (!backend || !backend->state) return;
     VulkanRendererState* state = (VulkanRendererState*)backend->state;
     draw_frame_scene(state, scene);
-}
-
-static void vk_backend_draw(RendererBackend* backend) {
-    // Legacy draw, empty scene
-    vk_backend_render_scene(backend, NULL);
 }
 
 static void vk_backend_cleanup(RendererBackend* backend) {
@@ -399,7 +386,6 @@ RendererBackend* vulkan_renderer_backend(void) {
     g_vulkan_backend.state = NULL;
     g_vulkan_backend.init = vk_backend_init;
     g_vulkan_backend.render_scene = vk_backend_render_scene;
-    g_vulkan_backend.draw = vk_backend_draw;
     g_vulkan_backend.cleanup = vk_backend_cleanup;
     return &g_vulkan_backend;
 }

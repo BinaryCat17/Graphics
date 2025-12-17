@@ -8,10 +8,6 @@ void fatal_vk(const char* msg, VkResult res) {
     LOG_FATAL("%s: VkResult %d", msg, res);
 }
 
-void fatal(const char* msg) {
-    LOG_FATAL("%s", msg);
-}
-
 double vk_now_ms(void) {
     // Implement or wrap platform time
     // For now, simple placeholder or use platform if available
