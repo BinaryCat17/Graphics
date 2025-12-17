@@ -65,7 +65,14 @@ UiDef* ui_loader_load_from_node(const void* node_ptr) {
     if (!def) return NULL;
 
     // 1. Identity & Style
-    if (id_node) def->id = strdup_safe(id_node->scalar);
+    if (id_node) {
+        def->id = strdup_safe(id_node->scalar);
+    } else {
+        static int anon_counter = 0;
+        char buffer[64];
+        snprintf(buffer, sizeof(buffer), "%s_%d", type_str, ++anon_counter);
+        def->id = strdup_safe(buffer);
+    }
 
     const ConfigNode* style = config_node_get_scalar(node, "style");
     if (style) def->style_name = strdup_safe(style->scalar);

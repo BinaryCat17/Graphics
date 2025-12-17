@@ -31,6 +31,8 @@ static void try_sync_packet(RenderSystem* sys) {
     // Clear old scene
     render_packet_free_resources(dest);
     
+    dest->scene.frame_number = sys->frame_count;
+
     // Bridge: Convert UI View to Scene Objects
     if (sys->assets) {
         ui_build_scene(sys->ui_root_view, &dest->scene, sys->assets);
@@ -99,6 +101,7 @@ bool render_system_init(RenderSystem* sys, const RenderSystemConfig* config) {
     memset(sys, 0, sizeof(RenderSystem));
     mtx_init(&sys->packet_mutex, mtx_plain);
     sys->back_packet_index = 1;
+    sys->frame_count = 0;
 
     // Register Backend
     renderer_backend_register(vulkan_renderer_backend());
@@ -162,6 +165,7 @@ void render_system_run(RenderSystem* sys) {
     sys->running = true;
     
     while (sys->running && !platform_window_should_close(sys->render_context.window)) {
+        sys->frame_count++;
         platform_poll_events();
         
         // 0. Input Polling

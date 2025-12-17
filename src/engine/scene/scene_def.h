@@ -60,6 +60,8 @@ typedef struct Scene {
     size_t object_capacity;
     
     SceneCamera camera;
+    
+    uint64_t frame_number;
 } Scene;
 
 // API

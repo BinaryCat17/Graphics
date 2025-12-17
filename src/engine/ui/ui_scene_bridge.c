@@ -144,8 +144,8 @@ void ui_build_scene(const UiView* root, Scene* scene, const Assets* assets) {
     }
     
     if (debug_frame) {
-        LOG_TRACE("UI Build Scene: %zu objects generated. Root Rect: %.1f, %.1f, %.1f, %.1f", 
-            scene->object_count, root->rect.x, root->rect.y, root->rect.w, root->rect.h);
+        LOG_TRACE("UI Build Scene [Frame %llu]: %zu objects generated. Root Rect: %.1f, %.1f, %.1f, %.1f", 
+            (unsigned long long)scene->frame_number, scene->object_count, root->rect.x, root->rect.y, root->rect.w, root->rect.h);
     }
     
     traverse_ui(root, scene, assets, debug_frame);

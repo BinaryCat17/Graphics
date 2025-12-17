@@ -42,6 +42,8 @@ typedef struct RenderSystem {
     thrd_t thread;
     bool running;
     bool renderer_ready;
+    
+    uint64_t frame_count;
 } RenderSystem;
 
 typedef struct RenderSystemConfig {
