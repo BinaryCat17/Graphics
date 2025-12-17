@@ -38,16 +38,23 @@
     *   Created `editor.yaml` using the Dual Repeater pattern (Wires Layer + Nodes Layer).
     *   Implemented Node Dragging logic (View -> C-Struct -> Event -> View Update).
 
-## Phase 4: The Brain (Transpilation) [IN PROGRESS]
+## Phase 4: The Brain (Transpilation) [COMPLETED]
 *Goal: Turn the Visual Graph into executable GPU code.*
 
 1.  **[DONE] Expression Transpiler**
     *   Implemented `transpiler.c`: Traverses `MathGraph` and generates GLSL Compute Shader code.
-    *   Supports basic arithmetic operations (Add, Sub, Mul, Div, Sin, Cos).
+    *   Supports basic arithmetic (Add, Sub, Mul, Div, Sin, Cos) and Image generation (TRANSPILE_MODE_IMAGE_2D).
 2.  **[DONE] Runtime Shader Compilation**
     *   Implemented `vk_compute` backend.
     *   Uses `glslc` (via subprocess) to compile generated GLSL strings to SPIR-V at runtime.
-    *   Implemented `vk_run_compute_graph_oneshot` to dispatch compute jobs on demand.
-3.  **[TODO] Compute & Visualize**
-    *   Link the Compute Shader output buffer to the Instanced Renderer (Data Visualization).
-    *   **Milestone:** User creates a "Wave" graph, and the engine renders a million-particle wave simulation in real-time.
+    *   Implemented `vk_run_compute_graph_image` to dispatch compute jobs on 2D images.
+
+## Phase 5: Visualization (Compute & Display) [COMPLETED]
+*Goal: See the math.*
+
+1.  **[DONE] Compute-to-Texture Pipeline**
+    *   Implemented `VkImage` creation for Compute Target.
+    *   Implemented Descriptor Set management to bind Compute Result as a texture (Set 2).
+2.  **[DONE] Visualization UI**
+    *   Added 'C' key toggle to run compute and display the result.
+    *   Visualizer renders a Quad textured with the compute output using standard scene pipeline.
