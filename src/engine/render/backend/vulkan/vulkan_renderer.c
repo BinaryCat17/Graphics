@@ -141,8 +141,8 @@ static bool recover_device_loss(VulkanRendererState* state) {
 static void draw_frame_scene(VulkanRendererState* state, const Scene* scene) {
     static uint64_t frame_count = 0;
     frame_count++;
-    // Log frame 1 and then every 300 frames (~5 sec at 60fps)
-    bool debug_frame = (frame_count == 1) || (frame_count % 300 == 0);
+    // Log frame 1 and then every 3000 frames (~10 sec at 300fps)
+    bool debug_frame = (frame_count == 1) || (frame_count % 3000 == 0);
 
     if (state->swapchain == VK_NULL_HANDLE) return;
     
@@ -233,11 +233,11 @@ static void draw_frame_scene(VulkanRendererState* state, const Scene* scene) {
     // Push Constants (Global ViewProj)
     float w = (float)state->swapchain_extent.width;
     float h = (float)state->swapchain_extent.height;
-    // Fix Z-range: Map [0.5, 1.0] world Z to [0, 1] Vulkan Z (given standard GL ortho mapping).
-    // near=0.0, far=1.0. GL maps 0->-1, 1->1. Vulkan clips <0.
-    // So Z=0.5 maps to 0.0 (Near). Z=1.0 maps to 1.0 (Far).
-    // Visible range: [0.5, 1.0].
-    Mat4 proj = mat4_orthographic(0, w, 0, h, 0.0f, 1.0f);
+    // Fix Z-range: Map [-1, 1] world Z to [0, 1] Vulkan Z.
+    // near=-1.0, far=1.0. 
+    // Z=0.0 maps to 0.5 (Mid). Z=0.1 maps to 0.55.
+    // Objects must be in [-1, 1].
+    Mat4 proj = mat4_orthographic(0, w, 0, h, -1.0f, 1.0f);
     Mat4 view = mat4_identity(); 
     Mat4 view_proj = mat4_multiply(&proj, &view);
     

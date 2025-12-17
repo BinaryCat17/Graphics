@@ -8,12 +8,13 @@ struct GpuInstanceData {
     vec4 color;
     vec4 uv_rect;
     vec4 params;
+    vec4 pad; // Explicit padding to match C struct (128 bytes)
 };
 
 // Set 0: Texture (Sampler)
 // Set 1: Instances (SSBO)
 
-layout(std430, set = 1, binding = 0) readonly buffer InstanceBuffer {
+layout(std140, set = 1, binding = 0) readonly buffer InstanceBuffer {
     GpuInstanceData objects[];
 } instances;
 

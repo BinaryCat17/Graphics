@@ -19,7 +19,7 @@ static void traverse_ui(const UiView* view, Scene* scene, const Assets* assets, 
     if (view->rect.w > 0 && view->rect.h > 0) {
         SceneObject obj = {0};
         obj.layer = LAYER_UI_BACKGROUND; // Background layer
-        obj.position = (Vec3){view->rect.x, view->rect.y, 0.9f}; // Z=0.9 (Farther, background)
+        obj.position = (Vec3){view->rect.x, view->rect.y, 0.1f}; // Z=0.1 (Slightly behind text)
         obj.scale = (Vec3){view->rect.w, view->rect.h, 1.0f};
         obj.rotation = (Vec3){0, 0, 0};
         obj.mesh = &assets->unit_quad;
@@ -81,7 +81,7 @@ static void traverse_ui(const UiView* view, Scene* scene, const Assets* assets, 
                     float x_pos = cursor_x + g.xoff;
                     float y_pos = cursor_y + g.yoff; 
                     
-                    char_obj.position = (Vec3){x_pos, y_pos, 0.5f}; // Z=0.5 (Closer, visible in 0.5-1.0 range)
+                    char_obj.position = (Vec3){x_pos, y_pos, 0.0f}; // Z=0.0 (Closest, visible in -1.0 to 1.0 range)
                     char_obj.scale = (Vec3){g.w, g.h, 1.0f};
                     char_obj.rotation = (Vec3){0, 0, 0};
                     char_obj.mesh = &assets->unit_quad;
@@ -123,7 +123,7 @@ void ui_build_scene(const UiView* root, Scene* scene, const Assets* assets) {
     
     static uint64_t ui_frame = 0;
     ui_frame++;
-    bool debug_frame = (ui_frame % 300 == 0);
+    bool debug_frame = (ui_frame % 3000 == 0);
     
     if (debug_frame) {
         LOG_INFO("UI Build Scene: %zu objects generated. Root Rect: %.1f, %.1f, %.1f, %.1f", 
