@@ -38,13 +38,16 @@
     *   Created `editor.yaml` using the Dual Repeater pattern (Wires Layer + Nodes Layer).
     *   Implemented Node Dragging logic (View -> C-Struct -> Event -> View Update).
 
-## Phase 4: The Brain (Transpilation)
+## Phase 4: The Brain (Transpilation) [IN PROGRESS]
 *Goal: Turn the Visual Graph into executable GPU code.*
 
-1.  **Expression Parser & Transpiler**
-    *   Implement the logic to traverse `MathGraph` and generate GLSL strings.
-2.  **Shader Hot-Reloading**
-    *   Pipeline to compile generated GLSL -> SPIR-V -> VkPipeline at runtime.
-3.  **Compute & Visualize**
-    *   Link the Compute Shader output buffer to the Instanced Renderer.
+1.  **[DONE] Expression Transpiler**
+    *   Implemented `transpiler.c`: Traverses `MathGraph` and generates GLSL Compute Shader code.
+    *   Supports basic arithmetic operations (Add, Sub, Mul, Div, Sin, Cos).
+2.  **[DONE] Runtime Shader Compilation**
+    *   Implemented `vk_compute` backend.
+    *   Uses `glslc` (via subprocess) to compile generated GLSL strings to SPIR-V at runtime.
+    *   Implemented `vk_run_compute_graph_oneshot` to dispatch compute jobs on demand.
+3.  **[TODO] Compute & Visualize**
+    *   Link the Compute Shader output buffer to the Instanced Renderer (Data Visualization).
     *   **Milestone:** User creates a "Wave" graph, and the engine renders a million-particle wave simulation in real-time.

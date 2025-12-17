@@ -37,7 +37,40 @@ To support the UI without custom rendering code, the `Unified Scene` supports di
 
 ---
 
-## 3. Technology Stack
+## 3. Transpilation & Compute Pipeline
+The engine includes a runtime compiler to turn the Visual Graph into high-performance GPU kernels.
+
+1.  **Transpiler (`transpiler.c`):**
+    *   Traverses the `MathGraph` topology.
+    *   Generates valid GLSL 450 Compute Shader code (e.g., `result = sin(t) + x;`).
+2.  **Runtime Compilation (`vk_compute.c`):**
+    *   Saves the generated GLSL to a temporary file.
+    *   Invokes `glslc` (Vulkan SDK) to compile GLSL -> SPIR-V.
+    *   Loads the SPIR-V bytecode into a new `VkShaderModule`.
+3.  **Execution:**
+    *   Creates a `VkComputePipeline` on the fly.
+    *   Allocates Storage Buffers for inputs/outputs.
+    *   Dispatches the compute kernel.
+
+---
+
+## 4. Module Structure (Refactored)
+
+*   **`src/engine/scene/`**:
+    *   `scene.h/.c`: Defines `Scene` and `SceneObject`. Pure data container.
+*   **`src/engine/text/`**:
+    *   `font.h/.c`: Font loading and atlas generation.
+    *   `text_renderer.h/.c`: Helper to generate text meshes for the scene.
+*   **`src/engine/render/backend/vulkan/`**:
+    *   `vulkan_renderer.c`: Main backend logic.
+    *   `vk_compute.c`: Runtime shader compilation and execution.
+*   **`src/domains/math_model/`**:
+    *   `math_graph.c`: The logical graph data.
+    *   `transpiler.c`: GLSL generation logic.
+
+---
+
+## 5. Technology Stack
 
 | Component | Technology | Role |
 | :--- | :--- | :--- |
