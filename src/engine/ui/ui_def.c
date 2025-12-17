@@ -263,7 +263,24 @@ void ui_view_update(UiView* view) {
                 void* field_addr = meta_get_field_ptr(view->data_ptr, array_field);
                 if (field_addr) {
                     array_base = *(void**)field_addr;
-                    item_meta = meta_get_struct(array_field->type_name);
+                    
+                    // Strip pointers from type name to find struct meta
+                    // e.g. "MathNode**" -> "MathNode"
+                    char clean_name[64];
+                    strncpy(clean_name, array_field->type_name, sizeof(clean_name)-1);
+                    clean_name[sizeof(clean_name)-1] = 0;
+                    
+                    char* ptr = strchr(clean_name, '*');
+                    if (ptr) *ptr = 0;
+                    
+                    // Remove trailing spaces if any
+                    size_t len = strlen(clean_name);
+                    while(len > 0 && clean_name[len-1] == ' ') {
+                        clean_name[len-1] = 0;
+                        len--;
+                    }
+                    
+                    item_meta = meta_get_struct(clean_name);
                 }
             }
         }
