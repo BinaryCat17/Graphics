@@ -7,6 +7,7 @@
 #include "engine/render/backend/vulkan/vk_pipeline.h"
 #include "engine/render/backend/vulkan/vk_resources.h"
 #include "engine/render/backend/vulkan/vk_utils.h"
+#include "engine/text/font.h"
 
 #include "foundation/logger/logger.h"
 
@@ -285,41 +286,6 @@ static void draw_frame_scene(VulkanRendererState* state, const Scene* scene) {
     vkQueuePresentKHR(state->queue, &pi);
 }
 
-static bool vk_backend_get_glyph(RendererBackend* backend, uint32_t codepoint, RenderGlyph* out_glyph) {
-    if (!backend || !backend->state || !out_glyph) return false;
-    VulkanRendererState* state = (VulkanRendererState*)backend->state;
-    
-    if (codepoint >= GLYPH_CAPACITY || !state->glyph_valid[codepoint]) return false;
-    
-    Glyph* g = &state->glyphs[codepoint];
-    out_glyph->u0 = g->u0;
-    out_glyph->v0 = g->v0;
-    out_glyph->u1 = g->u1;
-    out_glyph->v1 = g->v1;
-    out_glyph->w = g->w;
-    out_glyph->h = g->h;
-    out_glyph->xoff = g->xoff;
-    out_glyph->yoff = g->yoff;
-    out_glyph->advance = g->advance;
-    
-    return true;
-}
-
-static float vk_backend_measure_text(RendererBackend* backend, const char* text) {
-    if (!backend || !backend->state || !text) return 0.0f;
-    VulkanRendererState* state = (VulkanRendererState*)backend->state;
-    
-    float width = 0.0f;
-    const char* ptr = text;
-    while (*ptr) {
-        int advance = 0, lsb = 0;
-        stbtt_GetCodepointHMetrics(&state->fontinfo, *ptr, &advance, &lsb);
-        width += advance * state->font_scale;
-        ptr++;
-    }
-    return width;
-}
-
 static void vk_backend_render_scene(RendererBackend* backend, const Scene* scene) {
     if (!backend || !backend->state) return;
     VulkanRendererState* state = (VulkanRendererState*)backend->state;
@@ -347,6 +313,8 @@ static void vk_backend_cleanup(RendererBackend* backend) {
     if (state->platform_surface) state->destroy_surface(state->instance, NULL, state->platform_surface);
     if (state->instance) vkDestroyInstance(state->instance, NULL);
     
+    font_cleanup(); // Clean up font module
+    
     render_logger_cleanup(state->logger);
     free(state);
     backend->state = NULL;
@@ -371,6 +339,13 @@ static bool vk_backend_init(RendererBackend* backend, const RenderBackendInit* i
     state->frag_spv = init->frag_spv;
     state->font_path = init->font_path;
 
+    // Initialize Font Module
+    if (!font_init(state->font_path)) {
+        LOG_ERROR("Failed to initialize font module with path: %s", state->font_path);
+        // Continue but with broken text? or fail? 
+        // For now, continue to see if at least rendering works.
+    }
+
     vk_create_instance(state);
     state->create_surface(state->window, state->instance, NULL, state->platform_surface);
     state->surface = (VkSurfaceKHR)(state->platform_surface ? state->platform_surface->handle : NULL);
@@ -381,8 +356,10 @@ static bool vk_backend_init(RendererBackend* backend, const RenderBackendInit* i
     vk_create_descriptor_layout(state);
     vk_create_pipeline(state, state->vert_spv, state->frag_spv);
     vk_create_cmds_and_sync(state);
-    vk_build_font_atlas(state);
+    
+    // Upload font atlas (now via FontService)
     vk_create_font_texture(state);
+    
     vk_create_descriptor_pool_and_set(state);
 
     // Create Unit Quad Buffer (6 vertices for list)
@@ -411,8 +388,6 @@ RendererBackend* vulkan_renderer_backend(void) {
     g_vulkan_backend.state = NULL;
     g_vulkan_backend.init = vk_backend_init;
     g_vulkan_backend.render_scene = vk_backend_render_scene;
-    g_vulkan_backend.get_glyph = vk_backend_get_glyph;
-    g_vulkan_backend.measure_text = vk_backend_measure_text;
     g_vulkan_backend.draw = vk_backend_draw;
     g_vulkan_backend.cleanup = vk_backend_cleanup;
     return &g_vulkan_backend;

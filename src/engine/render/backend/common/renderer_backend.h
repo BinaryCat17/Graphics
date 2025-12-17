@@ -62,8 +62,6 @@ typedef struct RenderBackendInit {
     const RenderLoggerConfig* logger_config;
 } RenderBackendInit;
 
-typedef struct { float u0,v0,u1,v1; float w,h,xoff,yoff,advance; } RenderGlyph;
-
 typedef struct RendererBackend {
     const char* id;
     RenderLogger logger;
@@ -73,10 +71,6 @@ typedef struct RendererBackend {
     // Unified Draw Call
     void (*render_scene)(struct RendererBackend* backend, const Scene* scene);
     
-    // Resources
-    bool (*get_glyph)(struct RendererBackend* backend, uint32_t codepoint, RenderGlyph* out_glyph);
-    float (*measure_text)(struct RendererBackend* backend, const char* text);
-
     // Legacy generic draw (can be removed if render_scene covers it)
     void (*draw)(struct RendererBackend* backend);
     

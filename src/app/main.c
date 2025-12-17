@@ -4,7 +4,7 @@
 #include <string.h>
 
 #include "foundation/platform/platform.h"
-#include "engine/assets/assets_service.h"
+#include "engine/assets/assets.h"
 #include "engine/ui/ui_loader.h"
 #include "engine/ui/ui_def.h"
 #include "engine/render/render_system.h"

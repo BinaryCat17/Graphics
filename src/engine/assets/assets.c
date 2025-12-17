@@ -1,4 +1,4 @@
-#include "engine/assets/assets_service.h"
+#include "engine/assets/assets.h"
 #include "foundation/platform/platform.h"
 #include "foundation/logger/logger.h"
 

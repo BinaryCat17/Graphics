@@ -122,7 +122,6 @@ target_link_libraries(foundation_config PUBLIC foundation_platform foundation_lo
 # Or keeping them split but under engine_render umbrella.
 set(ENGINE_RENDER_SOURCES
     "src/engine/render/backend/common/renderer_backend.c"
-    "src/engine/render/backend/common/stb_impl.c"
     "src/engine/render/backend/vulkan/vulkan_renderer.c"
     "src/engine/render/backend/vulkan/vk_utils.c"
     "src/engine/render/backend/vulkan/vk_context.c"
@@ -141,10 +140,19 @@ target_link_libraries(engine_render PUBLIC foundation_platform foundation_math f
 # Note: circular dependency UI <-> Render might exist in legacy code.
 
 # Assets
-set(ENGINE_ASSETS_SOURCES "src/engine/assets/assets_service.c")
+set(ENGINE_ASSETS_SOURCES "src/engine/assets/assets.c")
 add_library(engine_assets STATIC ${ENGINE_ASSETS_SOURCES})
 target_include_directories(engine_assets PUBLIC "src/")
 target_link_libraries(engine_assets PUBLIC foundation_platform foundation_config)
+
+# Text
+set(ENGINE_TEXT_SOURCES
+    "src/engine/text/font.c"
+    "src/engine/text/stb_impl.c"
+)
+add_library(engine_text STATIC ${ENGINE_TEXT_SOURCES})
+target_include_directories(engine_text PUBLIC "src/" ${Stb_INCLUDE_DIR})
+target_link_libraries(engine_text PUBLIC foundation_platform foundation_logger)
 
 # UI
 set(ENGINE_UI_SOURCES
@@ -155,7 +163,7 @@ set(ENGINE_UI_SOURCES
     "src/engine/ui/ui_scene_bridge.c")
 add_library(engine_ui STATIC ${ENGINE_UI_SOURCES})
 target_include_directories(engine_ui PUBLIC "src/" ${Stb_INCLUDE_DIR})
-target_link_libraries(engine_ui PUBLIC foundation_config engine_assets foundation_meta foundation_math)
+target_link_libraries(engine_ui PUBLIC foundation_config engine_assets foundation_meta foundation_math engine_text)
 
 # Math Model
 set(DOMAIN_MATH_SOURCES
@@ -180,6 +188,7 @@ target_link_libraries(Graphics PRIVATE
     engine_render
     engine_ui
     engine_assets
+    engine_text
     foundation_config
     foundation_platform
     foundation_meta

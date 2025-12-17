@@ -4,9 +4,10 @@
 #include "foundation/logger/logger.h"
 #include "foundation/math/coordinate_systems.h"
 #include "foundation/platform/platform.h"
-#include "engine/render/backend/common/renderer_backend.h" // For RendererBackend and RenderGlyph
+#include "engine/render/backend/common/renderer_backend.h" // For RendererBackend (draw commands might still use it?)
+#include "engine/text/font.h"
 #include "engine/scene/scene_def.h"
-#include "engine/assets/assets_service.h"
+#include "engine/assets/assets.h"
 #include <string.h> // For memcpy
 #include <stdio.h> // For snprintf
 
@@ -63,65 +64,62 @@ static void traverse_ui(const UiView* view, Scene* scene, const Assets* assets, 
 
     // Text Rendering
     if (view->cached_text && strlen(view->cached_text) > 0) {
-        RendererBackend* backend = renderer_backend_default();
-        if (backend && backend->get_glyph) {
-            float cursor_x = view->rect.x + 5.0f; // Padding
-            // Shift down by approximate ascent (24px for 32px font) to act as baseline
-            float cursor_y = view->rect.y + 24.0f; 
-            
-            // Center text for buttons
-            if (view->def->type == UI_NODE_BUTTON) {
-                // Approximate centering (would need text measurement first)
-                cursor_x += 10.0f; 
-                cursor_y += (view->rect.h - 15.0f) * 0.5f; 
-            }
-            
-            if (debug_frame) {
-                LOG_TRACE("[Frame %llu] GenText '%s': Start(%.1f, %.1f) Rect(%.1f, %.1f, %.1f, %.1f)", 
-                    (unsigned long long)scene->frame_number,
-                    view->cached_text, cursor_x, cursor_y,
-                    view->rect.x, view->rect.y, view->rect.w, view->rect.h);
-            }
+        float cursor_x = view->rect.x + 5.0f; // Padding
+        // Shift down by approximate ascent (24px for 32px font) to act as baseline
+        float cursor_y = view->rect.y + 24.0f; 
+        
+        // Center text for buttons
+        if (view->def->type == UI_NODE_BUTTON) {
+            // Approximate centering (would need text measurement first)
+            cursor_x += 10.0f; 
+            cursor_y += (view->rect.h - 15.0f) * 0.5f; 
+        }
+        
+        if (debug_frame) {
+            LOG_TRACE("[Frame %llu] GenText '%s': Start(%.1f, %.1f) Rect(%.1f, %.1f, %.1f, %.1f)", 
+                (unsigned long long)scene->frame_number,
+                view->cached_text, cursor_x, cursor_y,
+                view->rect.x, view->rect.y, view->rect.w, view->rect.h);
+        }
 
-            const char* ptr = view->cached_text;
-            int char_count = 0;
-            while (*ptr) {
-                uint32_t codepoint = (uint32_t)*ptr; // Simple ASCII for now
-                RenderGlyph g;
-                if (backend->get_glyph(backend, codepoint, &g)) {
-                    SceneObject char_obj = {0};
-                    char_obj.layer = LAYER_UI_CONTENT;
-                    
-                    float x_pos = cursor_x + g.xoff;
-                    float y_pos = cursor_y + g.yoff; 
-                    
-                    char_obj.position = (Vec3){x_pos, y_pos, 0.0f}; // Z=0.0 (Closest, visible in -1.0 to 1.0 range)
-                    char_obj.scale = (Vec3){g.w, g.h, 1.0f};
-                    char_obj.rotation = (Vec3){0, 0, 0};
-                    char_obj.mesh = &assets->unit_quad;
-                    char_obj.color = (Vec4){1.0f, 1.0f, 1.0f, 1.0f}; // White text
-                    
-                    // Texture Params
-                    char_obj.uv_rect.x = g.u0;
-                    char_obj.uv_rect.y = g.v0;
-                    char_obj.uv_rect.z = g.u1 - g.u0; // Width in UV space
-                    char_obj.uv_rect.w = g.v1 - g.v0; // Height in UV space (positive if v1 > v0)
-                    
-                    char_obj.params.x = 1.0f; // Enable Texture
-                    
-                    scene_add_object(scene, char_obj);
-                    
-                    if (debug_frame && char_count == 0) {
-                        LOG_TRACE("  [Frame %llu] First Char '%c': Pos(%.1f, %.1f) Sz(%.1f, %.1f) UV(%.3f,%.3f)",
-                            (unsigned long long)scene->frame_number,
-                            *ptr, x_pos, y_pos, g.w, g.h, g.u0, g.v0);
-                    }
-                    
-                    cursor_x += g.advance;
-                    char_count++;
+        const char* ptr = view->cached_text;
+        int char_count = 0;
+        while (*ptr) {
+            uint32_t codepoint = (uint32_t)*ptr; // Simple ASCII for now
+            Glyph g;
+            if (font_get_glyph(codepoint, &g)) {
+                SceneObject char_obj = {0};
+                char_obj.layer = LAYER_UI_CONTENT;
+                
+                float x_pos = cursor_x + g.xoff;
+                float y_pos = cursor_y + g.yoff; 
+                
+                char_obj.position = (Vec3){x_pos, y_pos, 0.0f}; // Z=0.0 (Closest, visible in -1.0 to 1.0 range)
+                char_obj.scale = (Vec3){g.w, g.h, 1.0f};
+                char_obj.rotation = (Vec3){0, 0, 0};
+                char_obj.mesh = &assets->unit_quad;
+                char_obj.color = (Vec4){1.0f, 1.0f, 1.0f, 1.0f}; // White text
+                
+                // Texture Params
+                char_obj.uv_rect.x = g.u0;
+                char_obj.uv_rect.y = g.v0;
+                char_obj.uv_rect.z = g.u1 - g.u0; // Width in UV space
+                char_obj.uv_rect.w = g.v1 - g.v0; // Height in UV space (positive if v1 > v0)
+                
+                char_obj.params.x = 1.0f; // Enable Texture
+                
+                scene_add_object(scene, char_obj);
+                
+                if (debug_frame && char_count == 0) {
+                    LOG_TRACE("  [Frame %llu] First Char '%c': Pos(%.1f, %.1f) Sz(%.1f, %.1f) UV(%.3f,%.3f)",
+                        (unsigned long long)scene->frame_number,
+                        *ptr, x_pos, y_pos, g.w, g.h, g.u0, g.v0);
                 }
-                ptr++;
+                
+                cursor_x += g.advance;
+                char_count++;
             }
+            ptr++;
         }
     }
 

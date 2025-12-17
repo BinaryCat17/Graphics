@@ -9,21 +9,8 @@
 #include "foundation/platform/platform.h"
 #include "engine/render/backend/vulkan/vulkan_renderer.h"
 #include "engine/ui/ui_renderer.h"
-#include "stb_truetype.h"
 
 typedef struct { float viewport[2]; } ViewConstants;
-
-/* Vertex format for GUI: pos.xyz, uv.xy, use_tex, color.rgba */
-typedef struct { float px, py, pz; float u, v; float use_tex; float r, g, b, a; } Vtx;
-
-typedef struct {
-    float z;
-    size_t order;
-    Vtx vertices[6];
-} Primitive;
-
-typedef struct { float u0, v0, u1, v1; float xoff, yoff; float w, h; float advance; } Glyph;
-#define GLYPH_CAPACITY 2048
 
 typedef enum {
     FRAME_AVAILABLE,
@@ -32,9 +19,7 @@ typedef enum {
 } FrameStage;
 
 typedef struct {
-    // Legacy CPU vertex buffers (removed)
-    // We can keep Vtx *vertices for now if needed by font or other legacy parts not yet ported
-    Vtx *vertices;
+
     size_t vertex_capacity;
 } FrameCpuArena;
 
@@ -106,16 +91,6 @@ typedef struct VulkanRendererState {
     VkDescriptorSetLayout instance_layout;
     VkDescriptorSet instance_set;
     size_t instance_capacity; // In element count
-    
-    // Font state
-    unsigned char* ttf_buffer;
-    stbtt_fontinfo fontinfo;
-    unsigned char* atlas;
-    int atlas_w, atlas_h;
-    float font_scale;
-    int ascent, descent;
-    Glyph glyphs[GLYPH_CAPACITY];
-    unsigned char glyph_valid[GLYPH_CAPACITY];
 
     bool (*get_required_instance_extensions)(const char*** names, uint32_t* count);
     bool (*create_surface)(PlatformWindow* window, VkInstance instance, const VkAllocationCallbacks* alloc,

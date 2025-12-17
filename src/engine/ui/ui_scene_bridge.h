@@ -3,7 +3,7 @@
 
 #include "engine/ui/ui_def.h"
 #include "engine/scene/scene_def.h"
-#include "engine/assets/assets_service.h"
+#include "engine/assets/assets.h"
 
 // Traverses the UiView tree and populates the Scene with renderable objects.
 void ui_build_scene(const UiView* root, Scene* scene, const Assets* assets);

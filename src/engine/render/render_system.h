@@ -4,7 +4,7 @@
 #include <stdbool.h>
 #include <threads.h>
 
-#include "engine/assets/assets_service.h"
+#include "engine/assets/assets.h"
 #include "engine/ui/ui_def.h"
 #include "engine/ui/ui_renderer.h"
 #include "domains/math_model/math_graph.h"
