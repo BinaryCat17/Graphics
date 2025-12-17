@@ -85,7 +85,8 @@ void math_graph_set_value(MathNode* node, float value) {
 
 float math_graph_evaluate(MathNode* node) {
     if (!node) return 0.0f;
-    if (!node->dirty) return node->value;
+    // We always evaluate to ensure changes propagate. 
+    // (Optimization: Could use a frame-ID based cache if needed later)
     
     // Recursive evaluation (naive, no cycle detection yet)
     float v0 = (node->input_count > 0 && node->inputs[0]) ? math_graph_evaluate(node->inputs[0]) : 0.0f;
@@ -99,6 +100,8 @@ float math_graph_evaluate(MathNode* node) {
         case MATH_NODE_DIV: node->value = (v1 != 0.0f) ? v0 / v1 : 0.0f; break;
         case MATH_NODE_SIN: node->value = sinf(v0); break;
         case MATH_NODE_COS: node->value = cosf(v0); break;
+        case MATH_NODE_UV:  node->value = 0.5f; break; // Dummy preview value
+        case MATH_NODE_TIME: node->value = 0.0f; break; // Placeholder
         default: break;
     }
     
