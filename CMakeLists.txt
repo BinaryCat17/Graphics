@@ -135,16 +135,17 @@ set(ENGINE_RENDER_SOURCES
     "src/engine/render/backend/vulkan/vk_swapchain.c"
     "src/engine/render/backend/vulkan/vk_pipeline.c"
     "src/engine/render/backend/vulkan/vk_resources.c"
+    "src/engine/render/backend/vulkan/vk_compute.c"
     # Runtime
     "src/engine/render/render_thread.c"
     "src/engine/render/render_system.c"
     # Unified Scene
     "src/engine/scene/scene.c"
-    "src/engine/scene/text_renderer.c"
+    "src/engine/text/text_renderer.c"
 )
 add_library(engine_render STATIC ${ENGINE_RENDER_SOURCES})
 target_include_directories(engine_render PUBLIC "src/" ${Stb_INCLUDE_DIR})
-target_link_libraries(engine_render PUBLIC foundation_platform foundation_math foundation_memory Vulkan::Vulkan glfw Threads::Threads foundation_config engine_ui engine_assets)
+target_link_libraries(engine_render PUBLIC foundation_platform foundation_math foundation_memory Vulkan::Vulkan glfw Threads::Threads foundation_config engine_ui engine_assets domain_math)
 # Note: circular dependency UI <-> Render might exist in legacy code.
 
 # Assets
@@ -164,7 +165,6 @@ target_link_libraries(engine_text PUBLIC foundation_platform foundation_logger)
 
 # UI
 set(ENGINE_UI_SOURCES
-    "src/engine/ui/ui_renderer.c"
     "src/engine/ui/ui_loader.c"
     "src/engine/ui/ui_def.c"
     "src/engine/ui/ui_layout.c"
@@ -176,7 +176,8 @@ target_link_libraries(engine_ui PUBLIC foundation_config engine_assets foundatio
 # Math Model
 set(DOMAIN_MATH_SOURCES
     "src/domains/math_model/math_scene.c"
-    "src/domains/math_model/math_graph.c")
+    "src/domains/math_model/math_graph.c"
+    "src/domains/math_model/transpiler.c")
 add_library(domain_math STATIC ${DOMAIN_MATH_SOURCES})
 target_include_directories(domain_math PUBLIC "src/")
 target_link_libraries(domain_math PUBLIC foundation_math)
@@ -220,4 +221,5 @@ endfunction()
 # Update test paths and libs
 add_graphics_test(transform_tests tests/transform_tests.c foundation_math engine_render)
 add_graphics_test(math_scene_tests tests/math_scene_tests.c domain_math)
+add_graphics_test(transpiler_tests tests/transpiler_tests.c domain_math)
 add_graphics_test(ui_tests tests/ui_tests.c engine_ui foundation_logger domain_math)

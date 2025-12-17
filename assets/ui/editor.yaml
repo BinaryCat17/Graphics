@@ -1,0 +1,44 @@
+type: container
+layout: overlay
+width: -1
+height: -1
+children:
+  # Layer 1: Wires (Background)
+  - type: list
+    data: wires
+    count: wire_count
+    item_template:
+      type: curve
+      bind_x: x
+      bind_y: y
+      bind_w: width
+      bind_h: height
+      bind_u1: u1
+      bind_v1: v1
+      bind_u2: u2
+      bind_v2: v2
+
+  # Layer 2: Nodes (Foreground)
+  - type: list
+    data: nodes
+    count: node_count
+    item_template:
+      type: panel
+      draggable: true
+      width: 150
+      height: 100
+      bind_x: x
+      bind_y: y
+      layout: column
+      padding: 5
+      spacing: 5
+      children:
+        # Header
+        - type: panel
+          height: 25
+          children:
+             - type: label
+               text: "{name}"
+        # Value Display
+        - type: label
+          text: "Val: {value}"

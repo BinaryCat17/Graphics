@@ -6,7 +6,7 @@
 #include "foundation/platform/platform.h"
 #include "engine/render/backend/common/renderer_backend.h" // For RendererBackend (draw commands might still use it?)
 #include "engine/text/font.h"
-#include "engine/scene/scene_def.h"
+#include "engine/scene/scene.h"
 #include "engine/assets/assets.h"
 #include <string.h> // For memcpy
 #include <stdio.h> // For snprintf

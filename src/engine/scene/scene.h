@@ -1,9 +1,13 @@
-#ifndef SCENE_DEF_H
-#define SCENE_DEF_H
+#ifndef SCENE_H
+#define SCENE_H
 
 #include "foundation/math/coordinate_systems.h"
-#include "foundation/meta/reflection.h"
+#include <stddef.h> // size_t
+#include <stdint.h> // uint64_t
 
+// --- Basic Types ---
+
+// Simple mesh descriptor for the Unified Scene
 typedef struct Mesh {
     float *positions; // xyz triplets
     size_t position_count;
@@ -22,16 +26,17 @@ typedef enum RenderLayer {
     LAYER_COUNT
 } RenderLayer;
 
-typedef struct SceneCamera {
-    Mat4 view_matrix;
-    Mat4 proj_matrix;
-    // Viewport rect?
-} SceneCamera;
-
 typedef enum ScenePrimitiveType {
     SCENE_PRIM_QUAD = 0, // Standard Mesh/Quad
     SCENE_PRIM_CURVE = 1 // SDF Bezier Curve
 } ScenePrimitiveType;
+
+// --- Scene Components ---
+
+typedef struct SceneCamera {
+    Mat4 view_matrix;
+    Mat4 proj_matrix;
+} SceneCamera;
 
 typedef struct SceneObject {
     int id;
@@ -40,28 +45,24 @@ typedef struct SceneObject {
     
     // Transform
     Vec3 position;
-    Vec3 rotation; // Euler angles or Quaternion
+    Vec3 rotation; 
     Vec3 scale;
     
     // Visuals
-    const Mesh* mesh; // Geometry
-    // Material* material; // TODO: Define Material struct
-    Vec4 color; // Simple color support
-    Vec4 uv_rect; // Texture Subset: xy = offset, zw = scale. Default: (0,0,1,1)
-    Vec4 params; // Shader params: x = use_texture (0.0 or 1.0)
+    const Mesh* mesh; 
+    Vec4 color; 
+    Vec4 uv_rect; // Texture Subset (xy=off, zw=scale) OR Curve Points (xy=P0, zw=P3)
+    Vec4 params;  // Shader params: x = use_texture, z = thickness
     
     // Instancing (Data-Driven Visualization)
-    // If instance_count > 0, this object is a template
-    void* instance_buffer; // Pointer to GpuBuffer (TBD)
+    void* instance_buffer; // Pointer to GpuBuffer (if massive instancing)
     size_t instance_count;
-    
-    // UI Specifics (Optional, could be component)
-    // bool is_interactive;
-    // ...
 } SceneObject;
 
+// --- The Scene Container ---
+
 typedef struct Scene {
-    SceneObject* objects; // Array of structs, not pointers
+    SceneObject* objects; // Linear array
     size_t object_count;
     size_t object_capacity;
     
@@ -70,9 +71,10 @@ typedef struct Scene {
     uint64_t frame_number;
 } Scene;
 
-// API
+// --- API ---
+
 void scene_init(Scene* scene);
-void scene_add_object(Scene* scene, SceneObject obj); // Pass by value
+void scene_add_object(Scene* scene, SceneObject obj); // Pass by value (copy)
 void scene_clear(Scene* scene);
 
-#endif // SCENE_DEF_H
+#endif // SCENE_H

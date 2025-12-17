@@ -41,8 +41,10 @@ typedef struct MathGraph {
     int node_count;   // REFLECT
     int node_capacity;
     
-    VisualWire* wires; // REFLECT
+    VisualWire** wires; // REFLECT
     int wire_count;    // REFLECT
+    
+    VisualWire* _wire_pool; // Internal storage
 } MathGraph;
 
 void math_graph_init(MathGraph* graph);

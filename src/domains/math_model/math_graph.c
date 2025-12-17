@@ -22,6 +22,8 @@ void math_graph_dispose(MathGraph* graph) {
         free_node(graph->nodes[i]);
     }
     free(graph->nodes);
+    free(graph->_wire_pool);
+    free(graph->wires);
     memset(graph, 0, sizeof(MathGraph));
 }
 
@@ -126,8 +128,16 @@ void math_graph_update_visuals(MathGraph* graph) {
     
     // 2. Reallocate if needed
     if (count != graph->wire_count) {
+        free(graph->_wire_pool);
         free(graph->wires);
-        graph->wires = (count > 0) ? (VisualWire*)malloc(sizeof(VisualWire) * count) : NULL;
+        
+        if (count > 0) {
+            graph->_wire_pool = (VisualWire*)malloc(sizeof(VisualWire) * count);
+            graph->wires = (VisualWire**)malloc(sizeof(VisualWire*) * count);
+        } else {
+            graph->_wire_pool = NULL;
+            graph->wires = NULL;
+        }
         graph->wire_count = count;
     }
     
@@ -164,16 +174,19 @@ void math_graph_update_visuals(MathGraph* graph) {
                 float w = max_x - min_x;
                 float h = max_y - min_y;
                 
-                graph->wires[idx].x = min_x;
-                graph->wires[idx].y = min_y;
-                graph->wires[idx].width = w;
-                graph->wires[idx].height = h;
+                VisualWire* wire = &graph->_wire_pool[idx];
+                graph->wires[idx] = wire;
+                
+                wire->x = min_x;
+                wire->y = min_y;
+                wire->width = w;
+                wire->height = h;
                 
                 // UVs (Normalized 0..1 in BBox)
-                graph->wires[idx].u1 = (sx - min_x) / w;
-                graph->wires[idx].v1 = (sy - min_y) / h;
-                graph->wires[idx].u2 = (tx - min_x) / w;
-                graph->wires[idx].v2 = (ty - min_y) / h;
+                wire->u1 = (sx - min_x) / w;
+                wire->v1 = (sy - min_y) / h;
+                wire->u2 = (tx - min_x) / w;
+                wire->v2 = (ty - min_y) / h;
                 
                 idx++;
             }

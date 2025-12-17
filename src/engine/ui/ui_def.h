@@ -10,6 +10,7 @@ typedef struct InputState {
     float mouse_x, mouse_y;
     bool mouse_down;
     bool mouse_clicked;
+    float scroll_dx, scroll_dy;
 } InputState;
 
 // --- UI DEFINITION (TEMPLATE) ---
@@ -69,6 +70,8 @@ typedef struct UiDef {
     float width, height; // < 0 means auto/fill
     float padding;
     float spacing;
+    
+    bool draggable; // Enables drag interaction
 
     // Slider props
     float min_value;

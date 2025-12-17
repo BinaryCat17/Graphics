@@ -23,6 +23,37 @@ static const MetaField* find_field(const MetaStruct* meta, const char* name) {
     return NULL;
 }
 
+static void write_geometry_binding(UiView* view, float dx, float dy) {
+    if (!view || !view->data_ptr || !view->meta) return;
+
+    if (view->def->x_source) {
+        const MetaField* f = find_field(view->meta, view->def->x_source);
+        if (f) {
+            float val = 0;
+            if (f->type == META_TYPE_FLOAT) val = meta_get_float(view->data_ptr, f);
+            else if (f->type == META_TYPE_INT) val = (float)meta_get_int(view->data_ptr, f);
+            
+            val += dx;
+            
+            if (f->type == META_TYPE_FLOAT) meta_set_float(view->data_ptr, f, val);
+            else if (f->type == META_TYPE_INT) meta_set_int(view->data_ptr, f, (int)val);
+        }
+    }
+    if (view->def->y_source) {
+        const MetaField* f = find_field(view->meta, view->def->y_source);
+        if (f) {
+            float val = 0;
+            if (f->type == META_TYPE_FLOAT) val = meta_get_float(view->data_ptr, f);
+            else if (f->type == META_TYPE_INT) val = (float)meta_get_int(view->data_ptr, f);
+            
+            val += dy;
+            
+            if (f->type == META_TYPE_FLOAT) meta_set_float(view->data_ptr, f, val);
+            else if (f->type == META_TYPE_INT) meta_set_int(view->data_ptr, f, (int)val);
+        }
+    }
+}
+
 // --- UiDef Implementation ---
 
 UiDef* ui_def_create(UiNodeType type) {
@@ -295,11 +326,14 @@ static bool rect_contains(Rect r, float x, float y) {
     return x >= r.x && x <= r.x + r.w && y >= r.y && y <= r.y + r.h;
 }
 
+static UiView* s_drag_view = NULL;
+static float s_last_mx = 0;
+static float s_last_my = 0;
+
 void ui_view_process_input(UiView* view, const InputState* input) {
     if (!view || !input || !view->def) return;
 
-    // 1. Process Children (Top-down for hit testing usually, but for simple UI order doesn't matter much)
-    // We process children first so they are "on top" if z-order matches tree order
+    // 1. Process Children
     for (size_t i = 0; i < view->child_count; ++i) {
         ui_view_process_input(view->children[i], input);
     }
@@ -308,6 +342,32 @@ void ui_view_process_input(UiView* view, const InputState* input) {
     bool hover = rect_contains(view->rect, input->mouse_x, input->mouse_y);
     view->is_hovered = hover;
     view->is_pressed = hover && input->mouse_down;
+
+    // Drag Handling
+    if (s_drag_view == view) {
+        if (!input->mouse_down) {
+            s_drag_view = NULL; // Drop
+        } else {
+            float dx = input->mouse_x - s_last_mx;
+            float dy = input->mouse_y - s_last_my;
+            
+            if (dx != 0 || dy != 0) {
+                write_geometry_binding(view, dx, dy);
+                // Also update local rect immediately for responsiveness
+                // (though next frame update will overwrite from data)
+                view->rect.x += dx;
+                view->rect.y += dy;
+            }
+            
+            s_last_mx = input->mouse_x;
+            s_last_my = input->mouse_y;
+        }
+    } 
+    else if (s_drag_view == NULL && view->def->draggable && hover && input->mouse_clicked) {
+        s_drag_view = view;
+        s_last_mx = input->mouse_x;
+        s_last_my = input->mouse_y;
+    }
 
     if (hover) {
         

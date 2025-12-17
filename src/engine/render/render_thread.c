@@ -25,11 +25,12 @@ static void on_mouse_button(PlatformWindow* window, PlatformMouseButton button, 
 }
 
 static void on_scroll(PlatformWindow* window, double xoff, double yoff, void* user_data) {
-    (void)window; (void)xoff; (void)yoff;
+    (void)window; 
     RenderSystem* sys = (RenderSystem*)user_data;
     if (!sys) return;
 
-    // TODO: Forward scroll to New UI System
+    sys->input.scroll_dx += (float)xoff;
+    sys->input.scroll_dy += (float)yoff;
 }
 
 static void on_cursor_pos(PlatformWindow* window, double x, double y, void* user_data) {

@@ -7,6 +7,7 @@
 #include "engine/render/backend/vulkan/vk_pipeline.h"
 #include "engine/render/backend/vulkan/vk_resources.h"
 #include "engine/render/backend/vulkan/vk_utils.h"
+#include "engine/render/backend/vulkan/vk_compute.h"
 #include "engine/text/font.h"
 
 #include "foundation/logger/logger.h"
@@ -18,6 +19,14 @@
 #include <stdio.h>
 
 static RendererBackend g_vulkan_backend;
+
+// --- Compute ---
+
+static float vk_backend_run_compute(RendererBackend* backend, const char* glsl_source) {
+    if (!backend || !backend->state || !glsl_source) return 0.0f;
+    VulkanRendererState* state = (VulkanRendererState*)backend->state;
+    return vk_run_compute_graph_oneshot(state, glsl_source);
+}
 
 // Unified Push Constants layout (Global per pass)
 typedef struct {
@@ -407,5 +416,6 @@ RendererBackend* vulkan_renderer_backend(void) {
     g_vulkan_backend.init = vk_backend_init;
     g_vulkan_backend.render_scene = vk_backend_render_scene;
     g_vulkan_backend.cleanup = vk_backend_cleanup;
+    g_vulkan_backend.run_compute = vk_backend_run_compute;
     return &g_vulkan_backend;
 }

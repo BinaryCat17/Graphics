@@ -11,7 +11,7 @@
 #include "engine/ui/ui_scene_bridge.h"
 #include "engine/ui/ui_layout.h"
 #include "engine/text/font.h"
-#include "engine/scene/text_renderer.h"
+#include "engine/text/text_renderer.h"
 
 // --- Helper: Packet Management ---
 
@@ -175,13 +175,23 @@ void render_system_update(RenderSystem* sys) {
     try_sync_packet(sys);
 }
 
+#include "domains/math_model/transpiler.h"
+
+#define KEY_C 67
+
 void render_system_run(RenderSystem* sys) {
     if (!sys) return;
     
     sys->running = true;
+    static bool key_c_prev = false;
     
     while (sys->running && !platform_window_should_close(sys->render_context.window)) {
         sys->frame_count++;
+        
+        // Reset per-frame input
+        sys->input.scroll_dx = 0;
+        sys->input.scroll_dy = 0;
+        
         platform_poll_events();
         
         // 0. Input Polling
@@ -191,6 +201,26 @@ void render_system_run(RenderSystem* sys) {
         sys->input.mouse_y = (float)my;
         sys->input.mouse_down = platform_get_mouse_button(sys->render_context.window, 0); // Left button
         
+        // Key C (Compute)
+        bool key_c_curr = platform_get_key(sys->render_context.window, KEY_C);
+        if (key_c_curr && !key_c_prev) {
+             if (sys->math_graph) {
+                LOG_INFO("Transpiling & Running Compute Graph...");
+                char* glsl = math_graph_transpile_glsl(sys->math_graph);
+                if (glsl) {
+                    LOG_INFO("Generated GLSL:\n%s", glsl);
+                    if (sys->backend->run_compute) {
+                        float res = sys->backend->run_compute(sys->backend, glsl);
+                        LOG_INFO("Compute Result: %f", res);
+                    } else {
+                        LOG_WARN("Backend does not support run_compute");
+                    }
+                    free(glsl);
+                }
+            }
+        }
+        key_c_prev = key_c_curr;
+        
         // Simple click detection (down this frame, was up last frame)
         static bool last_down = false;
         sys->input.mouse_clicked = sys->input.mouse_down && !last_down;
@@ -198,13 +228,20 @@ void render_system_run(RenderSystem* sys) {
         
         // 1. Update Domain Logic
         if (sys->math_graph) {
-             // math_graph_update(sys->math_graph);
+             math_graph_update(sys->math_graph);
+             math_graph_update_visuals(sys->math_graph);
         }
         
         // 2. Update UI Logic (Reactivity)
         if (sys->ui_root_view) {
             ui_view_process_input(sys->ui_root_view, &sys->input);
             ui_view_update(sys->ui_root_view);
+            
+            // Layout Pass (using window size from context)
+            PlatformWindowSize size = platform_get_framebuffer_size(sys->render_context.window);
+            // We pass debug=false here, logging controlled by trace interval inside ui_build_scene if needed, 
+            // but layout happens here every frame.
+            ui_layout_root(sys->ui_root_view, (float)size.width, (float)size.height, sys->frame_count, false);
         }
 
         // 3. Render Prep

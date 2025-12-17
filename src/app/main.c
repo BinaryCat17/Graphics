@@ -17,7 +17,7 @@ int main(int argc, char** argv) {
 
     // 1. Config
     const char* assets_dir = "assets";
-    const char* ui_path = "assets/ui/test_binding.yaml"; // New default
+    const char* ui_path = "assets/ui/editor.yaml"; // Editor UI
     
     // Default log level
     logger_set_level(LOG_LEVEL_INFO);
@@ -61,12 +61,17 @@ int main(int argc, char** argv) {
     MathGraph graph;
     math_graph_init(&graph);
     
-    // Create a test node to bind to
-    MathNode* node = math_graph_add_node(&graph, MATH_NODE_SIN);
-    node->name = strdup("Debug Node");
-    node->value = 0.0f;
-    node->id = 101;
-    node->dirty = 0;
+    // Create Test Nodes
+    MathNode* n1 = math_graph_add_node(&graph, MATH_NODE_VALUE);
+    n1->name = strdup("Input");
+    n1->value = 1.0f;
+    n1->x = 100; n1->y = 100;
+    
+    MathNode* n2 = math_graph_add_node(&graph, MATH_NODE_SIN);
+    n2->name = strdup("Sin(x)");
+    n2->x = 400; n2->y = 150;
+    
+    math_graph_connect(n2, 0, n1);
 
     // 4. UI System (The View)
     UiDef* ui_def = ui_loader_load_from_file(ui_path);
@@ -75,14 +80,14 @@ int main(int argc, char** argv) {
         return 1;
     }
 
-    // Create View bound to the Node
-    const MetaStruct* node_meta = meta_get_struct("MathNode");
-    if (!node_meta) {
-        LOG_FATAL("Reflection metadata for 'MathNode' not found.");
+    // Create View bound to the Graph
+    const MetaStruct* graph_meta = meta_get_struct("MathGraph");
+    if (!graph_meta) {
+        LOG_FATAL("Reflection metadata for 'MathGraph' not found.");
         return 1;
     }
     
-    UiView* root_view = ui_view_create(ui_def, node, node_meta);
+    UiView* root_view = ui_view_create(ui_def, &graph, graph_meta);
     if (!root_view) {
         LOG_ERROR("Failed to create UI View.");
         return 1;

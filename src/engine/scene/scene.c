@@ -1,4 +1,4 @@
-#include "scene_def.h"
+#include "scene.h"
 #include <stdlib.h>
 #include <string.h>
 

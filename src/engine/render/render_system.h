@@ -6,7 +6,6 @@
 
 #include "engine/assets/assets.h"
 #include "engine/ui/ui_def.h"
-#include "engine/ui/ui_renderer.h"
 #include "domains/math_model/math_graph.h"
 #include "engine/render/backend/common/renderer_backend.h"
 #include "engine/render/render_thread.h"

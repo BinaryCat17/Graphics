@@ -88,6 +88,9 @@ UiDef* ui_loader_load_from_node(const void* node_ptr) {
     def->height = parse_float(config_node_get_scalar(node, "height"), -1.0f);
     def->padding = parse_float(config_node_get_scalar(node, "padding"), 0.0f);
     def->spacing = parse_float(config_node_get_scalar(node, "spacing"), 0.0f);
+    
+    const ConfigNode* draggable = config_node_get_scalar(node, "draggable");
+    if (draggable) def->draggable = (strcmp(draggable->scalar, "true") == 0);
 
     def->min_value = parse_float(config_node_get_scalar(node, "min"), 0.0f);
     def->max_value = parse_float(config_node_get_scalar(node, "max"), 1.0f);

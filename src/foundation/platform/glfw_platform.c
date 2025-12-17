@@ -128,6 +128,11 @@ bool platform_get_mouse_button(PlatformWindow* window, int button) {
     return glfwGetMouseButton(window->handle, button) == GLFW_PRESS;
 }
 
+bool platform_get_key(PlatformWindow* window, int key) {
+    if (!window || !window->handle) return false;
+    return glfwGetKey(window->handle, key) == GLFW_PRESS;
+}
+
 void platform_set_framebuffer_size_callback(PlatformWindow* window, PlatformFramebufferSizeCallback callback, 
                                             void* user_data) {
     if (!window) return;
