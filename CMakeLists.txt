@@ -137,7 +137,6 @@ set(ENGINE_RENDER_SOURCES
     "src/engine/render/backend/vulkan/vk_resources.c"
     "src/engine/render/backend/vulkan/vk_compute.c"
     # Runtime
-    "src/engine/render/render_thread.c"
     "src/engine/render/render_system.c"
     # Unified Scene
     "src/engine/scene/scene.c"
@@ -175,7 +174,6 @@ target_link_libraries(engine_ui PUBLIC foundation_config engine_assets foundatio
 
 # Math Model
 set(DOMAIN_MATH_SOURCES
-    "src/domains/math_model/math_scene.c"
     "src/domains/math_model/math_graph.c"
     "src/domains/math_model/transpiler.c")
 add_library(domain_math STATIC ${DOMAIN_MATH_SOURCES})
@@ -185,14 +183,22 @@ if(UNIX)
     target_link_libraries(domain_math PUBLIC m)
 endif()
 
-# --- APP ---
+# ... (Existing Engine Libs)
 
-# We need to create a dummy main.c first or use the existing one, but existing one is full of service junk.
-# I will overwrite the existing main.c in next step.
+# Engine Core
+set(ENGINE_CORE_SOURCES
+    "src/engine/core/engine.c"
+)
+add_library(engine_core STATIC ${ENGINE_CORE_SOURCES})
+target_include_directories(engine_core PUBLIC "src/")
+target_link_libraries(engine_core PUBLIC engine_render engine_ui engine_assets domain_math foundation_meta foundation_logger)
+
+# --- APP ---
 
 add_executable(Graphics "src/app/main.c")
 target_include_directories(Graphics PRIVATE "src/" ${Vulkan_INCLUDE_DIRS} ${Stb_INCLUDE_DIR})
 target_link_libraries(Graphics PRIVATE
+    engine_core
     domain_math
     engine_render
     engine_ui
@@ -209,6 +215,7 @@ target_link_libraries(Graphics PRIVATE
     Threads::Threads)
 add_dependencies(Graphics Shaders)
 
+
 # --- Tests ---
 
 function(add_graphics_test TEST_NAME SOURCE_FILE)
@@ -220,6 +227,5 @@ endfunction()
 
 # Update test paths and libs
 add_graphics_test(transform_tests tests/transform_tests.c foundation_math engine_render)
-add_graphics_test(math_scene_tests tests/math_scene_tests.c domain_math)
 add_graphics_test(transpiler_tests tests/transpiler_tests.c domain_math)
 add_graphics_test(ui_tests tests/ui_tests.c engine_ui foundation_logger domain_math)

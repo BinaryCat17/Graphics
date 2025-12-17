@@ -8,8 +8,8 @@
 #include "engine/ui/ui_def.h"
 #include "domains/math_model/math_graph.h"
 #include "engine/render/backend/common/renderer_backend.h"
-#include "engine/render/render_thread.h"
 #include "engine/render/render_packet.h"
+#include "foundation/platform/platform.h"
 
 // Forward decl
 struct RendererBackend;
@@ -21,11 +21,8 @@ typedef struct RenderSystem {
     MathGraph* math_graph;
 
     // Internal State
-    RenderRuntimeContext render_context; // Thread context
+    PlatformWindow* window;
     struct RendererBackend* backend;
-    
-    // Input State
-    InputState input;
     
     // Packet buffering
     RenderFramePacket packets[2];
@@ -38,7 +35,6 @@ typedef struct RenderSystem {
     RenderLoggerConfig logger_config;
     
     // Thread control
-    thrd_t thread;
     bool running;
     bool renderer_ready;
     bool show_compute_result;
@@ -47,6 +43,7 @@ typedef struct RenderSystem {
 } RenderSystem;
 
 typedef struct RenderSystemConfig {
+    PlatformWindow* window;
     const char* backend_type; // "vulkan"
     RenderLogLevel log_level;
 } RenderSystemConfig;
@@ -59,9 +56,11 @@ void render_system_bind_assets(RenderSystem* sys, Assets* assets);
 void render_system_bind_ui(RenderSystem* sys, UiView* root_view);
 void render_system_bind_math_graph(RenderSystem* sys, MathGraph* graph);
 
-// Runtime
-void render_system_update(RenderSystem* sys); // Called on main thread
-void render_system_run(RenderSystem* sys);    // Called on main thread (blocking loop)
+// Updates the render system (Syncs logic to render packet)
+void render_system_update(RenderSystem* sys);
+
+// Shuts down the system
+void render_system_shutdown(RenderSystem* sys);
 
 const RenderFramePacket* render_system_acquire_packet(RenderSystem* sys);
 
