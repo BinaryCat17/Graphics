@@ -47,8 +47,8 @@ void scene_add_text(Scene* scene, const char* text, Vec3 pos, float scale, Vec4 
             // UVs
             obj.uv_rect.x = g.u0;
             obj.uv_rect.y = g.v0;
-            obj.uv_rect.z = g.u1;
-            obj.uv_rect.w = g.v1;
+            obj.uv_rect.z = g.u1 - g.u0; // Width
+            obj.uv_rect.w = g.v1 - g.v0; // Height
             
             scene_add_object(scene, obj);
             count++;

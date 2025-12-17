@@ -196,6 +196,7 @@ static void draw_frame_scene(VulkanRendererState* state, const Scene* scene) {
             
             memcpy(data[idx].model, model.m, sizeof(float)*16);
             
+            data[idx].color[0] = obj->color.x;
             data[idx].color[1] = obj->color.y;
             data[idx].color[2] = obj->color.z;
             data[idx].color[3] = obj->color.w;
@@ -268,9 +269,21 @@ static void draw_frame_scene(VulkanRendererState* state, const Scene* scene) {
     // ViewProj Push Constants
     float w = (float)state->swapchain_extent.width;
     float h = (float)state->swapchain_extent.height;
-    Mat4 proj = mat4_orthographic(0, w, 0, h, 1.0f, -1.0f);
-    Mat4 view = mat4_identity(); 
-    Mat4 view_proj = mat4_multiply(&proj, &view);
+
+    // Custom Vulkan Ortho Projection
+    // Maps:
+    // X: [0, w] -> [-1, 1]
+    // Y: [0, h] -> [-1, 1] (Top to Bottom, Y-Down in World)
+    // Z: [-1, 1] -> [0, 1] (Safe Z range)
+    Mat4 view_proj = mat4_identity();
+    if (w > 0 && h > 0) {
+        view_proj.m[0] = 2.0f / w;
+        view_proj.m[5] = 2.0f / h;
+        view_proj.m[10] = 0.5f; // Compress Z range 2 (-1..1) to 1 (0..1)
+        view_proj.m[12] = -1.0f;
+        view_proj.m[13] = -1.0f;
+        view_proj.m[14] = 0.5f; // Center Z=0 at 0.5
+    }
     
     UnifiedPushConstants pc;
     memcpy(pc.view_proj, view_proj.m, sizeof(float)*16);
@@ -316,6 +329,35 @@ static void draw_frame_scene(VulkanRendererState* state, const Scene* scene) {
 
     vkCmdEndRenderPass(cb);
     vkEndCommandBuffer(cb);
+
+    // 4. Submit & Present
+    VkPipelineStageFlags waitStages[] = {VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT};
+    VkSubmitInfo si = { 
+        .sType = VK_STRUCTURE_TYPE_SUBMIT_INFO, 
+        .waitSemaphoreCount = 1, 
+        .pWaitSemaphores = &state->sem_img_avail, 
+        .pWaitDstStageMask = waitStages, 
+        .commandBufferCount = 1, 
+        .pCommandBuffers = &cb, 
+        .signalSemaphoreCount = 1, 
+        .pSignalSemaphores = &state->sem_render_done 
+    };
+
+    VkResult res = vkQueueSubmit(state->queue, 1, &si, state->fences[img_idx]);
+    if (res != VK_SUCCESS) {
+        LOG_ERROR("vkQueueSubmit failed: %d", res);
+    }
+
+    VkPresentInfoKHR pi = { 
+        .sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR, 
+        .waitSemaphoreCount = 1, 
+        .pWaitSemaphores = &state->sem_render_done, 
+        .swapchainCount = 1, 
+        .pSwapchains = &state->swapchain, 
+        .pImageIndices = &img_idx 
+    };
+
+    vkQueuePresentKHR(state->queue, &pi);
 }
 
 static void vk_backend_render_scene(RendererBackend* backend, const Scene* scene) {
