@@ -77,6 +77,10 @@ void main() {
         
         float dist = sdWire(inUV, inExtra.xy, inExtra.zw);
         
+        // Add round caps (circles at endpoints)
+        dist = min(dist, length(inUV - inExtra.xy));
+        dist = min(dist, length(inUV - inExtra.zw));
+        
         // Anti-aliased stroke
         // Thickness = 0.01 (in UV space) - depends on scale. 
         // Ideally pass thickness in params.z. Let's assume params.z

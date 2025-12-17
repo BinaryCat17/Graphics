@@ -145,9 +145,9 @@ void math_graph_update_visuals(MathGraph* graph) {
     
     // 3. Populate
     int idx = 0;
-    const float node_w = 100.0f;
-    const float port_y_off = 30.0f;
-    const float port_spacing = 20.0f;
+    const float node_w = 150.0f; // Matches editor.yaml
+    const float port_y_off = 45.0f; // Header (25) + Padding
+    const float port_spacing = 25.0f; // Approx line height
     
     for (int i = 0; i < graph->node_count; ++i) {
         MathNode* target = graph->nodes[i];
