@@ -91,6 +91,10 @@ typedef struct UiView {
     char* cached_text;    // Resolved text (e.g. "Value: 5.0")
     float cached_value;   // Last read float value (for diffing)
     
+    // Interaction State
+    bool is_hovered;
+    bool is_pressed;
+    
 } UiView;
 
 // API

@@ -54,6 +54,7 @@ PlatformWindowSize platform_get_window_size(PlatformWindow* window);
 PlatformWindowSize platform_get_framebuffer_size(PlatformWindow* window);
 PlatformDpiScale platform_get_window_dpi(PlatformWindow* window);
 void platform_get_cursor_pos(PlatformWindow* window, double* x, double* y);
+bool platform_get_mouse_button(PlatformWindow* window, int button);
 
 void platform_set_framebuffer_size_callback(PlatformWindow* window, PlatformFramebufferSizeCallback callback,
                                             void* user_data);

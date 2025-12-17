@@ -123,6 +123,11 @@ void platform_get_cursor_pos(PlatformWindow* window, double* x, double* y) {
     glfwGetCursorPos(window->handle, x, y);
 }
 
+bool platform_get_mouse_button(PlatformWindow* window, int button) {
+    if (!window || !window->handle) return false;
+    return glfwGetMouseButton(window->handle, button) == GLFW_PRESS;
+}
+
 void platform_set_framebuffer_size_callback(PlatformWindow* window, PlatformFramebufferSizeCallback callback, 
                                             void* user_data) {
     if (!window) return;

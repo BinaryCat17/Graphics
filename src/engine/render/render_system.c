@@ -164,6 +164,18 @@ void render_system_run(RenderSystem* sys) {
     while (sys->running && !platform_window_should_close(sys->render_context.window)) {
         platform_poll_events();
         
+        // 0. Input Polling
+        double mx, my;
+        platform_get_cursor_pos(sys->render_context.window, &mx, &my);
+        sys->input.mouse_x = (float)mx;
+        sys->input.mouse_y = (float)my;
+        sys->input.mouse_down = platform_get_mouse_button(sys->render_context.window, 0); // Left button
+        
+        // Simple click detection (down this frame, was up last frame)
+        static bool last_down = false;
+        sys->input.mouse_clicked = sys->input.mouse_down && !last_down;
+        last_down = sys->input.mouse_down;
+        
         // 1. Update Domain Logic
         if (sys->math_graph) {
              // math_graph_update(sys->math_graph);
@@ -174,9 +186,6 @@ void render_system_run(RenderSystem* sys) {
             ui_view_process_input(sys->ui_root_view, &sys->input);
             ui_view_update(sys->ui_root_view);
         }
-
-        // Reset frame events
-        sys->input.mouse_clicked = false;
 
         // 3. Render Prep
         render_system_update(sys); // Generates DrawList and pushes to packet

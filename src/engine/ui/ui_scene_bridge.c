@@ -1,4 +1,11 @@
 #include "ui_scene_bridge.h"
+#include "ui_layout.h"
+#include "engine/render/backend/common/renderer_backend.h"
+#include <stddef.h>
+#include <string.h>
+
+#include "ui_scene_bridge.h"
+#include "ui_layout.h"
 #include "engine/render/backend/common/renderer_backend.h"
 #include <stddef.h>
 #include <string.h>
@@ -20,7 +27,13 @@ static void traverse_ui(const UiView* view, Scene* scene, const Assets* assets) 
         if (view->def->type == UI_NODE_PANEL) {
             obj.color = (Vec4){0.2f, 0.2f, 0.2f, 1.0f};
         } else if (view->def->type == UI_NODE_BUTTON) {
-            obj.color = (Vec4){0.3f, 0.5f, 0.8f, 1.0f};
+            if (view->is_pressed) {
+                obj.color = (Vec4){0.2f, 0.4f, 0.7f, 1.0f};
+            } else if (view->is_hovered) {
+                obj.color = (Vec4){0.4f, 0.6f, 0.9f, 1.0f};
+            } else {
+                obj.color = (Vec4){0.3f, 0.5f, 0.8f, 1.0f};
+            }
         } else if (view->def->type == UI_NODE_SLIDER) {
             obj.color = (Vec4){0.4f, 0.4f, 0.4f, 1.0f};
         } else if (view->def->type == UI_NODE_LABEL) {
@@ -56,19 +69,6 @@ static void traverse_ui(const UiView* view, Scene* scene, const Assets* assets) 
                     SceneObject char_obj = {0};
                     char_obj.layer = LAYER_UI_CONTENT;
                     
-                    // Position:
-                    // Quad origin is Bottom-Left? Or Top-Left?
-                    // Standard: Unit Quad is 0,0 to 1,1.
-                    // Text needs to be drawn at (x + xoff, y + yoff).
-                    // Vulkan Y is down? If Ortho 0..H is bottom-up, then Y increases up.
-                    // If Ortho 0..H is top-down (standard UI), Y increases down.
-                    // Check vk_backend: mat4_orthographic(0, w, 0, h, ...) -> 0 is Bottom? 
-                    // Let's assume standard math ortho: 0,0 is Bottom-Left.
-                    // But UI usually assumes 0,0 is Top-Left.
-                    // If my UI coordinates are Top-Left based, but Projection is Bottom-Left...
-                    // I might need to flip Y.
-                    // Let's assume consistent coordinate system for now (Y Up).
-                    
                     float x_pos = cursor_x + g.xoff;
                     float y_pos = cursor_y + g.yoff; 
                     
@@ -102,5 +102,11 @@ static void traverse_ui(const UiView* view, Scene* scene, const Assets* assets) 
 
 void ui_build_scene(const UiView* root, Scene* scene, const Assets* assets) {
     if (!root || !scene || !assets) return;
+    
+    // Layout Pass
+    // TBD: Pass real window size. For now hardcoded or need a way to get it.
+    // Ideally ui_build_scene should take window dimensions.
+    ui_layout_root((UiView*)root, 1280.0f, 720.0f); 
+    
     traverse_ui(root, scene, assets);
 }

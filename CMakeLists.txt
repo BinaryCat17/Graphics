@@ -151,6 +151,7 @@ set(ENGINE_UI_SOURCES
     "src/engine/ui/ui_renderer.c"
     "src/engine/ui/ui_loader.c"
     "src/engine/ui/ui_def.c"
+    "src/engine/ui/ui_layout.c"
     "src/engine/ui/ui_scene_bridge.c")
 add_library(engine_ui STATIC ${ENGINE_UI_SOURCES})
 target_include_directories(engine_ui PUBLIC "src/" ${Stb_INCLUDE_DIR})

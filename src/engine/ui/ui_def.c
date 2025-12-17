@@ -200,7 +200,11 @@ void ui_view_process_input(UiView* view, const InputState* input) {
     }
 
     // 2. Hit Test
-    if (rect_contains(view->rect, input->mouse_x, input->mouse_y)) {
+    bool hover = rect_contains(view->rect, input->mouse_x, input->mouse_y);
+    view->is_hovered = hover;
+    view->is_pressed = hover && input->mouse_down;
+
+    if (hover) {
         
         // Button Click
         if (view->def->type == UI_NODE_BUTTON && input->mouse_clicked) {
@@ -212,14 +216,6 @@ void ui_view_process_input(UiView* view, const InputState* input) {
                         int current = meta_get_int(view->data_ptr, field);
                         meta_set_int(view->data_ptr, field, !current); 
                     } else if (field->type == META_TYPE_BOOL) {
-                        // We don't have meta_get_bool in header? 
-                        // Assuming int for bool in C reflection or I missed it.
-                        // reflection.h had META_TYPE_BOOL but no meta_get_bool?
-                        // Let's assume int logic works or check header again.
-                        // Header had meta_get_int, meta_get_float, meta_get_string. 
-                        // It MISSED meta_get_bool/set_bool! 
-                        // I will assume bool is stored as int for now or cast.
-                        // Safe bet: treat as int.
                         int current = meta_get_int(view->data_ptr, field);
                         meta_set_int(view->data_ptr, field, !current); 
                     }
