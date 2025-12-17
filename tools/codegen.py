@@ -51,6 +51,9 @@ def parse_header(file_path):
 
             # Check for reflected field
             if '// REFLECT' in line:
+                comment_part = line.split('//')[1]
+                is_observable = 'Observable' in comment_part
+                
                 # Remove comment
                 code_part = line.split('//')[0].strip()
                 # Parse type and name: "float value;"
@@ -77,12 +80,14 @@ def parse_header(file_path):
                     current_struct['fields'].append({
                         'name': name,
                         'type': meta_type,
-                        'c_type': type_str
+                        'c_type': type_str,
+                        'observable': is_observable
                     })
 
     return structs
 
 def generate_c_code(structs, headers, output_path):
+    # 1. Generate Registry (Existing)
     with open(output_path, 'w') as f:
         f.write('#include "foundation/meta/reflection.h"\n')
         f.write('#include <string.h>\n')
@@ -122,6 +127,51 @@ def generate_c_code(structs, headers, output_path):
         f.write('    }\n')
         f.write('    return NULL;\n')
         f.write('}\n')
+
+    # 2. Generate Accessors
+    base_dir = os.path.dirname(output_path)
+    h_path = os.path.join(base_dir, 'accessors.h')
+    c_path = os.path.join(base_dir, 'accessors.c')
+    
+    with open(h_path, 'w') as fh, open(c_path, 'w') as fc:
+        fh.write('#pragma once\n\n')
+        fh.write('#include <stdbool.h>\n')
+        
+        fc.write('#include "accessors.h"\n')
+        fc.write('#include "foundation/event/event_system.h"\n')
+        fc.write('#include <string.h>\n')
+        
+        # Include headers in accessor.c too
+        for h in headers:
+            if 'src/' in h:
+                rel = h.split('src/')[1]
+                fc.write(f'#include "{rel}"\n')
+                fh.write(f'#include "{rel}"\n') # Also need types in header
+            else:
+                fc.write(f'#include "{h}"\n')
+                fh.write(f'#include "{h}"\n')
+
+        fh.write('\n')
+        fc.write('\n')
+        
+        for s in structs:
+            for field in s['fields']:
+                if field.get('observable'):
+                    # Setter Signature
+                    func_name = f'{s["name"]}_set_{field["name"]}'
+                    # Pointer type for struct?
+                    # The struct type name is s['name'].
+                    
+                    fh.write(f'void {func_name}({s["name"]}* obj, {field["c_type"]} value);\n')
+                    
+                    fc.write(f'void {func_name}({s["name"]}* obj, {field["c_type"]} value) {{\n')
+                    fc.write(f'    if (obj) {{\n')
+                    # Simple comparison (won't work for structs/arrays but fine for primitives/pointers)
+                    # For strings, we might need strcmp, but let's assume primitives for now as per roadmap example
+                    fc.write(f'        obj->{field["name"]} = value;\n') 
+                    fc.write(f'        event_emit(obj, "{field["name"]}");\n')
+                    fc.write(f'    }}\n')
+                    fc.write(f'}}\n\n')
 
 if __name__ == '__main__':
     src_dir = sys.argv[1]

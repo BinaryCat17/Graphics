@@ -59,9 +59,11 @@ add_custom_target(Shaders DEPENDS ${SHADER_OUTPUTS})
 find_package(Python3 REQUIRED)
 set(GENERATED_DIR "${CMAKE_CURRENT_SOURCE_DIR}/src/generated")
 set(REFLECTION_REGISTRY "${GENERATED_DIR}/reflection_registry.c")
+set(GENERATED_ACCESSORS_C "${GENERATED_DIR}/accessors.c")
+set(GENERATED_ACCESSORS_H "${GENERATED_DIR}/accessors.h")
 
 add_custom_command(
-    OUTPUT ${REFLECTION_REGISTRY}
+    OUTPUT ${REFLECTION_REGISTRY} ${GENERATED_ACCESSORS_C} ${GENERATED_ACCESSORS_H}
     COMMAND ${Python3_EXECUTABLE} "${CMAKE_CURRENT_SOURCE_DIR}/tools/codegen.py" "${CMAKE_CURRENT_SOURCE_DIR}/src" "${REFLECTION_REGISTRY}"
     DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/tools/codegen.py"
     COMMENT "Generating reflection metadata..."
@@ -77,10 +79,11 @@ target_include_directories(foundation_logger PUBLIC "src/")
 set(FOUNDATION_META_SOURCES
     "src/foundation/meta/reflection.c"
     ${REFLECTION_REGISTRY}
+    ${GENERATED_ACCESSORS_C}
 )
 add_library(foundation_meta STATIC ${FOUNDATION_META_SOURCES})
 target_include_directories(foundation_meta PUBLIC "src/")
-target_link_libraries(foundation_meta PUBLIC foundation_logger)
+target_link_libraries(foundation_meta PUBLIC foundation_logger foundation_event)
 
 # Platform
 set(FOUNDATION_PLATFORM_SOURCES
@@ -105,6 +108,10 @@ set(FOUNDATION_MEMORY_SOURCES "src/foundation/memory/buffer.c")
 add_library(foundation_memory STATIC ${FOUNDATION_MEMORY_SOURCES})
 target_include_directories(foundation_memory PUBLIC "src/")
 target_link_libraries(foundation_memory PUBLIC foundation_logger)
+
+# Event
+add_library(foundation_event STATIC "src/foundation/event/event_system.c")
+target_include_directories(foundation_event PUBLIC "src/")
 
 # Config
 set(FOUNDATION_CONFIG_SOURCES
@@ -133,6 +140,7 @@ set(ENGINE_RENDER_SOURCES
     "src/engine/render/render_system.c"
     # Unified Scene
     "src/engine/scene/scene.c"
+    "src/engine/scene/text_renderer.c"
 )
 add_library(engine_render STATIC ${ENGINE_RENDER_SOURCES})
 target_include_directories(engine_render PUBLIC "src/" ${Stb_INCLUDE_DIR})
@@ -194,6 +202,7 @@ target_link_libraries(Graphics PRIVATE
     foundation_meta
     foundation_math
     foundation_memory
+    foundation_event
     glfw
     Vulkan::Vulkan
     Threads::Threads)

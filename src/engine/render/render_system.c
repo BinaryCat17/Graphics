@@ -11,6 +11,7 @@
 #include "engine/ui/ui_scene_bridge.h"
 #include "engine/ui/ui_layout.h"
 #include "engine/text/font.h"
+#include "engine/scene/text_renderer.h"
 
 // --- Helper: Packet Management ---
 
@@ -21,7 +22,7 @@ static void render_packet_free_resources(RenderFramePacket* packet) {
 }
 
 static void try_sync_packet(RenderSystem* sys) {
-    if (!sys || !sys->ui_root_view) return;
+    if (!sys) return;
     
     // 1. Unified Scene Generation
     // We need to populate sys->packets[sys->back_packet_index].scene
@@ -36,9 +37,13 @@ static void try_sync_packet(RenderSystem* sys) {
     dest->scene.frame_number = sys->frame_count;
 
     // Bridge: Convert UI View to Scene Objects
-    if (sys->assets) {
+    if (sys->assets && sys->ui_root_view) {
         ui_build_scene(sys->ui_root_view, &dest->scene, sys->assets);
     }
+
+    // DEBUG: Add Hello World Text
+    // Center of screen approx (400, 300) for 800x600 default
+    scene_add_text(&dest->scene, "Hello Graphics Engine", (Vec3){100.0f, 100.0f, 0.0f}, 1.0f, (Vec4){1.0f, 1.0f, 1.0f, 1.0f});
 
     sys->packet_ready = true;
     mtx_unlock(&sys->packet_mutex);

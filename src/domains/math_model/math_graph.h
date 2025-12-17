@@ -18,7 +18,7 @@ typedef enum MathNodeType {
 typedef struct MathNode {
     int id; // REFLECT
     MathNodeType type; // REFLECT
-    float value; // REFLECT
+    float value; // REFLECT(Observable)
     int dirty;   // REFLECT
     
     // Inputs (dependencies)

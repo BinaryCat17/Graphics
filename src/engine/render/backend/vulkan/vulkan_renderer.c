@@ -78,6 +78,13 @@ static bool vk_create_and_upload_buffer(VulkanRendererState* state, VkBufferUsag
     return true;
 }
 
+static void update_instance_descriptor(VulkanRendererState* state, VkBuffer buffer) {
+    if (buffer == VK_NULL_HANDLE) return;
+    VkDescriptorBufferInfo dbi = { .buffer = buffer, .offset = 0, .range = VK_WHOLE_SIZE };
+    VkWriteDescriptorSet w = { .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET, .dstSet = state->instance_set, .dstBinding = 0, .descriptorCount = 1, .descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, .pBufferInfo = &dbi };
+    vkUpdateDescriptorSets(state->device, 1, &w, 0, NULL);
+}
+
 static void ensure_instance_buffer(VulkanRendererState* state, size_t count) {
     if (count == 0) return;
     if (state->instance_capacity >= count) return;
@@ -103,10 +110,7 @@ static void ensure_instance_buffer(VulkanRendererState* state, size_t count) {
     vkBindBufferMemory(state->device, state->instance_buffer, state->instance_memory, 0);
     vkMapMemory(state->device, state->instance_memory, 0, VK_WHOLE_SIZE, 0, &state->instance_mapped);
     
-    // Update Descriptor Set
-    VkDescriptorBufferInfo dbi = { .buffer = state->instance_buffer, .offset = 0, .range = VK_WHOLE_SIZE };
-    VkWriteDescriptorSet w = { .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET, .dstSet = state->instance_set, .dstBinding = 0, .descriptorCount = 1, .descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, .pBufferInfo = &dbi };
-    vkUpdateDescriptorSets(state->device, 1, &w, 0, NULL);
+    // Note: Descriptor update happens in draw loop now
 }
 
 static bool recover_device_loss(VulkanRendererState* state) {
@@ -140,7 +144,7 @@ static bool recover_device_loss(VulkanRendererState* state) {
 }
 
 static void draw_frame_scene(VulkanRendererState* state, const Scene* scene) {
-    static double last_log_time = -1.0; // Use -1.0 to ensure initial log
+    static double last_log_time = -1.0; 
     bool debug_frame = false;
 
     double current_time = platform_get_time_ms();
@@ -160,51 +164,53 @@ static void draw_frame_scene(VulkanRendererState* state, const Scene* scene) {
     vkWaitForFences(state->device, 1, &state->fences[img_idx], VK_TRUE, UINT64_MAX);
     vkResetFences(state->device, 1, &state->fences[img_idx]);
 
-    // PREPARE INSTANCE DATA (CPU -> GPU)
-    if (scene && scene->object_count > 0) {
-        ensure_instance_buffer(state, scene->object_count);
+    // --- PREPARE DATA ---
+    size_t single_count = 0;
+    if (scene) {
+        for (size_t i = 0; i < scene->object_count; ++i) {
+            if (scene->objects[i].instance_count == 0) single_count++;
+        }
+    }
+
+    if (single_count > 0) {
+        ensure_instance_buffer(state, single_count);
         GpuInstanceData* data = (GpuInstanceData*)state->instance_mapped;
+        size_t idx = 0;
         
         for (size_t i = 0; i < scene->object_count; ++i) {
             SceneObject* obj = &scene->objects[i];
+            if (obj->instance_count > 0) continue; // Skip massive objects
+
             Mat4 T = mat4_translation(obj->position);
             Mat4 S = mat4_scale(obj->scale);
             Mat4 model = mat4_multiply(&T, &S);
             
-            memcpy(data[i].model, model.m, sizeof(float)*16);
+            memcpy(data[idx].model, model.m, sizeof(float)*16);
             
-            data[i].color[0] = obj->color.x;
-            data[i].color[1] = obj->color.y;
-            data[i].color[2] = obj->color.z;
-            data[i].color[3] = obj->color.w;
+            data[idx].color[0] = obj->color.x;
+            data[idx].color[1] = obj->color.y;
+            data[idx].color[2] = obj->color.z;
+            data[idx].color[3] = obj->color.w;
             
             if (obj->uv_rect.z == 0.0f && obj->uv_rect.w == 0.0f) {
-                 data[i].uv_rect[0] = 0.0f; data[i].uv_rect[1] = 0.0f;
-                 data[i].uv_rect[2] = 1.0f; data[i].uv_rect[3] = 1.0f;
+                 data[idx].uv_rect[0] = 0.0f; data[idx].uv_rect[1] = 0.0f;
+                 data[idx].uv_rect[2] = 1.0f; data[idx].uv_rect[3] = 1.0f;
             } else {
-                 data[i].uv_rect[0] = obj->uv_rect.x; data[i].uv_rect[1] = obj->uv_rect.y;
-                 data[i].uv_rect[2] = obj->uv_rect.z; data[i].uv_rect[3] = obj->uv_rect.w;
+                 data[idx].uv_rect[0] = obj->uv_rect.x; data[idx].uv_rect[1] = obj->uv_rect.y;
+                 data[idx].uv_rect[2] = obj->uv_rect.z; data[idx].uv_rect[3] = obj->uv_rect.w;
             }
             
-            data[i].params[0] = obj->params.x;
-            data[i].params[1] = 0; data[i].params[2] = 0; data[i].params[3] = 0;
+            data[idx].params[0] = obj->params.x;
+            data[idx].params[1] = 0; data[idx].params[2] = 0; data[idx].params[3] = 0;
             
-            // Log 1st object (Background) and 2nd object (First Letter)
-            if (debug_frame) {
-                if (i == 0) {
-                    LOG_TRACE("[Frame %llu] Obj[0] (Bg): Pos(%.2f, %.2f) Scale(%.2f, %.2f) Tex(%.1f)",
-                        (unsigned long long)scene->frame_number,
-                        obj->position.x, obj->position.y, obj->scale.x, obj->scale.y, obj->params.x);
-                } else if (i == 1) {
-                    LOG_TRACE("[Frame %llu] Obj[1] (Txt): Pos(%.2f, %.2f) Scale(%.2f, %.2f) Tex(%.1f) UV(%.2f,%.2f,%.2f,%.2f)",
-                        (unsigned long long)scene->frame_number,
-                        obj->position.x, obj->position.y, obj->scale.x, obj->scale.y, obj->params.x,
+            if (debug_frame && idx < 2) {
+                LOG_TRACE("[Frame %llu] Single[%zu]: Pos(%.2f, %.2f) UV(%.2f,%.2f,%.2f,%.2f)",
+                        (unsigned long long)scene->frame_number, idx,
+                        obj->position.x, obj->position.y,
                         obj->uv_rect.x, obj->uv_rect.y, obj->uv_rect.z, obj->uv_rect.w);
-                }
             }
+            idx++;
         }
-    } else if (debug_frame) {
-        LOG_TRACE("Scene is empty or NULL");
     }
 
     VkCommandBuffer cb = state->cmdbuffers[img_idx];
@@ -230,48 +236,53 @@ static void draw_frame_scene(VulkanRendererState* state, const Scene* scene) {
     // 3. Bind Pipeline & Resources
     vkCmdBindPipeline(cb, VK_PIPELINE_BIND_POINT_GRAPHICS, state->pipeline);
     
-    if (state->descriptor_set) {
-        vkCmdBindDescriptorSets(cb, VK_PIPELINE_BIND_POINT_GRAPHICS, state->pipeline_layout, 0, 1, &state->descriptor_set, 0, NULL);
-    }
-    if (state->instance_set && scene && scene->object_count > 0) {
-        vkCmdBindDescriptorSets(cb, VK_PIPELINE_BIND_POINT_GRAPHICS, state->pipeline_layout, 1, 1, &state->instance_set, 0, NULL);
-    }
-    
-    // Push Constants (Global ViewProj)
+    // ViewProj Push Constants
     float w = (float)state->swapchain_extent.width;
     float h = (float)state->swapchain_extent.height;
-    // Fix Z-range: Map [-1, 1] world Z to [0, 1] Vulkan Z.
-    // near=-1.0, far=1.0. 
-    // Z=0.0 maps to 0.5 (Mid). Z=0.1 maps to 0.55.
-    // Objects must be in [-1, 1].
-    // UPDATE: We use near=1.0, far=-1.0 so that Z_ndc = Z.
-    // This maps input Z=[0, 1] to NDC=[0, 1], which matches Vulkan clip volume.
     Mat4 proj = mat4_orthographic(0, w, 0, h, 1.0f, -1.0f);
     Mat4 view = mat4_identity(); 
     Mat4 view_proj = mat4_multiply(&proj, &view);
-    
-    if (debug_frame) {
-        LOG_TRACE("[Frame %llu] ViewProj: W=%.1f H=%.1f Proj[0]=%.4f Proj[5]=%.4f Proj[10]=%.4f Proj[12]=%.4f Proj[13]=%.4f Proj[14]=%.4f", 
-            (unsigned long long)(scene ? scene->frame_number : 0),
-            w, h, proj.m[0], proj.m[5], proj.m[10], proj.m[12], proj.m[13], proj.m[14]);
-    }
     
     UnifiedPushConstants pc;
     memcpy(pc.view_proj, view_proj.m, sizeof(float)*16);
     vkCmdPushConstants(cb, state->pipeline_layout, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(UnifiedPushConstants), &pc);
 
-    // Bind Vertex Buffer (Unit Quad)
-    // Removed debug log here to reduce spam
-    if (state->unit_quad_buffer && scene && scene->object_count > 0) {
+    if (state->descriptor_set) {
+        vkCmdBindDescriptorSets(cb, VK_PIPELINE_BIND_POINT_GRAPHICS, state->pipeline_layout, 0, 1, &state->descriptor_set, 0, NULL);
+    }
+
+    // DRAW SINGLES
+    if (single_count > 0 && state->unit_quad_buffer) {
         VkDeviceSize offset = 0;
         vkCmdBindVertexBuffers(cb, 0, 1, &state->unit_quad_buffer, &offset);
-        
-        // INSTANCED DRAW CALL
-        if (debug_frame) {
-            LOG_TRACE("[Frame %llu] Issuing DrawInstanced: VertexCount=6, InstanceCount=%zu", 
-                (unsigned long long)scene->frame_number, scene->object_count);
+
+        // Bind Global Instance Buffer
+        update_instance_descriptor(state, state->instance_buffer);
+        if (state->instance_set) {
+            vkCmdBindDescriptorSets(cb, VK_PIPELINE_BIND_POINT_GRAPHICS, state->pipeline_layout, 1, 1, &state->instance_set, 0, NULL);
         }
-        vkCmdDraw(cb, 6, scene->object_count, 0, 0); 
+
+        if (debug_frame) {
+            LOG_TRACE("[Frame %llu] Draw Singles: Count=%zu", (unsigned long long)scene->frame_number, single_count);
+        }
+        vkCmdDraw(cb, 6, single_count, 0, 0); 
+    }
+
+    // DRAW MASSIVE
+    if (scene) {
+        for (size_t i = 0; i < scene->object_count; ++i) {
+            SceneObject* obj = &scene->objects[i];
+            if (obj->instance_count > 0 && obj->instance_buffer) {
+                // Bind specific buffer
+                update_instance_descriptor(state, (VkBuffer)(uintptr_t)obj->instance_buffer);
+                vkCmdBindDescriptorSets(cb, VK_PIPELINE_BIND_POINT_GRAPHICS, state->pipeline_layout, 1, 1, &state->instance_set, 0, NULL);
+                
+                if (debug_frame) {
+                    LOG_TRACE("[Frame %llu] Draw Massive: ObjID=%d Count=%zu", (unsigned long long)scene->frame_number, obj->id, obj->instance_count);
+                }
+                vkCmdDraw(cb, 6, obj->instance_count, 0, 0);
+            }
+        }
     }
 
     vkCmdEndRenderPass(cb);
