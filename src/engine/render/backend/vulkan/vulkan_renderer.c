@@ -18,14 +18,20 @@
 
 static RendererBackend g_vulkan_backend;
 
-// Unified Push Constants layout
+// Unified Push Constants layout (Global per pass)
 typedef struct {
-    float model[16];
     float view_proj[16];
-    float color[4];
-    float uv_rect[4];
-    float params[4]; // x = use_texture
 } UnifiedPushConstants;
+
+// Per-Instance Data (Must match shader struct GpuInstanceData std140)
+// Aligned to 128 bytes for safety and cache line friendliness
+typedef struct {
+    float model[16]; // 64 bytes
+    float color[4];  // 16 bytes
+    float uv_rect[4]; // 16 bytes
+    float params[4]; // 16 bytes
+    float pad[4];    // 16 bytes -> Total 128 bytes
+} GpuInstanceData;
 
 // --- Helpers ---
 
@@ -71,6 +77,37 @@ static bool vk_create_and_upload_buffer(VulkanRendererState* state, VkBufferUsag
     return true;
 }
 
+static void ensure_instance_buffer(VulkanRendererState* state, size_t count) {
+    if (count == 0) return;
+    if (state->instance_capacity >= count) return;
+    
+    // Reallocate
+    if (state->instance_buffer) {
+        vkDestroyBuffer(state->device, state->instance_buffer, NULL);
+        vkFreeMemory(state->device, state->instance_memory, NULL);
+    }
+    
+    state->instance_capacity = (count < 1024) ? 1024 : count * 2;
+    size_t size = state->instance_capacity * sizeof(GpuInstanceData);
+    
+    LOG_INFO("Allocating Instance Buffer: %zu elements (%zu bytes)", state->instance_capacity, size);
+    
+    VkBufferCreateInfo bci = { .sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO, .size = size, .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, .sharingMode = VK_SHARING_MODE_EXCLUSIVE };
+    vkCreateBuffer(state->device, &bci, NULL, &state->instance_buffer);
+    
+    VkMemoryRequirements mr; vkGetBufferMemoryRequirements(state->device, state->instance_buffer, &mr);
+    VkMemoryAllocateInfo mai = { .sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO, .allocationSize = mr.size, .memoryTypeIndex = find_mem_type(state->physical_device, mr.memoryTypeBits, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT) };
+    vkAllocateMemory(state->device, &mai, NULL, &state->instance_memory);
+    
+    vkBindBufferMemory(state->device, state->instance_buffer, state->instance_memory, 0);
+    vkMapMemory(state->device, state->instance_memory, 0, VK_WHOLE_SIZE, 0, &state->instance_mapped);
+    
+    // Update Descriptor Set
+    VkDescriptorBufferInfo dbi = { .buffer = state->instance_buffer, .offset = 0, .range = VK_WHOLE_SIZE };
+    VkWriteDescriptorSet w = { .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET, .dstSet = state->instance_set, .dstBinding = 0, .descriptorCount = 1, .descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, .pBufferInfo = &dbi };
+    vkUpdateDescriptorSets(state->device, 1, &w, 0, NULL);
+}
+
 static bool recover_device_loss(VulkanRendererState* state) {
     fprintf(stderr, "Device lost detected; tearing down and recreating logical device and swapchain resources...\n");
     if (state->device) vkDeviceWaitIdle(state->device);
@@ -93,33 +130,71 @@ static bool recover_device_loss(VulkanRendererState* state) {
     vk_create_font_texture(state);
     vk_create_descriptor_pool_and_set(state);
     
+    // Reset instance buffer state
+    state->instance_buffer = VK_NULL_HANDLE;
+    state->instance_memory = VK_NULL_HANDLE;
+    state->instance_capacity = 0;
+    
     return true;
 }
 
 static void draw_frame_scene(VulkanRendererState* state, const Scene* scene) {
+    static uint64_t frame_count = 0;
+    frame_count++;
+    // Log frame 1 and then every 300 frames (~5 sec at 60fps)
+    bool debug_frame = (frame_count == 1) || (frame_count % 300 == 0);
+
     if (state->swapchain == VK_NULL_HANDLE) return;
     
     // 1. Acquire Image
     uint32_t img_idx;
     VkResult acq = vkAcquireNextImageKHR(state->device, state->swapchain, UINT64_MAX, state->sem_img_avail, VK_NULL_HANDLE, &img_idx);
     if (acq == VK_ERROR_DEVICE_LOST) { if (!recover_device_loss(state)) fatal_vk("vkAcquireNextImageKHR", acq); return; }
-    if (acq == VK_ERROR_OUT_OF_DATE_KHR || acq == VK_SUBOPTIMAL_KHR) { 
-        vkDeviceWaitIdle(state->device);
-        VkSwapchainKHR old = state->swapchain;
-        vk_cleanup_swapchain(state, true); 
-        vk_create_swapchain_and_views(state, old);
-        if (!state->swapchain) { if (old) vkDestroySwapchainKHR(state->device, old, NULL); return; }
-        vk_create_depth_resources(state);
-        vk_create_render_pass(state);
-        vk_create_pipeline(state, state->vert_spv, state->frag_spv);
-        vk_create_cmds_and_sync(state);
-        if (old) vkDestroySwapchainKHR(state->device, old, NULL);
-        return; 
-    }
-    if (acq != VK_SUCCESS) fatal_vk("vkAcquireNextImageKHR", acq);
+    if (acq != VK_SUCCESS && acq != VK_SUBOPTIMAL_KHR) { fatal_vk("vkAcquireNextImageKHR", acq); return; }
     
     vkWaitForFences(state->device, 1, &state->fences[img_idx], VK_TRUE, UINT64_MAX);
     vkResetFences(state->device, 1, &state->fences[img_idx]);
+
+    // PREPARE INSTANCE DATA (CPU -> GPU)
+    if (scene && scene->object_count > 0) {
+        ensure_instance_buffer(state, scene->object_count);
+        GpuInstanceData* data = (GpuInstanceData*)state->instance_mapped;
+        
+        for (size_t i = 0; i < scene->object_count; ++i) {
+            SceneObject* obj = &scene->objects[i];
+            Mat4 T = mat4_translation(obj->position);
+            Mat4 S = mat4_scale(obj->scale);
+            Mat4 model = mat4_multiply(&T, &S);
+            
+            memcpy(data[i].model, model.m, sizeof(float)*16);
+            
+            data[i].color[0] = obj->color.x;
+            data[i].color[1] = obj->color.y;
+            data[i].color[2] = obj->color.z;
+            data[i].color[3] = obj->color.w;
+            
+            if (obj->uv_rect.z == 0.0f && obj->uv_rect.w == 0.0f) {
+                 data[i].uv_rect[0] = 0.0f; data[i].uv_rect[1] = 0.0f;
+                 data[i].uv_rect[2] = 1.0f; data[i].uv_rect[3] = 1.0f;
+            } else {
+                 data[i].uv_rect[0] = obj->uv_rect.x; data[i].uv_rect[1] = obj->uv_rect.y;
+                 data[i].uv_rect[2] = obj->uv_rect.z; data[i].uv_rect[3] = obj->uv_rect.w;
+            }
+            
+            data[i].params[0] = obj->params.x;
+            data[i].params[1] = 0; data[i].params[2] = 0; data[i].params[3] = 0;
+            
+            if (debug_frame && i == 0 && frame_count < 5) {
+                LOG_INFO("[Frame %llu] Obj[0]: Pos(%.2f, %.2f) Scale(%.2f, %.2f) Color(%.2f, %.2f, %.2f) Tex(%.1f)",
+                    frame_count,
+                    obj->position.x, obj->position.y, obj->scale.x, obj->scale.y,
+                    obj->color.x, obj->color.y, obj->color.z,
+                    obj->params.x);
+            }
+        }
+    } else if (debug_frame && frame_count < 5) {
+        LOG_INFO("[Frame %llu] Scene is empty or NULL", frame_count);
+    }
 
     VkCommandBuffer cb = state->cmdbuffers[img_idx];
     vkResetCommandBuffer(cb, 0);
@@ -141,60 +216,45 @@ static void draw_frame_scene(VulkanRendererState* state, const Scene* scene) {
     };
     vkCmdBeginRenderPass(cb, &rpbi, VK_SUBPASS_CONTENTS_INLINE);
 
-    // 3. Bind Pipeline & Global Resources
+    // 3. Bind Pipeline & Resources
     vkCmdBindPipeline(cb, VK_PIPELINE_BIND_POINT_GRAPHICS, state->pipeline);
     
     if (state->descriptor_set) {
         vkCmdBindDescriptorSets(cb, VK_PIPELINE_BIND_POINT_GRAPHICS, state->pipeline_layout, 0, 1, &state->descriptor_set, 0, NULL);
     }
+    if (state->instance_set && scene && scene->object_count > 0) {
+        vkCmdBindDescriptorSets(cb, VK_PIPELINE_BIND_POINT_GRAPHICS, state->pipeline_layout, 1, 1, &state->instance_set, 0, NULL);
+    }
     
-    // View Projection Matrix (Ortho for UI: Top-Left is 0,0)
+    // Push Constants (Global ViewProj)
     float w = (float)state->swapchain_extent.width;
     float h = (float)state->swapchain_extent.height;
     // Fix Z-range: Map [-10, 10] world Z to [0, 1] Vulkan Z.
-    // Swapping near/far effectively inverts Z mapping so +Z objects become visible if they were mapping to negative.
-    Mat4 proj = mat4_orthographic(0, w, h, 0, 10.0f, -10.0f);
-    Mat4 view = mat4_identity(); // Camera at origin
+    // Standard Ortho (0,0 -> -1,-1 NDC which is Top-Left in Vulkan)
+    Mat4 proj = mat4_orthographic(0, w, 0, h, 10.0f, -10.0f);
+    Mat4 view = mat4_identity(); 
     Mat4 view_proj = mat4_multiply(&proj, &view);
+    
+    if (debug_frame && frame_count < 5) {
+        LOG_INFO("[Frame %llu] ViewProj: W=%.1f H=%.1f Proj[0]=%.4f Proj[5]=%.4f Proj[12]=%.4f Proj[13]=%.4f", 
+            frame_count, w, h, proj.m[0], proj.m[5], proj.m[12], proj.m[13]);
+    }
+    
+    UnifiedPushConstants pc;
+    memcpy(pc.view_proj, view_proj.m, sizeof(float)*16);
+    vkCmdPushConstants(cb, state->pipeline_layout, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(UnifiedPushConstants), &pc);
 
     // Bind Vertex Buffer (Unit Quad)
-    if (state->unit_quad_buffer) {
+    // Removed debug log here to reduce spam
+    if (state->unit_quad_buffer && scene && scene->object_count > 0) {
         VkDeviceSize offset = 0;
         vkCmdBindVertexBuffers(cb, 0, 1, &state->unit_quad_buffer, &offset);
         
-        // 4. Draw Scene Objects
-        if (scene) {
-            for (size_t i = 0; i < scene->object_count; ++i) {
-                SceneObject* obj = &scene->objects[i];
-                
-                Mat4 T = mat4_translation(obj->position);
-                Mat4 S = mat4_scale(obj->scale);
-                Mat4 model = mat4_multiply(&T, &S);
-                
-                UnifiedPushConstants pc;
-                memcpy(pc.model, model.m, sizeof(float)*16);
-                memcpy(pc.view_proj, view_proj.m, sizeof(float)*16);
-                pc.color[0] = obj->color.x;
-                pc.color[1] = obj->color.y;
-                pc.color[2] = obj->color.z;
-                pc.color[3] = obj->color.w;
-                
-                // UV Rect (Default to 0,0,1,1 if 0)
-                if (obj->uv_rect.z == 0.0f && obj->uv_rect.w == 0.0f) {
-                     pc.uv_rect[0] = 0.0f; pc.uv_rect[1] = 0.0f;
-                     pc.uv_rect[2] = 1.0f; pc.uv_rect[3] = 1.0f;
-                } else {
-                     pc.uv_rect[0] = obj->uv_rect.x; pc.uv_rect[1] = obj->uv_rect.y;
-                     pc.uv_rect[2] = obj->uv_rect.z; pc.uv_rect[3] = obj->uv_rect.w;
-                }
-                
-                pc.params[0] = obj->params.x;
-                
-                vkCmdPushConstants(cb, state->pipeline_layout, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(UnifiedPushConstants), &pc);
-                
-                vkCmdDraw(cb, 6, 1, 0, 0); 
-            }
+        // INSTANCED DRAW CALL
+        if (debug_frame && frame_count < 5) {
+            LOG_INFO("[Frame %llu] Issuing DrawInstanced: VertexCount=6, InstanceCount=%zu", frame_count, scene->object_count);
         }
+        vkCmdDraw(cb, 6, scene->object_count, 0, 0); 
     }
 
     vkCmdEndRenderPass(cb);
@@ -309,6 +369,8 @@ static bool vk_backend_init(RendererBackend* backend, const RenderBackendInit* i
         0.0f, 1.0f, 0.0f,  0.0f, 1.0f
     };
     vk_create_and_upload_buffer(state, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, quad_verts, sizeof(quad_verts), &state->unit_quad_buffer, &state->unit_quad_memory);
+    
+    LOG_INFO("Vulkan Initialized. Unit Quad Buffer: %p", (void*)state->unit_quad_buffer);
 
     return true;
 }

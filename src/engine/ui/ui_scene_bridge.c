@@ -100,6 +100,10 @@ static void traverse_ui(const UiView* view, Scene* scene, const Assets* assets) 
     }
 }
 
+#include "foundation/logger/logger.h"
+
+// ...
+
 void ui_build_scene(const UiView* root, Scene* scene, const Assets* assets) {
     if (!root || !scene || !assets) return;
     
@@ -109,4 +113,10 @@ void ui_build_scene(const UiView* root, Scene* scene, const Assets* assets) {
     ui_layout_root((UiView*)root, 1280.0f, 720.0f); 
     
     traverse_ui(root, scene, assets);
+    
+    static int log_limit = 0;
+    if (log_limit++ < 5) {
+        LOG_INFO("UI Build Scene: %zu objects generated. Root Rect: %.1f, %.1f, %.1f, %.1f", 
+            scene->object_count, root->rect.x, root->rect.y, root->rect.w, root->rect.h);
+    }
 }
