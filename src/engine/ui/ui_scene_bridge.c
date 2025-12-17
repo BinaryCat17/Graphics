@@ -10,14 +10,16 @@
 #include <stddef.h>
 #include <string.h>
 
-static void traverse_ui(const UiView* view, Scene* scene, const Assets* assets) {
+#include "foundation/logger/logger.h"
+
+static void traverse_ui(const UiView* view, Scene* scene, const Assets* assets, bool debug_frame) {
     if (!view) return;
 
     // Create Scene Object for this view (Background)
     if (view->rect.w > 0 && view->rect.h > 0) {
         SceneObject obj = {0};
         obj.layer = LAYER_UI_BACKGROUND; // Background layer
-        obj.position = (Vec3){view->rect.x, view->rect.y, 0.0f};
+        obj.position = (Vec3){view->rect.x, view->rect.y, 0.9f}; // Z=0.9 (Farther, background)
         obj.scale = (Vec3){view->rect.w, view->rect.h, 1.0f};
         obj.rotation = (Vec3){0, 0, 0};
         obj.mesh = &assets->unit_quad;
@@ -60,8 +62,15 @@ static void traverse_ui(const UiView* view, Scene* scene, const Assets* assets) 
                 cursor_x += 10.0f; 
                 cursor_y += (view->rect.h - 15.0f) * 0.5f; 
             }
+            
+            if (debug_frame) {
+                LOG_INFO("GenText '%s': Start(%.1f, %.1f) Rect(%.1f, %.1f, %.1f, %.1f)", 
+                    view->cached_text, cursor_x, cursor_y,
+                    view->rect.x, view->rect.y, view->rect.w, view->rect.h);
+            }
 
             const char* ptr = view->cached_text;
+            int char_count = 0;
             while (*ptr) {
                 uint32_t codepoint = (uint32_t)*ptr; // Simple ASCII for now
                 RenderGlyph g;
@@ -72,7 +81,7 @@ static void traverse_ui(const UiView* view, Scene* scene, const Assets* assets) 
                     float x_pos = cursor_x + g.xoff;
                     float y_pos = cursor_y + g.yoff; 
                     
-                    char_obj.position = (Vec3){x_pos, y_pos, 0.1f}; // Z slightly above background
+                    char_obj.position = (Vec3){x_pos, y_pos, 0.5f}; // Z=0.5 (Closer, visible in 0.5-1.0 range)
                     char_obj.scale = (Vec3){g.w, g.h, 1.0f};
                     char_obj.rotation = (Vec3){0, 0, 0};
                     char_obj.mesh = &assets->unit_quad;
@@ -81,14 +90,20 @@ static void traverse_ui(const UiView* view, Scene* scene, const Assets* assets) 
                     // Texture Params
                     char_obj.uv_rect.x = g.u0;
                     char_obj.uv_rect.y = g.v0;
-                    char_obj.uv_rect.z = g.u1 - g.u0;
-                    char_obj.uv_rect.w = g.v1 - g.v0;
+                    char_obj.uv_rect.z = g.u1 - g.u0; // Width in UV space
+                    char_obj.uv_rect.w = g.v1 - g.v0; // Height in UV space (positive if v1 > v0)
                     
                     char_obj.params.x = 1.0f; // Enable Texture
                     
                     scene_add_object(scene, char_obj);
                     
+                    if (debug_frame && char_count == 0) {
+                        LOG_INFO("  First Char '%c': Pos(%.1f, %.1f) Sz(%.1f, %.1f) UV(%.3f,%.3f)",
+                            *ptr, x_pos, y_pos, g.w, g.h, g.u0, g.v0);
+                    }
+                    
                     cursor_x += g.advance;
+                    char_count++;
                 }
                 ptr++;
             }
@@ -96,27 +111,24 @@ static void traverse_ui(const UiView* view, Scene* scene, const Assets* assets) 
     }
 
     for (size_t i = 0; i < view->child_count; ++i) {
-        traverse_ui(view->children[i], scene, assets);
+        traverse_ui(view->children[i], scene, assets, debug_frame);
     }
 }
-
-#include "foundation/logger/logger.h"
-
-// ...
 
 void ui_build_scene(const UiView* root, Scene* scene, const Assets* assets) {
     if (!root || !scene || !assets) return;
     
     // Layout Pass
-    // TBD: Pass real window size. For now hardcoded or need a way to get it.
-    // Ideally ui_build_scene should take window dimensions.
     ui_layout_root((UiView*)root, 1280.0f, 720.0f); 
     
-    traverse_ui(root, scene, assets);
+    static uint64_t ui_frame = 0;
+    ui_frame++;
+    bool debug_frame = (ui_frame % 300 == 0);
     
-    static int log_limit = 0;
-    if (log_limit++ < 5) {
+    if (debug_frame) {
         LOG_INFO("UI Build Scene: %zu objects generated. Root Rect: %.1f, %.1f, %.1f, %.1f", 
             scene->object_count, root->rect.x, root->rect.y, root->rect.w, root->rect.h);
     }
+    
+    traverse_ui(root, scene, assets, debug_frame);
 }

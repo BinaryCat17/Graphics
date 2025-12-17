@@ -10,17 +10,10 @@ struct GpuInstanceData {
     vec4 params;
 };
 
-// Set 0: Texture (Sampler) - defined in fragment shader usually, but we need consistent layout
-// Let's assume Set 1 is Instances.
-// Actually, standard practice:
-// Set 0: Global (ViewProj) - we use PushConstant for this.
-// Set 1: Resources (Texture)
-// Set 2: Instances? 
-// To match current C code minimal changes:
-// Existing Set 0 is Texture. 
-// We will add Set 1 for Instances.
+// Set 0: Texture (Sampler)
+// Set 1: Instances (SSBO)
 
-layout(std140, set = 1, binding = 0) readonly buffer InstanceBuffer {
+layout(std430, set = 1, binding = 0) readonly buffer InstanceBuffer {
     GpuInstanceData objects[];
 } instances;
 

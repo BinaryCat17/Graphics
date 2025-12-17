@@ -1,10 +1,13 @@
 #include "vk_resources.h"
 #include "vk_swapchain.h"
 #include "vk_utils.h"
+#include "foundation/logger/logger.h"
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
 #include <math.h>
+
+// ... (vk_create_buffer remains unchanged) ...
 
 void vk_create_buffer(VulkanRendererState* state, VkDeviceSize size, VkBufferUsageFlags usage, VkMemoryPropertyFlags props, VkBuffer* out_buf, VkDeviceMemory* out_mem) {
     VkBufferCreateInfo bci = { .sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO, .size = size, .usage = usage, .sharingMode = VK_SHARING_MODE_EXCLUSIVE };
@@ -62,6 +65,7 @@ static void copy_buffer_to_image(VulkanRendererState* state, VkBuffer buffer, Vk
 }
 
 bool vk_create_vertex_buffer(VulkanRendererState* state, FrameResources *frame, size_t bytes) {
+    // ... (unchanged)
     if (frame->vertex_buffer != VK_NULL_HANDLE && frame->vertex_capacity >= bytes) {
         return true;
     }
@@ -125,6 +129,8 @@ void vk_build_font_atlas(VulkanRendererState* state) {
     int range_count = (int)(sizeof(ranges) / sizeof(ranges[0]));
 
     int x = 0, y = 0, rowh = 0;
+    int glyph_count = 0;
+    
     for (int r = 0; r < range_count; r++) {
         for (int c = ranges[r][0]; c <= ranges[r][1] && c < GLYPH_CAPACITY; c++) {
             int aw, ah, bx, by;
@@ -151,11 +157,25 @@ void vk_build_font_atlas(VulkanRendererState* state) {
             state->glyphs[c].u1 = (float)(x + aw) / (float)state->atlas_w;
             state->glyphs[c].v1 = (float)(y + ah) / (float)state->atlas_h;
             state->glyph_valid[c] = 1;
+            glyph_count++;
+            
             x += aw + 1;
             if (ah > rowh) rowh = ah;
         }
     }
+    
+    LOG_INFO("Font Atlas Built: %dx%d, Glyphs: %d, Scale: %.4f, Ascent: %d", 
+        state->atlas_w, state->atlas_h, glyph_count, state->font_scale, state->ascent);
+        
+    // Sample 'A' (65) debug
+    if (state->glyph_valid['A']) {
+        Glyph* g = &state->glyphs['A'];
+        LOG_INFO("Glyph 'A': UV(%.4f, %.4f)-(%.4f, %.4f), Size(%.1f, %.1f), Off(%.1f, %.1f)",
+            g->u0, g->v0, g->u1, g->v1, g->w, g->h, g->xoff, g->yoff);
+    }
 }
+
+// ... (rest of file)
 
 void vk_create_font_texture(VulkanRendererState* state) {
     if (!state->atlas) fatal("font atlas not built");

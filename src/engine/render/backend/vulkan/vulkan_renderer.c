@@ -184,12 +184,16 @@ static void draw_frame_scene(VulkanRendererState* state, const Scene* scene) {
             data[i].params[0] = obj->params.x;
             data[i].params[1] = 0; data[i].params[2] = 0; data[i].params[3] = 0;
             
-            if (debug_frame && i == 0 && frame_count < 5) {
-                LOG_INFO("[Frame %llu] Obj[0]: Pos(%.2f, %.2f) Scale(%.2f, %.2f) Color(%.2f, %.2f, %.2f) Tex(%.1f)",
-                    frame_count,
-                    obj->position.x, obj->position.y, obj->scale.x, obj->scale.y,
-                    obj->color.x, obj->color.y, obj->color.z,
-                    obj->params.x);
+            // Log 1st object (Background) and 2nd object (First Letter)
+            if (debug_frame && frame_count < 5) {
+                if (i == 0) {
+                    LOG_INFO("[Frame %llu] Obj[0] (Bg): Pos(%.2f, %.2f) Scale(%.2f, %.2f) Tex(%.1f)",
+                        frame_count, obj->position.x, obj->position.y, obj->scale.x, obj->scale.y, obj->params.x);
+                } else if (i == 1) {
+                    LOG_INFO("[Frame %llu] Obj[1] (Txt): Pos(%.2f, %.2f) Scale(%.2f, %.2f) Tex(%.1f) UV(%.2f,%.2f,%.2f,%.2f)",
+                        frame_count, obj->position.x, obj->position.y, obj->scale.x, obj->scale.y, obj->params.x,
+                        obj->uv_rect.x, obj->uv_rect.y, obj->uv_rect.z, obj->uv_rect.w);
+                }
             }
         }
     } else if (debug_frame && frame_count < 5) {
@@ -229,9 +233,11 @@ static void draw_frame_scene(VulkanRendererState* state, const Scene* scene) {
     // Push Constants (Global ViewProj)
     float w = (float)state->swapchain_extent.width;
     float h = (float)state->swapchain_extent.height;
-    // Fix Z-range: Map [-10, 10] world Z to [0, 1] Vulkan Z.
-    // Standard Ortho (0,0 -> -1,-1 NDC which is Top-Left in Vulkan)
-    Mat4 proj = mat4_orthographic(0, w, 0, h, 10.0f, -10.0f);
+    // Fix Z-range: Map [0.5, 1.0] world Z to [0, 1] Vulkan Z (given standard GL ortho mapping).
+    // near=0.0, far=1.0. GL maps 0->-1, 1->1. Vulkan clips <0.
+    // So Z=0.5 maps to 0.0 (Near). Z=1.0 maps to 1.0 (Far).
+    // Visible range: [0.5, 1.0].
+    Mat4 proj = mat4_orthographic(0, w, 0, h, 0.0f, 1.0f);
     Mat4 view = mat4_identity(); 
     Mat4 view_proj = mat4_multiply(&proj, &view);
     
