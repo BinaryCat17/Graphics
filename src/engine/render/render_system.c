@@ -196,9 +196,18 @@ void render_system_run(RenderSystem* sys) {
     
     sys->running = true;
     static bool key_c_prev = false;
+    static double last_log_time = -1.0;
     
     while (sys->running && !platform_window_should_close(sys->render_context.window)) {
         sys->frame_count++;
+
+        // Log Interval Logic
+        bool log_debug = false;
+        double current_time = platform_get_time_ms();
+        if (last_log_time < 0 || (current_time - last_log_time) / 1000.0 >= logger_get_trace_interval()) {
+            log_debug = true;
+            last_log_time = current_time;
+        }
         
         // Reset per-frame input
         sys->input.scroll_dx = 0;
@@ -245,7 +254,7 @@ void render_system_run(RenderSystem* sys) {
         // 1. Update Domain Logic
         if (sys->math_graph) {
              math_graph_update(sys->math_graph);
-             math_graph_update_visuals(sys->math_graph);
+             math_graph_update_visuals(sys->math_graph, log_debug);
         }
         
         // 2. Update UI Logic (Reactivity)
@@ -257,7 +266,7 @@ void render_system_run(RenderSystem* sys) {
             PlatformWindowSize size = platform_get_framebuffer_size(sys->render_context.window);
             // We pass debug=false here, logging controlled by trace interval inside ui_build_scene if needed, 
             // but layout happens here every frame.
-            ui_layout_root(sys->ui_root_view, (float)size.width, (float)size.height, sys->frame_count, false);
+            ui_layout_root(sys->ui_root_view, (float)size.width, (float)size.height, sys->frame_count, log_debug);
         }
 
         // 3. Render Prep

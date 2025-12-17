@@ -1,4 +1,5 @@
 #include "math_graph.h"
+#include "foundation/logger/logger.h"
 #include <stdlib.h>
 #include <string.h>
 #include <math.h>
@@ -115,7 +116,7 @@ void math_graph_update(MathGraph* graph) {
     }
 }
 
-void math_graph_update_visuals(MathGraph* graph) {
+void math_graph_update_visuals(MathGraph* graph, bool log_debug) {
     if (!graph) return;
     
     // 1. Count Wires
@@ -187,6 +188,11 @@ void math_graph_update_visuals(MathGraph* graph) {
                 wire->v1 = (sy - min_y) / h;
                 wire->u2 = (tx - min_x) / w;
                 wire->v2 = (ty - min_y) / h;
+
+                if (log_debug) {
+                    LOG_DEBUG("Wire [%d]: Start(%.1f, %.1f) End(%.1f, %.1f) BBox(%.1f, %.1f, %.1f, %.1f)",
+                        idx, sx, sy, tx, ty, min_x, min_y, w, h);
+                }
                 
                 idx++;
             }

@@ -89,7 +89,7 @@ static void layout_recursive(UiView* view, Rect available, uint64_t frame_number
     view->rect.h = h;
 
     if (log_debug) {
-        LOG_TRACE("[Frame %llu] Layout Node id='%s': Rect(%.1f, %.1f, %.1f, %.1f)", 
+        LOG_DEBUG("[Frame %llu] Layout Node id='%s': Rect(%.1f, %.1f, %.1f, %.1f)", 
             (unsigned long long)frame_number,
             view->def->id ? view->def->id : "(anon)",
             view->rect.x, view->rect.y, view->rect.w, view->rect.h);

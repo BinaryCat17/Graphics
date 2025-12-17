@@ -2,6 +2,7 @@
 #define MATH_GRAPH_H
 
 #include <stddef.h>
+#include <stdbool.h>
 
 typedef enum MathNodeType {
     MATH_NODE_VALUE = 0,
@@ -62,6 +63,6 @@ float math_graph_evaluate(MathNode* node);
 void math_graph_update(MathGraph* graph);
 
 // Updates VisualWire array based on node connections
-void math_graph_update_visuals(MathGraph* graph);
+void math_graph_update_visuals(MathGraph* graph, bool log_debug);
 
 #endif // MATH_GRAPH_H

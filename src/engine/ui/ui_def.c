@@ -1,4 +1,5 @@
 #include "ui_def.h"
+#include "foundation/logger/logger.h"
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
