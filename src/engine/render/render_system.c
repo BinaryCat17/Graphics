@@ -216,20 +216,23 @@ void render_system_run(RenderSystem* sys) {
         // Key C (Compute)
         bool key_c_curr = platform_get_key(sys->render_context.window, KEY_C);
         if (key_c_curr && !key_c_prev) {
-             if (sys->math_graph) {
+             sys->show_compute_result = !sys->show_compute_result;
+             
+             if (sys->show_compute_result && sys->math_graph) {
                 LOG_INFO("Transpiling & Running Compute Graph (Image Mode)...");
                 char* glsl = math_graph_transpile_glsl(sys->math_graph, TRANSPILE_MODE_IMAGE_2D);
                 if (glsl) {
                     LOG_INFO("Generated GLSL:\n%s", glsl);
                     if (sys->backend->run_compute_image) {
                         sys->backend->run_compute_image(sys->backend, glsl, 512, 512);
-                        sys->show_compute_result = true;
                         LOG_INFO("Compute Dispatched.");
                     } else {
                         LOG_WARN("Backend does not support run_compute_image");
                     }
                     free(glsl);
                 }
+            } else {
+                LOG_INFO("Compute Visualization Hidden.");
             }
         }
         key_c_prev = key_c_curr;

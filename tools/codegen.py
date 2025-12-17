@@ -4,7 +4,7 @@ import sys
 
 # Regex patterns
 STRUCT_PATTERN = re.compile(r'typedef\s+struct\s+(\w+)\s*\{', re.MULTILINE)
-FIELD_PATTERN = re.compile(r'\s*(\w+\*?)\s+(\w+);\s*//\s*REFLECT', re.MULTILINE)
+REFLECT_PATTERN = re.compile(r'^\s*(.+?);\s*//\s*REFLECT(.*)', re.MULTILINE)
 END_STRUCT_PATTERN = re.compile(r'\}\s*(\w+);', re.MULTILINE)
 
 # Map C types to MetaTypeKind
@@ -51,39 +51,88 @@ def parse_header(file_path):
                 continue
 
             # Check for reflected field
-            if '// REFLECT' in line:
-                comment_part = line.split('//')[1]
+            match = REFLECT_PATTERN.match(line)
+            if match:
+                code_part = match.group(1).strip()
+                comment_part = match.group(2)
                 is_observable = 'Observable' in comment_part
                 
-                # Remove comment
-                code_part = line.split('//')[0].strip()
-                # Parse type and name: "float value;"
-                # Remove semicolon
-                if code_part.endswith(';'):
-                    code_part = code_part[:-1]
+                # "float x, y, width, height" or "MathNode** nodes"
+                # Naive C parsing: Type is everything until the last identifier(s)
+                # But with commas it's tricky: "float x, y" -> Type "float", vars "x", "y".
+                # "MathNode** nodes" -> Type "MathNode**", var "nodes".
                 
-                parts = code_part.split()
-                if len(parts) >= 2:
-                    name = parts[-1]
-                    type_str = " ".join(parts[:-1])
+                # Split by comma to find variables
+                vars_part = code_part.split(',')
+                
+                # The first part contains the Type and the first var
+                # e.g. "float x"
+                first_decl = vars_part[0].strip()
+                
+                # Find the split between type and name in first_decl
+                # We assume the last word is the name, possibly preceded by stars
+                # "float x" -> type="float", name="x"
+                # "MathNode** nodes" -> type="MathNode**", name="nodes"
+                # "int* a" -> type="int*", name="a"
+                
+                # Let's tokenize by space
+                tokens = first_decl.split()
+                if not tokens: continue
+                
+                # Reconstruct type. 
+                # Case 1: "float x" -> tokens=["float", "x"]
+                # Case 2: "unsigned int x" -> tokens=["unsigned", "int", "x"]
+                # Case 3: "MathNode* n" -> tokens=["MathNode*", "n"]
+                # Case 4: "MathNode *n" -> tokens=["MathNode", "*n"]
+                
+                # We assume standard formatting "Type Name" or "Type* Name" or "Type *Name"
+                # Grab base type from everything except last token
+                # But checking if last token is just a name or has stars
+                
+                last_token = tokens[-1]
+                base_type_tokens = tokens[:-1]
+                
+                base_type = " ".join(base_type_tokens)
+                first_name = last_token
+                
+                # Handle "Type *Name" -> base_type="Type", name="*Name" (pointer belongs to name in C syntax strictly, but we want type)
+                # We want type="Type*", name="Name"
+                
+                # Let's clean up stars from name and append to type
+                num_stars = first_name.count('*')
+                clean_name = first_name.replace('*', '')
+                
+                full_type = base_type
+                if num_stars > 0:
+                    full_type += '*' * num_stars
+                
+                # Add first var
+                vars_list = [(clean_name, full_type)]
+                
+                # Process remaining vars (they inherit base type)
+                # e.g. ", y, *z"
+                for v in vars_part[1:]:
+                    v = v.strip()
+                    v_stars = v.count('*')
+                    v_name = v.replace('*', '')
+                    v_type = base_type + ('*' * v_stars)
+                    vars_list.append((v_name, v_type))
+                
+                for name, c_type in vars_list:
+                    # Map to meta type
+                    meta_type = TYPE_MAP.get(c_type, 'META_TYPE_STRUCT')
                     
-                    # Handle pointers sticky to type or name
-                    if name.startswith('*'):
-                        type_str += '*'
-                        name = name[1:]
-                    
-                    meta_type = TYPE_MAP.get(type_str, 'META_TYPE_STRUCT')
-                    
-                    # Heuristic for pointers to structs (handle **, *** etc)
-                    if type_str.endswith('*') and meta_type == 'META_TYPE_STRUCT' and type_str != 'char*':
-                        meta_type = 'META_TYPE_POINTER'
-                        while type_str.endswith('*'):
-                            type_str = type_str[:-1].strip()
+                    # Heuristic for pointers
+                    if '*' in c_type:
+                        if c_type == 'char*':
+                            meta_type = 'META_TYPE_STRING'
+                        else:
+                            meta_type = 'META_TYPE_POINTER'
 
                     current_struct['fields'].append({
                         'name': name,
                         'type': meta_type,
-                        'c_type': type_str,
+                        'c_type': c_type,
                         'observable': is_observable
                     })
 
