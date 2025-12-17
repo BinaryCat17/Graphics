@@ -6,12 +6,12 @@
 #include <string.h>
 
 #include "foundation/platform/platform.h"
-#include "engine/graphics/renderer_backend.h"
-#include "engine/graphics/vulkan/vulkan_renderer.h"
+#include "engine/graphics/backend/renderer_backend.h"
+#include "engine/graphics/backend/vulkan/vulkan_renderer.h"
 #include "engine/ui/ui_scene_bridge.h"
 #include "engine/ui/ui_layout.h"
-#include "engine/graphics/font.h"
-#include "engine/graphics/text_renderer.h"
+#include "engine/graphics/text/font.h"
+#include "engine/graphics/text/text_renderer.h"
 
 // --- Helper: Packet Management ---
 

@@ -6,8 +6,8 @@
 
 #include "engine/assets/assets.h"
 #include "engine/ui/ui_def.h"
-#include "engine/graphics/renderer_backend.h"
-#include "engine/graphics/render_packet.h"
+#include "engine/graphics/backend/renderer_backend.h"
+#include "engine/graphics/scene/render_packet.h"
 #include "foundation/platform/platform.h"
 
 // Forward decl

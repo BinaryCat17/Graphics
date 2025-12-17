@@ -4,7 +4,7 @@
 #include "foundation/meta/reflection.h"
 #include "features/graph_editor/transpiler.h"
 #include "engine/ui/ui_layout.h"
-#include "engine/graphics/font.h"
+#include "engine/graphics/text/font.h"
 
 #include <stdio.h>
 #include <string.h>

@@ -1,9 +1,9 @@
 #include "engine/ui/ui_scene_bridge.h"
 #include "foundation/logger/logger.h"
-#include "engine/graphics/renderer_backend.h"
-#include "engine/graphics/font.h"
-#include "engine/graphics/scene.h"
-#include "engine/graphics/text_renderer.h" 
+#include "engine/graphics/backend/renderer_backend.h"
+#include "engine/graphics/text/font.h"
+#include "engine/graphics/scene/scene.h"
+#include "engine/graphics/text/text_renderer.h" 
 
 #include <string.h>
 #include <stdio.h>

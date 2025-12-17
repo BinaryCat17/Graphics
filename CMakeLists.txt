@@ -126,19 +126,19 @@ target_link_libraries(foundation_config PUBLIC foundation_platform foundation_lo
 
 # Graphics (Renderer + Scene + Text + Vulkan)
 set(ENGINE_GRAPHICS_SOURCES
-    "src/engine/graphics/renderer_backend.c"
-    "src/engine/graphics/vulkan/vulkan_renderer.c"
-    "src/engine/graphics/vulkan/vk_utils.c"
-    "src/engine/graphics/vulkan/vk_context.c"
-    "src/engine/graphics/vulkan/vk_swapchain.c"
-    "src/engine/graphics/vulkan/vk_pipeline.c"
-    "src/engine/graphics/vulkan/vk_resources.c"
-    "src/engine/graphics/vulkan/vk_compute.c"
+    "src/engine/graphics/backend/renderer_backend.c"
+    "src/engine/graphics/backend/vulkan/vulkan_renderer.c"
+    "src/engine/graphics/backend/vulkan/vk_utils.c"
+    "src/engine/graphics/backend/vulkan/vk_context.c"
+    "src/engine/graphics/backend/vulkan/vk_swapchain.c"
+    "src/engine/graphics/backend/vulkan/vk_pipeline.c"
+    "src/engine/graphics/backend/vulkan/vk_resources.c"
+    "src/engine/graphics/backend/vulkan/vk_compute.c"
     "src/engine/graphics/render_system.c"
-    "src/engine/graphics/scene.c"
-    "src/engine/graphics/text_renderer.c"
-    "src/engine/graphics/font.c"
-    "src/engine/graphics/stb_impl.c"
+    "src/engine/graphics/scene/scene.c"
+    "src/engine/graphics/text/text_renderer.c"
+    "src/engine/graphics/text/font.c"
+    "src/engine/graphics/text/stb_impl.c"
 )
 add_library(engine_graphics STATIC ${ENGINE_GRAPHICS_SOURCES})
 target_include_directories(engine_graphics PUBLIC "src/" ${Stb_INCLUDE_DIR})
