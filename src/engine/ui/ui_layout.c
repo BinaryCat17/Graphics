@@ -97,8 +97,8 @@ static void layout_recursive(UiView* view, Rect available, uint64_t frame_number
 
     // Layout Children
     Rect content = {
-        available.x + view->def->padding,
-        available.y + view->def->padding,
+        view->rect.x + view->def->padding,
+        view->rect.y + view->def->padding,
         w - view->def->padding * 2,
         h - view->def->padding * 2
     };
