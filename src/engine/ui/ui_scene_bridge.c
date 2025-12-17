@@ -46,7 +46,8 @@ static void traverse_ui(const UiView* view, Scene* scene, const Assets* assets, 
         scene_add_object(scene, obj);
 
         if (debug_frame) {
-            LOG_TRACE("GenPanel id='%s' Type=%d Rect(%.1f, %.1f, %.1f, %.1f) Color(%.2f, %.2f, %.2f, %.2f)",
+            LOG_TRACE("[Frame %llu] GenPanel id='%s' Type=%d Rect(%.1f, %.1f, %.1f, %.1f) Color(%.2f, %.2f, %.2f, %.2f)",
+                (unsigned long long)scene->frame_number,
                 view->def->id ? view->def->id : "(anon)",
                 view->def->type,
                 view->rect.x, view->rect.y, view->rect.w, view->rect.h,
@@ -76,7 +77,8 @@ static void traverse_ui(const UiView* view, Scene* scene, const Assets* assets, 
             }
             
             if (debug_frame) {
-                LOG_TRACE("GenText '%s': Start(%.1f, %.1f) Rect(%.1f, %.1f, %.1f, %.1f)", 
+                LOG_TRACE("[Frame %llu] GenText '%s': Start(%.1f, %.1f) Rect(%.1f, %.1f, %.1f, %.1f)", 
+                    (unsigned long long)scene->frame_number,
                     view->cached_text, cursor_x, cursor_y,
                     view->rect.x, view->rect.y, view->rect.w, view->rect.h);
             }
@@ -110,7 +112,8 @@ static void traverse_ui(const UiView* view, Scene* scene, const Assets* assets, 
                     scene_add_object(scene, char_obj);
                     
                     if (debug_frame && char_count == 0) {
-                        LOG_TRACE("  First Char '%c': Pos(%.1f, %.1f) Sz(%.1f, %.1f) UV(%.3f,%.3f)",
+                        LOG_TRACE("  [Frame %llu] First Char '%c': Pos(%.1f, %.1f) Sz(%.1f, %.1f) UV(%.3f,%.3f)",
+                            (unsigned long long)scene->frame_number,
                             *ptr, x_pos, y_pos, g.w, g.h, g.u0, g.v0);
                     }
                     
