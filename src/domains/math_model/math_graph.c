@@ -80,13 +80,13 @@ void math_graph_set_value(MathNode* node, float value) {
     }
 }
 
-static float evaluate_node(MathNode* node) {
+float math_graph_evaluate(MathNode* node) {
     if (!node) return 0.0f;
     if (!node->dirty) return node->value;
     
     // Recursive evaluation (naive, no cycle detection yet)
-    float v0 = (node->input_count > 0 && node->inputs[0]) ? evaluate_node(node->inputs[0]) : 0.0f;
-    float v1 = (node->input_count > 1 && node->inputs[1]) ? evaluate_node(node->inputs[1]) : 0.0f;
+    float v0 = (node->input_count > 0 && node->inputs[0]) ? math_graph_evaluate(node->inputs[0]) : 0.0f;
+    float v1 = (node->input_count > 1 && node->inputs[1]) ? math_graph_evaluate(node->inputs[1]) : 0.0f;
     
     switch (node->type) {
         case MATH_NODE_VALUE: break; // Already set

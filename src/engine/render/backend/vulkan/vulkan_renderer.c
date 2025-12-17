@@ -305,6 +305,21 @@ static bool vk_backend_get_glyph(RendererBackend* backend, uint32_t codepoint, R
     return true;
 }
 
+static float vk_backend_measure_text(RendererBackend* backend, const char* text) {
+    if (!backend || !backend->state || !text) return 0.0f;
+    VulkanRendererState* state = (VulkanRendererState*)backend->state;
+    
+    float width = 0.0f;
+    const char* ptr = text;
+    while (*ptr) {
+        int advance = 0, lsb = 0;
+        stbtt_GetCodepointHMetrics(&state->fontinfo, *ptr, &advance, &lsb);
+        width += advance * state->font_scale;
+        ptr++;
+    }
+    return width;
+}
+
 static void vk_backend_render_scene(RendererBackend* backend, const Scene* scene) {
     if (!backend || !backend->state) return;
     VulkanRendererState* state = (VulkanRendererState*)backend->state;
@@ -397,6 +412,7 @@ RendererBackend* vulkan_renderer_backend(void) {
     g_vulkan_backend.init = vk_backend_init;
     g_vulkan_backend.render_scene = vk_backend_render_scene;
     g_vulkan_backend.get_glyph = vk_backend_get_glyph;
+    g_vulkan_backend.measure_text = vk_backend_measure_text;
     g_vulkan_backend.draw = vk_backend_draw;
     g_vulkan_backend.cleanup = vk_backend_cleanup;
     return &g_vulkan_backend;

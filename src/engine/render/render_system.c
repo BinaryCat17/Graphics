@@ -9,6 +9,7 @@
 #include "engine/render/backend/common/renderer_backend.h"
 #include "engine/render/backend/vulkan/vulkan_renderer.h"
 #include "engine/ui/ui_scene_bridge.h"
+#include "engine/ui/ui_layout.h"
 
 // --- Helper: Packet Management ---
 
@@ -59,6 +60,14 @@ const RenderFramePacket* render_system_acquire_packet(RenderSystem* sys) {
 
 // --- Init & Bootstrap ---
 
+static float render_system_measure_text_wrapper(const char* text, void* user_data) {
+    RendererBackend* backend = (RendererBackend*)user_data;
+    if (backend && backend->measure_text) {
+        return backend->measure_text(backend, text);
+    }
+    return 0.0f;
+}
+
 static void try_bootstrap_renderer(RenderSystem* sys) {
     if (!sys) return;
     if (sys->renderer_ready) return;
@@ -93,6 +102,10 @@ static void try_bootstrap_renderer(RenderSystem* sys) {
     };
 
     sys->renderer_ready = sys->backend->init(sys->backend, &init);
+
+    if (sys->renderer_ready && sys->backend->measure_text) {
+        ui_layout_set_measure_func(render_system_measure_text_wrapper, sys->backend);
+    }
 }
 
 bool render_system_init(RenderSystem* sys, const RenderSystemConfig* config) {

@@ -41,6 +41,7 @@ void math_graph_dispose(MathGraph* graph);
 MathNode* math_graph_add_node(MathGraph* graph, MathNodeType type);
 void math_graph_connect(MathNode* target, size_t input_index, MathNode* source);
 void math_graph_set_value(MathNode* node, float value);
+float math_graph_evaluate(MathNode* node);
 
 // Propagates dirty flags and recomputes values
 void math_graph_update(MathGraph* graph);

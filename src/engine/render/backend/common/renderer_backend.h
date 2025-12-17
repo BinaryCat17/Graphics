@@ -75,6 +75,7 @@ typedef struct RendererBackend {
     
     // Resources
     bool (*get_glyph)(struct RendererBackend* backend, uint32_t codepoint, RenderGlyph* out_glyph);
+    float (*measure_text)(struct RendererBackend* backend, const char* text);
 
     // Legacy generic draw (can be removed if render_scene covers it)
     void (*draw)(struct RendererBackend* backend);

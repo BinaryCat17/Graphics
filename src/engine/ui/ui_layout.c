@@ -5,6 +5,14 @@
 #include <stdbool.h>
 #include <string.h>
 
+static UiTextMeasureFunc g_measure_func = NULL;
+static void* g_measure_user_data = NULL;
+
+void ui_layout_set_measure_func(UiTextMeasureFunc func, void* user_data) {
+    g_measure_func = func;
+    g_measure_user_data = user_data;
+}
+
 static void layout_recursive(UiView* view, Rect available, uint64_t frame_number, bool log_debug) {
     if (!view || !view->def) return;
 
@@ -19,8 +27,13 @@ static void layout_recursive(UiView* view, Rect available, uint64_t frame_number
         if (parent_is_row || view->def->type == UI_NODE_LABEL || view->def->type == UI_NODE_BUTTON) {
              const char* text = view->cached_text ? view->cached_text : view->def->text;
              if (text) {
-                 // Estimate: 10px per char approx
-                 w = strlen(text) * 10.0f + view->def->padding * 2 + 10.0f; 
+                 if (g_measure_func) {
+                     float text_w = g_measure_func(text, g_measure_user_data);
+                     w = text_w + view->def->padding * 2;
+                 } else {
+                     // Fallback Estimate: 10px per char approx
+                     w = strlen(text) * 10.0f + view->def->padding * 2 + 10.0f;
+                 }
              } else {
                  w = 100.0f; // Default small width
              }

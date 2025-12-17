@@ -2,81 +2,208 @@
 #include "engine/ui/ui_def.h"
 #include "engine/ui/ui_layout.h"
 #include <stdio.h>
+#include <string.h>
+#include <stdlib.h>
 
-// Mock logger if needed, but we link against foundation_logger
-// But we need to ensure we can run without crashing.
-
-int test_row_layout_label_autosize() {
-    // Parent Panel (Row, Width 400)
-    UiDef* parent_def = ui_def_create(UI_NODE_PANEL);
-    parent_def->layout = UI_LAYOUT_ROW;
-    parent_def->width = 400.0f;
-    parent_def->height = 40.0f;
-    parent_def->spacing = 10.0f;
-    parent_def->padding = 0.0f;
-    parent_def->id = strdup("parent");
-
-    // Child 1: Label "Label 1" (Auto width)
-    UiDef* child1_def = ui_def_create(UI_NODE_LABEL);
-    child1_def->text = strdup("Label 1"); // 7 chars -> ~70px + padding
-    child1_def->width = -1.0f;
-    child1_def->id = strdup("child1");
-
-    // Child 2: Label "Label 2" (Auto width)
-    UiDef* child2_def = ui_def_create(UI_NODE_LABEL);
-    child2_def->text = strdup("Label 2");
-    child2_def->width = -1.0f;
-    child2_def->id = strdup("child2");
-
-    // Link definitions (Manually since we don't use loader)
-    parent_def->child_count = 2;
-    parent_def->children = (UiDef**)calloc(2, sizeof(UiDef*));
-    parent_def->children[0] = child1_def;
-    parent_def->children[1] = child2_def;
-
-    // Create View
-    UiView* root_view = ui_view_create(parent_def, NULL, NULL);
-    
-    // Run Layout
-    ui_layout_root(root_view, 800.0f, 600.0f, 0, false);
-
-    // Verify
-    UiView* child1 = root_view->children[0];
-    UiView* child2 = root_view->children[1];
-
-    printf("Child 1 Rect: %.1f, %.1f, %.1f, %.1f\n", child1->rect.x, child1->rect.y, child1->rect.w, child1->rect.h);
-    printf("Child 2 Rect: %.1f, %.1f, %.1f, %.1f\n", child2->rect.x, child2->rect.y, child2->rect.w, child2->rect.h);
-
-    // Child 1 should NOT be 400.0f. It should be much smaller (e.g. < 150.0f).
-    // The previous bug caused it to be 400.0f (available.w).
-    
-    int result = 1;
-    
-    if (child1->rect.w >= 390.0f) {
-        printf(TERM_RED "FAILED: Child 1 took full width (%.1f) in ROW layout!\n" TERM_RESET, child1->rect.w);
-        result = 0;
-    }
-
-    if (child2->rect.x >= 400.0f) {
-        printf(TERM_RED "FAILED: Child 2 pushed out of bounds (x=%.1f)!\n" TERM_RESET, child2->rect.x);
-        result = 0;
-    }
-    
-    // Expect rough size: 7 chars * 10 = 70 + 10 padding = ~80.
-    if (child1->rect.w < 50.0f || child1->rect.w > 200.0f) {
-        printf(TERM_RED "FAILED: Child 1 width (%.1f) is suspicious.\n" TERM_RESET, child1->rect.w);
-        result = 0;
-    }
-
-    // Cleanup
-    ui_view_free(root_view);
-    ui_def_free(parent_def); // Frees children too
-
-    return result;
+// --- Mock Measurement Function ---
+// Simulates a monospaced font where each character is 10px wide.
+static float mock_measure_text(const char* text, void* user_data) {
+    (void)user_data; // Unused
+    if (!text) return 0.0f;
+    return strlen(text) * 10.0f;
 }
 
+// --- Helper: Build Def Tree first ---
+static UiDef* create_def(UiNodeType type, UiLayoutType layout, float w, float h, const char* id) {
+    UiDef* def = ui_def_create(type);
+    def->layout = layout;
+    def->width = w;
+    def->height = h;
+    def->id = strdup(id ? id : "node");
+    return def;
+}
+
+static void add_child_def(UiDef* parent, UiDef* child) {
+    parent->child_count++;
+    parent->children = (UiDef**)realloc(parent->children, parent->child_count * sizeof(UiDef*));
+    parent->children[parent->child_count - 1] = child;
+}
+
+// --- TESTS ---
+
+int test_column_layout() {
+    // [Column 100x200]
+    //   - Child1 (Fixed 50x50)
+    //   - Child2 (Fixed 50x50)
+    
+    UiDef* root_def = create_def(UI_NODE_PANEL, UI_LAYOUT_COLUMN, 100.0f, 200.0f, "root");
+    root_def->spacing = 10.0f;
+    root_def->padding = 5.0f;
+
+    UiDef* c1 = create_def(UI_NODE_PANEL, UI_LAYOUT_COLUMN, 50.0f, 50.0f, "c1");
+    UiDef* c2 = create_def(UI_NODE_PANEL, UI_LAYOUT_COLUMN, 50.0f, 50.0f, "c2");
+    
+    add_child_def(root_def, c1);
+    add_child_def(root_def, c2);
+
+    UiView* view = ui_view_create(root_def, NULL, NULL);
+    ui_layout_root(view, 800, 600, 0, false);
+
+    // Verify Root
+    // x=0, y=0, w=100, h=200
+    TEST_ASSERT_FLOAT_EQ(view->rect.w, 100.0f, 0.1f);
+    TEST_ASSERT_FLOAT_EQ(view->rect.h, 200.0f, 0.1f);
+
+    // Verify Children
+    UiView* v1 = view->children[0];
+    UiView* v2 = view->children[1];
+
+    // Child 1: x = root.x + pad = 5. y = root.y + pad = 5.
+    TEST_ASSERT_FLOAT_EQ(v1->rect.x, 5.0f, 0.1f);
+    TEST_ASSERT_FLOAT_EQ(v1->rect.y, 5.0f, 0.1f);
+    
+    // Child 2: y = v1.y + v1.h + spacing = 5 + 50 + 10 = 65.
+    TEST_ASSERT_FLOAT_EQ(v2->rect.x, 5.0f, 0.1f);
+    TEST_ASSERT_FLOAT_EQ(v2->rect.y, 65.0f, 0.1f);
+
+    ui_view_free(view);
+    ui_def_free(root_def);
+    return 1;
+}
+
+int test_row_layout_auto_width() {
+    // [Row Auto x 50]
+    //   - Label1 ("ABC") -> 30px
+    //   - Label2 ("DE")  -> 20px
+    //   - Spacing 5, Padding 2
+    
+    ui_layout_set_measure_func(mock_measure_text, NULL);
+
+    UiDef* root_def = create_def(UI_NODE_PANEL, UI_LAYOUT_ROW, -1.0f, 50.0f, "root");
+    root_def->spacing = 5.0f;
+    root_def->padding = 2.0f;
+
+    UiDef* l1 = create_def(UI_NODE_LABEL, UI_LAYOUT_COLUMN, -1.0f, -1.0f, "l1");
+    l1->text = strdup("ABC");
+
+    UiDef* l2 = create_def(UI_NODE_LABEL, UI_LAYOUT_COLUMN, -1.0f, -1.0f, "l2");
+    l2->text = strdup("DE");
+
+    add_child_def(root_def, l1);
+    add_child_def(root_def, l2);
+
+    UiView* view = ui_view_create(root_def, NULL, NULL);
+    ui_layout_root(view, 800, 600, 0, false);
+
+    UiView* v1 = view->children[0];
+    UiView* v2 = view->children[1];
+
+    // Check sizes (Mock measure: 10px per char)
+    // L1: 3 chars * 10 = 30.
+    // L1 width in layout is text_w + padding*2.
+    // Def padding is 0 by default. So 30.
+    TEST_ASSERT_FLOAT_EQ(v1->rect.w, 30.0f, 0.1f);
+    // L2: 2 chars * 10 = 20.
+    TEST_ASSERT_FLOAT_EQ(v2->rect.w, 20.0f, 0.1f);
+
+    // Check Positions
+    // Root Pad = 2.
+    // V1 x = 2.
+    TEST_ASSERT_FLOAT_EQ(v1->rect.x, 2.0f, 0.1f);
+    
+    // V2 x = v1.x + v1.w + spacing = 2 + 30 + 5 = 37.
+    TEST_ASSERT_FLOAT_EQ(v2->rect.x, 37.0f, 0.1f);
+
+    // Root Width (Auto)
+    // If w < 0:
+    //   if (parent_is_row || type==LABEL...) w = measured...
+    //   else w = available.w;
+    // Here root is PANEL and has no parent. So it will take available.w (800).
+    TEST_ASSERT_FLOAT_EQ(view->rect.w, 800.0f, 0.1f);
+
+    ui_view_free(view);
+    ui_def_free(root_def);
+    return 1;
+}
+
+int test_nested_auto_size() {
+    // [Column 200x200]
+    //   - [Row Auto x Auto]
+    //       - Label "A"
+    
+    ui_layout_set_measure_func(mock_measure_text, NULL);
+    
+    UiDef* root = create_def(UI_NODE_PANEL, UI_LAYOUT_COLUMN, 200.0f, 200.0f, "root");
+    UiDef* row = create_def(UI_NODE_PANEL, UI_LAYOUT_ROW, -1.0f, -1.0f, "row");
+    UiDef* lbl = create_def(UI_NODE_LABEL, UI_LAYOUT_COLUMN, -1.0f, -1.0f, "lbl");
+    lbl->text = strdup("A"); // 10px
+
+    add_child_def(row, lbl);
+    add_child_def(root, row);
+
+    UiView* view = ui_view_create(root, NULL, NULL);
+    ui_layout_root(view, 800, 600, 0, false);
+    
+    UiView* v_row = view->children[0];
+    UiView* v_lbl = v_row->children[0];
+
+    // Label: 10px wide.
+    TEST_ASSERT_FLOAT_EQ(v_lbl->rect.w, 10.0f, 0.1f);
+
+    // Row: 
+    // Logic: w = available.w.
+    // So Row should be 200px wide (inherited from root content width).
+    TEST_ASSERT_FLOAT_EQ(v_row->rect.w, 200.0f, 0.1f);
+    
+    // Row Height (Auto):
+    // Columns calculate height based on children, but Rows default to 30.0f if auto.
+    TEST_ASSERT_FLOAT_EQ(v_row->rect.h, 30.0f, 0.1f);
+
+    ui_view_free(view);
+    ui_def_free(root);
+    return 1;
+}
+
+int test_overlay_layout() {
+    // [Overlay 100x100]
+    //   - Child1 50x50
+    //   - Child2 50x50
+    // Both should be at (0,0) relative to content area.
+    
+    UiDef* root = create_def(UI_NODE_PANEL, UI_LAYOUT_OVERLAY, 100.0f, 100.0f, "root");
+    root->padding = 10.0f;
+    
+    UiDef* c1 = create_def(UI_NODE_PANEL, UI_LAYOUT_COLUMN, 50.0f, 50.0f, "c1");
+    UiDef* c2 = create_def(UI_NODE_PANEL, UI_LAYOUT_COLUMN, 50.0f, 50.0f, "c2");
+    
+    add_child_def(root, c1);
+    add_child_def(root, c2);
+
+    UiView* view = ui_view_create(root, NULL, NULL);
+    ui_layout_root(view, 800, 600, 0, false);
+
+    UiView* v1 = view->children[0];
+    UiView* v2 = view->children[1];
+
+    // Root x=0, y=0. Padding=10.
+    // Content starts at 10,10.
+    TEST_ASSERT_FLOAT_EQ(v1->rect.x, 10.0f, 0.1f);
+    TEST_ASSERT_FLOAT_EQ(v1->rect.y, 10.0f, 0.1f);
+    
+    TEST_ASSERT_FLOAT_EQ(v2->rect.x, 10.0f, 0.1f);
+    TEST_ASSERT_FLOAT_EQ(v2->rect.y, 10.0f, 0.1f);
+
+    ui_view_free(view);
+    ui_def_free(root);
+    return 1;
+}
 int main() {
-    RUN_TEST(test_row_layout_label_autosize);
+    printf("--- Running UI Tests ---\n");
+
+    RUN_TEST(test_column_layout);
+    RUN_TEST(test_row_layout_auto_width);
+    RUN_TEST(test_nested_auto_size);
+    RUN_TEST(test_overlay_layout);
     
     if (g_tests_failed > 0) {
         printf(TERM_RED "\n%d TESTS FAILED\n" TERM_RESET, g_tests_failed);
