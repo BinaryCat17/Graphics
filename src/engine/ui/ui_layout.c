@@ -3,13 +3,33 @@
 #include <stddef.h>
 #include <stdint.h>
 #include <stdbool.h>
+#include <string.h>
 
 static void layout_recursive(UiView* view, Rect available, uint64_t frame_number, bool log_debug) {
     if (!view || !view->def) return;
 
     // Determine size
-    float w = view->def->width < 0 ? available.w : view->def->width;
-    float h = view->def->height < 0 ? 30.0f : view->def->height; // Default height for auto
+    float w = view->def->width;
+    float h = view->def->height;
+
+    // Auto-width logic
+    if (w < 0) {
+        bool parent_is_row = (view->parent && view->parent->def->layout == UI_LAYOUT_ROW);
+        
+        if (parent_is_row || view->def->type == UI_NODE_LABEL || view->def->type == UI_NODE_BUTTON) {
+             const char* text = view->cached_text ? view->cached_text : view->def->text;
+             if (text) {
+                 // Estimate: 10px per char approx
+                 w = strlen(text) * 10.0f + view->def->padding * 2 + 10.0f; 
+             } else {
+                 w = 100.0f; // Default small width
+             }
+        } else {
+             w = available.w; // Fill available (Column default)
+        }
+    }
+
+    if (h < 0) h = 30.0f; // Default height for auto
     
     // Auto height for container based on children (Simple Stack)
     if (view->def->height < 0 && view->child_count > 0 && view->def->layout == UI_LAYOUT_COLUMN) {
