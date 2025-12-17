@@ -7,7 +7,7 @@
 
 #include "foundation/math/coordinate_systems.h"
 #include "foundation/platform/platform.h"
-#include "engine/render/backend/vulkan/vulkan_renderer.h"
+#include "engine/graphics/vulkan/vulkan_renderer.h"
 
 typedef struct { float viewport[2]; } ViewConstants;
 

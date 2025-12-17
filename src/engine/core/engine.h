@@ -1,8 +1,8 @@
 #pragma once
 
-#include "engine/render/render_system.h"
+#include "engine/graphics/render_system.h"
 #include "engine/assets/assets.h"
-#include "domains/math_model/math_graph.h"
+#include "features/graph_editor/math_graph.h"
 #include "engine/ui/ui_loader.h"
 #include "foundation/platform/platform.h"
 #include "engine/ui/ui_def.h"

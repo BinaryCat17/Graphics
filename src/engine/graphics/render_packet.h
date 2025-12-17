@@ -1,7 +1,7 @@
 #ifndef RENDER_PACKET_H
 #define RENDER_PACKET_H
 
-#include "engine/scene/scene.h"
+#include "engine/graphics/scene.h"
 
 typedef struct RenderFramePacket {
     // The unified scene state for this frame

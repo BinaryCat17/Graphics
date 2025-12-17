@@ -2,8 +2,9 @@
 #include "foundation/logger/logger.h"
 #include "foundation/platform/platform.h"
 #include "foundation/meta/reflection.h"
-#include "domains/math_model/transpiler.h"
+#include "features/graph_editor/transpiler.h"
 #include "engine/ui/ui_layout.h"
+#include "engine/graphics/font.h"
 
 #include <stdio.h>
 #include <string.h>
@@ -113,6 +114,11 @@ bool engine_init(Engine* engine, const EngineConfig* config) {
         return false;
     }
 
+    if (!font_init(engine->assets.font_path)) {
+        LOG_FATAL("Failed to initialize font from '%s'", engine->assets.font_path);
+        return false;
+    }
+
     // 4. Math Graph (Model)
     math_graph_init(&engine->graph);
     engine_setup_default_graph(engine);
@@ -150,7 +156,7 @@ bool engine_init(Engine* engine, const EngineConfig* config) {
     // Bindings (Legacy coupling, to be refactored)
     render_system_bind_assets(&engine->render_system, &engine->assets);
     render_system_bind_ui(&engine->render_system, engine->ui_root);
-    render_system_bind_math_graph(&engine->render_system, &engine->graph);
+    // render_system_bind_math_graph(&engine->render_system, &engine->graph); // Removed dependency
 
     engine->running = true;
     return true;

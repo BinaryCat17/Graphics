@@ -1,4 +1,4 @@
-#include "engine/render/render_system.h"
+#include "engine/graphics/render_system.h"
 #include "foundation/logger/logger.h"
 
 #include <stdio.h>
@@ -6,12 +6,12 @@
 #include <string.h>
 
 #include "foundation/platform/platform.h"
-#include "engine/render/backend/common/renderer_backend.h"
-#include "engine/render/backend/vulkan/vulkan_renderer.h"
+#include "engine/graphics/renderer_backend.h"
+#include "engine/graphics/vulkan/vulkan_renderer.h"
 #include "engine/ui/ui_scene_bridge.h"
 #include "engine/ui/ui_layout.h"
-#include "engine/text/font.h"
-#include "engine/text/text_renderer.h"
+#include "engine/graphics/font.h"
+#include "engine/graphics/text_renderer.h"
 
 // --- Helper: Packet Management ---
 
@@ -161,16 +161,9 @@ void render_system_bind_ui(RenderSystem* sys, UiView* root_view) {
     try_bootstrap_renderer(sys);
 }
 
-void render_system_bind_math_graph(RenderSystem* sys, MathGraph* graph) {
-    sys->math_graph = graph;
-}
-
 void render_system_update(RenderSystem* sys) {
     if (!sys || !sys->renderer_ready) return;
     try_sync_packet(sys);
 }
 
-#include "domains/math_model/transpiler.h"
-
 #define KEY_C 67
-

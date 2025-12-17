@@ -1,5 +1,5 @@
 #include "text_renderer.h"
-#include "engine/text/font.h"
+#include "engine/graphics/font.h"
 #include "foundation/logger/logger.h"
 #include <string.h>
 

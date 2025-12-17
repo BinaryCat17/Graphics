@@ -198,7 +198,7 @@ int test_overlay_layout() {
     return 1;
 }
 
-#include "domains/math_model/math_graph.h"
+#include "features/graph_editor/math_graph.h"
 
 int test_repeater() {
     // 1. Setup Data Model

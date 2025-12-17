@@ -6,7 +6,7 @@
 #include <stdio.h>
 
 #include "foundation/platform/platform.h"
-#include "engine/scene/scene.h"
+#include "engine/graphics/scene.h"
 
 typedef struct CoordinateSystem2D CoordinateTransformer;
 

@@ -1,6 +1,6 @@
 #include "test_framework.h"
-#include "domains/math_model/math_graph.h"
-#include "domains/math_model/transpiler.h"
+#include "features/graph_editor/math_graph.h"
+#include "features/graph_editor/transpiler.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>

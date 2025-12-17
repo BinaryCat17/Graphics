@@ -2,7 +2,7 @@
 #define ASSETS_SYSTEM_H
 
 #include <stdbool.h>
-#include "engine/scene/scene.h"
+#include "engine/graphics/scene.h"
 
 typedef struct Assets {
     // Paths (Legacy/Config)
