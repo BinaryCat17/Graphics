@@ -1,10 +1,18 @@
+#define _POSIX_C_SOURCE 200809L // For localtime_r
 #include "logger.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <time.h>
 #include <string.h>
+#include <pthread.h>
+#include <stdbool.h>
 
-static LogLevel g_current_level = LOG_LEVEL_INFO;
+static LogLevel g_console_level = LOG_LEVEL_INFO;
+static LogLevel g_file_level = LOG_LEVEL_TRACE;
+
+static FILE* g_log_file = NULL;
+static pthread_mutex_t g_log_mutex = PTHREAD_MUTEX_INITIALIZER;
+static bool g_initialized = false;
 
 static const char* level_strings[] = {
     "TRACE", "DEBUG", "INFO ", "WARN ", "ERROR", "FATAL"
@@ -21,62 +29,117 @@ static const char* level_colors[] = {
 
 static const char* reset_color = "\033[0m";
 
+void logger_init(const char* log_file_path) {
+    pthread_mutex_lock(&g_log_mutex);
+    if (g_initialized) {
+        pthread_mutex_unlock(&g_log_mutex);
+        return;
+    }
+
+    if (log_file_path) {
+        g_log_file = fopen(log_file_path, "w");
+        if (!g_log_file) {
+            fprintf(stderr, "Logger: Failed to open log file '%s'\n", log_file_path);
+        }
+    }
+
+    g_initialized = true;
+    pthread_mutex_unlock(&g_log_mutex);
+}
+
+void logger_shutdown(void) {
+    pthread_mutex_lock(&g_log_mutex);
+    if (g_log_file) {
+        fclose(g_log_file);
+        g_log_file = NULL;
+    }
+    g_initialized = false;
+    pthread_mutex_unlock(&g_log_mutex);
+}
+
 void logger_set_level(LogLevel level) {
-    g_current_level = level;
+    // Legacy behavior: Sets Console Level
+    g_console_level = level;
+}
+
+void logger_set_console_level(LogLevel level) {
+    g_console_level = level;
+}
+
+void logger_set_file_level(LogLevel level) {
+    g_file_level = level;
 }
 
 LogLevel logger_get_level(void) {
-    return g_current_level;
+    return g_console_level;
 }
 
 void logger_log(LogLevel level, const char* file, int line, const char* fmt, ...) {
-    if (level < g_current_level) {
+    // Quick check before lock (optimization)
+    // Note: Technically racy but harmless for logging levels
+    if (level < g_console_level && level < g_file_level) {
         return;
     }
 
     // Get time
     time_t now = time(NULL);
-    struct tm* t = localtime(&now);
-    char time_str[32];
-    strftime(time_str, sizeof(time_str), "%H:%M:%S", t);
+    struct tm t;
+    localtime_r(&now, &t); // Thread-safe
+    
+    char time_short[16];
+    char time_long[32];
+    strftime(time_short, sizeof(time_short), "%H:%M:%S", &t);
+    strftime(time_long, sizeof(time_long), "%Y-%m-%d %H:%M:%S", &t);
 
-    // Determine output stream
-    FILE* out = (level >= LOG_LEVEL_ERROR) ? stderr : stdout;
-
-    // Simplify file path (remove leading directories)
+    // Simplify file path
     const char* short_file = strrchr(file, '/');
     if (short_file) {
-        short_file++; // Skip '/'
+        short_file++; 
     } else {
         short_file = file; 
     }
-    // Handle Windows paths if necessary
-    const char* short_file_win = strrchr(short_file, '\\');
-    if (short_file_win) {
-        short_file = short_file_win + 1;
+
+    pthread_mutex_lock(&g_log_mutex);
+
+    // Console Output
+    if (level >= g_console_level) {
+        FILE* out = (level >= LOG_LEVEL_ERROR) ? stderr : stdout;
+        fprintf(out, "%s[%s] [%s]%s %s:%d: ", 
+            level_colors[level], 
+            time_short, 
+            level_strings[level], 
+            reset_color, 
+            short_file, 
+            line);
+        
+        va_list args;
+        va_start(args, fmt);
+        vfprintf(out, fmt, args);
+        va_end(args);
+        fprintf(out, "\n");
+        fflush(out); // Ensure console is snappy
     }
 
-    // Print Header: [Time] [Level] File:Line: 
-    fprintf(out, "%s[%s] [%s]%s %s:%d: ", 
-        level_colors[level], 
-        time_str, 
-        level_strings[level], 
-        reset_color, 
-        short_file, 
-        line);
+    // File Output
+    if (g_log_file && level >= g_file_level) {
+        fprintf(g_log_file, "[%s] [%s] %s:%d: ", 
+            time_long, 
+            level_strings[level], 
+            short_file, 
+            line);
+        
+        va_list args;
+        va_start(args, fmt);
+        vfprintf(g_log_file, fmt, args);
+        va_end(args);
+        fprintf(g_log_file, "\n");
+        fflush(g_log_file); // Flush file to ensure logs are saved on crash
+    }
 
-    // Print Message
-    va_list args;
-    va_start(args, fmt);
-    vfprintf(out, fmt, args);
-    va_end(args);
-
-    fprintf(out, "\n");
-    
-    // Flush to ensure logs appear immediately
-    fflush(out);
+    pthread_mutex_unlock(&g_log_mutex);
 
     if (level == LOG_LEVEL_FATAL) {
+        logger_shutdown(); // Close file properly
         exit(1);
     }
 }

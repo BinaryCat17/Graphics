@@ -12,9 +12,16 @@ typedef enum LogLevel {
     LOG_LEVEL_FATAL  // Critical errors causing shutdown
 } LogLevel;
 
-// Global configuration
-void logger_set_level(LogLevel level);
-LogLevel logger_get_level(void);
+// Lifecycle
+void logger_init(const char* log_file_path);
+void logger_shutdown(void);
+
+// Configuration
+void logger_set_level(LogLevel level); // Sets Console Level (Backwards Compatibility)
+void logger_set_console_level(LogLevel level);
+void logger_set_file_level(LogLevel level);
+
+LogLevel logger_get_level(void); // Gets Console Level
 
 // Core logging function
 void logger_log(LogLevel level, const char* file, int line, const char* fmt, ...);

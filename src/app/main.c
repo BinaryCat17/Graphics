@@ -11,6 +11,9 @@
 #include "foundation/meta/reflection.h"
 
 int main(int argc, char** argv) {
+    // 0. Logging Init
+    logger_init("graphics.log");
+
     // 1. Config
     const char* assets_dir = "assets";
     const char* ui_path = "assets/ui/test_binding.yaml"; // New default
@@ -102,5 +105,6 @@ int main(int argc, char** argv) {
     math_graph_dispose(&graph);
     assets_shutdown(&assets);
 
+    logger_shutdown();
     return 0;
 }
