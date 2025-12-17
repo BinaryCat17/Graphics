@@ -189,18 +189,30 @@ void vk_create_font_texture(VulkanRendererState* state) {
 }
 
 void vk_create_descriptor_pool_and_set(VulkanRendererState* state) {
-    VkDescriptorPoolSize pool = { .type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, .descriptorCount = 1 };
-    VkDescriptorPoolCreateInfo dpci = { .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO, .maxSets = 1, .poolSizeCount = 1, .pPoolSizes = &pool };
+    VkDescriptorPoolSize pools[2] = {
+        { .type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, .descriptorCount = 2 }, // Reserve a bit more
+        { .type = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, .descriptorCount = 2 }
+    };
+    VkDescriptorPoolCreateInfo dpci = { .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO, .maxSets = 4, .poolSizeCount = 2, .pPoolSizes = pools };
     state->res = vkCreateDescriptorPool(state->device, &dpci, NULL, &state->descriptor_pool);
     if (state->res != VK_SUCCESS) fatal_vk("vkCreateDescriptorPool", state->res);
 
-    VkDescriptorSetAllocateInfo dsai = { .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO, .descriptorPool = state->descriptor_pool, .descriptorSetCount = 1, .pSetLayouts = &state->descriptor_layout };
-    state->res = vkAllocateDescriptorSets(state->device, &dsai, &state->descriptor_set);
-    if (state->res != VK_SUCCESS) fatal_vk("vkAllocateDescriptorSets", state->res);
+    // Set 0: Texture
+    VkDescriptorSetAllocateInfo dsai0 = { .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO, .descriptorPool = state->descriptor_pool, .descriptorSetCount = 1, .pSetLayouts = &state->descriptor_layout };
+    state->res = vkAllocateDescriptorSets(state->device, &dsai0, &state->descriptor_set);
+    if (state->res != VK_SUCCESS) fatal_vk("vkAllocateDescriptorSets (Set 0)", state->res);
 
     VkDescriptorImageInfo dii = { .sampler = state->font_sampler, .imageView = state->font_image_view, .imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL };
-    VkWriteDescriptorSet w = { .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET, .dstSet = state->descriptor_set, .dstBinding = 0, .descriptorCount = 1, .descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, .pImageInfo = &dii };
-    vkUpdateDescriptorSets(state->device, 1, &w, 0, NULL);
+    VkWriteDescriptorSet w0 = { .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET, .dstSet = state->descriptor_set, .dstBinding = 0, .descriptorCount = 1, .descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, .pImageInfo = &dii };
+    vkUpdateDescriptorSets(state->device, 1, &w0, 0, NULL);
+    
+    // Set 1: Instance Buffer
+    VkDescriptorSetAllocateInfo dsai1 = { .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO, .descriptorPool = state->descriptor_pool, .descriptorSetCount = 1, .pSetLayouts = &state->instance_layout };
+    state->res = vkAllocateDescriptorSets(state->device, &dsai1, &state->instance_set);
+    if (state->res != VK_SUCCESS) fatal_vk("vkAllocateDescriptorSets (Set 1)", state->res);
+    
+    // Note: Instance Buffer is not bound here because it's dynamic (resizable).
+    // It is bound in ensure_instance_buffer().
 }
 
 bool vk_upload_vertices(VulkanRendererState* state, FrameResources *frame) {
@@ -258,6 +270,7 @@ void vk_destroy_device_resources(VulkanRendererState* state) {
 
     if (state->descriptor_pool) { vkDestroyDescriptorPool(state->device, state->descriptor_pool, NULL); state->descriptor_pool = VK_NULL_HANDLE; }
     if (state->descriptor_layout) { vkDestroyDescriptorSetLayout(state->device, state->descriptor_layout, NULL); state->descriptor_layout = VK_NULL_HANDLE; }
+    if (state->instance_layout) { vkDestroyDescriptorSetLayout(state->device, state->instance_layout, NULL); state->instance_layout = VK_NULL_HANDLE; }
     if (state->font_sampler) { vkDestroySampler(state->device, state->font_sampler, NULL); state->font_sampler = VK_NULL_HANDLE; }
     if (state->font_image_view) { vkDestroyImageView(state->device, state->font_image_view, NULL); state->font_image_view = VK_NULL_HANDLE; }
     if (state->font_image) { vkDestroyImage(state->device, state->font_image, NULL); state->font_image = VK_NULL_HANDLE; }

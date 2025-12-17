@@ -3,20 +3,42 @@
 layout(location = 0) in vec3 inPosition;
 layout(location = 1) in vec2 inUV;
 
-layout(push_constant) uniform Push {
+struct GpuInstanceData {
     mat4 model;
+    vec4 color;
+    vec4 uv_rect;
+    vec4 params;
+};
+
+// Set 0: Texture (Sampler) - defined in fragment shader usually, but we need consistent layout
+// Let's assume Set 1 is Instances.
+// Actually, standard practice:
+// Set 0: Global (ViewProj) - we use PushConstant for this.
+// Set 1: Resources (Texture)
+// Set 2: Instances? 
+// To match current C code minimal changes:
+// Existing Set 0 is Texture. 
+// We will add Set 1 for Instances.
+
+layout(std140, set = 1, binding = 0) readonly buffer InstanceBuffer {
+    GpuInstanceData objects[];
+} instances;
+
+layout(push_constant) uniform Push {
     mat4 view_proj;
-    vec4 color; 
-    vec4 uv_rect; // xy=offset, zw=scale
-    vec4 params; // x = use_texture (1.0 = yes)
 } pc;
 
 layout(location = 0) out vec4 fragColor;
 layout(location = 1) out vec2 fragUV;
+layout(location = 2) out vec4 fragParams;
 
 void main() {
-    gl_Position = pc.view_proj * pc.model * vec4(inPosition, 1.0);
-    fragColor = pc.color;
-    // Transform UV: scale first, then offset
-    fragUV = inUV * pc.uv_rect.zw + pc.uv_rect.xy;
+    GpuInstanceData obj = instances.objects[gl_InstanceIndex];
+    
+    gl_Position = pc.view_proj * obj.model * vec4(inPosition, 1.0);
+    fragColor = obj.color;
+    fragParams = obj.params;
+    
+    // Transform UV
+    fragUV = inUV * obj.uv_rect.zw + obj.uv_rect.xy;
 }

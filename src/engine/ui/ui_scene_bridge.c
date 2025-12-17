@@ -38,7 +38,8 @@ static void traverse_ui(const UiView* view, Scene* scene, const Assets* assets) 
         RendererBackend* backend = renderer_backend_default();
         if (backend && backend->get_glyph) {
             float cursor_x = view->rect.x + 5.0f; // Padding
-            float cursor_y = view->rect.y + 5.0f; // Padding (Top alignment)
+            // Shift down by approximate ascent (24px for 32px font) to act as baseline
+            float cursor_y = view->rect.y + 24.0f; 
             
             // Center text for buttons
             if (view->def->type == UI_NODE_BUTTON) {

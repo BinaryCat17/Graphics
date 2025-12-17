@@ -8,6 +8,8 @@
 #include "engine/render/backend/vulkan/vk_resources.h"
 #include "engine/render/backend/vulkan/vk_utils.h"
 
+#include "foundation/logger/logger.h"
+
 #include "foundation/math/coordinate_systems.h"
 
 #include <stdlib.h>
@@ -146,16 +148,21 @@ static void draw_frame_scene(VulkanRendererState* state, const Scene* scene) {
         vkCmdBindDescriptorSets(cb, VK_PIPELINE_BIND_POINT_GRAPHICS, state->pipeline_layout, 0, 1, &state->descriptor_set, 0, NULL);
     }
     
+    // View Projection Matrix (Ortho for UI: Top-Left is 0,0)
     float w = (float)state->swapchain_extent.width;
     float h = (float)state->swapchain_extent.height;
-    Mat4 proj = mat4_orthographic(0, w, 0, h, -1.0f, 1.0f);
-    Mat4 view = mat4_identity(); 
+    // Fix Z-range: Map [-10, 10] world Z to [0, 1] Vulkan Z.
+    // Swapping near/far effectively inverts Z mapping so +Z objects become visible if they were mapping to negative.
+    Mat4 proj = mat4_orthographic(0, w, h, 0, 10.0f, -10.0f);
+    Mat4 view = mat4_identity(); // Camera at origin
     Mat4 view_proj = mat4_multiply(&proj, &view);
 
+    // Bind Vertex Buffer (Unit Quad)
     if (state->unit_quad_buffer) {
         VkDeviceSize offset = 0;
         vkCmdBindVertexBuffers(cb, 0, 1, &state->unit_quad_buffer, &offset);
         
+        // 4. Draw Scene Objects
         if (scene) {
             for (size_t i = 0; i < scene->object_count; ++i) {
                 SceneObject* obj = &scene->objects[i];
@@ -240,6 +247,9 @@ static void vk_backend_cleanup(RendererBackend* backend) {
     
     if (state->unit_quad_buffer) vkDestroyBuffer(state->device, state->unit_quad_buffer, NULL);
     if (state->unit_quad_memory) vkFreeMemory(state->device, state->unit_quad_memory, NULL);
+    
+    if (state->instance_buffer) vkDestroyBuffer(state->device, state->instance_buffer, NULL);
+    if (state->instance_memory) vkFreeMemory(state->device, state->instance_memory, NULL);
     
     vk_destroy_device_resources(state);
     if (state->device) vkDestroyDevice(state->device, NULL);

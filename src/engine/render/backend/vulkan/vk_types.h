@@ -99,6 +99,14 @@ typedef struct VulkanRendererState {
     VkBuffer unit_quad_buffer;
     VkDeviceMemory unit_quad_memory;
     
+    // Instancing
+    VkBuffer instance_buffer;
+    VkDeviceMemory instance_memory;
+    void* instance_mapped;
+    VkDescriptorSetLayout instance_layout;
+    VkDescriptorSet instance_set;
+    size_t instance_capacity; // In element count
+    
     // Font state
     unsigned char* ttf_buffer;
     stbtt_fontinfo fontinfo;
