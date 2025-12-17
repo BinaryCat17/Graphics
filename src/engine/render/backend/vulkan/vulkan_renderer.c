@@ -139,10 +139,14 @@ static bool recover_device_loss(VulkanRendererState* state) {
 }
 
 static void draw_frame_scene(VulkanRendererState* state, const Scene* scene) {
-    static uint64_t frame_count = 0;
-    frame_count++;
-    // Log frame 1 and then every 3000 frames (~10 sec at 300fps)
-    bool debug_frame = (frame_count == 1) || (frame_count % 3000 == 0);
+    static double last_log_time = -1.0; // Use -1.0 to ensure initial log
+    bool debug_frame = false;
+
+    double current_time = platform_get_time_ms();
+    if (last_log_time < 0 || (current_time - last_log_time) / 1000.0 >= 5.0) {
+        debug_frame = true;
+        last_log_time = current_time;
+    }
 
     if (state->swapchain == VK_NULL_HANDLE) return;
     
@@ -185,19 +189,19 @@ static void draw_frame_scene(VulkanRendererState* state, const Scene* scene) {
             data[i].params[1] = 0; data[i].params[2] = 0; data[i].params[3] = 0;
             
             // Log 1st object (Background) and 2nd object (First Letter)
-            if (debug_frame && frame_count < 5) {
+            if (debug_frame) {
                 if (i == 0) {
-                    LOG_INFO("[Frame %llu] Obj[0] (Bg): Pos(%.2f, %.2f) Scale(%.2f, %.2f) Tex(%.1f)",
-                        frame_count, obj->position.x, obj->position.y, obj->scale.x, obj->scale.y, obj->params.x);
+                    LOG_INFO("Obj[0] (Bg): Pos(%.2f, %.2f) Scale(%.2f, %.2f) Tex(%.1f)",
+                        obj->position.x, obj->position.y, obj->scale.x, obj->scale.y, obj->params.x);
                 } else if (i == 1) {
-                    LOG_INFO("[Frame %llu] Obj[1] (Txt): Pos(%.2f, %.2f) Scale(%.2f, %.2f) Tex(%.1f) UV(%.2f,%.2f,%.2f,%.2f)",
-                        frame_count, obj->position.x, obj->position.y, obj->scale.x, obj->scale.y, obj->params.x,
+                    LOG_INFO("Obj[1] (Txt): Pos(%.2f, %.2f) Scale(%.2f, %.2f) Tex(%.1f) UV(%.2f,%.2f,%.2f,%.2f)",
+                        obj->position.x, obj->position.y, obj->scale.x, obj->scale.y, obj->params.x,
                         obj->uv_rect.x, obj->uv_rect.y, obj->uv_rect.z, obj->uv_rect.w);
                 }
             }
         }
-    } else if (debug_frame && frame_count < 5) {
-        LOG_INFO("[Frame %llu] Scene is empty or NULL", frame_count);
+    } else if (debug_frame) {
+        LOG_INFO("Scene is empty or NULL");
     }
 
     VkCommandBuffer cb = state->cmdbuffers[img_idx];
@@ -241,9 +245,9 @@ static void draw_frame_scene(VulkanRendererState* state, const Scene* scene) {
     Mat4 view = mat4_identity(); 
     Mat4 view_proj = mat4_multiply(&proj, &view);
     
-    if (debug_frame && frame_count < 5) {
-        LOG_INFO("[Frame %llu] ViewProj: W=%.1f H=%.1f Proj[0]=%.4f Proj[5]=%.4f Proj[12]=%.4f Proj[13]=%.4f", 
-            frame_count, w, h, proj.m[0], proj.m[5], proj.m[12], proj.m[13]);
+    if (debug_frame) {
+        LOG_INFO("ViewProj: W=%.1f H=%.1f Proj[0]=%.4f Proj[5]=%.4f Proj[12]=%.4f Proj[13]=%.4f", 
+            w, h, proj.m[0], proj.m[5], proj.m[12], proj.m[13]);
     }
     
     UnifiedPushConstants pc;
@@ -257,8 +261,8 @@ static void draw_frame_scene(VulkanRendererState* state, const Scene* scene) {
         vkCmdBindVertexBuffers(cb, 0, 1, &state->unit_quad_buffer, &offset);
         
         // INSTANCED DRAW CALL
-        if (debug_frame && frame_count < 5) {
-            LOG_INFO("[Frame %llu] Issuing DrawInstanced: VertexCount=6, InstanceCount=%zu", frame_count, scene->object_count);
+        if (debug_frame) {
+            LOG_INFO("Issuing DrawInstanced: VertexCount=6, InstanceCount=%zu", scene->object_count);
         }
         vkCmdDraw(cb, 6, scene->object_count, 0, 0); 
     }

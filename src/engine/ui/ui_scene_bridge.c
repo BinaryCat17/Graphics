@@ -1,16 +1,14 @@
 #include "ui_scene_bridge.h"
+#include "ui_def.h"
 #include "ui_layout.h"
-#include "engine/render/backend/common/renderer_backend.h"
-#include <stddef.h>
-#include <string.h>
-
-#include "ui_scene_bridge.h"
-#include "ui_layout.h"
-#include "engine/render/backend/common/renderer_backend.h"
-#include <stddef.h>
-#include <string.h>
-
 #include "foundation/logger/logger.h"
+#include "foundation/math/coordinate_systems.h"
+#include "foundation/platform/platform.h"
+#include "engine/render/backend/common/renderer_backend.h" // For RendererBackend and RenderGlyph
+#include "engine/scene/scene_def.h"
+#include "engine/assets/assets_service.h"
+#include <string.h> // For memcpy
+#include <stdio.h> // For snprintf
 
 static void traverse_ui(const UiView* view, Scene* scene, const Assets* assets, bool debug_frame) {
     if (!view) return;
@@ -115,15 +113,21 @@ static void traverse_ui(const UiView* view, Scene* scene, const Assets* assets, 
     }
 }
 
+
 void ui_build_scene(const UiView* root, Scene* scene, const Assets* assets) {
     if (!root || !scene || !assets) return;
     
     // Layout Pass
     ui_layout_root((UiView*)root, 1280.0f, 720.0f); 
     
-    static uint64_t ui_frame = 0;
-    ui_frame++;
-    bool debug_frame = (ui_frame % 3000 == 0);
+    static double last_log_time = -1.0; // Use -1.0 to ensure initial log
+    bool debug_frame = false;
+
+    double current_time = platform_get_time_ms();
+    if (last_log_time < 0 || (current_time - last_log_time) / 1000.0 >= 5.0) {
+        debug_frame = true;
+        last_log_time = current_time;
+    }
     
     if (debug_frame) {
         LOG_INFO("UI Build Scene: %zu objects generated. Root Rect: %.1f, %.1f, %.1f, %.1f", 

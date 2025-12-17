@@ -155,7 +155,7 @@ set(ENGINE_UI_SOURCES
     "src/engine/ui/ui_scene_bridge.c")
 add_library(engine_ui STATIC ${ENGINE_UI_SOURCES})
 target_include_directories(engine_ui PUBLIC "src/" ${Stb_INCLUDE_DIR})
-target_link_libraries(engine_ui PUBLIC foundation_config engine_assets foundation_meta)
+target_link_libraries(engine_ui PUBLIC foundation_config engine_assets foundation_meta foundation_math)
 
 # Math Model
 set(DOMAIN_MATH_SOURCES
