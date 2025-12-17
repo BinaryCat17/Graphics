@@ -1,28 +1,39 @@
 # Current State: "Graphics" Engine
-**Version:** 0.2.0 (The Foundation)
+**Version:** 0.3.0 (The Reactive Engine)
 **Date:** December 17, 2025
 
 ## 1. Executive Summary
-The project has successfully transitioned from a prototype to a cohesive **Unified Visual Engine**. The core architectural distinction between "2D UI" and "3D World" has been abolished at the rendering level. Everything visible—from a button to a mathematical surface—is a `SceneObject`.
+The engine has evolved into a functional **Reactive Visual System**. It now possesses the "Voice" (Text Rendering) and the "Nervous System" (Event-based Reactivity), enabling dynamic UI construction. The "Muscle" (Instancing) has been upgraded to support massive object counts, paving the way for the compute shader integration.
 
-While the architectural skeleton is strong (Data-Oriented, Vulkan-backed), the engine is currently "silent" and "static". It lacks text rendering and interactivity, making it a powerful renderer of colored rectangles, but not yet a usable application.
+The project is now capable of rendering complex, data-driven interfaces (via the Repeater pattern) and massive visual simulations (via Hardware Instancing) within a unified pipeline.
 
-## 2. Technical Architecture (Existing)
+## 2. Technical Architecture (New & Updated)
 
 ### Core Systems
-*   **Unified Scene (`src/engine/scene`):** A flat, data-oriented array of `SceneObject` structs. This is the single source of truth for the renderer.
-*   **Vulkan Backend (`src/engine/render/backend/vulkan`):** A modern, decoupled renderer. It consumes the `Scene` snapshot and renders it in a single pass using a unified shader (`unified.vert/frag`).
-*   **Meta-System (`src/foundation/meta`):** A powerful reflection engine powered by `tools/codegen.py`. It parses C headers and generates memory layout descriptions (`MetaStruct`), enabling generic data manipulation.
-*   **UI Loader (`src/engine/ui`):** A YAML-based loader that instantiates `UiView` hierarchies. Currently, it relies on a "Push" model (updating the view every frame) rather than a reactive model.
+*   **Unified Scene (`src/engine/scene`):** Enhanced to support Text objects (via Font Atlas) and Massive Instanced objects (via GPU Storage Buffers).
+*   **Vulkan Backend (`src/engine/render/backend/vulkan`):**
+    *   **Dual-Path Rendering:** Seamlessly handles "Singles" (dynamic UI, mapped via uniform buffers) and "Massive" (static/compute geometry, via instance buffers).
+    *   **Cleanup:** Legacy `draw` calls and redundant helpers have been removed for a leaner implementation.
+*   **Text Rendering (`src/engine/text`, `src/engine/scene/text_renderer.c`):** A dedicated system that generates geometry from a Font Atlas (using `stb_truetype`) and integrates it into the Unified Scene.
+*   **Reactivity System (`src/foundation/event`):**
+    *   **Event Bus:** A lightweight Signal/Slot mechanism.
+    *   **Generated Accessors (`src/generated`):** The reflection system now generates `_set_property` functions that automatically emit events when data changes.
+    *   **UI Repeater:** The `UI_NODE_LIST` primitive now uses reflection to iterate over C arrays (`MathNode**`) and dynamically spawn UI views, listening for count changes.
 
 ### Domain Model
-*   **Math Graph (`src/domains/math_model`):** A basic directed graph structure exists in C. It is currently disconnected from the renderer and runs solely on the CPU.
+*   **Math Graph (`src/domains/math_model`):**
+    *   Reflected `MathNode` now includes visual properties (`x`, `y`) for the editor.
+    *   Integrated with the Event System for reactive updates.
 
-## 3. Critical Gaps
-1.  **Text Rendering (The Voice):** The system cannot render text. All UI widgets are blank. This is the top priority blocker.
-2.  **Reactivity (The Nervous System):** The UI does not "react" to data changes; it merely polls them or requires manual updates.
-3.  **GPU Compute (The Muscle):** Mathematical calculations happen on the CPU. There is no mechanism yet to offload massive number-crunching to Compute Shaders.
-4.  **Interactivity:** No mouse picking, drag-and-drop, or camera control.
+## 3. Accomplished Milestones (Phase 1 & 2)
+*   [x] **Text Rendering:** Fully implemented with signed distance fields/atlas support.
+*   [x] **Instancing:** Vulkan backend supports drawing 100k+ objects via `instance_buffer`.
+*   [x] **Reactivity:** `Observable` reflection tag triggers event emission.
+*   [x] **UI Repeater:** Data-driven list generation (The "Vue v-for" of C).
+*   [x] **Safety & Cleanup:** Codebase analyzed and refactored (Legacy code removal).
 
-## 4. Conclusion
-The foundation is solid A-grade C code. The project is ready for the "Brain Transplant": moving from static YAML interfaces to a dynamic, user-programmable environment.
+## 4. Immediate Next Steps (Phase 3)
+The focus shifts entirely to the **Visual Node Editor**:
+1.  **Canvas Interaction:** Implement dragging nodes (`x`, `y` binding).
+2.  **Connection Rendering:** Draw lines/curves between nodes (requires a new `Line` primitive or `UI_NODE_CUSTOM`).
+3.  **Graph Logic:** Connect the visual graph to the actual `MathGraph` evaluation logic.
