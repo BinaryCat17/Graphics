@@ -1,68 +1,70 @@
 # Graphics Engine Architecture
 
 ## Overview
-This project implements a high-performance, data-oriented graphics engine in C11. It is designed to be a foundation for visual applications, specifically node-based editors and compute visualization tools.
+This project implements a high-performance, data-oriented graphics engine in C11. It follows a strict **Foundation -> Engine -> Features -> App** hierarchy. 
 
-The architecture follows a strict layered approach (Foundation -> Engine -> Features -> App), although current implementation details show significant coupling that is being actively refactored.
+The architecture has recently undergone significant refactoring to decouple the generic runtime from specific application logic (like the Graph Editor).
 
 ## System Layers
 
 ### 1. Foundation (`src/foundation/`)
-The bedrock of the system. Has **zero dependencies** on other layers.
-- **Platform:** Abstraction for OS windows, input, and file system (wrapping GLFW).
-- **Memory:** Custom memory allocators (Arenas, Pools) to avoid fragmentation and `malloc` overhead.
+The bedrock of the system. Zero dependencies on other layers.
+- **Platform:** Generic abstraction for OS windows, input, and graphics context creation.
+    - *Recent Change:* Uses opaque handles (`void*`) to abstract specific graphics APIs (Vulkan/OpenGL) from the public interface.
+- **Memory:** 
+    - **MemoryArena:** Linear allocator for high-performance, fragmentation-free memory management. Used by the Transpiler.
+    - **Buffer:** Dynamic array implementation.
 - **Logger:** Thread-safe, leveled logging system.
-- **Math:** Linear algebra (vec3, mat4), geometry, and coordinate systems.
-- **Meta:** A reflection system enabling runtime introspection of C structs, critical for the UI and Serialization systems.
+- **Math:** Linear algebra (vec3, mat4) and geometry.
+- **Meta:** Reflection system enabling runtime introspection of C structs.
 
 ### 2. Engine (`src/engine/`)
 The core runtime. Depends only on **Foundation**.
-- **Graphics:** A render graph based renderer.
+- **Core:** The `Engine` struct is now a generic container. It holds systems (Window, Renderer, Assets) but *not* domain data.
+    - *Inversion of Control:* The Engine invokes application-provided callbacks (`on_init`, `on_update`) to drive logic.
+- **Graphics:** A render-graph based renderer.
     - *Frontend:* `RenderSystem`, `RenderPacket`, `Scene` (Generic).
-    - *Backend:* `RendererBackend` interface (currently Vulkan implementation).
+    - *Backend:* `RendererBackend` interface (Vulkan implementation). Now strictly separated from platform details.
 - **UI:** A reactive, data-driven UI framework ("The Dual Repeater" pattern).
-    - Uses YAML templates (`ui_loader`) and Reflection to bind directly to C-structs.
-    - *Layout:* Flexbox-like layout engine.
-- **Assets:** Resource management for fonts, shaders, and textures.
+- **Assets:** Resource management.
 
 ### 3. Features (`src/features/`)
-Specific business logic modules. Should operate as plugins.
-- **Graph Editor:** A mathematical node graph model, transpiler (to GLSL), and interaction logic.
+Specific business logic modules.
+- **Graph Editor:** A mathematical node graph model and Transpiler (GLSL generation).
+    - *Optimization:* Transpiler now uses `MemoryArena` for string generation, eliminating heap fragmentation.
 
 ### 4. Application (`src/app/`)
-The entry point.
-- **Main:** Configures the engine, loads specific features, and runs the loop.
+The concrete implementation of a product.
+- **Main:** Defines the `AppState`, initializes specific features (like the Graph Editor), and binds them to the Engine via callbacks.
 
 ---
 
 ## Key Architectural Patterns
 
 ### The "Unified Scene"
-Unlike traditional engines that separate UI and 3D rendering, this engine uses a single **Unified Scene**.
-- **Primitives:** UI Panels, Text, and Graph Wires are all `SceneObject`s.
-- **Rendering:** A single "Uber-Shader" (`unified.frag`) handles rendering based on the `type` field (Quad, SDF Curve, etc.).
-- **Benefit:** Massive batching efficiency. The UI is just 3D geometry.
+The engine renders everything as 3D primitives.
+- **Primitives:** UI Panels, Text, and Wires are all `SceneObject`s.
+- **Rendering:** A single "Uber-Shader" handles rendering based on the `type` field.
 
 ### Reactive UI (MVVM)
-The UI does not store state. It reflects the application state.
-1.  **Model:** C Structs (e.g., `MathNode`).
+The UI does not store state. It reflects the application state via Reflection.
+1.  **Model:** C Structs (e.g., `MathNode` in AppState).
 2.  **ViewDefinition:** YAML file describing the hierarchy.
-3.  **ViewModel:** The Reflection system binds the YAML paths (`node.x`) to memory addresses.
-4.  **Layout:** Calculated every frame based on the Model.
+3.  **ViewModel:** The Reflection system binds YAML paths to memory addresses.
 
-### Transpilation Pipeline
-The engine includes a runtime compiler:
-1.  **Graph Data:** User connects nodes (Math, Logic).
-2.  **Transpiler:** Converts the graph topology into GLSL Compute Shader source code.
-3.  **JIT:** The Vulkan backend invokes `glslc` to compile SPIR-V at runtime and dispatches the compute job.
+### Application Lifecycle (Callbacks)
+The Engine is agnostic to the application data.
+1.  `main.c` fills `EngineConfig` with `on_init` and `on_update`.
+2.  `Engine` initializes low-level systems.
+3.  `Engine` calls `on_init`. App allocates its state (`AppState`) and stores it in `engine->user_data`.
+4.  Loop: `Engine` calls `on_update`. App updates its graph/UI and requests rendering.
 
 ---
 
-## Current Architecture vs. Ideal State
+## Current Architecture Status
 
-| Aspect | Current Reality | Ideal Target |
+| Aspect | Status | Notes |
 | :--- | :--- | :--- |
-| **Coupling** | `Engine` hardcodes `GraphEditor` headers. | `Engine` is generic; `App` plugs Feature into Engine. |
-| **Rendering** | `RenderSystem` calls `ui_build_scene`. | `SceneBuilder` (External) feeds both UI and 3D into Renderer. |
-| **Backend** | `RendererBackend` interface leaks Vulkan types. | Strict opaque handles (`BackendHandle`). |
-| **Memory** | Mixed usage of `malloc` and `Arena`. | 100% Arena/Pool usage for frame data. |
+| **Coupling** | **Low** | Engine is generic. App injects logic. |
+| **Renderer Abstraction** | **Medium** | Interface uses `void*`, but backend implementation is still Vulkan-only. |
+| **Memory** | **Hybrid** | Moving towards Arenas (Transpiler done), but generic Logic still uses `malloc`. |
