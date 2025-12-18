@@ -135,18 +135,11 @@ static bool vulkan_renderer_init(RendererBackend* backend, const RenderBackendIn
     state->frag_spv = init->frag_spv;
     state->font_path = init->font_path;
     
-    // Callbacks
-    state->get_required_instance_extensions = (bool (*)(const char***, uint32_t*))init->get_required_extensions;
-    state->create_surface = (bool (*)(PlatformWindow*, VkInstance, const VkAllocationCallbacks*, PlatformSurface*))init->create_surface;
-    state->destroy_surface = (void (*)(VkInstance, const VkAllocationCallbacks*, PlatformSurface*))init->destroy_surface;
-    state->get_framebuffer_size = init->get_framebuffer_size;
-    state->wait_events = init->wait_events;
-
     // 1. Instance
     vk_create_instance(state);
     
     // 2. Surface
-    if (!state->create_surface(state->window, state->instance, NULL, state->platform_surface)) {
+    if (!platform_create_surface(state->window, state->instance, NULL, state->platform_surface)) {
         LOG_FATAL("Failed to create surface");
         return false;
     }
@@ -496,7 +489,7 @@ static void vulkan_renderer_cleanup(RendererBackend* backend) {
         vk_destroy_device_resources(state);
         
         if (state->surface) {
-            state->destroy_surface(state->instance, NULL, state->platform_surface);
+            platform_destroy_surface(state->instance, NULL, state->platform_surface);
         }
         vkDestroyInstance(state->instance, NULL);
         free(state);

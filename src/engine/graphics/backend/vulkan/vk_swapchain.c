@@ -112,17 +112,13 @@ void vk_create_swapchain_and_views(VulkanRendererState* state, VkSwapchainKHR ol
     state->swapchain_format = chosen_fmt.format;
     free(fmts);
 
-    PlatformWindowSize fb_size = state->get_framebuffer_size ? state->get_framebuffer_size(state->window) : (PlatformWindowSize){0};
+    PlatformWindowSize fb_size = platform_get_framebuffer_size(state->window);
     int w = fb_size.width;
     int h = fb_size.height;
     while (w == 0 || h == 0) {
-        if (state->wait_events) {
-            state->wait_events();
-        } else {
-            platform_wait_events();
-        }
+        platform_wait_events();
         if (platform_window_should_close(state->window)) return;
-        fb_size = state->get_framebuffer_size ? state->get_framebuffer_size(state->window) : (PlatformWindowSize){0};
+        fb_size = platform_get_framebuffer_size(state->window);
         w = fb_size.width;
         h = fb_size.height;
     }

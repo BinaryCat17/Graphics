@@ -129,10 +129,6 @@ typedef struct UiElement {
     Rect rect;            // Computed layout relative to parent
     Rect screen_rect;     // Computed screen space (for hit testing)
     
-    // Cached Bindings (to detect changes)
-    char cached_text[64];
-    float cached_value;
-    
     // Interaction
     bool is_hovered;
     bool is_active;       // Pressed

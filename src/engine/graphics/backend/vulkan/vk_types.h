@@ -105,13 +105,6 @@ typedef struct VulkanRendererState {
     VkDescriptorSetLayout compute_write_layout;
     int compute_width;
     int compute_height;
-
-    bool (*get_required_instance_extensions)(const char*** names, uint32_t* count);
-    bool (*create_surface)(PlatformWindow* window, VkInstance instance, const VkAllocationCallbacks* alloc,
-                           PlatformSurface* out_surface);
-    void (*destroy_surface)(VkInstance instance, const VkAllocationCallbacks* alloc, PlatformSurface* surface);
-    PlatformWindowSize (*get_framebuffer_size)(PlatformWindow* window);
-    void (*wait_events)(void);
 } VulkanRendererState;
 
 #endif // VK_TYPES_H

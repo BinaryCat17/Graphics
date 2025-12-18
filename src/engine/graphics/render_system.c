@@ -117,12 +117,6 @@ static void try_bootstrap_renderer(RenderSystem* sys) {
     RenderBackendInit init = {
         .window = sys->window,
         .surface = &surface, // Pass pointer to empty surface struct, backend/platform fills it
-        .get_required_extensions = platform_get_required_extensions,
-        .create_surface = platform_create_surface,
-        .destroy_surface = platform_destroy_surface,
-        .get_framebuffer_size = platform_get_framebuffer_size,
-        .wait_events = platform_wait_events,
-        .poll_events = platform_poll_events,
         .vert_spv = sys->assets->ui_default_vert_spv,
         .frag_spv = sys->assets->ui_default_frag_spv,
         .font_path = sys->assets->font_path,

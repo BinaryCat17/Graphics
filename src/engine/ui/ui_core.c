@@ -84,22 +84,6 @@ UiElement* ui_element_create(UiInstance* instance, const UiNodeSpec* spec, void*
 void ui_element_update(UiElement* element) {
     if (!element || !element->spec) return;
     
-    // 1. Resolve Text Binding
-    if (element->spec->text_source && element->data_ptr && element->meta) {
-        // Find field
-        const MetaField* field = meta_find_field(element->meta, element->spec->text_source);
-        if (field) {
-            char buffer[64];
-            ui_bind_read_string(element->data_ptr, field, buffer, sizeof(buffer));
-            
-            // Update cache if changed
-            if (strcmp(element->cached_text, buffer) != 0) {
-                strncpy(element->cached_text, buffer, sizeof(element->cached_text) - 1);
-                element->cached_text[sizeof(element->cached_text) - 1] = '\0';
-            }
-        }
-    }
-
     // 2. Resolve Geometry Bindings (X/Y)
     if (element->data_ptr && element->meta) {
         if (element->spec->x_source) {

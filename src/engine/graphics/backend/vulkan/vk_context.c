@@ -36,7 +36,7 @@ void vk_create_instance(VulkanRendererState* state) {
     /* request platform extensions */
     uint32_t extc = 0; 
     const char** exts = NULL;
-    if (!state->get_required_instance_extensions || !state->get_required_instance_extensions(&exts, &extc)) {
+    if (!platform_get_required_extensions(&exts, &extc)) {
         LOG_FATAL("Failed to query platform Vulkan extensions");
     }
     ici.enabledExtensionCount = extc; 
@@ -111,8 +111,8 @@ void vk_pick_physical_and_create_device(VulkanRendererState* state) {
 }
 
 void vk_recreate_instance_and_surface(VulkanRendererState* state) {
-    if (state->platform_surface && state->destroy_surface && state->instance) {
-        state->destroy_surface(state->instance, NULL, state->platform_surface);
+    if (state->platform_surface && state->instance) {
+        platform_destroy_surface(state->instance, NULL, state->platform_surface);
     } else if (state->surface && state->instance) {
         vkDestroySurfaceKHR(state->instance, state->surface, NULL);
     }
@@ -124,8 +124,8 @@ void vk_recreate_instance_and_surface(VulkanRendererState* state) {
 
     vk_create_instance(state);
     
-    if (!state->create_surface || !state->platform_surface ||
-        !state->create_surface(state->window, state->instance, NULL, state->platform_surface)) {
+    if (!state->platform_surface ||
+        !platform_create_surface(state->window, state->instance, NULL, state->platform_surface)) {
         LOG_FATAL("Failed to recreate platform surface");
     }
     state->surface = (VkSurfaceKHR)(state->platform_surface ? state->platform_surface->handle : NULL);

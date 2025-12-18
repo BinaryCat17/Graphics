@@ -8,10 +8,10 @@
 
 typedef struct {
     int indent;
-    SimpleYamlNode *node;
+    ConfigNode *node;
 } SimpleYamlContext;
 
-static void set_error(SimpleYamlError *err, int line, int column, const char *msg)
+static void set_error(ConfigError *err, int line, int column, const char *msg)
 {
     if (!err) return;
     err->line = line;
@@ -30,20 +30,20 @@ static char *dup_range(const char *begin, const char *end)
     return out;
 }
 
-static SimpleYamlNode *yaml_node_new(SimpleYamlNodeType type, int line)
+static ConfigNode *yaml_node_new(ConfigNodeType type, int line)
 {
-    SimpleYamlNode *n = (SimpleYamlNode *)calloc(1, sizeof(SimpleYamlNode));
+    ConfigNode *n = (ConfigNode *)calloc(1, sizeof(ConfigNode));
     if (!n) return NULL;
     n->type = type;
     n->line = line;
     return n;
 }
 
-static int yaml_pair_append(SimpleYamlNode *map, const char *key, SimpleYamlNode *value)
+static int yaml_pair_append(ConfigNode *map, const char *key, ConfigNode *value)
 {
     if (map->pair_count + 1 > map->pair_capacity) {
         size_t new_cap = map->pair_capacity == 0 ? 4 : map->pair_capacity * 2;
-        SimpleYamlPair *expanded = (SimpleYamlPair *)realloc(map->pairs, new_cap * sizeof(SimpleYamlPair));
+        ConfigPair *expanded = (ConfigPair *)realloc(map->pairs, new_cap * sizeof(ConfigPair));
         if (!expanded) return 0;
         map->pairs = expanded;
         map->pair_capacity = new_cap;
@@ -54,11 +54,11 @@ static int yaml_pair_append(SimpleYamlNode *map, const char *key, SimpleYamlNode
     return 1;
 }
 
-static int yaml_sequence_append(SimpleYamlNode *seq, SimpleYamlNode *value)
+static int yaml_sequence_append(ConfigNode *seq, ConfigNode *value)
 {
     if (seq->item_count + 1 > seq->item_capacity) {
         size_t new_cap = seq->item_capacity == 0 ? 4 : seq->item_capacity * 2;
-        SimpleYamlNode **expanded = (SimpleYamlNode **)realloc(seq->items, new_cap * sizeof(SimpleYamlNode *));
+        ConfigNode **expanded = (ConfigNode **)realloc(seq->items, new_cap * sizeof(ConfigNode *));
         if (!expanded) return 0;
         seq->items = expanded;
         seq->item_capacity = new_cap;
@@ -93,9 +93,9 @@ static int parse_scalar_value(const char *raw, char **out_value)
     return *out_value != NULL;
 }
 
-int simple_yaml_parse(const char *text, SimpleYamlNode **out_root, SimpleYamlError *err)
+int simple_yaml_parse(const char *text, ConfigNode **out_root, ConfigError *err)
 {
-    SimpleYamlNode *root = yaml_node_new(SIMPLE_YAML_MAP, 1);
+    ConfigNode *root = yaml_node_new(CONFIG_NODE_MAP, 1);
     if (!root) return 0;
 
     SimpleYamlContext stack[128];
@@ -110,7 +110,7 @@ int simple_yaml_parse(const char *text, SimpleYamlNode **out_root, SimpleYamlErr
         size_t line_len = (size_t)(cursor - line_start);
         char *line = (char *)malloc(line_len + 1);
         if (!line) {
-            simple_yaml_free(root);
+            config_node_free(root);
             return 0;
         }
         memcpy(line, line_start, line_len);
@@ -143,35 +143,35 @@ int simple_yaml_parse(const char *text, SimpleYamlNode **out_root, SimpleYamlErr
         }
         if (depth == 0) {
             free(line);
-            simple_yaml_free(root);
+            config_node_free(root);
             set_error(err, line_number, 1, "Invalid indentation");
             return 0;
         }
 
-        SimpleYamlNode *parent = stack[depth - 1].node;
-        if (parent->type == SIMPLE_YAML_UNKNOWN) {
-            parent->type = (*p == '-') ? SIMPLE_YAML_SEQUENCE : SIMPLE_YAML_MAP;
+        ConfigNode *parent = stack[depth - 1].node;
+        if (parent->type == CONFIG_NODE_UNKNOWN) {
+            parent->type = (*p == '-') ? CONFIG_NODE_SEQUENCE : CONFIG_NODE_MAP;
         }
 
         if (*p == '-') {
             p = trim_left(p + 1);
-            if (parent->type != SIMPLE_YAML_SEQUENCE) {
-                simple_yaml_free(root);
+            if (parent->type != CONFIG_NODE_SEQUENCE) {
+                config_node_free(root);
                 free(line);
                 set_error(err, line_number, indent + 1, "Sequence item in non-sequence");
                 return 0;
             }
 
-            SimpleYamlNode *item = yaml_node_new(SIMPLE_YAML_UNKNOWN, line_number);
+            ConfigNode *item = yaml_node_new(CONFIG_NODE_UNKNOWN, line_number);
             if (!item || !yaml_sequence_append(parent, item)) {
                 free(line);
-                simple_yaml_free(root);
+                config_node_free(root);
                 return 0;
             }
 
             char *colon = strchr(p, ':');
             if (colon) {
-                item->type = SIMPLE_YAML_MAP;
+                item->type = CONFIG_NODE_MAP;
                 const char *key_start = p;
                 const char *key_end = colon;
                 while (key_end > key_start && isspace((unsigned char)*(key_end - 1))) --key_end;
@@ -181,29 +181,29 @@ int simple_yaml_parse(const char *text, SimpleYamlNode **out_root, SimpleYamlErr
                 if (*value_start) {
                     if (!parse_scalar_value(value_start, &value_text)) {
                         free(line);
-                        simple_yaml_free(root);
+                        config_node_free(root);
                         return 0;
                     }
-                    SimpleYamlNode *scalar_node = yaml_node_new(SIMPLE_YAML_SCALAR, line_number);
+                    ConfigNode *scalar_node = yaml_node_new(CONFIG_NODE_SCALAR, line_number);
                     scalar_node->scalar = value_text;
                     yaml_pair_append(item, key, scalar_node);
                     free(key);
                 } else {
-                    yaml_pair_append(item, key, yaml_node_new(SIMPLE_YAML_UNKNOWN, line_number));
+                    yaml_pair_append(item, key, yaml_node_new(CONFIG_NODE_UNKNOWN, line_number));
                     free(key);
                 }
             } else if (*p) {
                 char *value_text = NULL;
                 if (parse_scalar_value(p, &value_text)) {
-                    item->type = SIMPLE_YAML_SCALAR;
+                    item->type = CONFIG_NODE_SCALAR;
                     item->scalar = value_text;
                 }
             }
 
             stack[depth++] = (SimpleYamlContext){indent, item};
         } else {
-            if (parent->type != SIMPLE_YAML_MAP) {
-                simple_yaml_free(root);
+            if (parent->type != CONFIG_NODE_MAP) {
+                config_node_free(root);
                 free(line);
                 set_error(err, line_number, indent + 1, "Mapping entry in non-map");
                 return 0;
@@ -211,7 +211,7 @@ int simple_yaml_parse(const char *text, SimpleYamlNode **out_root, SimpleYamlErr
 
             char *colon = strchr(p, ':');
             if (!colon) {
-                simple_yaml_free(root);
+                config_node_free(root);
                 free(line);
                 set_error(err, line_number, indent + 1, "Missing ':' in mapping entry");
                 return 0;
@@ -227,15 +227,15 @@ int simple_yaml_parse(const char *text, SimpleYamlNode **out_root, SimpleYamlErr
                 if (!parse_scalar_value(value_start, &value_text)) {
                     free(line);
                     free(key);
-                    simple_yaml_free(root);
+                    config_node_free(root);
                     return 0;
                 }
-                SimpleYamlNode *scalar = yaml_node_new(SIMPLE_YAML_SCALAR, line_number);
+                ConfigNode *scalar = yaml_node_new(CONFIG_NODE_SCALAR, line_number);
                 scalar->scalar = value_text;
                 yaml_pair_append(parent, key, scalar);
                 stack[depth++] = (SimpleYamlContext){indent, scalar};
             } else {
-                SimpleYamlNode *child = yaml_node_new(SIMPLE_YAML_UNKNOWN, line_number);
+                ConfigNode *child = yaml_node_new(CONFIG_NODE_UNKNOWN, line_number);
                 yaml_pair_append(parent, key, child);
                 stack[depth++] = (SimpleYamlContext){indent, child};
             }
@@ -248,32 +248,32 @@ int simple_yaml_parse(const char *text, SimpleYamlNode **out_root, SimpleYamlErr
     return 1;
 }
 
-const SimpleYamlNode *simple_yaml_map_get(const SimpleYamlNode *map, const char *key)
+const ConfigNode *config_node_map_get(const ConfigNode *map, const char *key)
 {
-    if (!map || map->type != SIMPLE_YAML_MAP) return NULL;
+    if (!map || map->type != CONFIG_NODE_MAP) return NULL;
     for (size_t i = 0; i < map->pair_count; ++i) {
         if (map->pairs[i].key && strcmp(map->pairs[i].key, key) == 0) return map->pairs[i].value;
     }
     return NULL;
 }
 
-void simple_yaml_free(SimpleYamlNode *node)
+void config_node_free(ConfigNode *node)
 {
     if (!node) return;
     free(node->scalar);
     for (size_t i = 0; i < node->pair_count; ++i) {
         free(node->pairs[i].key);
-        simple_yaml_free(node->pairs[i].value);
+        config_node_free(node->pairs[i].value);
     }
     free(node->pairs);
     for (size_t i = 0; i < node->item_count; ++i) {
-        simple_yaml_free(node->items[i]);
+        config_node_free(node->items[i]);
     }
     free(node->items);
     free(node);
 }
 
-static int emit_scalar_json(const SimpleYamlNode *node, char **out)
+static int emit_scalar_json(const ConfigNode *node, char **out)
 {
     if (!node || !node->scalar) return 0;
     const char *s = node->scalar;
@@ -296,13 +296,13 @@ static int emit_scalar_json(const SimpleYamlNode *node, char **out)
     return 1;
 }
 
-static int emit_json_internal(const SimpleYamlNode *node, char **out)
+static int emit_json_internal(const ConfigNode *node, char **out)
 {
     if (!node) return 0;
-    if (node->type == SIMPLE_YAML_SCALAR) {
+    if (node->type == CONFIG_NODE_SCALAR) {
         return emit_scalar_json(node, out);
     }
-    if (node->type == SIMPLE_YAML_SEQUENCE) {
+    if (node->type == CONFIG_NODE_SEQUENCE) {
         size_t total = 2; // []
         char **children = (char **)calloc(node->item_count, sizeof(char *));
         if (!children) return 0;
@@ -325,7 +325,7 @@ static int emit_json_internal(const SimpleYamlNode *node, char **out)
         *out = buf;
         return 1;
     }
-    if (node->type == SIMPLE_YAML_MAP || node->type == SIMPLE_YAML_UNKNOWN) {
+    if (node->type == CONFIG_NODE_MAP || node->type == CONFIG_NODE_UNKNOWN) {
         size_t total = 2; // {}
         char **pairs = (char **)calloc(node->pair_count, sizeof(char *));
         if (!pairs) return 0;
@@ -362,7 +362,7 @@ static int emit_json_internal(const SimpleYamlNode *node, char **out)
     return 0;
 }
 
-int simple_yaml_emit_json(const SimpleYamlNode *node, char **out_json)
+int config_node_emit_json(const ConfigNode *node, char **out_json)
 {
     return emit_json_internal(node, out_json);
 }

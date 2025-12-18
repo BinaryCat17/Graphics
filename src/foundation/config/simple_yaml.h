@@ -2,40 +2,46 @@
 
 #include <stddef.h>
 
-typedef enum SimpleYamlNodeType {
-    SIMPLE_YAML_UNKNOWN,
-    SIMPLE_YAML_SCALAR,
-    SIMPLE_YAML_MAP,
-    SIMPLE_YAML_SEQUENCE,
-} SimpleYamlNodeType;
+typedef enum ConfigNodeType {
+    CONFIG_NODE_UNKNOWN,
+    CONFIG_NODE_SCALAR,
+    CONFIG_NODE_MAP,
+    CONFIG_NODE_SEQUENCE,
+} ConfigNodeType;
 
-typedef struct SimpleYamlNode SimpleYamlNode;
+typedef struct ConfigNode ConfigNode;
 
-typedef struct SimpleYamlPair {
+typedef struct ConfigPair {
     char *key;
-    SimpleYamlNode *value;
-} SimpleYamlPair;
+    ConfigNode *value;
+} ConfigPair;
 
-typedef struct SimpleYamlNode {
-    SimpleYamlNodeType type;
+typedef struct ConfigNode {
+    ConfigNodeType type;
     int line;
     char *scalar;
-    SimpleYamlPair *pairs;
+    ConfigPair *pairs;
     size_t pair_count;
     size_t pair_capacity;
-    SimpleYamlNode **items;
+    ConfigNode **items;
     size_t item_count;
     size_t item_capacity;
-} SimpleYamlNode;
+} ConfigNode;
 
-typedef struct SimpleYamlError {
+typedef struct ConfigError {
     int line;
     int column;
     char message[128];
-} SimpleYamlError;
+} ConfigError;
 
-int simple_yaml_parse(const char *text, SimpleYamlNode **out_root, SimpleYamlError *err);
-const SimpleYamlNode *simple_yaml_map_get(const SimpleYamlNode *map, const char *key);
-void simple_yaml_free(SimpleYamlNode *node);
-int simple_yaml_emit_json(const SimpleYamlNode *node, char **out_json);
+// Parser specifically for YAML, but produces a generic ConfigNode tree
+int simple_yaml_parse(const char *text, ConfigNode **out_root, ConfigError *err);
+
+// Generic tree traversal
+const ConfigNode *config_node_map_get(const ConfigNode *map, const char *key);
+
+void config_node_free(ConfigNode *node);
+
+// Utility
+int config_node_emit_json(const ConfigNode *node, char **out_json);
 

@@ -47,8 +47,8 @@ static UiKind parse_kind(const char* type_str, uint32_t* out_flags) {
 
 // --- Recursive Loader ---
 
-static UiNodeSpec* load_recursive(UiAsset* asset, const SimpleYamlNode* node) {
-    if (!node || node->type != SIMPLE_YAML_MAP) return NULL;
+static UiNodeSpec* load_recursive(UiAsset* asset, const ConfigNode* node) {
+    if (!node || node->type != CONFIG_NODE_MAP) return NULL;
 
     // Allocate Spec from Asset's Arena
     UiNodeSpec* spec = ui_asset_push_node(asset);
@@ -68,7 +68,7 @@ static UiNodeSpec* load_recursive(UiAsset* asset, const SimpleYamlNode* node) {
     // Iterate all pairs in the YAML map
     for (size_t i = 0; i < node->pair_count; ++i) {
         const char* key = node->pairs[i].key;
-        const SimpleYamlNode* val = node->pairs[i].value;
+        const ConfigNode* val = node->pairs[i].value;
         if (!key || !val) continue;
 
         // --- Special Handling for Recursion / Templates ---
@@ -79,7 +79,7 @@ static UiNodeSpec* load_recursive(UiAsset* asset, const SimpleYamlNode* node) {
         }
         
         if (strcmp(key, "children") == 0) {
-            if (val->type == SIMPLE_YAML_SEQUENCE) {
+            if (val->type == CONFIG_NODE_SEQUENCE) {
                 spec->child_count = val->item_count;
                 spec->children = (UiNodeSpec**)arena_alloc_zero(&asset->arena, spec->child_count * sizeof(UiNodeSpec*));
                 for (size_t k = 0; k < spec->child_count; ++k) {
@@ -93,7 +93,7 @@ static UiNodeSpec* load_recursive(UiAsset* asset, const SimpleYamlNode* node) {
             continue;
         }
         if (strcmp(key, "color") == 0) {
-            if (val->type == SIMPLE_YAML_SEQUENCE && val->item_count >= 3) {
+            if (val->type == CONFIG_NODE_SEQUENCE && val->item_count >= 3) {
                  float r = val->items[0]->scalar ? (float)atof(val->items[0]->scalar) : 1.0f;
                  float g = val->items[1]->scalar ? (float)atof(val->items[1]->scalar) : 1.0f;
                  float b = val->items[2]->scalar ? (float)atof(val->items[2]->scalar) : 1.0f;
@@ -176,8 +176,8 @@ UiAsset* ui_parser_load_from_file(const char* path) {
         return NULL;
     }
 
-    SimpleYamlNode* root = NULL;
-    SimpleYamlError err = {0};
+    ConfigNode* root = NULL;
+    ConfigError err = {0};
     if (!simple_yaml_parse(text, &root, &err)) {
         LOG_ERROR("UiParser: YAML Parse error in %s (line %d, col %d): %s", path, err.line, err.column, err.message);
         free(text);
@@ -187,14 +187,14 @@ UiAsset* ui_parser_load_from_file(const char* path) {
     // Create Asset (Owner)
     UiAsset* asset = ui_asset_create(64 * 1024);
     if (!asset) {
-        simple_yaml_free(root);
+        config_node_free(root);
         free(text);
         return NULL;
     }
 
     asset->root = load_recursive(asset, root);
     
-    simple_yaml_free(root);
+    config_node_free(root);
     free(text);
     return asset;
 }

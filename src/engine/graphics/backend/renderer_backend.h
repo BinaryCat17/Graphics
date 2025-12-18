@@ -12,16 +12,6 @@ typedef struct RenderBackendInit {
     PlatformWindow* window;
     PlatformSurface* surface;
     
-    // Platform-specific Vulkan helpers (can be NULL for other backends)
-    bool (*get_required_extensions)(const char*** names, uint32_t* count);
-    bool (*create_surface)(PlatformWindow* window, void* instance, void* allocator, PlatformSurface* out_surface);
-    void (*destroy_surface)(void* instance, void* allocator, PlatformSurface* surface);
-    PlatformWindowSize (*get_framebuffer_size)(PlatformWindow* window);
-    
-    // Core Events
-    void (*wait_events)(void);
-    void (*poll_events)(void);
-    
     // Resources
     const char* vert_spv;
     const char* frag_spv;
