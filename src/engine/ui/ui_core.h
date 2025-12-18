@@ -56,44 +56,41 @@ typedef struct InputState {
 
 typedef struct UiNodeSpec {
     // 1. Identity & Behavior
-    char* id;
-    UiKind kind;
-    UiLayoutStrategy layout;
-    uint32_t flags;
+    char* id;               // REFLECT
+    UiKind kind;            // REFLECT
+    UiLayoutStrategy layout;// REFLECT
+    uint32_t flags;         // REFLECT
     
     // 3. Styling (Reference to style sheet, not implemented yet)
-    char* style_name; 
-    Vec4 color;       // Base color / tint
+    char* style_name;       // REFLECT
+    Vec4 color;             // REFLECT
     
     // 9-Slice Sizing (if kind == UI_KIND_CONTAINER and texture is used)
-    float border_l, border_t, border_r, border_b;
-    float tex_w, tex_h;
-    char* texture_path; // If NULL, use flat color
+    float border_l, border_t, border_r, border_b; // REFLECT
+    float tex_w, tex_h;     // REFLECT
+    char* texture_path;     // REFLECT
     
     // 4. Data Bindings (Sources)
-    // "text_source" -> binds content (Label text, Image path)
-    // "value_source" -> binds logic state (Checkbox bool, Slider float)
-    // "data_source"  -> binds context (List items, Sub-tree scope)
-    char* text_source;  
-    char* value_source; 
-    char* data_source;  
+    char* text_source;      // REFLECT
+    char* value_source;     // REFLECT
+    char* data_source;      // REFLECT
     
     // 4. Geometry Bindings (For CANVAS layout or manual overrides)
-    char* x_source;
-    char* y_source;
-    char* w_source;
-    char* h_source;
+    char* x_source;         // REFLECT
+    char* y_source;         // REFLECT
+    char* w_source;         // REFLECT
+    char* h_source;         // REFLECT
 
     // 5. Properties (Static defaults)
-    char* static_text;
-    float width, height; // < 0 means Auto/Fill
-    float padding;
-    float spacing;
+    char* static_text;      // REFLECT
+    float width, height;    // REFLECT
+    float padding;          // REFLECT
+    float spacing;          // REFLECT
 
     // 6. Hierarchy
-    struct UiNodeSpec* item_template; // For Lists
-    struct UiNodeSpec** children;
-    size_t child_count;
+    struct UiNodeSpec* item_template; // REFLECT
+    struct UiNodeSpec** children;     // REFLECT
+    size_t child_count;               // REFLECT
     
 } UiNodeSpec;
 

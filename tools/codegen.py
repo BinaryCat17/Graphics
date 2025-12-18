@@ -14,7 +14,10 @@ TYPE_MAP = {
     'char*': 'META_TYPE_STRING',
     'bool': 'META_TYPE_BOOL',
     'size_t': 'META_TYPE_INT',
-    'MathNodeType': 'META_TYPE_INT', # Enums as ints for now
+    'uint32_t': 'META_TYPE_INT',
+    'MathNodeType': 'META_TYPE_INT',
+    'UiKind': 'META_TYPE_INT',
+    'UiLayoutStrategy': 'META_TYPE_INT',
 }
 
 def parse_header(file_path):

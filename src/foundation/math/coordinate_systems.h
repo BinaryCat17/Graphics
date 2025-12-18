@@ -18,10 +18,10 @@ typedef struct Vec3 {
 } Vec3;
 
 typedef struct Vec4 {
-    float x;
-    float y;
-    float z;
-    float w;
+    float x; // REFLECT
+    float y; // REFLECT
+    float z; // REFLECT
+    float w; // REFLECT
 } Vec4;
 
 typedef struct Quat {
