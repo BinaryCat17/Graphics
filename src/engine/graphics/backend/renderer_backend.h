@@ -73,6 +73,9 @@ typedef struct RendererBackend {
     
     void (*update_viewport)(struct RendererBackend* backend, int width, int height);
     void (*cleanup)(struct RendererBackend* backend);
+
+    // Screenshot
+    void (*request_screenshot)(struct RendererBackend* backend, const char* filepath);
     
     // Compute (Prototype)
     float (*run_compute)(struct RendererBackend* backend, const char* glsl_source);

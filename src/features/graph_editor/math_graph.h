@@ -48,6 +48,8 @@ typedef struct MathGraph {
     VisualWire** wires; // REFLECT
     int wire_count;    // REFLECT
     
+    char* graph_name; // REFLECT
+    
     VisualWire* _wire_pool; // Internal storage
 } MathGraph;
 

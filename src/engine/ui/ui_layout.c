@@ -47,18 +47,42 @@ static void layout_recursive(UiElement* el, Rect available, uint64_t frame_numbe
         }
     }
 
-    if (h < 0) h = 30.0f; 
-    
-    // Auto height for container
-    if (spec->height < 0 && el->child_count > 0 && spec->layout == UI_LAYOUT_FLEX_COLUMN) {
-        h = spec->padding * 2;
-        for (size_t i = 0; i < el->child_count; ++i) {
-            float child_h = el->children[i]->spec->height;
-            if (child_h < 0) child_h = 30.0f; // Simplified
-            h += child_h;
-            h += spec->spacing;
+    // Auto-height / Fill logic
+    if (h < 0) {
+        // If we are in a column, -1 usually means "fit content" (auto) because we can't fill infinite scroll.
+        // But if we have specific "available" height passed from parent (like fixed height parent), we could fill.
+        // Current simplified logic:
+        // If Container and Column: Auto grow.
+        // If Container and Row or Canvas: Fill available?
+        // Let's rely on "available" if it's not a huge number (infinite).
+        
+        if (el->child_count > 0 && spec->layout == UI_LAYOUT_FLEX_COLUMN) {
+            // Calculate from children later
+            h = spec->padding * 2;
+             for (size_t i = 0; i < el->child_count; ++i) {
+                float child_h = el->children[i]->spec->height;
+                if (child_h < 0) child_h = 30.0f; // Approx for now
+                h += child_h;
+                h += spec->spacing;
+            }
+            if (el->child_count > 0) h -= spec->spacing;
+            
+            // If calculated height is small but we want to fill (e.g. root), take available
+            if (available.h > 0 && available.h < 10000.0f && h < available.h) {
+                // Only fill if we are the only child or explicity asked?
+                // For 'root' (width=-1, height=-1), we expect fill.
+                // Let's say if h < available.h and we are 'root' or similar, we take available.
+                // Simple heuristic: take max.
+                h = available.h;
+            }
+        } else {
+            // Default fill
+             if (available.h > 0 && available.h < 10000.0f) {
+                 h = available.h;
+             } else {
+                 h = 30.0f; 
+             }
         }
-        if (el->child_count > 0) h -= spec->spacing;
     }
 
     // 2. Position (Relative to Parent Content Area)

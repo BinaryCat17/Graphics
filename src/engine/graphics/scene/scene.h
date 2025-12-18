@@ -51,8 +51,9 @@ typedef struct SceneObject {
     // Visuals
     const Mesh* mesh; 
     Vec4 color; 
-    Vec4 uv_rect; // Texture Subset (xy=off, zw=scale) OR Curve Points (xy=P0, zw=P3)
-    Vec4 params;  // Shader params: x = use_texture, z = thickness
+    Vec4 uv_rect; // Texture Subset (xy=off, zw=scale)
+    Vec4 params;  // Shader params: x = type, y = prim_type, z/w = varies
+    Vec4 extra;   // Additional data: 9-slice borders or curve points
     Vec4 clip_rect; // Clipping bounds (x,y,w,h). 0,0,0,0 means no clipping.
     
     // Instancing (Data-Driven Visualization)

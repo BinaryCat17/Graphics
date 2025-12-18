@@ -24,8 +24,11 @@ layout(location = 0) out vec4 fragColor;
 layout(location = 1) out vec2 fragUV;
 layout(location = 2) out vec4 fragParams;
 layout(location = 3) out vec4 fragExtra;
-layout(location = 4) out vec4 fragClipRect;
+layout(location = 4) out flat vec4 fragClipRect; // Must be flat
 layout(location = 5) out vec3 fragWorldPos;
+layout(location = 6) out vec2 fragOrigUV;
+layout(location = 7) out vec4 fragUVRect;
+layout(location = 8) out vec2 fragTargetSize;
 
 void main() {
     GpuInstanceData obj = instances.objects[gl_InstanceIndex];
@@ -38,6 +41,14 @@ void main() {
     fragExtra = obj.extra;
     fragClipRect = obj.clip_rect;
     fragWorldPos = worldPos.xyz;
+    fragOrigUV = inUV;
+    fragUVRect = obj.uv_rect;
+    
+    // Extract scale from model matrix for 9-slice target size
+    fragTargetSize = vec2(
+        length(vec3(obj.model[0][0], obj.model[0][1], obj.model[0][2])),
+        length(vec3(obj.model[1][0], obj.model[1][1], obj.model[1][2]))
+    );
     
     // Transform UV
     fragUV = inUV * obj.uv_rect.zw + obj.uv_rect.xy;

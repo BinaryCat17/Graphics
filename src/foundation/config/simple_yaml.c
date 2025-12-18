@@ -192,6 +192,12 @@ int simple_yaml_parse(const char *text, SimpleYamlNode **out_root, SimpleYamlErr
                     yaml_pair_append(item, key, yaml_node_new(SIMPLE_YAML_UNKNOWN, line_number));
                     free(key);
                 }
+            } else if (*p) {
+                char *value_text = NULL;
+                if (parse_scalar_value(p, &value_text)) {
+                    item->type = SIMPLE_YAML_SCALAR;
+                    item->scalar = value_text;
+                }
             }
 
             stack[depth++] = (SimpleYamlContext){indent, item};

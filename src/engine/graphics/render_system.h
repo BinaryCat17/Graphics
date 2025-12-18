@@ -59,6 +59,9 @@ void render_system_update(RenderSystem* sys);
 // Shuts down the system
 void render_system_shutdown(RenderSystem* sys);
 
+// Request a screenshot to be saved to the specified path
+void render_system_request_screenshot(RenderSystem* sys, const char* filepath);
+
 const RenderFramePacket* render_system_acquire_packet(RenderSystem* sys);
 
 #endif // RENDER_SYSTEM_H

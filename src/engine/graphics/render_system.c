@@ -34,6 +34,29 @@ static void try_sync_packet(RenderSystem* sys) {
     
     dest->scene.frame_number = sys->frame_count;
 
+    // Setup Camera (Ortho)
+    PlatformWindowSize size = platform_get_framebuffer_size(sys->window);
+    float w = (float)size.width;
+    float h = (float)size.height;
+    if (w < 1.0f) w = 1.0f;
+    if (h < 1.0f) h = 1.0f;
+
+    // View: Identity (Camera at 0,0)
+    dest->scene.camera.view_matrix = mat4_identity();
+    
+    // Proj: Ortho 0..w, 0..h. 
+    // Vulkan Clip: Y is down (-1 Top, +1 Bottom).
+    // We want y=0 (Top) -> -1.
+    // We want y=h (Bottom) -> +1.
+    // mat4_orthographic(left, right, bottom, top, ...)
+    // m[5] = 2/(top-bottom). m[13] = -(top+bottom)/(top-bottom).
+    // If bottom=0, top=h: m[5]=2/h, m[13]=-1.
+    // y=0 -> -1. y=h -> 1. Correct.
+    
+    Mat4 proj = mat4_orthographic(0.0f, w, 0.0f, h, -100.0f, 100.0f);
+    
+    dest->scene.camera.view_matrix = proj; 
+
     // 2. Generate UI Scene (if bound)
     if (sys->ui_root_view) {
         ui_renderer_build_scene(sys->ui_root_view, &dest->scene, sys->assets);
@@ -52,7 +75,7 @@ static void try_sync_packet(RenderSystem* sys) {
     }
 
     // DEBUG: Add Hello World Text
-    scene_add_text(&dest->scene, "Hello Graphics Engine", (Vec3){100.0f, 100.0f, 0.0f}, 1.0f, (Vec4){1.0f, 1.0f, 1.0f, 1.0f});
+    // scene_add_text(&dest->scene, "Hello Graphics Engine", (Vec3){100.0f, 100.0f, 0.0f}, 1.0f, (Vec4){1.0f, 1.0f, 1.0f, 1.0f});
 
     sys->packet_ready = true;
     mtx_unlock(&sys->packet_mutex);
@@ -165,6 +188,11 @@ void render_system_bind_ui(RenderSystem* sys, UiElement* root_view) {
 void render_system_update(RenderSystem* sys) {
     if (!sys || !sys->renderer_ready) return;
     try_sync_packet(sys);
+}
+
+void render_system_request_screenshot(RenderSystem* sys, const char* filepath) {
+    if (!sys || !sys->backend || !sys->backend->request_screenshot) return;
+    sys->backend->request_screenshot(sys->backend, filepath);
 }
 
 #define KEY_C 67

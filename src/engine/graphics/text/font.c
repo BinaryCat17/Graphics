@@ -14,6 +14,13 @@ static struct {
     bool initialized;
 } g_font_state;
 
+static float smoothstep(float edge0, float edge1, float x) {
+    float t = (x - edge0) / (edge1 - edge0);
+    if (t < 0.0f) t = 0.0f;
+    if (t > 1.0f) t = 1.0f;
+    return t * t * (3.0f - 2.0f * t);
+}
+
 bool font_init(const char* font_path) {
     if (g_font_state.initialized) return true;
     if (!font_path) {
@@ -56,6 +63,39 @@ bool font_init(const char* font_path) {
 
     g_font_state.atlas.font_scale = stbtt_ScaleForPixelHeight(&g_font_state.fontinfo, 32.0f);
     
+    // Reserve space for white pixel at (0,0) and UI rect at (2,0)
+    // We will start glyphs at y=32 to be safe
+    for (int i = 0; i < 4; ++i) {
+        for (int j = 0; j < 4; ++j) {
+            g_font_state.atlas.pixels[i * g_font_state.atlas.width + j] = 255;
+        }
+    }
+    
+    // Generate a simple 9-slice rounded rect (32x32)
+    int ui_x = 8, ui_y = 0, ui_sz = 32;
+    for (int j = 0; j < ui_sz; ++j) {
+        for (int i = 0; i < ui_sz; ++i) {
+            float dx = (float)i - (ui_sz-1)*0.5f;
+            float dy = (float)j - (ui_sz-1)*0.5f;
+            float d = sqrtf(dx*dx + dy*dy);
+            float radius = (ui_sz-1)*0.5f - 2.0f;
+            
+            // Outer shape
+            float alpha = 1.0f - smoothstep(radius, radius + 1.0f, d);
+            
+            // Border (2px)
+            float inner = radius - 2.0f;
+            float border = smoothstep(inner, inner + 1.0f, d);
+            
+            unsigned char val = (unsigned char)(alpha * 255);
+            // We want it to be a bit thicker at borders for visibility
+            if (d > inner) val = (unsigned char)(alpha * 255); 
+            else val = (unsigned char)(alpha * 180); // Lighter center
+            
+            g_font_state.atlas.pixels[(ui_y + j) * g_font_state.atlas.width + (ui_x + i)] = val;
+        }
+    }
+
     int raw_ascent = 0, raw_descent = 0;
     stbtt_GetFontVMetrics(&g_font_state.fontinfo, &raw_ascent, &raw_descent, NULL);
     g_font_state.atlas.ascent = (int)roundf(raw_ascent * g_font_state.atlas.font_scale);
@@ -64,7 +104,7 @@ bool font_init(const char* font_path) {
     int ranges[][2] = { {32, 126}, {0x0400, 0x04FF} }; // ASCII + Cyrillic
     int range_count = (int)(sizeof(ranges) / sizeof(ranges[0]));
 
-    int x = 0, y = 0, rowh = 0;
+    int x = 0, y = 40, rowh = 0; // Start below UI placeholders
     int glyph_count = 0;
     
     for (int r = 0; r < range_count; r++) {
@@ -162,4 +202,16 @@ float font_measure_text(const char* text) {
         ptr++;
     }
     return width;
+}
+
+void font_get_white_pixel_uv(float* u, float* v) {
+    if (u) *u = 1.0f / (float)g_font_state.atlas.width;
+    if (v) *v = 1.0f / (float)g_font_state.atlas.height;
+}
+
+void font_get_ui_rect_uv(float* u0, float* v0, float* u1, float* v1) {
+    if (u0) *u0 = 8.0f / (float)g_font_state.atlas.width;
+    if (v0) *v0 = 0.0f / (float)g_font_state.atlas.height;
+    if (u1) *u1 = (8.0f + 32.0f) / (float)g_font_state.atlas.width;
+    if (v1) *v1 = 32.0f / (float)g_font_state.atlas.height;
 }

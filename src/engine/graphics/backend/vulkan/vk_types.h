@@ -86,6 +86,10 @@ typedef struct VulkanRendererState {
     CoordinateSystem2D transformer;
     RenderLogger* logger;
     
+    // Screenshot State
+    bool screenshot_pending;
+    char screenshot_path[256];
+
     // Unified Resources
     VkBuffer unit_quad_buffer;
     VkDeviceMemory unit_quad_memory;

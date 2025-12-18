@@ -10,6 +10,8 @@ typedef struct PlatformWindowCallbacks {
     PlatformFramebufferSizeCallback framebuffer_size;
     PlatformScrollCallback scroll;
     PlatformMouseButtonCallback mouse_button;
+    PlatformKeyCallback key;
+    PlatformCharCallback character;
     PlatformCursorPosCallback cursor_pos;
     void* user_data;
 } PlatformWindowCallbacks;
@@ -41,6 +43,19 @@ static void on_glfw_mouse_button(GLFWwindow* window, int button, int action, int
     if (!platform_window || !platform_window->callbacks.mouse_button) return;
     platform_window->callbacks.mouse_button(platform_window, (PlatformMouseButton)button, (PlatformInputAction)action, mods,
                                            platform_window->callbacks.user_data);
+}
+
+static void on_glfw_key(GLFWwindow* window, int key, int scancode, int action, int mods) {
+    PlatformWindow* platform_window = (PlatformWindow*)glfwGetWindowUserPointer(window);
+    if (!platform_window || !platform_window->callbacks.key) return;
+    platform_window->callbacks.key(platform_window, key, scancode, (PlatformInputAction)action, mods,
+                                    platform_window->callbacks.user_data);
+}
+
+static void on_glfw_char(GLFWwindow* window, unsigned int codepoint) {
+    PlatformWindow* platform_window = (PlatformWindow*)glfwGetWindowUserPointer(window);
+    if (!platform_window || !platform_window->callbacks.character) return;
+    platform_window->callbacks.character(platform_window, codepoint, platform_window->callbacks.user_data);
 }
 
 static void on_glfw_cursor_pos(GLFWwindow* window, double x, double y) {
@@ -78,6 +93,8 @@ PlatformWindow* platform_create_window(int width, int height, const char* title)
     glfwSetFramebufferSizeCallback(window->handle, on_glfw_framebuffer_size);
     glfwSetScrollCallback(window->handle, on_glfw_scroll);
     glfwSetMouseButtonCallback(window->handle, on_glfw_mouse_button);
+    glfwSetKeyCallback(window->handle, on_glfw_key);
+    glfwSetCharCallback(window->handle, on_glfw_char);
     glfwSetCursorPosCallback(window->handle, on_glfw_cursor_pos);
     return window;
 }
@@ -149,6 +166,18 @@ void platform_set_scroll_callback(PlatformWindow* window, PlatformScrollCallback
 void platform_set_mouse_button_callback(PlatformWindow* window, PlatformMouseButtonCallback callback, void* user_data) {
     if (!window) return;
     window->callbacks.mouse_button = callback;
+    window->callbacks.user_data = user_data;
+}
+
+void platform_set_key_callback(PlatformWindow* window, PlatformKeyCallback callback, void* user_data) {
+    if (!window) return;
+    window->callbacks.key = callback;
+    window->callbacks.user_data = user_data;
+}
+
+void platform_set_char_callback(PlatformWindow* window, PlatformCharCallback callback, void* user_data) {
+    if (!window) return;
+    window->callbacks.character = callback;
     window->callbacks.user_data = user_data;
 }
 

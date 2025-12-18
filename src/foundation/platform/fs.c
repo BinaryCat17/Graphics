@@ -172,3 +172,25 @@ void platform_dir_close(PlatformDir* dir) {
     free(dir->base_path);
     free(dir);
 }
+
+bool platform_mkdir(const char* path) {
+    if (!path) return false;
+#ifdef _WIN32
+    return CreateDirectoryA(path, NULL) != 0 || GetLastError() == ERROR_ALREADY_EXISTS;
+#else
+    struct stat st = {0};
+    if (stat(path, &st) == -1) {
+        return mkdir(path, 0700) == 0;
+    }
+    return S_ISDIR(st.st_mode);
+#endif
+}
+
+bool platform_remove_file(const char* path) {
+    if (!path) return false;
+#ifdef _WIN32
+    return DeleteFileA(path) != 0;
+#else
+    return unlink(path) == 0;
+#endif
+}

@@ -35,6 +35,8 @@ typedef enum PlatformInputAction {
 
 typedef void (*PlatformMouseButtonCallback)(PlatformWindow* window, PlatformMouseButton button, PlatformInputAction action,
                                             int mods, void* user_data);
+typedef void (*PlatformKeyCallback)(PlatformWindow* window, int key, int scancode, PlatformInputAction action, int mods, void* user_data);
+typedef void (*PlatformCharCallback)(PlatformWindow* window, unsigned int codepoint, void* user_data);
 typedef void (*PlatformScrollCallback)(PlatformWindow* window, double xoff, double yoff, void* user_data);
 typedef void (*PlatformCursorPosCallback)(PlatformWindow* window, double x, double y, void* user_data);
 typedef void (*PlatformFramebufferSizeCallback)(PlatformWindow* window, int width, int height, void* user_data);
@@ -62,6 +64,8 @@ void platform_set_framebuffer_size_callback(PlatformWindow* window, PlatformFram
 void platform_set_scroll_callback(PlatformWindow* window, PlatformScrollCallback callback, void* user_data);
 void platform_set_mouse_button_callback(PlatformWindow* window, PlatformMouseButtonCallback callback,
                                         void* user_data);
+void platform_set_key_callback(PlatformWindow* window, PlatformKeyCallback callback, void* user_data);
+void platform_set_char_callback(PlatformWindow* window, PlatformCharCallback callback, void* user_data);
 void platform_set_cursor_pos_callback(PlatformWindow* window, PlatformCursorPosCallback callback, void* user_data);
 
 bool platform_window_should_close(PlatformWindow* window);

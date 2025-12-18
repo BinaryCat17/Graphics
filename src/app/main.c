@@ -30,6 +30,8 @@ typedef struct AppState {
 static void app_setup_graph(AppState* app) {
     LOG_INFO("App: Setting up default Math Graph...");
     
+    app->graph.graph_name = strdup("My Awesome Graph");
+    
     // Create Test Nodes (Visualizer Graph)
     MathNode* uv = math_graph_add_node(&app->graph, MATH_NODE_UV);
     uv->name = strdup("UV.x");
@@ -172,7 +174,9 @@ int main(int argc, char** argv) {
             else if (strcmp(level_str, "error") == 0) config.log_level = LOG_LEVEL_ERROR;
             else if (strcmp(level_str, "fatal") == 0) config.log_level = LOG_LEVEL_FATAL;
         } else if (strcmp(argv[i], "--log-interval") == 0 && i + 1 < argc) {
-             logger_set_trace_interval(atof(argv[++i]));
+             float interval = atof(argv[++i]);
+             logger_set_trace_interval(interval);
+             config.screenshot_interval = (double)interval;
         }
     }
 

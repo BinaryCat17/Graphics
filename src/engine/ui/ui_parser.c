@@ -32,6 +32,11 @@ static UiKind parse_kind(const char* type_str, uint32_t* out_flags) {
         return UI_KIND_CONTAINER; // A button is just a clickable container usually
     }
     
+    if (strcmp(type_str, "text_input") == 0 || strcmp(type_str, "textfield") == 0 || strcmp(type_str, "input") == 0) {
+        *out_flags |= UI_FLAG_CLICKABLE | UI_FLAG_FOCUSABLE | UI_FLAG_EDITABLE;
+        return UI_KIND_TEXT_INPUT;
+    }
+    
     if (strcmp(type_str, "checkbox") == 0) {
         *out_flags |= UI_FLAG_CLICKABLE;
         return UI_KIND_ICON; // TODO: Needs specific rendering logic
@@ -91,6 +96,29 @@ static UiNodeSpec* load_recursive(UiAsset* asset, const void* node_ptr) {
     spec->height = parse_float(config_node_get_scalar(node, "height"), -1.0f);
     spec->padding = parse_float(config_node_get_scalar(node, "padding"), 0.0f);
     spec->spacing = parse_float(config_node_get_scalar(node, "spacing"), 0.0f);
+
+    // 9-Slice & Styling
+    spec->border_l = parse_float(config_node_get_scalar(node, "border_l"), 0.0f);
+    spec->border_t = parse_float(config_node_get_scalar(node, "border_t"), 0.0f);
+    spec->border_r = parse_float(config_node_get_scalar(node, "border_r"), 0.0f);
+    spec->border_b = parse_float(config_node_get_scalar(node, "border_b"), 0.0f);
+    spec->tex_w = parse_float(config_node_get_scalar(node, "tex_w"), 0.0f);
+    spec->tex_h = parse_float(config_node_get_scalar(node, "tex_h"), 0.0f);
+    
+    const ConfigNode* tex_path = config_node_get_scalar(node, "texture");
+    if (tex_path) spec->texture_path = arena_push_string(&asset->arena, tex_path->scalar);
+    
+    const ConfigNode* color_node = config_node_get_sequence(node, "color");
+    if (color_node && color_node->item_count >= 3) {
+        float r = (color_node->items[0] && color_node->items[0]->scalar) ? (float)atof(color_node->items[0]->scalar) : 1.0f;
+        float g = (color_node->items[1] && color_node->items[1]->scalar) ? (float)atof(color_node->items[1]->scalar) : 1.0f;
+        float b = (color_node->items[2] && color_node->items[2]->scalar) ? (float)atof(color_node->items[2]->scalar) : 1.0f;
+        float a = 1.0f;
+        if (color_node->item_count > 3 && color_node->items[3] && color_node->items[3]->scalar) {
+            a = (float)atof(color_node->items[3]->scalar);
+        }
+        spec->color = (Vec4){r, g, b, a};
+    }
 
     // 4. Data Bindings
     const ConfigNode* text = config_node_get_scalar(node, "text");

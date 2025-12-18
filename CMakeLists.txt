@@ -163,7 +163,7 @@ set(ENGINE_UI_SOURCES
     src/engine/ui/ui_renderer.c)
 add_library(engine_ui STATIC ${ENGINE_UI_SOURCES})
 target_include_directories(engine_ui PUBLIC "src/" ${Stb_INCLUDE_DIR})
-target_link_libraries(engine_ui PUBLIC foundation_config engine_assets foundation_meta foundation_math)
+target_link_libraries(engine_ui PUBLIC foundation_config engine_assets foundation_meta foundation_math engine_graphics)
 
 # --- FEATURES LAYER ---
 

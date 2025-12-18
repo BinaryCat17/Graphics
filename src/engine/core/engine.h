@@ -15,6 +15,7 @@ typedef struct EngineConfig {
     const char* assets_path;
     const char* ui_path;
     int log_level;
+    double screenshot_interval;
 
     // Application Callbacks
     void (*on_init)(Engine* engine);
@@ -36,6 +37,8 @@ struct Engine {
     // State
     bool running;
     bool show_compute_visualizer;
+    double screenshot_interval;
+    double last_screenshot_time;
     
     // Callbacks
     void (*on_update)(Engine* engine);

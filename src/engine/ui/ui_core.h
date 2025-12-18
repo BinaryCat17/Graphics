@@ -5,6 +5,7 @@
 #include <stdint.h>
 #include "foundation/meta/reflection.h"
 #include "foundation/memory/arena.h"
+#include "foundation/math/coordinate_systems.h"
 
 // --- CONSTANTS & FLAGS ---
 
@@ -22,7 +23,8 @@ typedef enum UiFlags {
     UI_FLAG_SCROLLABLE  = 1 << 2,
     UI_FLAG_FOCUSABLE   = 1 << 3,
     UI_FLAG_HIDDEN      = 1 << 4,
-    UI_FLAG_CLIPPED     = 1 << 5  // Masks children outside bounds
+    UI_FLAG_CLIPPED     = 1 << 5, // Masks children outside bounds
+    UI_FLAG_EDITABLE    = 1 << 6  // Supports text input
 } UiFlags;
 
 // "Kind" helps the renderer choose a default visual style, 
@@ -30,6 +32,7 @@ typedef enum UiFlags {
 typedef enum UiKind {
     UI_KIND_CONTAINER, // Generic Rect
     UI_KIND_TEXT,      // Renders text
+    UI_KIND_TEXT_INPUT, // Text Field
     UI_KIND_ICON,      // Renders an image/icon
     UI_KIND_CUSTOM     // Custom render callback (e.g. Curves)
 } UiKind;
@@ -41,6 +44,11 @@ typedef struct InputState {
     bool mouse_down;
     bool mouse_clicked;
     float scroll_dx, scroll_dy;
+    
+    // Keyboard
+    uint32_t last_char; // Unicode codepoint
+    int last_key;       // Platform key code
+    int last_action;    // Press/Release/Repeat
 } InputState;
 
 // --- UI SPECIFICATION (The DNA) ---
@@ -53,10 +61,16 @@ typedef struct UiNodeSpec {
     UiLayoutStrategy layout;
     uint32_t flags;
     
-    // 2. Styling (Reference to style sheet, not implemented yet)
+    // 3. Styling (Reference to style sheet, not implemented yet)
     char* style_name; 
+    Vec4 color;       // Base color / tint
     
-    // 3. Data Bindings (Sources)
+    // 9-Slice Sizing (if kind == UI_KIND_CONTAINER and texture is used)
+    float border_l, border_t, border_r, border_b;
+    float tex_w, tex_h;
+    char* texture_path; // If NULL, use flat color
+    
+    // 4. Data Bindings (Sources)
     // "text_source" -> binds content (Label text, Image path)
     // "value_source" -> binds logic state (Checkbox bool, Slider float)
     // "data_source"  -> binds context (List items, Sub-tree scope)
@@ -128,7 +142,11 @@ typedef struct UiElement {
     
     // Interaction
     bool is_hovered;
-    bool is_active;       // Pressed / Focused
+    bool is_active;       // Pressed
+    bool is_focused;      // Keyboard focus
+    
+    int cursor_idx;       // Text Input Cursor
+    int selection_len;    // Text Input Selection
     
     // Scrolling State (Internal or Bound)
     float scroll_x;

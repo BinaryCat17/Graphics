@@ -40,4 +40,8 @@ bool font_get_glyph(uint32_t codepoint, Glyph* out_glyph);
 // Measure the width of a text string.
 float font_measure_text(const char* text);
 
+// Special UVs
+void font_get_white_pixel_uv(float* u, float* v);
+void font_get_ui_rect_uv(float* u0, float* v0, float* u1, float* v1);
+
 #endif // FONT_H

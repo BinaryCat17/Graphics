@@ -89,19 +89,106 @@ void ui_input_update(UiInputContext* ctx, UiElement* root, const InputState* inp
         }
     }
 
-    // 2. Mouse Press (Activation)
-    if (input->mouse_clicked && ctx->hovered) {
-        // Only interactive elements can be active?
-        // Let's allow clicking anything for now, but focus flags matter.
-        ctx->active = ctx->hovered;
-        ctx->possible_drag = true;
-        ctx->drag_start_mouse_x = input->mouse_x;
-        ctx->drag_start_mouse_y = input->mouse_y;
-        
-        // Capture initial element state
-        if (ctx->active->spec->flags & UI_FLAG_SCROLLABLE) {
-             ctx->drag_start_elem_x = ctx->active->scroll_x;
-             ctx->drag_start_elem_y = ctx->active->scroll_y;
+    // 2. Mouse Press (Activation & Focus)
+    if (input->mouse_clicked) {
+        if (ctx->hovered) {
+            ctx->active = ctx->hovered;
+            ctx->possible_drag = true;
+            ctx->drag_start_mouse_x = input->mouse_x;
+            ctx->drag_start_mouse_y = input->mouse_y;
+            
+            // Capture initial element state
+            if (ctx->active->spec->flags & UI_FLAG_SCROLLABLE) {
+                 ctx->drag_start_elem_x = ctx->active->scroll_x;
+                 ctx->drag_start_elem_y = ctx->active->scroll_y;
+            }
+
+            // Update Focus
+            if (ctx->hovered->spec->flags & UI_FLAG_FOCUSABLE) {
+                if (ctx->focused && ctx->focused != ctx->hovered) {
+                    ctx->focused->is_focused = false;
+                }
+                ctx->focused = ctx->hovered;
+                ctx->focused->is_focused = true;
+            } else {
+                if (ctx->focused) {
+                    ctx->focused->is_focused = false;
+                }
+                ctx->focused = NULL;
+            }
+        } else {
+            // Clicked empty space
+            if (ctx->focused) {
+                ctx->focused->is_focused = false;
+            }
+            ctx->focused = NULL;
+        }
+    }
+    
+    // Update is_active (Pressed state)
+    if (ctx->active) {
+        ctx->active->is_active = true;
+    }
+
+    // 2.5 Keyboard Events (Routed to Focused Element)
+    if (ctx->focused) {
+        UiElement* el = ctx->focused;
+        // Text Input Logic
+        if ((el->spec->flags & UI_FLAG_EDITABLE) && el->spec->kind == UI_KIND_TEXT_INPUT) {
+            
+            // 1. Typing (Printable chars)
+            if (input->last_char >= 32 && input->last_char <= 126) {
+                if (el->data_ptr && el->meta && el->spec->text_source) {
+                    const MetaField* field = meta_find_field(el->meta, el->spec->text_source);
+                    if (field && field->type == META_TYPE_STRING) {
+                         const char* current = meta_get_string(el->data_ptr, field);
+                         char buf[256];
+                         if (current) {
+                             strncpy(buf, current, 255);
+                             buf[255] = '\0';
+                         } else {
+                             buf[0] = '\0';
+                         }
+                         
+                         size_t len = strlen(buf);
+                         if (len < 255) {
+                             // Insert at cursor or append? For now, append/insert at end.
+                             // TODO: Insert at cursor_idx
+                             buf[len] = (char)input->last_char;
+                             buf[len+1] = '\0';
+                             meta_set_string(el->data_ptr, field, buf);
+                             
+                             el->cursor_idx++;
+                             // Update cached text immediately for responsiveness
+                             // (Assuming ui_element_update re-reads it next frame)
+                         }
+                    }
+                }
+            }
+            
+            // 2. Backspace (Key 259 is GLFW_KEY_BACKSPACE)
+            if (input->last_key == 259 && input->last_action != 0) { // Press or Repeat
+                if (el->data_ptr && el->meta && el->spec->text_source) {
+                    const MetaField* field = meta_find_field(el->meta, el->spec->text_source);
+                    if (field && field->type == META_TYPE_STRING) {
+                         const char* current = meta_get_string(el->data_ptr, field);
+                         if (current) {
+                             size_t len = strlen(current);
+                             if (len > 0) {
+                                 char buf[256];
+                                 strncpy(buf, current, 255);
+                                 buf[255] = '\0';
+                                 
+                                 // Remove last char
+                                 buf[len-1] = '\0';
+                                 
+                                 meta_set_string(el->data_ptr, field, buf);
+                                 if (el->cursor_idx > 0) el->cursor_idx--;
+                             }
+                         }
+                    }
+                }
+            }
         }
     }
 
@@ -109,6 +196,7 @@ void ui_input_update(UiInputContext* ctx, UiElement* root, const InputState* inp
     if (!input->mouse_down) {
         if (ctx->active) {
             // Click Event could fire here if we stayed on same element
+            ctx->active->is_active = false;
             ctx->active = NULL;
         }
         ctx->is_dragging = false;

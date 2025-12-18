@@ -14,4 +14,7 @@ PlatformDir* platform_dir_open(const char* path);
 bool platform_dir_read(PlatformDir* dir, PlatformDirEntry* out_entry);
 void platform_dir_close(PlatformDir* dir);
 
+bool platform_mkdir(const char* path);
+bool platform_remove_file(const char* path);
+
 #endif // PLATFORM_FS_H

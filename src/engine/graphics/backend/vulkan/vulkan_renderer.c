@@ -16,9 +16,43 @@
 #include <stdlib.h>
 #include <string.h>
 #include <math.h>
+#include <threads.h>
 
 #define STB_IMAGE_WRITE_IMPLEMENTATION
 #include "stb_image_write.h"
+
+typedef struct ScreenshotContext {
+    char path[256];
+    int width;
+    int height;
+    bool needs_swizzle;
+    uint8_t* data;
+} ScreenshotContext;
+
+static int save_screenshot_task(void* arg) {
+    ScreenshotContext* ctx = (ScreenshotContext*)arg;
+    if (ctx) {
+        if (ctx->needs_swizzle) {
+            for (int i = 0; i < ctx->width * ctx->height; i++) {
+                uint8_t b = ctx->data[i * 4 + 0];
+                uint8_t r = ctx->data[i * 4 + 2];
+                ctx->data[i * 4 + 0] = r;
+                ctx->data[i * 4 + 2] = b;
+            }
+        }
+        
+        LOG_INFO("Screenshot Thread: Writing to disk (%s)...", ctx->path);
+        // Using default compression (which is slow but standard). Threading hides the latency.
+        if (stbi_write_png(ctx->path, ctx->width, ctx->height, 4, ctx->data, ctx->width * 4)) {
+            LOG_INFO("Screenshot saved to %s", ctx->path);
+        } else {
+            LOG_ERROR("Failed to write screenshot to %s", ctx->path);
+        }
+        free(ctx->data);
+        free(ctx);
+    }
+    return 0;
+}
 
 // Must match shader struct layout (std140)
 typedef struct GpuInstanceData {
@@ -183,12 +217,36 @@ static void vulkan_renderer_update_viewport(RendererBackend* backend, int width,
     if (width == 0 || height == 0) return;
     
     vkDeviceWaitIdle(state->device);
-    vk_cleanup_swapchain(state, true); // Keep handle? No, usually destroy old.
     
-    vk_create_swapchain_and_views(state, VK_NULL_HANDLE);
+    // Save old swapchain handle
+    VkSwapchainKHR old_swapchain = state->swapchain;
+    
+    // Cleanup old resources (destroys framebuffers, cmd buffers, pipelines, etc.)
+    // Pass 'true' to keep the swapchain handle alive in 'state->swapchain' for now,
+    // although we have a copy in 'old_swapchain'.
+    vk_cleanup_swapchain(state, true); 
+    
+    // Create new swapchain, passing the old one for recycling
+    vk_create_swapchain_and_views(state, old_swapchain);
+    
+    // Destroy the old swapchain handle (driver requires this if not NULL)
+    // Note: vkCreateSwapchainKHR uses oldSwapchain for optimization but doesn't destroy it.
+    if (old_swapchain != VK_NULL_HANDLE) {
+        vkDestroySwapchainKHR(state->device, old_swapchain, NULL);
+    }
+    
+    // Recreate dependent resources
     vk_create_depth_resources(state);
-    vk_create_render_pass(state); // Usually compatible, but safer to recreate if format changed
-    // Pipeline might need recreation if viewport is dynamic state or baked.
+    vk_create_render_pass(state);
+    
+    // Recreate Framebuffers, Command Pool, and Command Buffers (which were destroyed by cleanup)
+    vk_create_cmds_and_sync(state);
+    
+    // Recreate Pipeline (which depends on Render Pass and was destroyed)
+    vk_create_pipeline(state, state->vert_spv, state->frag_spv);
+    
+    // Reset frame cursor as sync objects were recreated
+    state->current_frame_cursor = 0;
 }
 
 static void vulkan_renderer_render_scene(RendererBackend* backend, const Scene* scene) {
@@ -358,7 +416,7 @@ static void vulkan_renderer_render_scene(RendererBackend* backend, const Scene* 
     
     vkQueueSubmit(state->queue, 1, &submit_info, state->fences[state->current_frame_cursor]);
 
-    // Save Screenshot (Stalling)
+    // Save Screenshot (Offloaded to thread)
     if (state->screenshot_pending && screenshot_buffer) {
         LOG_INFO("Screenshot: Waiting for GPU...");
         vkQueueWaitIdle(state->queue);
@@ -371,22 +429,35 @@ static void vulkan_renderer_render_scene(RendererBackend* backend, const Scene* 
         vkMapMemory(state->device, screenshot_memory, 0, VK_WHOLE_SIZE, 0, (void**)&data);
         
         if (data) {
-            LOG_INFO("Screenshot: Memory mapped. Swizzling...");
-            // Swizzle BGRA -> RGBA if needed
-            if (state->swapchain_format == VK_FORMAT_B8G8R8A8_UNORM || state->swapchain_format == VK_FORMAT_B8G8R8A8_SRGB) {
-                for (uint32_t i = 0; i < w * h; i++) {
-                    uint8_t b = data[i * 4 + 0];
-                    uint8_t r = data[i * 4 + 2];
-                    data[i * 4 + 0] = r;
-                    data[i * 4 + 2] = b;
+            LOG_INFO("Screenshot: Copying to host buffer...");
+            size_t size = w * h * 4;
+            uint8_t* host_copy = (uint8_t*)malloc(size);
+            if (host_copy) {
+                memcpy(host_copy, data, size);
+                
+                ScreenshotContext* ctx = (ScreenshotContext*)malloc(sizeof(ScreenshotContext));
+                if (ctx) {
+                    platform_strncpy(ctx->path, state->screenshot_path, sizeof(ctx->path) - 1);
+                    ctx->width = (int)w;
+                    ctx->height = (int)h;
+                    ctx->data = host_copy;
+                    ctx->needs_swizzle = (state->swapchain_format == VK_FORMAT_B8G8R8A8_UNORM || state->swapchain_format == VK_FORMAT_B8G8R8A8_SRGB);
+
+                    thrd_t t;
+                    if (thrd_create(&t, save_screenshot_task, ctx) == thrd_success) {
+                        thrd_detach(t);
+                        LOG_INFO("Screenshot: Offloaded to thread.");
+                    } else {
+                        LOG_ERROR("Screenshot: Failed to create thread!");
+                        free(host_copy);
+                        free(ctx);
+                    }
+                } else {
+                    LOG_ERROR("Screenshot: Failed to allocate context!");
+                    free(host_copy);
                 }
-            }
-            
-            LOG_INFO("Screenshot: Writing to disk (%s)...", state->screenshot_path);
-            if (stbi_write_png(state->screenshot_path, (int)w, (int)h, 4, data, (int)(w * 4))) {
-                LOG_INFO("Screenshot saved to %s", state->screenshot_path);
             } else {
-                LOG_ERROR("Failed to write screenshot to %s", state->screenshot_path);
+                LOG_ERROR("Screenshot: Failed to allocate host buffer!");
             }
             vkUnmapMemory(state->device, screenshot_memory);
         } else {

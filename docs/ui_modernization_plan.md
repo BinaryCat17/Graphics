@@ -2,7 +2,7 @@
 
 This document outlines the roadmap for transforming the current UI prototype (`src/engine/ui`) into a professional-grade interface toolkit comparable to industry standards.
 
-## 1. Text Input (High Priority)
+## 1. Text Input
 Currently, the UI only supports output (Labels). Input is essential for editors.
 *   **Widget:** `TextField` / `TextArea`.
 *   **Features:**

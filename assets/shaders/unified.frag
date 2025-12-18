@@ -6,11 +6,27 @@ layout(location = 2) in vec4 inParams; // x=use_tex, y=prim_type
 layout(location = 3) in vec4 inExtra;  // xy=start_uv, zw=end_uv
 layout(location = 4) in flat vec4 inClipRect; // x,y,w,h
 layout(location = 5) in vec3 inWorldPos;
+layout(location = 6) in vec2 inOrigUV;
+layout(location = 7) in vec4 inUVRect;
+layout(location = 8) in vec2 inTargetSize;
 
 layout(set = 0, binding = 0) uniform sampler2D texSampler; // Font/Atlas
 layout(set = 2, binding = 0) uniform sampler2D userTex;    // Compute/User
 
 layout(location = 0) out vec4 outColor;
+
+// --- 9-Slice Helper ---
+float map_9slice(float t, float target_size, float b1, float b2, float tex_size) {
+    float px = t * target_size;
+    if (px < b1) {
+        return (px / b1) * (b1 / tex_size);
+    } else if (px > target_size - b2) {
+        return 1.0 - ((target_size - px) / b2) * (b2 / tex_size);
+    } else {
+        float middle_t = (px - b1) / (target_size - b1 - b2);
+        return (b1 / tex_size) + middle_t * ((tex_size - b1 - b2) / tex_size);
+    }
+}
 
 // --- SDF Utilities ---
 
@@ -20,28 +36,18 @@ float sdSegment(in vec2 p, in vec2 a, in vec2 b) {
     return length( pa - ba*h );
 }
 
-// Approximate distance to cubic bezier (Adaptive)
-// We simplify by just evaluating distance to a few segments for now (Performance/Stability)
-// A proper SDF is complex. Let's use a specialized "Wire" function.
 float sdWire(vec2 p, vec2 a, vec2 b) {
     vec2 c1 = a + vec2((b.x - a.x) * 0.5, 0.0);
     vec2 c2 = b - vec2((b.x - a.x) * 0.5, 0.0);
-    
-    // Evaluate Bezier at t=0.25, 0.5, 0.75 for segment approximation
-    // B(t) = (1-t)^3 A + 3(1-t)^2 t C1 + 3(1-t)t^2 C2 + t^3 B
     
     vec2 pts[5];
     pts[0] = a;
     pts[4] = b;
     
-    // t=0.5
     vec2 m = 0.125*a + 0.375*c1 + 0.375*c2 + 0.125*b;
     pts[2] = m;
     
-    // t=0.25
-    // coefficients for t=0.25: (0.75)^3, 3*(0.75)^2*0.25, ...
-    // approx to simplify
-    pts[1] = mix(a, m, 0.5); // Simple linear mid for now to verify pipeline
+    pts[1] = mix(a, m, 0.5);
     pts[3] = mix(m, b, 0.5);
     
     float d = 1e5;
@@ -55,7 +61,6 @@ float sdWire(vec2 p, vec2 a, vec2 b) {
 
 void main() {
     // 0. Clipping
-    // Clip Rect: x, y, w, h. If w<=0 or h<=0, ignore clipping (infinite).
     if (inClipRect.z > 0.0 && inClipRect.w > 0.0) {
         if (inWorldPos.x < inClipRect.x || 
             inWorldPos.x > (inClipRect.x + inClipRect.z) ||
@@ -69,17 +74,37 @@ void main() {
     vec4 color = inColor;
     float alpha = color.a;
     
+    vec2 uv = inUV;
+
     if (inParams.x > 0.5) { 
         if (inParams.x < 1.5) {
-             // Textured Quad (Font) - Param 1.0
+             // 1.0: Textured Quad (Font)
              float texAlpha = texture(texSampler, inUV).r;
              alpha *= texAlpha;
-        } else {
-             // User Texture (Compute) - Param 2.0
-             // Sample fully
+        } else if (inParams.x < 2.5) {
+             // 2.0: User Texture (Compute)
              vec4 texColor = texture(userTex, inUV);
-             color = texColor; // Replace color with texture
-             alpha = texColor.a;
+             color = texColor * inColor; 
+             alpha = texColor.a * inColor.a;
+        } else if (inParams.x < 3.5) {
+             // 3.0: 9-Slice Quad
+             // Layout:
+             // inParams.z = tex_w (px)
+             // inParams.w = tex_h (px)
+             // inExtra.x = border_l (px)
+             // inExtra.y = border_t (px)
+             // inExtra.z = border_r (px)
+             // inExtra.w = border_b (px)
+             // inTargetSize = from vertex shader (px)
+             
+             float u9 = map_9slice(inOrigUV.x, inTargetSize.x, inExtra.x, inExtra.z, inParams.z);
+             float v9 = map_9slice(inOrigUV.y, inTargetSize.y, inExtra.y, inExtra.w, inParams.w);
+             
+             uv = vec2(u9, v9) * inUVRect.zw + inUVRect.xy;
+             
+             vec4 texColor = texture(texSampler, uv);
+             color = texColor * inColor;
+             alpha = texColor.a * inColor.a;
         }
     } 
     else if (inParams.y > 0.5) { // Curve (PrimType == 1)
@@ -94,12 +119,9 @@ void main() {
         float dist = sdWire(p, a, b);
         
         // Anti-aliased stroke
-        // Thickness passed in params.z (already relative to height)
         float thickness = (inParams.z > 0.0) ? inParams.z : 0.01;
-        float aa = 0.005; // Fixed AA feather
+        float aa = 0.005; 
 
-        // Add round caps (Ports)
-        // Make them larger (Radius = 2 * thickness) to look like connection points
         dist = min(dist, length(p - a) - thickness);
         dist = min(dist, length(p - b) - thickness);
         
