@@ -30,6 +30,13 @@ typedef struct {
     size_t vertex_count;
     FrameStage stage;
     VkFence inflight_fence;
+
+    // Per-Frame Instance Buffer (Dynamic)
+    VkBuffer instance_buffer;
+    VkDeviceMemory instance_memory;
+    void* instance_mapped;
+    VkDescriptorSet instance_set; // Set 1: Points to this frame's buffer
+    size_t instance_capacity;     // Current capacity (element count)
 } FrameResources;
 
 typedef struct VulkanRendererState {
@@ -75,7 +82,7 @@ typedef struct VulkanRendererState {
     VkSampler font_sampler;
     VkDescriptorSetLayout descriptor_layout;
     VkDescriptorPool descriptor_pool;
-    VkDescriptorSet descriptor_set;
+    VkDescriptorSet descriptor_set; // Set 0: Global Textures
     CoordinateSystem2D transformer;
     RenderLogger* logger;
     
@@ -83,13 +90,8 @@ typedef struct VulkanRendererState {
     VkBuffer unit_quad_buffer;
     VkDeviceMemory unit_quad_memory;
     
-    // Instancing
-    VkBuffer instance_buffer;
-    VkDeviceMemory instance_memory;
-    void* instance_mapped;
+    // Instancing (Global Layout, Per-Frame Sets)
     VkDescriptorSetLayout instance_layout;
-    VkDescriptorSet instance_set;
-    size_t instance_capacity; // In element count
 
     // Compute Target (Visualization)
     VkImage compute_target_image;

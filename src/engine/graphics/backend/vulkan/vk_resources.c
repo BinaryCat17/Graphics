@@ -161,13 +161,10 @@ void vk_create_descriptor_pool_and_set(VulkanRendererState* state) {
     vkUpdateDescriptorSets(state->device, 1, &w0, 0, NULL);
     
     // Set 1: Instance Buffer
-    VkDescriptorSetAllocateInfo dsai1 = { .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO, .descriptorPool = state->descriptor_pool, .descriptorSetCount = 1, .pSetLayouts = &state->instance_layout };
-    state->res = vkAllocateDescriptorSets(state->device, &dsai1, &state->instance_set);
-    if (state->res != VK_SUCCESS) fatal_vk("vkAllocateDescriptorSets (Set 1)", state->res);
+    // Note: Instance Set is allocated per-frame (Double Buffered) in vulkan_renderer.c
+    // We only create the layout here (which is done in vk_create_descriptor_layout, not here).
+    // Here we just skip Set 1 allocation.
     
-    // Note: Instance Buffer is not bound here because it's dynamic (resizable).
-    // It is bound in ensure_instance_buffer().
-
     // Set 2: User Texture (Compute Target)
     VkDescriptorSetAllocateInfo dsai2 = { .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO, .descriptorPool = state->descriptor_pool, .descriptorSetCount = 1, .pSetLayouts = &state->descriptor_layout }; // Same layout as Set 0
     state->res = vkAllocateDescriptorSets(state->device, &dsai2, &state->compute_target_descriptor);

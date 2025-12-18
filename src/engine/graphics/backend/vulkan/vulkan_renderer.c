@@ -27,6 +27,59 @@ typedef struct GpuInstanceData {
     Vec4 clip_rect; // Added
 } GpuInstanceData;
 
+// Helper to resize instance buffer dynamically
+static void ensure_instance_capacity(VulkanRendererState* state, FrameResources* frame, size_t required_count) {
+    if (frame->instance_capacity >= required_count && frame->instance_buffer != VK_NULL_HANDLE) return;
+
+    // Calculate new capacity (Start with 1024, double until fits)
+    size_t new_cap = frame->instance_capacity > 0 ? frame->instance_capacity : 1024;
+    while (new_cap < required_count) new_cap *= 2;
+    
+    // Cleanup old buffer
+    if (frame->instance_buffer != VK_NULL_HANDLE) {
+        vkDestroyBuffer(state->device, frame->instance_buffer, NULL);
+        vkFreeMemory(state->device, frame->instance_memory, NULL);
+    }
+
+    frame->instance_capacity = new_cap;
+    VkDeviceSize size = new_cap * sizeof(GpuInstanceData);
+    
+    // Create new buffer (Host Coherent for frequent updates)
+    vk_create_buffer(state, size, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, 
+                     VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, 
+                     &frame->instance_buffer, &frame->instance_memory);
+    
+    vkMapMemory(state->device, frame->instance_memory, 0, VK_WHOLE_SIZE, 0, &frame->instance_mapped);
+    
+    // Update Descriptor Set
+    // If set doesn't exist, allocate it
+    if (frame->instance_set == VK_NULL_HANDLE) {
+        VkDescriptorSetAllocateInfo alloc_info = {
+            .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO,
+            .descriptorPool = state->descriptor_pool,
+            .descriptorSetCount = 1,
+            .pSetLayouts = &state->instance_layout
+        };
+        if (vkAllocateDescriptorSets(state->device, &alloc_info, &frame->instance_set) != VK_SUCCESS) {
+            LOG_FATAL("Failed to allocate instance descriptor set");
+        }
+    }
+    
+    // Point set to new buffer
+    VkDescriptorBufferInfo dbi = { .buffer = frame->instance_buffer, .offset = 0, .range = VK_WHOLE_SIZE };
+    VkWriteDescriptorSet w = { 
+        .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET, 
+        .dstSet = frame->instance_set, 
+        .dstBinding = 0, 
+        .descriptorCount = 1, 
+        .descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 
+        .pBufferInfo = &dbi 
+    };
+    vkUpdateDescriptorSets(state->device, 1, &w, 0, NULL);
+    
+    LOG_INFO("Resized Instance Buffer to %zu elements", new_cap);
+}
+
 static bool vulkan_renderer_init(RendererBackend* backend, const RenderBackendInit* init) {
     VulkanRendererState* state = (VulkanRendererState*)backend->state;
     
@@ -68,7 +121,6 @@ static bool vulkan_renderer_init(RendererBackend* backend, const RenderBackendIn
     vk_create_render_pass(state);
 
     // 6. Resources (Depth, Command Pool, Sync)
-    // FIX: Depth resources MUST be created before Framebuffers (which are in vk_create_cmds_and_sync)
     vk_create_depth_resources(state);
     vk_create_cmds_and_sync(state);
     
@@ -89,40 +141,6 @@ static bool vulkan_renderer_init(RendererBackend* backend, const RenderBackendIn
         -0.5f,  0.5f, 0.0f,  0.0f, 1.0f
     };
     VkDeviceSize v_size = sizeof(quad_verts);
-    vk_create_buffer(state, v_size, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT, 
-                     VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, &state->unit_quad_buffer, &state->unit_quad_memory);
-    
-    // Upload Quad Data (HACK: using host visible for now to avoid staging complexity in this snippet)
-    // Actually, let's just do it properly with staging if we had the function exposed.
-    // For now, assume unit quad is not critical or valid (we aren't binding it yet in render_scene anyway).
-    // The shader uses hardcoded quad or expects it? The shader has `layout(location = 0) in vec3 inPosition;`.
-    // We need to bind vertex buffer.
-    
-    // Create Instance Buffer (Storage Buffer)
-    state->instance_capacity = 1000;
-    VkDeviceSize inst_size = state->instance_capacity * sizeof(GpuInstanceData);
-    vk_create_buffer(state, inst_size, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, 
-                     VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, 
-                     &state->instance_buffer, &state->instance_memory);
-    
-    vkMapMemory(state->device, state->instance_memory, 0, VK_WHOLE_SIZE, 0, &state->instance_mapped);
-
-    // Update Descriptor Set 1 to point to Instance Buffer
-    VkDescriptorBufferInfo dbi = { .buffer = state->instance_buffer, .offset = 0, .range = VK_WHOLE_SIZE };
-    VkWriteDescriptorSet w1 = { 
-        .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET, 
-        .dstSet = state->instance_set, 
-        .dstBinding = 0, 
-        .descriptorCount = 1, 
-        .descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 
-        .pBufferInfo = &dbi 
-    };
-    vkUpdateDescriptorSets(state->device, 1, &w1, 0, NULL);
-    
-    // Create and upload Quad Vertices (Reuse instance staging logic for simplicity or just create host visible vertex buffer)
-    vkDestroyBuffer(state->device, state->unit_quad_buffer, NULL);
-    vkFreeMemory(state->device, state->unit_quad_memory, NULL);
-    
     vk_create_buffer(state, v_size, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, 
                      VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, 
                      &state->unit_quad_buffer, &state->unit_quad_memory);
@@ -131,6 +149,14 @@ static bool vulkan_renderer_init(RendererBackend* backend, const RenderBackendIn
     vkMapMemory(state->device, state->unit_quad_memory, 0, VK_WHOLE_SIZE, 0, &v_map);
     memcpy(v_map, quad_verts, v_size);
     vkUnmapMemory(state->device, state->unit_quad_memory);
+    
+    // 10. Per-Frame Instance Resources
+    for (int i = 0; i < 2; ++i) {
+        state->frame_resources[i].instance_capacity = 0;
+        state->frame_resources[i].instance_buffer = VK_NULL_HANDLE;
+        state->frame_resources[i].instance_set = VK_NULL_HANDLE;
+        ensure_instance_capacity(state, &state->frame_resources[i], 1024); // Initial allocation
+    }
 
     LOG_INFO("Vulkan Initialized.");
     return true;
@@ -169,31 +195,23 @@ static void vulkan_renderer_render_scene(RendererBackend* backend, const Scene* 
     }
     
     vkResetFences(state->device, 1, &state->fences[state->current_frame_cursor]);
-    VkCommandBuffer cmd = state->cmdbuffers[state->current_frame_cursor];
-    vkResetCommandBuffer(cmd, 0);
     
-    // Update Instance Buffer
-    GpuInstanceData* instances = (GpuInstanceData*)state->instance_mapped;
+    // --- UPDATE RESOURCES ---
+    FrameResources* frame = &state->frame_resources[state->current_frame_cursor];
+    
+    // 1. Check Capacity and Resize if needed
     size_t count = scene->object_count;
-    if (count > state->instance_capacity) count = state->instance_capacity;
+    if (count == 0) count = 1; // Avoid 0 size
+    ensure_instance_capacity(state, frame, count);
     
-    for (size_t i = 0; i < count; ++i) {
+    // 2. Upload Data
+    GpuInstanceData* instances = (GpuInstanceData*)frame->instance_mapped;
+    for (size_t i = 0; i < scene->object_count; ++i) {
         SceneObject* obj = &scene->objects[i];
         
-        // Simple SRT to Mat4
-        // T * R * S
-        // Assuming 2D/3D mix. For now just basic Translation + Scale.
-        // Rotation is currently ignored for UI quads (usually aligned).
-        
         Mat4 m = mat4_identity();
-        
-        // 1. Scale
         Mat4 s = mat4_scale(obj->scale);
-        
-        // 2. Translate
         Mat4 t = mat4_translation(obj->position);
-        
-        // M = T * S
         m = mat4_multiply(&t, &s);
         
         instances[i].model = m;
@@ -201,8 +219,12 @@ static void vulkan_renderer_render_scene(RendererBackend* backend, const Scene* 
         instances[i].uv_rect = obj->uv_rect;
         instances[i].params = obj->params;
         instances[i].extra = (Vec4){0,0,0,0}; // Curve data
-        instances[i].clip_rect = obj->clip_rect; // Copy clip rect
+        instances[i].clip_rect = obj->clip_rect;
     }
+    
+    // --- COMMAND RECORDING ---
+    VkCommandBuffer cmd = state->cmdbuffers[state->current_frame_cursor];
+    vkResetCommandBuffer(cmd, 0);
     
     VkCommandBufferBeginInfo begin_info = {.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO};
     vkBeginCommandBuffer(cmd, &begin_info);
@@ -236,18 +258,18 @@ static void vulkan_renderer_render_scene(RendererBackend* backend, const Scene* 
     vkCmdBindVertexBuffers(cmd, 0, 1, &state->unit_quad_buffer, offsets);
 
     // Bind Descriptors
-    // Set 0: Texture (Global Font Atlas for now)
+    // Set 0: Global Textures (Font)
     vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, state->pipeline_layout, 0, 1, &state->descriptor_set, 0, NULL);
     
-    // Set 1: Instance Buffer
-    vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, state->pipeline_layout, 1, 1, &state->instance_set, 0, NULL);
+    // Set 1: Instance Data (Per-Frame)
+    vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, state->pipeline_layout, 1, 1, &frame->instance_set, 0, NULL);
     
     // Push Constants (ViewProj)
-    vkCmdPushConstants(cmd, state->pipeline_layout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(Mat4), &scene->camera.view_matrix); // Actually need Proj * View
+    vkCmdPushConstants(cmd, state->pipeline_layout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(Mat4), &scene->camera.view_matrix); 
 
     // Draw
-    if (count > 0) {
-        vkCmdDraw(cmd, 6, count, 0, 0);
+    if (scene->object_count > 0) {
+        vkCmdDraw(cmd, 6, scene->object_count, 0, 0);
     }
     
     vkCmdEndRenderPass(cmd);
@@ -282,6 +304,15 @@ static void vulkan_renderer_render_scene(RendererBackend* backend, const Scene* 
 static void vulkan_renderer_cleanup(RendererBackend* backend) {
     VulkanRendererState* state = (VulkanRendererState*)backend->state;
     vkDeviceWaitIdle(state->device);
+    
+    // Clean up per-frame resources
+    for (int i = 0; i < 2; ++i) {
+        if (state->frame_resources[i].instance_buffer) {
+            vkDestroyBuffer(state->device, state->frame_resources[i].instance_buffer, NULL);
+            vkFreeMemory(state->device, state->frame_resources[i].instance_memory, NULL);
+        }
+    }
+
     vk_destroy_device_resources(state);
     
     if (state->surface) {
