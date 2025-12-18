@@ -480,38 +480,50 @@ static void vulkan_renderer_render_scene(RendererBackend* backend, const Scene* 
 }
 
 static void vulkan_renderer_cleanup(RendererBackend* backend) {
+    if (!backend) return;
     VulkanRendererState* state = (VulkanRendererState*)backend->state;
-    vkDeviceWaitIdle(state->device);
-    
-    // Clean up per-frame resources
-    for (int i = 0; i < 2; ++i) {
-        if (state->frame_resources[i].instance_buffer) {
-            vkDestroyBuffer(state->device, state->frame_resources[i].instance_buffer, NULL);
-            vkFreeMemory(state->device, state->frame_resources[i].instance_memory, NULL);
+    if (state) {
+        vkDeviceWaitIdle(state->device);
+        
+        // Clean up per-frame resources
+        for (int i = 0; i < 2; ++i) {
+            if (state->frame_resources[i].instance_buffer) {
+                vkDestroyBuffer(state->device, state->frame_resources[i].instance_buffer, NULL);
+                vkFreeMemory(state->device, state->frame_resources[i].instance_memory, NULL);
+            }
         }
-    }
 
-    vk_destroy_device_resources(state);
-    
-    if (state->surface) {
-        state->destroy_surface(state->instance, NULL, state->platform_surface);
+        vk_destroy_device_resources(state);
+        
+        if (state->surface) {
+            state->destroy_surface(state->instance, NULL, state->platform_surface);
+        }
+        vkDestroyInstance(state->instance, NULL);
+        free(state);
     }
-    vkDestroyInstance(state->instance, NULL);
-    free(state);
+    
+    free(backend);
 }
 
 // Factory
 RendererBackend* vulkan_renderer_backend(void) {
-    static RendererBackend backend;
-    static VulkanRendererState state;
+    // Allocate Backend and State on Heap
+    RendererBackend* backend = (RendererBackend*)calloc(1, sizeof(RendererBackend));
+    if (!backend) return NULL;
+
+    VulkanRendererState* state = (VulkanRendererState*)calloc(1, sizeof(VulkanRendererState));
+    if (!state) {
+        free(backend);
+        return NULL;
+    }
     
-    backend.id = "vulkan";
-    backend.state = &state;
-    backend.init = vulkan_renderer_init;
-    backend.render_scene = vulkan_renderer_render_scene;
-    backend.update_viewport = vulkan_renderer_update_viewport;
-    backend.cleanup = vulkan_renderer_cleanup;
-    backend.request_screenshot = vulkan_renderer_request_screenshot;
+    backend->id = "vulkan";
+    backend->state = state;
+    backend->init = vulkan_renderer_init;
+    backend->render_scene = vulkan_renderer_render_scene;
+    backend->update_viewport = vulkan_renderer_update_viewport;
+    backend->cleanup = vulkan_renderer_cleanup;
+    backend->request_screenshot = vulkan_renderer_request_screenshot;
     
-    return &backend;
+    return backend;
 }
