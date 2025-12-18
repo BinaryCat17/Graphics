@@ -24,6 +24,7 @@ typedef struct GpuInstanceData {
     Vec4 uv_rect;
     Vec4 params;
     Vec4 extra;
+    Vec4 clip_rect; // Added
 } GpuInstanceData;
 
 static bool vulkan_renderer_init(RendererBackend* backend, const RenderBackendInit* init) {
@@ -181,26 +182,33 @@ static void vulkan_renderer_render_scene(RendererBackend* backend, const Scene* 
         
         // Simple SRT to Mat4
         // T * R * S
-        // Assuming 2D/3D mix. For now just basic Translation.
-        // TODO: Proper Matrix Math.
-        // HACK: Identity for now + Translation
+        // Assuming 2D/3D mix. For now just basic Translation + Scale.
+        // Rotation is currently ignored for UI quads (usually aligned).
+        
         Mat4 m = mat4_identity();
+        
+        // 1. Scale
+        Mat4 s = mat4_scale(obj->scale);
+        
+        // 2. Translate
         Mat4 t = mat4_translation(obj->position);
-        m = mat4_multiply(&m, &t);
-        // Rotation/Scale ignored for MVP stability, implement if needed
+        
+        // M = T * S
+        m = mat4_multiply(&t, &s);
         
         instances[i].model = m;
         instances[i].color = obj->color;
         instances[i].uv_rect = obj->uv_rect;
         instances[i].params = obj->params;
         instances[i].extra = (Vec4){0,0,0,0}; // Curve data
+        instances[i].clip_rect = obj->clip_rect; // Copy clip rect
     }
     
-    VkCommandBufferBeginInfo begin_info = {VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO};
+    VkCommandBufferBeginInfo begin_info = {.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO};
     vkBeginCommandBuffer(cmd, &begin_info);
     
     // Begin Pass
-    VkRenderPassBeginInfo pass_info = {VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO};
+    VkRenderPassBeginInfo pass_info = {.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO};
     pass_info.renderPass = state->render_pass;
     pass_info.framebuffer = state->framebuffers[image_index];
     pass_info.renderArea.offset = (VkOffset2D){0, 0};
@@ -246,7 +254,7 @@ static void vulkan_renderer_render_scene(RendererBackend* backend, const Scene* 
     vkEndCommandBuffer(cmd);
     
     // Submit
-    VkSubmitInfo submit_info = {VK_STRUCTURE_TYPE_SUBMIT_INFO};
+    VkSubmitInfo submit_info = {.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO};
     VkPipelineStageFlags wait_stages[] = {VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT};
     submit_info.waitSemaphoreCount = 1;
     submit_info.pWaitSemaphores = &state->sem_img_avail;
@@ -259,7 +267,7 @@ static void vulkan_renderer_render_scene(RendererBackend* backend, const Scene* 
     vkQueueSubmit(state->queue, 1, &submit_info, state->fences[state->current_frame_cursor]);
     
     // Present
-    VkPresentInfoKHR present_info = {VK_STRUCTURE_TYPE_PRESENT_INFO_KHR};
+    VkPresentInfoKHR present_info = {.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR};
     present_info.waitSemaphoreCount = 1;
     present_info.pWaitSemaphores = &state->sem_render_done;
     present_info.swapchainCount = 1;

@@ -53,6 +53,7 @@ typedef struct SceneObject {
     Vec4 color; 
     Vec4 uv_rect; // Texture Subset (xy=off, zw=scale) OR Curve Points (xy=P0, zw=P3)
     Vec4 params;  // Shader params: x = use_texture, z = thickness
+    Vec4 clip_rect; // Clipping bounds (x,y,w,h). 0,0,0,0 means no clipping.
     
     // Instancing (Data-Driven Visualization)
     void* instance_buffer; // Pointer to GpuBuffer (if massive instancing)

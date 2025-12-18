@@ -4,6 +4,8 @@ layout(location = 0) in vec4 inColor;
 layout(location = 1) in vec2 inUV;
 layout(location = 2) in vec4 inParams; // x=use_tex, y=prim_type
 layout(location = 3) in vec4 inExtra;  // xy=start_uv, zw=end_uv
+layout(location = 4) in flat vec4 inClipRect; // x,y,w,h
+layout(location = 5) in vec3 inWorldPos;
 
 layout(set = 0, binding = 0) uniform sampler2D texSampler; // Font/Atlas
 layout(set = 2, binding = 0) uniform sampler2D userTex;    // Compute/User
@@ -52,6 +54,17 @@ float sdWire(vec2 p, vec2 a, vec2 b) {
 }
 
 void main() {
+    // 0. Clipping
+    // Clip Rect: x, y, w, h. If w<=0 or h<=0, ignore clipping (infinite).
+    if (inClipRect.z > 0.0 && inClipRect.w > 0.0) {
+        if (inWorldPos.x < inClipRect.x || 
+            inWorldPos.x > (inClipRect.x + inClipRect.z) ||
+            inWorldPos.y < inClipRect.y || 
+            inWorldPos.y > (inClipRect.y + inClipRect.w)) {
+            discard;
+        }
+    }
+
     // 1. Texture/Color Base
     vec4 color = inColor;
     float alpha = color.a;

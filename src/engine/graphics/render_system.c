@@ -8,7 +8,8 @@
 #include "foundation/platform/platform.h"
 #include "engine/graphics/backend/renderer_backend.h"
 #include "engine/graphics/backend/vulkan/vulkan_renderer.h"
-#include "engine/ui/ui_scene_bridge.h"
+#include "engine/ui/ui_renderer.h"
+#include "engine/ui/ui_core.h"
 #include "engine/ui/ui_layout.h"
 #include "engine/graphics/text/font.h"
 #include "engine/graphics/text/text_renderer.h"
@@ -33,9 +34,9 @@ static void try_sync_packet(RenderSystem* sys) {
     
     dest->scene.frame_number = sys->frame_count;
 
-    // Bridge: Convert UI View to Scene Objects
-    if (sys->assets && sys->ui_root_view) {
-        ui_build_scene(sys->ui_root_view, &dest->scene, sys->assets);
+    // 2. Generate UI Scene (if bound)
+    if (sys->ui_root_view) {
+        ui_renderer_build_scene(sys->ui_root_view, &dest->scene, sys->assets);
     }
 
     // DEBUG: Compute Result Visualization
@@ -156,7 +157,7 @@ void render_system_bind_assets(RenderSystem* sys, Assets* assets) {
     try_bootstrap_renderer(sys);
 }
 
-void render_system_bind_ui(RenderSystem* sys, UiView* root_view) {
+void render_system_bind_ui(RenderSystem* sys, UiElement* root_view) {
     sys->ui_root_view = root_view;
     try_bootstrap_renderer(sys);
 }

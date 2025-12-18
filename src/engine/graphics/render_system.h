@@ -5,7 +5,7 @@
 #include <threads.h>
 
 #include "engine/assets/assets.h"
-#include "engine/ui/ui_def.h"
+#include "engine/ui/ui_core.h"
 #include "engine/graphics/backend/renderer_backend.h"
 #include "engine/graphics/scene/render_packet.h"
 #include "foundation/platform/platform.h"
@@ -16,7 +16,7 @@ struct RendererBackend;
 typedef struct RenderSystem {
     // Dependencies (Injectable)
     Assets* assets;
-    UiView* ui_root_view;
+    UiElement* ui_root_view;
 
     // Internal State
     PlatformWindow* window;
@@ -51,7 +51,7 @@ void render_system_shutdown(RenderSystem* sys);
 
 // Connect dependencies
 void render_system_bind_assets(RenderSystem* sys, Assets* assets);
-void render_system_bind_ui(RenderSystem* sys, UiView* root_view);
+void render_system_bind_ui(RenderSystem* sys, UiElement* root_view);
 
 // Updates the render system (Syncs logic to render packet)
 void render_system_update(RenderSystem* sys);

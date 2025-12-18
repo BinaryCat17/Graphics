@@ -5,8 +5,11 @@
 #include "foundation/meta/reflection.h"
 #include "engine/graphics/backend/renderer_backend.h"
 #include "features/graph_editor/math_graph.h"
-#include "engine/ui/ui_loader.h"
+#include "engine/ui/ui_parser.h"
+#include "engine/ui/ui_core.h"
+#include "engine/ui/ui_renderer.h"
 #include "engine/ui/ui_layout.h"
+#include "engine/ui/ui_input.h"
 
 #include <string.h>
 #include <stdlib.h>
@@ -17,8 +20,9 @@
 
 typedef struct AppState {
     MathGraph graph;
-    UiDef* ui_def;
-    UiView* ui_root;
+    UiAsset* ui_asset;
+    UiElement* ui_root;
+    UiInputContext input_ctx;
 } AppState;
 
 // --- Application Logic ---
@@ -58,32 +62,34 @@ static void app_on_init(Engine* engine) {
     math_graph_init(&app->graph);
     app_setup_graph(app);
 
-    // 3. Initialize UI
-    // Note: We access config paths via a global or pass them? 
-    // For now hardcoding or we need to access EngineConfig inside Engine if we stored it?
-    // Let's assume standard paths for this MVP refactor.
-    const char* ui_path = "assets/ui/editor.yaml"; // Ideally from config
-    
-    app->ui_def = ui_loader_load_from_file(ui_path);
-    if (!app->ui_def) {
-        LOG_ERROR("App: Failed to load UI definition from '%s'", ui_path);
-        return;
-    }
+    // 3. Initialize UI Input
+    ui_input_init(&app->input_ctx);
 
-    const MetaStruct* graph_meta = meta_get_struct("MathGraph");
-    if (!graph_meta) {
-        LOG_FATAL("App: Reflection metadata for 'MathGraph' not found.");
-        return;
-    }
+    // 4. Initialize UI Asset
+    const char* ui_path = "assets/ui/editor.yaml"; 
     
-    app->ui_root = ui_view_create(app->ui_def, &app->graph, graph_meta);
-    if (!app->ui_root) {
-        LOG_ERROR("App: Failed to create UI View.");
-        return;
-    }
+    if (ui_path) {
+        app->ui_asset = ui_parser_load_from_file(ui_path);
+        if (!app->ui_asset) {
+            LOG_ERROR("App: Failed to load UI definition from '%s'", ui_path);
+            return;
+        }
 
-    // 4. Bind UI to Renderer
-    render_system_bind_ui(&engine->render_system, app->ui_root);
+        const MetaStruct* graph_meta = meta_get_struct("MathGraph");
+        if (!graph_meta) {
+            LOG_FATAL("App: Reflection metadata for 'MathGraph' not found.");
+            return;
+        }
+        
+        app->ui_root = ui_element_create(app->ui_asset->root, &app->graph, graph_meta);
+        if (!app->ui_root) {
+            LOG_ERROR("App: Failed to create UI View.");
+            return;
+        }
+
+        // 5. Bind UI to Renderer
+        render_system_bind_ui(&engine->render_system, app->ui_root);
+    }
 }
 
 static void app_on_update(Engine* engine) {
@@ -116,11 +122,15 @@ static void app_on_update(Engine* engine) {
     }
     key_c_prev = key_c_curr;
 
-    // UI Update
+    // UI Update Pipeline
     if (app->ui_root) {
-        ui_view_process_input(app->ui_root, &engine->input);
-        ui_view_update(app->ui_root);
+        // 1. Update Data Bindings (Read latest X/Y/Text from Graph)
+        ui_element_update(app->ui_root);
         
+        // 2. Process Input (Write-back new positions if dragging)
+        ui_input_update(&app->input_ctx, app->ui_root, &engine->input);
+        
+        // 3. Layout (Calculate Rects based on updated data)
         PlatformWindowSize size = platform_get_framebuffer_size(engine->window);
         ui_layout_root(app->ui_root, (float)size.width, (float)size.height, engine->render_system.frame_count, false);
     }
@@ -174,8 +184,8 @@ int main(int argc, char** argv) {
         // Cleanup App State
         if (engine.user_data) {
              AppState* app = (AppState*)engine.user_data;
-             if (app->ui_root) ui_view_free(app->ui_root);
-             if (app->ui_def) ui_def_free(app->ui_def);
+             if (app->ui_root) ui_element_free(app->ui_root);
+             if (app->ui_asset) ui_asset_free(app->ui_asset);
              math_graph_dispose(&app->graph);
              free(app);
         }

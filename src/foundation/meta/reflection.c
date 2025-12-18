@@ -54,3 +54,13 @@ void meta_set_string(void* instance, const MetaField* field, const char* value) 
         *ptr = NULL;
     }
 }
+
+const MetaField* meta_find_field(const MetaStruct* meta, const char* field_name) {
+    if (!meta || !field_name) return NULL;
+    for (size_t i = 0; i < meta->field_count; ++i) {
+        if (strcmp(meta->fields[i].name, field_name) == 0) {
+            return &meta->fields[i];
+        }
+    }
+    return NULL;
+}

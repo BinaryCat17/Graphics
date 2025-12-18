@@ -44,4 +44,7 @@ void meta_set_int(void* instance, const MetaField* field, int value);
 void meta_set_float(void* instance, const MetaField* field, float value);
 void meta_set_string(void* instance, const MetaField* field, const char* value);
 
+// Helper to find a field by name in a struct definition
+const MetaField* meta_find_field(const MetaStruct* meta, const char* field_name);
+
 #endif // FOUNDATION_META_REFLECTION_H

@@ -1,4 +1,5 @@
 #include "ui_layout.h"
+#include "ui_core.h"
 #include "foundation/logger/logger.h"
 #include <stddef.h>
 #include <stdint.h>
@@ -13,125 +14,190 @@ void ui_layout_set_measure_func(UiTextMeasureFunc func, void* user_data) {
     g_measure_user_data = user_data;
 }
 
-static void layout_recursive(UiView* view, Rect available, uint64_t frame_number, bool log_debug) {
-    if (!view || !view->def) return;
+static void layout_recursive(UiElement* el, Rect available, uint64_t frame_number, bool log_debug) {
+    if (!el || !el->spec) return;
+    const UiNodeSpec* spec = el->spec;
 
-    // Determine size
-    float w = view->def->width;
-    float h = view->def->height;
+    // 1. Determine size
+    float w = spec->width;
+    float h = spec->height;
     
-    // Override with bound values if present
-    if (view->def->w_source) w = view->rect.w;
-    if (view->def->h_source) h = view->rect.h;
+    // Override with bound values
+    if (spec->w_source) w = el->rect.w; // updated by ui_core
+    if (spec->h_source) h = el->rect.h;
 
     // Auto-width logic
     if (w < 0) {
-        bool parent_is_row = (view->parent && view->parent->def->layout == UI_LAYOUT_ROW);
+        bool parent_is_row = (el->parent && el->parent->spec->layout == UI_LAYOUT_FLEX_ROW);
         
-        if (parent_is_row || view->def->type == UI_NODE_LABEL || view->def->type == UI_NODE_BUTTON) {
-             const char* text = view->cached_text ? view->cached_text : view->def->text;
+        if (parent_is_row || spec->kind == UI_KIND_TEXT || (spec->flags & UI_FLAG_CLICKABLE)) {
+             const char* text = el->cached_text ? el->cached_text : spec->static_text;
              if (text) {
                  if (g_measure_func) {
                      float text_w = g_measure_func(text, g_measure_user_data);
-                     w = text_w + view->def->padding * 2;
+                     w = text_w + spec->padding * 2;
                  } else {
-                     // Fallback Estimate: 10px per char approx
-                     w = strlen(text) * 10.0f + view->def->padding * 2 + 10.0f;
+                     w = strlen(text) * 10.0f + spec->padding * 2 + 10.0f;
                  }
              } else {
-                 w = 100.0f; // Default small width
+                 w = 100.0f;
              }
         } else {
-             w = available.w; // Fill available (Column default)
+             w = available.w; // Fill
         }
     }
 
-    if (h < 0) h = 30.0f; // Default height for auto
+    if (h < 0) h = 30.0f; 
     
-    // Auto height for container based on children (Simple Stack)
-    if (view->def->height < 0 && view->child_count > 0 && view->def->layout == UI_LAYOUT_COLUMN) {
-        h = view->def->padding * 2;
-        for (size_t i = 0; i < view->child_count; ++i) {
-            // Recursive pre-calc needed? 
-            // For simple stacking, we assume children have fixed or relative height.
-            // If child is also auto, this is tricky (multi-pass).
-            // Simplified: Child auto-height defaults to 30.0f unless layout happened.
-            // We do a single pass top-down. Child gets constraint, calculates its size.
-            // Wait, to know container height, we need to layout children first?
-            // Or we layout children with "infinite" height and see where they land.
-            // Let's keep it simple: Fixed height or 30.0f default for now.
-            // Proper way: Measure pass -> Layout pass.
-            // Simplified way: Top-down with growing bounds? No.
-            // Let's stick to the previous logic:
-            
-            float child_h = view->children[i]->def->height;
-            if (child_h < 0) child_h = 30.0f; 
+    // Auto height for container
+    if (spec->height < 0 && el->child_count > 0 && spec->layout == UI_LAYOUT_FLEX_COLUMN) {
+        h = spec->padding * 2;
+        for (size_t i = 0; i < el->child_count; ++i) {
+            float child_h = el->children[i]->spec->height;
+            if (child_h < 0) child_h = 30.0f; // Simplified
             h += child_h;
-            h += view->def->spacing;
+            h += spec->spacing;
         }
-        // Remove last spacing
-        if (view->child_count > 0) h -= view->def->spacing;
+        if (el->child_count > 0) h -= spec->spacing;
     }
 
-    if (view->def->x_source) {
-        view->rect.x = available.x + view->rect.x; // Add relative offset
+    // 2. Position (Relative to Parent Content Area)
+    if (spec->x_source) {
+        // Absolute overrides (Canvas)
+        // el->rect.x is already set by ui_core
     } else {
-        view->rect.x = available.x;
+        // Relative start (default)
+        // el->rect.x = 0; 
     }
     
-    if (view->def->y_source) {
-        view->rect.y = available.y + view->rect.y;
-    } else {
-        view->rect.y = available.y;
-    }
-
-    view->rect.w = w;
-    view->rect.h = h;
+    // Set Final Size
+    el->rect.w = w;
+    el->rect.h = h;
 
     if (log_debug) {
         LOG_DEBUG("[Frame %llu] Layout Node id='%s': Rect(%.1f, %.1f, %.1f, %.1f)", 
             (unsigned long long)frame_number,
-            view->def->id ? view->def->id : "(anon)",
-            view->rect.x, view->rect.y, view->rect.w, view->rect.h);
+            spec->id ? spec->id : "(anon)",
+            el->rect.x, el->rect.y, el->rect.w, el->rect.h);
     }
 
-    // Layout Children
+    // 3. Layout Children
     Rect content = {
-        view->rect.x + view->def->padding,
-        view->rect.y + view->def->padding,
-        w - view->def->padding * 2,
-        h - view->def->padding * 2
+        0 + spec->padding,
+        0 + spec->padding,
+        w - spec->padding * 2,
+        h - spec->padding * 2
     };
 
-    float cursor_x = content.x;
-    float cursor_y = content.y;
+    float cursor_x = content.x - el->scroll_x;
+    float cursor_y = content.y - el->scroll_y;
 
-    for (size_t i = 0; i < view->child_count; ++i) {
-        UiView* child = view->children[i];
+    float max_child_x = 0.0f;
+    float max_child_y = 0.0f;
+
+    for (size_t i = 0; i < el->child_count; ++i) {
+        UiElement* child = el->children[i];
         
         // Available space for child
         Rect child_avail = { 
             cursor_x, 
             cursor_y, 
             content.w, 
-            // If column, height is flexible? No, use child def. 
-            // If child is auto (-1), it takes available? Or default?
-            content.h - (cursor_y - content.y) 
+            content.h // Simplified
         };
         
+        // Recurse first
         layout_recursive(child, child_avail, frame_number, log_debug);
 
-        if (view->def->layout == UI_LAYOUT_COLUMN) {
-            cursor_y += child->rect.h + view->def->spacing;
-        } else if (view->def->layout == UI_LAYOUT_ROW) {
-            cursor_x += child->rect.w + view->def->spacing;
+        // Apply Layout Strategy
+        if (spec->layout == UI_LAYOUT_FLEX_COLUMN) {
+            child->rect.x = cursor_x;
+            child->rect.y = cursor_y;
+            cursor_y += child->rect.h + spec->spacing;
+            
+            // Track content size (relative to scroll origin)
+            // The cursor already moved, so we use the child's bottom edge + spacing relative to content start
+            // Content start is at (content.x, content.y)
+            float child_bottom = (child->rect.y - (content.y - el->scroll_y)) + child->rect.h;
+            float child_right = (child->rect.x - (content.x - el->scroll_x)) + child->rect.w;
+            
+            if (child_bottom > max_child_y) max_child_y = child_bottom;
+            if (child_right > max_child_x) max_child_x = child_right;
+
+        } else if (spec->layout == UI_LAYOUT_FLEX_ROW) {
+            child->rect.x = cursor_x;
+            child->rect.y = cursor_y;
+            cursor_x += child->rect.w + spec->spacing;
+
+            float child_bottom = (child->rect.y - (content.y - el->scroll_y)) + child->rect.h;
+            float child_right = (child->rect.x - (content.x - el->scroll_x)) + child->rect.w;
+            
+            if (child_bottom > max_child_y) max_child_y = child_bottom;
+            if (child_right > max_child_x) max_child_x = child_right;
         }
-        // Overlay: cursor doesn't move
+        else if (spec->layout == UI_LAYOUT_CANVAS) {
+            // Apply Scroll to Absolute nodes too?
+            // Yes, if I scroll a canvas, the nodes should move.
+            // But they have absolute X/Y from binding.
+            // We should apply scroll offset to their base position?
+            // Ideally: final_x = bound_x - scroll_x.
+            // But here layout is relative.
+            // So we just ensure child->rect.x includes the scroll offset?
+            // If child->rect.x comes from binding (e.g. 500), and scroll is 100.
+            // child->rect.x should stay 500 relative to origin.
+            // But when drawing relative to parent, it should be 400?
+            // Yes.
+            if (spec->flags & UI_FLAG_SCROLLABLE) {
+                 child->rect.x -= el->scroll_x;
+                 child->rect.y -= el->scroll_y;
+            }
+            // Canvas content size is tricky, assume it fits or max child
+            // Simple max logic for now
+             float child_bottom = child->rect.y + child->rect.h; // These are relative to parent
+             // We need to un-apply scroll to get "true" content size? 
+             // Actually, content size is the bounds of children in "unscrolled" space.
+             // If child is at 0, and we scrolled down 100, child.y is -100.
+             // True Y is 0. 
+             // content_h should be max(True Y + h)
+             // True Y = child.rect.y + el->scroll_y - content.y
+             // This is getting messy for Canvas. Let's stick to Flex for correct calcs first.
+        }
+    }
+    
+    // Store calculated content size
+    if (spec->layout == UI_LAYOUT_FLEX_COLUMN && el->child_count > 0) {
+        // Remove trailing spacing
+        max_child_y -= spec->spacing;
+    }
+     if (spec->layout == UI_LAYOUT_FLEX_ROW && el->child_count > 0) {
+        // Remove trailing spacing
+        max_child_x -= spec->spacing;
+    }
+    
+    el->content_w = max_child_x;
+    el->content_h = max_child_y;
+}
+
+static void update_screen_rects(UiElement* el, float parent_x, float parent_y) {
+    if (!el) return;
+    
+    el->screen_rect.x = parent_x + el->rect.x;
+    el->screen_rect.y = parent_y + el->rect.y;
+    el->screen_rect.w = el->rect.w;
+    el->screen_rect.h = el->rect.h;
+
+    for (size_t i = 0; i < el->child_count; ++i) {
+        update_screen_rects(el->children[i], el->screen_rect.x, el->screen_rect.y);
     }
 }
 
-void ui_layout_root(UiView* root, float window_w, float window_h, uint64_t frame_number, bool log_debug) {
+void ui_layout_root(UiElement* root, float window_w, float window_h, uint64_t frame_number, bool log_debug) {
     if (!root) return;
-    Rect screen_rect = {0, 0, window_w, window_h};
-    layout_recursive(root, screen_rect, frame_number, log_debug);
+    
+    if (root->spec->width < 0) root->rect.w = window_w;
+    if (root->spec->height < 0) root->rect.h = window_h;
+    
+    Rect initial_avail = {0, 0, window_w, window_h};
+    layout_recursive(root, initial_avail, frame_number, log_debug);
+    update_screen_rects(root, 0, 0);
 }

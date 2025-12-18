@@ -3,7 +3,7 @@
 #include "foundation/logger/logger.h"
 #include <string.h>
 
-void scene_add_text(Scene* scene, const char* text, Vec3 pos, float scale, Vec4 color) {
+void scene_add_text_clipped(Scene* scene, const char* text, Vec3 pos, float scale, Vec4 color, Vec4 clip_rect) {
     if (!scene || !text) return;
 
     float cursor_x = pos.x;
@@ -50,6 +50,9 @@ void scene_add_text(Scene* scene, const char* text, Vec3 pos, float scale, Vec4 
             obj.uv_rect.z = g.u1 - g.u0; // Width
             obj.uv_rect.w = g.v1 - g.v0; // Height
             
+            // Clipping
+            obj.clip_rect = clip_rect;
+            
             scene_add_object(scene, obj);
             count++;
             
@@ -57,9 +60,16 @@ void scene_add_text(Scene* scene, const char* text, Vec3 pos, float scale, Vec4 
         }
         ptr++;
     }
+}
+
+void scene_add_text(Scene* scene, const char* text, Vec3 pos, float scale, Vec4 color) {
+    // Default to infinite clip
+    Vec4 infinite_clip = {-10000.0f, -10000.0f, 20000.0f, 20000.0f};
+    scene_add_text_clipped(scene, text, pos, scale, color, infinite_clip);
+    
     static bool logged = false;
     if (!logged) {
-        LOG_INFO("Added text '%s' (%d chars) at (%.1f, %.1f)", text, count, pos.x, pos.y);
+        LOG_INFO("Added text '%s' at (%.1f, %.1f)", text, pos.x, pos.y);
         logged = true;
     }
 }
