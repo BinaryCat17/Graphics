@@ -49,8 +49,8 @@ function(add_shader_compile FILE_NAME)
     set(SHADER_OUTPUTS ${SHADER_OUTPUTS} ${OUTPUT} PARENT_SCOPE)
 endfunction()
 
-add_shader_compile("unified.vert")
-add_shader_compile("unified.frag")
+add_shader_compile("ui_default.vert")
+add_shader_compile("ui_default.frag")
 
 add_custom_target(Shaders DEPENDS ${SHADER_OUTPUTS})
 
@@ -95,8 +95,7 @@ target_link_libraries(foundation_platform PUBLIC glfw Vulkan::Vulkan foundation_
 
 # Math
 set(FOUNDATION_MATH_SOURCES
-    "src/foundation/math/coordinate_systems.c"
-    "src/foundation/math/layout_geometry.c")
+    "src/foundation/math/coordinate_systems.c")
 add_library(foundation_math STATIC ${FOUNDATION_MATH_SOURCES})
 target_include_directories(foundation_math PUBLIC "src/")
 if(UNIX)
@@ -118,9 +117,7 @@ target_include_directories(foundation_event PUBLIC "src/")
 
 # Config
 set(FOUNDATION_CONFIG_SOURCES
-    "src/foundation/config/simple_yaml.c"
-    "src/foundation/config/config_document.c"
-    "src/foundation/config/config_io.c")
+    "src/foundation/config/simple_yaml.c")
 add_library(foundation_config STATIC ${FOUNDATION_CONFIG_SOURCES})
 target_include_directories(foundation_config PUBLIC "src/")
 target_link_libraries(foundation_config PUBLIC foundation_platform foundation_logger)

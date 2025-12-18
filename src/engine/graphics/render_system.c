@@ -109,7 +109,7 @@ static void try_bootstrap_renderer(RenderSystem* sys) {
     
     // Dependencies Check
     if (!sys->window) return;
-    if (!sys->assets || !sys->assets->unified_vert_spv) return;
+    if (!sys->assets || !sys->assets->ui_default_vert_spv) return;
     if (!sys->backend) return;
 
     PlatformSurface surface = {0};
@@ -123,8 +123,8 @@ static void try_bootstrap_renderer(RenderSystem* sys) {
         .get_framebuffer_size = platform_get_framebuffer_size,
         .wait_events = platform_wait_events,
         .poll_events = platform_poll_events,
-        .vert_spv = sys->assets->unified_vert_spv,
-        .frag_spv = sys->assets->unified_frag_spv,
+        .vert_spv = sys->assets->ui_default_vert_spv,
+        .frag_spv = sys->assets->ui_default_frag_spv,
         .font_path = sys->assets->font_path,
     };
 

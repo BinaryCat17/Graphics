@@ -2,7 +2,7 @@
 #define MATH_GRAPH_H
 
 #include "foundation/memory/arena.h"
-#include "foundation/math/layout_geometry.h" // For Vec2/Rect if needed, or just use floats
+#include "foundation/math/coordinate_systems.h" // For Vec2/Rect
 
 #include <stdint.h>
 #include <stdbool.h>

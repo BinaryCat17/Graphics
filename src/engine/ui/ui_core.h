@@ -37,8 +37,6 @@ typedef enum UiKind {
     UI_KIND_CUSTOM     // Custom render callback (e.g. Curves)
 } UiKind;
 
-typedef struct Rect { float x, y, w, h; } Rect;
-
 typedef struct InputState {
     float mouse_x, mouse_y;
     bool mouse_down;

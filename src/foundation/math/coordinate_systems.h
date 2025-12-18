@@ -24,6 +24,13 @@ typedef struct Vec4 {
     float w; // REFLECT
 } Vec4;
 
+typedef struct Rect {
+    float x;
+    float y;
+    float w;
+    float h;
+} Rect;
+
 typedef struct Quat {
     float x;
     float y;

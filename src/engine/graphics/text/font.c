@@ -7,6 +7,13 @@
 #include <math.h>
 #include <string.h>
 
+#define ATLAS_WIDTH 1024
+#define ATLAS_HEIGHT 1024
+#define FONT_SIZE_PIXELS 32.0f
+#define UI_RECT_SIZE 32
+#define UI_RECT_X 8
+#define UI_RECT_Y 0
+
 static struct {
     FontAtlas atlas;
     stbtt_fontinfo fontinfo;
@@ -55,13 +62,13 @@ bool font_init(const char* font_path) {
     }
 
     // Build Atlas
-    g_font_state.atlas.width = 1024;
-    g_font_state.atlas.height = 1024;
+    g_font_state.atlas.width = ATLAS_WIDTH;
+    g_font_state.atlas.height = ATLAS_HEIGHT;
     g_font_state.atlas.pixels = malloc(g_font_state.atlas.width * g_font_state.atlas.height);
     memset(g_font_state.atlas.pixels, 0, g_font_state.atlas.width * g_font_state.atlas.height);
     memset(g_font_state.atlas.glyph_valid, 0, sizeof(g_font_state.atlas.glyph_valid));
 
-    g_font_state.atlas.font_scale = stbtt_ScaleForPixelHeight(&g_font_state.fontinfo, 32.0f);
+    g_font_state.atlas.font_scale = stbtt_ScaleForPixelHeight(&g_font_state.fontinfo, FONT_SIZE_PIXELS);
     
     // Reserve space for white pixel at (0,0) and UI rect at (2,0)
     // We will start glyphs at y=32 to be safe
@@ -71,8 +78,8 @@ bool font_init(const char* font_path) {
         }
     }
     
-    // Generate a simple 9-slice rounded rect (32x32)
-    int ui_x = 8, ui_y = 0, ui_sz = 32;
+    // Generate a simple 9-slice rounded rect
+    int ui_x = UI_RECT_X, ui_y = UI_RECT_Y, ui_sz = UI_RECT_SIZE;
     for (int j = 0; j < ui_sz; ++j) {
         for (int i = 0; i < ui_sz; ++i) {
             float dx = (float)i - (ui_sz-1)*0.5f;
@@ -101,7 +108,7 @@ bool font_init(const char* font_path) {
     g_font_state.atlas.ascent = (int)roundf(raw_ascent * g_font_state.atlas.font_scale);
     g_font_state.atlas.descent = (int)roundf(raw_descent * g_font_state.atlas.font_scale);
 
-    int ranges[][2] = { {32, 126}, {0x0400, 0x04FF} }; // ASCII + Cyrillic
+    static const int ranges[][2] = { {32, 126}, {0x0400, 0x04FF} }; // ASCII + Cyrillic
     int range_count = (int)(sizeof(ranges) / sizeof(ranges[0]));
 
     int x = 0, y = 40, rowh = 0; // Start below UI placeholders
@@ -210,8 +217,8 @@ void font_get_white_pixel_uv(float* u, float* v) {
 }
 
 void font_get_ui_rect_uv(float* u0, float* v0, float* u1, float* v1) {
-    if (u0) *u0 = 8.0f / (float)g_font_state.atlas.width;
-    if (v0) *v0 = 0.0f / (float)g_font_state.atlas.height;
-    if (u1) *u1 = (8.0f + 32.0f) / (float)g_font_state.atlas.width;
-    if (v1) *v1 = 32.0f / (float)g_font_state.atlas.height;
+    if (u0) *u0 = (float)UI_RECT_X / (float)g_font_state.atlas.width;
+    if (v0) *v0 = (float)UI_RECT_Y / (float)g_font_state.atlas.height;
+    if (u1) *u1 = (float)(UI_RECT_X + UI_RECT_SIZE) / (float)g_font_state.atlas.width;
+    if (v1) *v1 = (float)(UI_RECT_Y + UI_RECT_SIZE) / (float)g_font_state.atlas.height;
 }

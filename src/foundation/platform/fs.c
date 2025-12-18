@@ -46,6 +46,24 @@ FILE* platform_fopen(const char* filename, const char* mode) {
 #endif
 }
 
+char* fs_read_text(const char* path) {
+    if (!path) return NULL;
+    FILE *f = platform_fopen(path, "rb");
+    if (!f) return NULL;
+    fseek(f, 0, SEEK_END);
+    long len = ftell(f);
+    fseek(f, 0, SEEK_SET);
+    char *text = (char *)malloc((size_t)len + 1);
+    if (!text) {
+        fclose(f);
+        return NULL;
+    }
+    fread(text, 1, (size_t)len, f);
+    text[len] = 0;
+    fclose(f);
+    return text;
+}
+
 struct PlatformDir {
 #ifdef _WIN32
     HANDLE handle;

@@ -4,7 +4,6 @@
 #include "test_framework.h"
 
 #include "foundation/math/coordinate_systems.h"
-#include "foundation/math/layout_geometry.h"
 
 static int test_coordinate_round_trip(void) {
     CoordinateSystem2D system;
@@ -23,19 +22,6 @@ static int test_coordinate_round_trip(void) {
     TEST_ASSERT_FLOAT_EQ(world.x, roundtrip_world.x, 0.0001f);
     TEST_ASSERT_FLOAT_EQ(world.y, roundtrip_world.y, 0.0001f);
 
-    Mat4 projection = mat4_identity();
-    RenderContext ctx;
-    render_context_init(&ctx, &system, &projection);
-
-    LayoutBox logical_box = {{5.0f, 5.0f}, {10.0f, 10.0f}};
-    LayoutResult layout = layout_resolve(&logical_box, &ctx);
-    TEST_ASSERT_FLOAT_EQ(20.0f, layout.device.size.x, 0.0001f);
-    TEST_ASSERT_FLOAT_EQ(20.0f, layout.device.size.y, 0.0001f);
-
-    Vec2 inside = {7.0f, 7.0f};
-    Vec2 outside = {40.0f, 3.0f};
-    TEST_ASSERT(layout_hit_test(&layout, inside));
-    TEST_ASSERT(!layout_hit_test(&layout, outside));
     return 1;
 }
 

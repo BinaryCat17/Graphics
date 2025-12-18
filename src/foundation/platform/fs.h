@@ -10,6 +10,8 @@ typedef struct PlatformDirEntry {
     bool is_dir;
 } PlatformDirEntry;
 
+char* fs_read_text(const char* path);
+
 PlatformDir* platform_dir_open(const char* path);
 bool platform_dir_read(PlatformDir* dir, PlatformDirEntry* out_entry);
 void platform_dir_close(PlatformDir* dir);

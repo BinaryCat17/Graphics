@@ -1,8 +1,9 @@
 #include "ui_parser.h"
-#include "foundation/config/config_document.h"
+#include "foundation/config/simple_yaml.h"
 #include "foundation/logger/logger.h"
 #include "foundation/memory/arena.h"
 #include "foundation/meta/reflection.h"
+#include "foundation/platform/fs.h"
 #include <string.h>
 #include <stdlib.h>
 #include <stdio.h>
@@ -46,9 +47,8 @@ static UiKind parse_kind(const char* type_str, uint32_t* out_flags) {
 
 // --- Recursive Loader ---
 
-static UiNodeSpec* load_recursive(UiAsset* asset, const void* node_ptr) {
-    const ConfigNode* node = (const ConfigNode*)node_ptr;
-    if (!node || node->type != CONFIG_NODE_MAP) return NULL;
+static UiNodeSpec* load_recursive(UiAsset* asset, const SimpleYamlNode* node) {
+    if (!node || node->type != SIMPLE_YAML_MAP) return NULL;
 
     // Allocate Spec from Asset's Arena
     UiNodeSpec* spec = ui_asset_push_node(asset);
@@ -68,7 +68,7 @@ static UiNodeSpec* load_recursive(UiAsset* asset, const void* node_ptr) {
     // Iterate all pairs in the YAML map
     for (size_t i = 0; i < node->pair_count; ++i) {
         const char* key = node->pairs[i].key;
-        const ConfigNode* val = node->pairs[i].value;
+        const SimpleYamlNode* val = node->pairs[i].value;
         if (!key || !val) continue;
 
         // --- Special Handling for Recursion / Templates ---
@@ -78,10 +78,8 @@ static UiNodeSpec* load_recursive(UiAsset* asset, const void* node_ptr) {
              continue;
         }
         
-        // Removed explicit "layout" handler -> handled by reflection now
-
         if (strcmp(key, "children") == 0) {
-            if (val->type == CONFIG_NODE_SEQUENCE) {
+            if (val->type == SIMPLE_YAML_SEQUENCE) {
                 spec->child_count = val->item_count;
                 spec->children = (UiNodeSpec**)arena_alloc_zero(&asset->arena, spec->child_count * sizeof(UiNodeSpec*));
                 for (size_t k = 0; k < spec->child_count; ++k) {
@@ -95,7 +93,7 @@ static UiNodeSpec* load_recursive(UiAsset* asset, const void* node_ptr) {
             continue;
         }
         if (strcmp(key, "color") == 0) {
-            if (val->type == CONFIG_NODE_SEQUENCE && val->item_count >= 3) {
+            if (val->type == SIMPLE_YAML_SEQUENCE && val->item_count >= 3) {
                  float r = val->items[0]->scalar ? (float)atof(val->items[0]->scalar) : 1.0f;
                  float g = val->items[1]->scalar ? (float)atof(val->items[1]->scalar) : 1.0f;
                  float b = val->items[2]->scalar ? (float)atof(val->items[2]->scalar) : 1.0f;
@@ -124,7 +122,6 @@ static UiNodeSpec* load_recursive(UiAsset* asset, const void* node_ptr) {
             else if (strcmp(key, "bind") == 0) field = meta_find_field(meta, "value_source");
             else if (strcmp(key, "bind_x") == 0) field = meta_find_field(meta, "x_source");
             else if (strcmp(key, "bind_y") == 0) field = meta_find_field(meta, "y_source");
-            else if (strcmp(key, "items") == 0) field = meta_find_field(meta, "data_source");
         }
 
         if (field) {
@@ -173,22 +170,31 @@ UiAsset* ui_parser_load_from_file(const char* path) {
 
     LOG_INFO("UiParser: Loading UI definition from file: %s", path);
 
-    ConfigError err;
-    ConfigDocument doc;
-    if (!load_config_document(path, CONFIG_FORMAT_YAML, &doc, &err)) {
-        LOG_ERROR("UiParser: Failed to load %s: %s (line %d)", path, err.message, err.line);
+    char* text = fs_read_text(path);
+    if (!text) {
+        LOG_ERROR("UiParser: Failed to read file %s", path);
+        return NULL;
+    }
+
+    SimpleYamlNode* root = NULL;
+    SimpleYamlError err = {0};
+    if (!simple_yaml_parse(text, &root, &err)) {
+        LOG_ERROR("UiParser: YAML Parse error in %s (line %d, col %d): %s", path, err.line, err.column, err.message);
+        free(text);
         return NULL;
     }
 
     // Create Asset (Owner)
     UiAsset* asset = ui_asset_create(64 * 1024);
     if (!asset) {
-        config_document_free(&doc);
+        simple_yaml_free(root);
+        free(text);
         return NULL;
     }
 
-    asset->root = load_recursive(asset, doc.root);
+    asset->root = load_recursive(asset, root);
     
-    config_document_free(&doc);
+    simple_yaml_free(root);
+    free(text);
     return asset;
 }
