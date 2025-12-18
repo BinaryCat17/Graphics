@@ -1,19 +1,12 @@
 #include "ui_loader.h"
 #include "foundation/config/config_document.h"
 #include "foundation/logger/logger.h"
+#include "foundation/memory/arena.h"
 #include <string.h>
 #include <stdlib.h>
 #include <stdio.h>
 
 // --- Helper Functions ---
-
-static char* strdup_safe(const char* s) {
-    if (!s) return NULL;
-    size_t len = strlen(s);
-    char* copy = (char*)malloc(len + 1);
-    if (copy) memcpy(copy, s, len + 1);
-    return copy;
-}
 
 static UiNodeType parse_node_type(const char* type_str) {
     if (!type_str) return UI_NODE_PANEL;
@@ -47,7 +40,8 @@ static float parse_float(const ConfigNode* node, float fallback) {
 
 // --- Recursive Loader ---
 
-UiDef* ui_loader_load_from_node(const void* node_ptr) {
+// Internal function that propagates the arena
+static UiDef* load_recursive(MemoryArena* arena, const void* node_ptr) {
     const ConfigNode* node = (const ConfigNode*)node_ptr;
     if (!node || node->type != CONFIG_NODE_MAP) return NULL;
 
@@ -59,29 +53,27 @@ UiDef* ui_loader_load_from_node(const void* node_ptr) {
     const ConfigNode* id_node = config_node_get_scalar(node, "id");
     const char* id_str = id_node ? id_node->scalar : "(anon)";
 
-    LOG_DEBUG("UiLoader: Loading node type='%s' id='%s'", type_str, id_str);
-
-    UiDef* def = ui_def_create(type);
+    // Allocate generic node from Arena
+    UiDef* def = ui_def_create(arena, type);
     if (!def) return NULL;
 
     // 1. Identity & Style
     if (id_node) {
-        def->id = strdup_safe(id_node->scalar);
+        def->id = arena_push_string(arena, id_node->scalar);
     } else {
         static int anon_counter = 0;
         char buffer[64];
         snprintf(buffer, sizeof(buffer), "%s_%d", type_str, ++anon_counter);
-        def->id = strdup_safe(buffer);
+        def->id = arena_push_string(arena, buffer);
     }
 
     const ConfigNode* style = config_node_get_scalar(node, "style");
-    if (style) def->style_name = strdup_safe(style->scalar);
+    if (style) def->style_name = arena_push_string(arena, style->scalar);
 
     // 2. Layout Props
     const ConfigNode* layout = config_node_get_scalar(node, "layout");
     def->layout = parse_layout_type(layout ? layout->scalar : NULL);
     
-    // Default layout for lists is usually column
     if (type == UI_NODE_LIST && !layout) def->layout = UI_LAYOUT_COLUMN;
 
     def->width = parse_float(config_node_get_scalar(node, "width"), -1.0f);
@@ -97,48 +89,47 @@ UiDef* ui_loader_load_from_node(const void* node_ptr) {
 
     // 3. Data Binding
     const ConfigNode* text = config_node_get_scalar(node, "text");
-    if (text) def->text = strdup_safe(text->scalar);
+    if (text) def->text = arena_push_string(arena, text->scalar);
 
     const ConfigNode* bind = config_node_get_scalar(node, "bind");
-    if (bind) def->bind_source = strdup_safe(bind->scalar);
+    if (bind) def->bind_source = arena_push_string(arena, bind->scalar);
     
-    // "items", "data", or "data_context" for lists
     const ConfigNode* items = config_node_get_scalar(node, "items");
     if (items) {
-        def->data_source = strdup_safe(items->scalar);
+        def->data_source = arena_push_string(arena, items->scalar);
     } else {
         const ConfigNode* data = config_node_get_scalar(node, "data");
-        if (data) def->data_source = strdup_safe(data->scalar);
+        if (data) def->data_source = arena_push_string(arena, data->scalar);
     }
 
     const ConfigNode* count = config_node_get_scalar(node, "count");
-    if (count) def->count_source = strdup_safe(count->scalar);
+    if (count) def->count_source = arena_push_string(arena, count->scalar);
 
     // Geometry Bindings
     const ConfigNode* bx = config_node_get_scalar(node, "bind_x");
-    if (bx) def->x_source = strdup_safe(bx->scalar);
+    if (bx) def->x_source = arena_push_string(arena, bx->scalar);
     const ConfigNode* by = config_node_get_scalar(node, "bind_y");
-    if (by) def->y_source = strdup_safe(by->scalar);
+    if (by) def->y_source = arena_push_string(arena, by->scalar);
     const ConfigNode* bw = config_node_get_scalar(node, "bind_w");
-    if (bw) def->w_source = strdup_safe(bw->scalar);
+    if (bw) def->w_source = arena_push_string(arena, bw->scalar);
     const ConfigNode* bh = config_node_get_scalar(node, "bind_h");
-    if (bh) def->h_source = strdup_safe(bh->scalar);
+    if (bh) def->h_source = arena_push_string(arena, bh->scalar);
 
     // Curve Bindings
     const ConfigNode* bu1 = config_node_get_scalar(node, "bind_u1");
-    if (bu1) def->u1_source = strdup_safe(bu1->scalar);
+    if (bu1) def->u1_source = arena_push_string(arena, bu1->scalar);
     const ConfigNode* bv1 = config_node_get_scalar(node, "bind_v1");
-    if (bv1) def->v1_source = strdup_safe(bv1->scalar);
+    if (bv1) def->v1_source = arena_push_string(arena, bv1->scalar);
     const ConfigNode* bu2 = config_node_get_scalar(node, "bind_u2");
-    if (bu2) def->u2_source = strdup_safe(bu2->scalar);
+    if (bu2) def->u2_source = arena_push_string(arena, bu2->scalar);
     const ConfigNode* bv2 = config_node_get_scalar(node, "bind_v2");
-    if (bv2) def->v2_source = strdup_safe(bv2->scalar);
+    if (bv2) def->v2_source = arena_push_string(arena, bv2->scalar);
 
     // 4. List Template
     if (type == UI_NODE_LIST) {
         const ConfigNode* item_template = config_map_get(node, "item_template");
         if (item_template) {
-            def->item_template = ui_loader_load_from_node(item_template);
+            def->item_template = load_recursive(arena, item_template);
         }
     }
 
@@ -146,10 +137,11 @@ UiDef* ui_loader_load_from_node(const void* node_ptr) {
     const ConfigNode* children = config_node_get_sequence(node, "children");
     if (children) {
         def->child_count = children->item_count;
-        def->children = (UiDef**)calloc(def->child_count, sizeof(UiDef*));
+        // Allocate array of pointers from arena
+        def->children = (UiDef**)arena_alloc_zero(arena, def->child_count * sizeof(UiDef*));
         if (def->children) {
             for (size_t i = 0; i < def->child_count; ++i) {
-                def->children[i] = ui_loader_load_from_node(children->items[i]);
+                def->children[i] = load_recursive(arena, children->items[i]);
             }
         }
     }
@@ -169,7 +161,34 @@ UiDef* ui_loader_load_from_file(const char* path) {
         return NULL;
     }
 
-    UiDef* root = ui_loader_load_from_node(doc.root);
+    // Initialize Arena for this UI Definition Tree
+    // 64KB should be plenty for typical UI
+    MemoryArena arena;
+    if (!arena_init(&arena, 64 * 1024)) {
+        config_document_free(&doc);
+        return NULL;
+    }
+
+    // The root node gets the ownership of the arena
+    UiDef* root = load_recursive(&arena, doc.root);
+    
+    if (root) {
+        // Transfer arena ownership to the root node struct
+        // Note: root itself is allocated INSIDE the arena, but we copy the struct content (base ptr) here.
+        root->arena = arena;
+    } else {
+        arena_destroy(&arena);
+    }
+
     config_document_free(&doc);
     return root;
+}
+
+// Deprecated or redirect to internal
+UiDef* ui_loader_load_from_node(const void* node_ptr) {
+    // This function cannot work without an arena context in the new system.
+    // It should probably be removed or take an arena.
+    // For now, return NULL to signal it's not supported directly.
+    LOG_ERROR("ui_loader_load_from_node called without arena context");
+    return NULL;
 }

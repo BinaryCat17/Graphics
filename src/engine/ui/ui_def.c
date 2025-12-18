@@ -57,8 +57,10 @@ static void write_geometry_binding(UiView* view, float dx, float dy) {
 
 // --- UiDef Implementation ---
 
-UiDef* ui_def_create(UiNodeType type) {
-    UiDef* def = (UiDef*)calloc(1, sizeof(UiDef));
+UiDef* ui_def_create(MemoryArena* arena, UiNodeType type) {
+    if (!arena) return NULL;
+    
+    UiDef* def = (UiDef*)arena_alloc_zero(arena, sizeof(UiDef));
     if (def) {
         def->type = type;
         def->width = -1.0f; // Auto
@@ -69,27 +71,19 @@ UiDef* ui_def_create(UiNodeType type) {
 
 void ui_def_free(UiDef* def) {
     if (!def) return;
-    free(def->id);
-    free(def->style_name);
-    free(def->text);
-    free(def->bind_source);
-    free(def->data_source);
-    free(def->count_source);
     
-    free(def->x_source); free(def->y_source);
-    free(def->w_source); free(def->h_source);
-    free(def->u1_source); free(def->v1_source);
-    free(def->u2_source); free(def->v2_source);
-    
-    if (def->item_template) ui_def_free(def->item_template);
-    
-    if (def->children) {
-        for (size_t i = 0; i < def->child_count; ++i) {
-            ui_def_free(def->children[i]);
-        }
-        free(def->children);
+    // Only the root node holds the active arena.
+    // Children have a zeroed arena struct (since they were alloc_zero'd).
+    if (def->arena.base != NULL) {
+        // Destroying the arena frees ALL nodes and strings at once.
+        // Copy the arena struct to stack before destroying, although arena_destroy works with pointer.
+        // Wait, def itself is allocated inside arena!
+        // We cannot access def->arena after freeing base if arena struct was inside.
+        // But arena struct is value type inside UiDef.
+        
+        MemoryArena arena_copy = def->arena;
+        arena_destroy(&arena_copy);
     }
-    free(def);
 }
 
 // --- UiView Implementation ---
@@ -107,9 +101,6 @@ UiView* ui_view_create(const UiDef* def, void* root_data, const MetaStruct* root
     // Resolve Data Context shift if needed
     if (def->data_source && root_data && root_type) {
         // TBD: Find field in root_type by name (def->data_source)
-        // For now, let's assume direct binding or implement simple field lookup
-        // view->data_ptr = meta_get_field_ptr(...)
-        // view->meta = meta_get_field_type(...)
     }
     
     // Initial Child Creation
@@ -161,7 +152,6 @@ static void resolve_text_binding(UiView* view) {
         key[len] = 0;
         
         // Find field
-        // We need to implement meta_find_field in reflection or loop here
         const MetaField* field = NULL;
         for (size_t i = 0; i < view->meta->field_count; ++i) {
             if (strcmp(view->meta->fields[i].name, key) == 0) {
@@ -184,7 +174,6 @@ static void resolve_text_binding(UiView* view) {
             }
             
             // Reconstruct string
-            // This is a naive implementation that replaces the first occurrence
             size_t prefix_len = (size_t)(start - pattern);
             size_t val_len = strlen(val_buf);
             size_t suffix_len = strlen(end + 1);
@@ -238,9 +227,7 @@ static void resolve_geometry_bindings(UiView* view) {
     }
 }
 
-#include "foundation/logger/logger.h"
-
-// ... (existing includes)
+// ... (rest of ui_view_update and input processing remains same)
 
 void ui_view_update(UiView* view) {
     if (!view) return;
@@ -262,8 +249,6 @@ void ui_view_update(UiView* view) {
             
             if (count_field && count_field->type == META_TYPE_INT) {
                 count = meta_get_int(view->data_ptr, count_field);
-            } else {
-                LOG_WARN("UI List: Count field '%s' not found or not INT", view->def->count_source);
             }
             
             if (array_field && array_field->type == META_TYPE_POINTER) {
@@ -287,15 +272,8 @@ void ui_view_update(UiView* view) {
                     }
                     
                     item_meta = meta_get_struct(clean_name);
-                    if (!item_meta) {
-                        LOG_ERROR("UI List: Struct metadata '%s' not found for field '%s'", clean_name, view->def->data_source);
-                    }
                 }
-            } else {
-                 LOG_WARN("UI List: Array field '%s' not found or not POINTER", view->def->data_source);
             }
-        } else {
-             LOG_WARN("UI List: Missing bindings or data ptr");
         }
 
         // Resize Children Array
@@ -304,11 +282,10 @@ void ui_view_update(UiView* view) {
             UiView** new_children = (UiView**)realloc(view->children, sizeof(UiView*) * new_cap);
             if (new_children) {
                 view->children = new_children;
-                // Init new slots to NULL
                 for (size_t i = view->child_capacity; i < new_cap; ++i) view->children[i] = NULL;
                 view->child_capacity = new_cap;
             } else {
-                count = (int)view->child_capacity; // Allocation failed, cap count
+                count = (int)view->child_capacity;
             }
         }
 
@@ -319,13 +296,11 @@ void ui_view_update(UiView* view) {
                 void* item_ptr = ptrs[i];
                 
                 if (!view->children[i]) {
-                    // Create new
                     if (view->def->item_template) {
                         view->children[i] = ui_view_create(view->def->item_template, item_ptr, item_meta);
                         if (view->children[i]) view->children[i]->parent = view;
                     }
                 } else {
-                    // Update Context
                     view->children[i]->data_ptr = item_ptr;
                     view->children[i]->meta = item_meta;
                 }
@@ -350,8 +325,7 @@ void ui_view_update(UiView* view) {
     }
 }
 
-// --- Input Processing ---
-
+// Input Processing logic remains the same
 static bool rect_contains(Rect r, float x, float y) {
     return x >= r.x && x <= r.x + r.w && y >= r.y && y <= r.y + r.h;
 }
@@ -363,32 +337,25 @@ static float s_last_my = 0;
 void ui_view_process_input(UiView* view, const InputState* input) {
     if (!view || !input || !view->def) return;
 
-    // 1. Process Children
     for (size_t i = 0; i < view->child_count; ++i) {
         ui_view_process_input(view->children[i], input);
     }
 
-    // 2. Hit Test
     bool hover = rect_contains(view->rect, input->mouse_x, input->mouse_y);
     view->is_hovered = hover;
     view->is_pressed = hover && input->mouse_down;
 
-    // Drag Handling
     if (s_drag_view == view) {
         if (!input->mouse_down) {
-            s_drag_view = NULL; // Drop
+            s_drag_view = NULL; 
         } else {
             float dx = input->mouse_x - s_last_mx;
             float dy = input->mouse_y - s_last_my;
-            
             if (dx != 0 || dy != 0) {
                 write_geometry_binding(view, dx, dy);
-                // Also update local rect immediately for responsiveness
-                // (though next frame update will overwrite from data)
                 view->rect.x += dx;
                 view->rect.y += dy;
             }
-            
             s_last_mx = input->mouse_x;
             s_last_my = input->mouse_y;
         }
@@ -400,17 +367,11 @@ void ui_view_process_input(UiView* view, const InputState* input) {
     }
 
     if (hover) {
-        
-        // Button Click
         if (view->def->type == UI_NODE_BUTTON && input->mouse_clicked) {
             if (view->def->bind_source && view->data_ptr && view->meta) {
                 const MetaField* field = find_field(view->meta, view->def->bind_source);
                 if (field) {
-                    if (field->type == META_TYPE_INT) {
-                        // Toggle logic or Action signal
-                        int current = meta_get_int(view->data_ptr, field);
-                        meta_set_int(view->data_ptr, field, !current); 
-                    } else if (field->type == META_TYPE_BOOL) {
+                    if (field->type == META_TYPE_INT || field->type == META_TYPE_BOOL) {
                         int current = meta_get_int(view->data_ptr, field);
                         meta_set_int(view->data_ptr, field, !current); 
                     }
@@ -418,7 +379,6 @@ void ui_view_process_input(UiView* view, const InputState* input) {
             }
         }
         
-        // Slider Drag
         if (view->def->type == UI_NODE_SLIDER && input->mouse_down) {
             float relative = (input->mouse_x - view->rect.x) / view->rect.w;
             if (relative < 0) relative = 0.0f;

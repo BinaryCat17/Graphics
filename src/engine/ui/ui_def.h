@@ -3,6 +3,7 @@
 
 #include <stdbool.h>
 #include "foundation/meta/reflection.h"
+#include "foundation/memory/arena.h"
 
 typedef struct { float x, y, w, h; } Rect;
 
@@ -36,6 +37,9 @@ typedef enum UiLayoutType {
 } UiLayoutType;
 
 typedef struct UiDef {
+    // Memory Management (Root owns the arena)
+    MemoryArena arena; 
+
     UiNodeType type;
     UiLayoutType layout;
     
@@ -83,6 +87,10 @@ typedef struct UiDef {
     
 } UiDef;
 
+// API
+UiDef* ui_def_create(MemoryArena* arena, UiNodeType type);
+void ui_def_free(UiDef* def);
+
 // --- UI VIEW (INSTANCE) ---
 // This is the live graph that represents the current frame state.
 
@@ -112,10 +120,6 @@ typedef struct UiView {
     bool is_pressed;
     
 } UiView;
-
-// API
-UiDef* ui_def_create(UiNodeType type);
-void ui_def_free(UiDef* def);
 
 UiView* ui_view_create(const UiDef* def, void* root_data, const MetaStruct* root_type);
 void ui_view_free(UiView* view);
