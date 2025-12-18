@@ -15,15 +15,6 @@ double vk_now_ms(void) {
     return 0.0; // Placeholder
 }
 
-void vk_log_command(VulkanRendererState* state, RenderLogLevel level, const char* cmd, const char* param, double start_time_ms) {
-    (void)state; // Unused
-    (void)start_time_ms; // Unused for now or implement duration calc
-    (void)level; // Legacy level, we use global logger now
-    
-    // Default mapping
-    LOG_TRACE("Vulkan Command: %s (%s)", cmd, param ? param : "");
-}
-
 uint32_t find_mem_type(VkPhysicalDevice physical_device, uint32_t type_filter, VkMemoryPropertyFlags properties) {
     VkPhysicalDeviceMemoryProperties mem_props;
     vkGetPhysicalDeviceMemoryProperties(physical_device, &mem_props);

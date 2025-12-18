@@ -23,13 +23,8 @@ typedef struct UiInputContext {
     bool possible_drag; 
 } UiInputContext;
 
-// Initialize context
 void ui_input_init(UiInputContext* ctx);
-
-// Main update function. Call this every frame before Layout/Render.
-// - Performs Hit Testing
-// - Updates Hover/Active flags on elements
-// - Handles Drag logic and writes back to data bindings
+void ui_input_reset(UiInputContext* ctx); // Clears internal pointers (safe for rebuild)
 void ui_input_update(UiInputContext* ctx, UiElement* root, const InputState* input);
 
 #endif // UI_INPUT_H

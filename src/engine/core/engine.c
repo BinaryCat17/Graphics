@@ -118,8 +118,7 @@ bool engine_init(Engine* engine, const EngineConfig* config) {
     // 4. Render System
     RenderSystemConfig rs_config = {
         .window = engine->window,
-        .backend_type = "vulkan",
-        .log_level = config->log_level
+        .backend_type = "vulkan"
     };
     if (!render_system_init(&engine->render_system, &rs_config)) {
         LOG_FATAL("Failed to initialize RenderSystem.");

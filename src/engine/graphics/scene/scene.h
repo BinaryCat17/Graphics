@@ -52,9 +52,31 @@ typedef struct SceneObject {
     const Mesh* mesh; 
     Vec4 color; 
     Vec4 uv_rect; // Texture Subset (xy=off, zw=scale)
-    Vec4 params;  // Shader params: x = type, y = prim_type, z/w = varies
-    Vec4 extra;   // Additional data: 9-slice borders or curve points
     Vec4 clip_rect; // Clipping bounds (x,y,w,h). 0,0,0,0 means no clipping.
+
+    // Unified Parameters (Maps to shader 'params' and 'extra')
+    union {
+        // Raw Access (Fast copy to GPU)
+        struct {
+            Vec4 params; // x=tex_id/type
+            Vec4 extra;  // 9-slice borders, etc.
+        };
+
+        // UI Semantics
+        struct {
+            // Params
+            float texture_id;       // params.x
+            float _ui_unused;       // params.y
+            float tex_width;        // params.z
+            float tex_height;       // params.w
+            
+            // Extra
+            float border_top;       // extra.x
+            float border_right;     // extra.y
+            float border_bottom;    // extra.z
+            float border_left;      // extra.w
+        } ui_style;
+    };
     
     // Instancing (Data-Driven Visualization)
     void* instance_buffer; // Pointer to GpuBuffer (if massive instancing)

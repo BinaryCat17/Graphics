@@ -84,7 +84,6 @@ typedef struct VulkanRendererState {
     VkDescriptorPool descriptor_pool;
     VkDescriptorSet descriptor_set; // Set 0: Global Textures
     CoordinateSystem2D transformer;
-    RenderLogger* logger;
     
     // Screenshot State
     bool screenshot_pending;

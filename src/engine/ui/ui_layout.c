@@ -6,15 +6,7 @@
 #include <stdbool.h>
 #include <string.h>
 
-static UiTextMeasureFunc g_measure_func = NULL;
-static void* g_measure_user_data = NULL;
-
-void ui_layout_set_measure_func(UiTextMeasureFunc func, void* user_data) {
-    g_measure_func = func;
-    g_measure_user_data = user_data;
-}
-
-static float calculate_width(UiElement* el, float available_w) {
+static float calculate_width(UiElement* el, float available_w, UiTextMeasureFunc measure_func, void* measure_data) {
     const UiNodeSpec* spec = el->spec;
     float w = spec->width;
     if (spec->w_source) w = el->rect.w; // updated by ui_core
@@ -25,8 +17,8 @@ static float calculate_width(UiElement* el, float available_w) {
         if (parent_is_row || spec->kind == UI_KIND_TEXT || (spec->flags & UI_FLAG_CLICKABLE)) {
              const char* text = (el->cached_text[0] != '\0') ? el->cached_text : spec->static_text;
              if (text) {
-                 if (g_measure_func) {
-                     w = g_measure_func(text, g_measure_user_data) + spec->padding * 2;
+                 if (measure_func) {
+                     w = measure_func(text, measure_data) + spec->padding * 2;
                  } else {
                      w = strlen(text) * 10.0f + spec->padding * 2 + 10.0f;
                  }
@@ -104,12 +96,12 @@ static void layout_canvas(UiElement* el) {
     }
 }
 
-static void layout_recursive(UiElement* el, Rect available, uint64_t frame_number, bool log_debug) {
+static void layout_recursive(UiElement* el, Rect available, uint64_t frame_number, bool log_debug, UiTextMeasureFunc measure_func, void* measure_data) {
     if (!el || !el->spec) return;
     const UiNodeSpec* spec = el->spec;
 
     // 1. Self Size
-    el->rect.w = calculate_width(el, available.w);
+    el->rect.w = calculate_width(el, available.w, measure_func, measure_data);
     el->rect.h = calculate_height(el, available.h);
 
     if (log_debug) {
@@ -127,7 +119,7 @@ static void layout_recursive(UiElement* el, Rect available, uint64_t frame_numbe
     // Recurse First (Depth-first sizing)
     for (size_t i = 0; i < el->child_count; ++i) {
         Rect child_avail = { 0, 0, content.w, content.h };
-        layout_recursive(el->children[i], child_avail, frame_number, log_debug);
+        layout_recursive(el->children[i], child_avail, frame_number, log_debug, measure_func, measure_data);
     }
 
     // 3. Position Children
@@ -172,13 +164,13 @@ static void update_screen_rects(UiElement* el, float parent_x, float parent_y) {
     }
 }
 
-void ui_layout_root(UiElement* root, float window_w, float window_h, uint64_t frame_number, bool log_debug) {
+void ui_layout_root(UiElement* root, float window_w, float window_h, uint64_t frame_number, bool log_debug, UiTextMeasureFunc measure_func, void* measure_data) {
     if (!root) return;
     
     if (root->spec->width < 0) root->rect.w = window_w;
     if (root->spec->height < 0) root->rect.h = window_h;
     
     Rect initial_avail = {0, 0, window_w, window_h};
-    layout_recursive(root, initial_avail, frame_number, log_debug);
+    layout_recursive(root, initial_avail, frame_number, log_debug, measure_func, measure_data);
     update_screen_rects(root, 0, 0);
 }

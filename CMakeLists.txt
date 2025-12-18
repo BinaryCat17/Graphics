@@ -136,7 +136,6 @@ set(ENGINE_GRAPHICS_SOURCES
     "src/engine/graphics/backend/vulkan/vk_swapchain.c"
     "src/engine/graphics/backend/vulkan/vk_pipeline.c"
     "src/engine/graphics/backend/vulkan/vk_resources.c"
-    "src/engine/graphics/backend/vulkan/vk_compute.c"
     "src/engine/graphics/render_system.c"
     "src/engine/graphics/scene/scene.c"
     "src/engine/graphics/text/text_renderer.c"

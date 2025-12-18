@@ -126,14 +126,13 @@ static void try_bootstrap_renderer(RenderSystem* sys) {
         .vert_spv = sys->assets->unified_vert_spv,
         .frag_spv = sys->assets->unified_frag_spv,
         .font_path = sys->assets->font_path,
-        .logger_config = &sys->logger_config,
     };
 
     sys->renderer_ready = sys->backend->init(sys->backend, &init);
 
-    if (sys->renderer_ready) {
-        ui_layout_set_measure_func(render_system_measure_text_wrapper, NULL);
-    }
+    // if (sys->renderer_ready) {
+    //    ui_layout_set_measure_func(render_system_measure_text_wrapper, NULL);
+    // }
 }
 
 bool render_system_init(RenderSystem* sys, const RenderSystemConfig* config) {
@@ -154,9 +153,6 @@ bool render_system_init(RenderSystem* sys, const RenderSystemConfig* config) {
         LOG_ERROR("RenderSystem: Failed to load backend '%s'", backend_id);
         return false;
     }
-
-    sys->logger_config.level = config->log_level;
-    sys->logger_config.sink_type = RENDER_LOG_SINK_STDOUT;
     
     // Note: We delay bootstrap until assets are bound
     

@@ -9,7 +9,7 @@ void fatal_vk(const char* msg, VkResult res);
 double vk_now_ms(void);
 
 // Logging
-void vk_log_command(VulkanRendererState* state, RenderLogLevel level, const char* cmd, const char* param, double start_time_ms);
+// void vk_log_command(VulkanRendererState* state, RenderLogLevel level, const char* cmd, const char* param, double start_time_ms);
 
 // Memory
 uint32_t find_mem_type(VkPhysicalDevice physical_device, uint32_t type_filter, VkMemoryPropertyFlags properties);

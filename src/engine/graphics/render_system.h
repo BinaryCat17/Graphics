@@ -29,9 +29,6 @@ typedef struct RenderSystem {
     bool packet_ready;
     mtx_t packet_mutex;
     
-    // Config
-    RenderLoggerConfig logger_config;
-    
     // Thread control
     bool running;
     bool renderer_ready;
@@ -43,7 +40,6 @@ typedef struct RenderSystem {
 typedef struct RenderSystemConfig {
     PlatformWindow* window;
     const char* backend_type; // "vulkan"
-    RenderLogLevel log_level;
 } RenderSystemConfig;
 
 bool render_system_init(RenderSystem* sys, const RenderSystemConfig* config);

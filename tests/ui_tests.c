@@ -47,7 +47,7 @@ int test_column_layout() {
     ui_instance_init(&instance, 4096);
 
     UiElement* el = ui_element_create(&instance, root, NULL, NULL);
-    ui_layout_root(el, 800, 600, 0, false);
+    ui_layout_root(el, 800, 600, 0, false, NULL, NULL);
 
     TEST_ASSERT_FLOAT_EQ(el->rect.w, 100.0f, 0.1f);
     TEST_ASSERT_FLOAT_EQ(el->rect.h, 200.0f, 0.1f);

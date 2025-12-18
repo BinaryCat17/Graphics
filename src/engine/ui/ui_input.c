@@ -20,6 +20,17 @@ void ui_input_init(UiInputContext* ctx) {
     memset(ctx, 0, sizeof(UiInputContext));
 }
 
+void ui_input_reset(UiInputContext* ctx) {
+    if (!ctx) return;
+    ctx->hovered = NULL;
+    ctx->active = NULL;
+    ctx->focused = NULL;
+    ctx->possible_drag = false;
+    ctx->is_dragging = false;
+    // Don't reset text input buffers if we want to keep them? 
+    // Actually if UI is rebuilt, the element is gone, so focus is invalid.
+}
+
 // --- Hit Testing ---
 
 static UiElement* hit_test_recursive(UiElement* el, float x, float y) {

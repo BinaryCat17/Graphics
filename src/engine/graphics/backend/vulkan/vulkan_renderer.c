@@ -6,7 +6,6 @@
 #include "engine/graphics/backend/vulkan/vk_pipeline.h"
 #include "engine/graphics/backend/vulkan/vk_resources.h"
 #include "engine/graphics/backend/vulkan/vk_utils.h"
-#include "engine/graphics/backend/vulkan/vk_compute.h"
 #include "engine/graphics/text/font.h"
 
 #include "foundation/logger/logger.h"
@@ -142,10 +141,6 @@ static bool vulkan_renderer_init(RendererBackend* backend, const RenderBackendIn
     state->destroy_surface = (void (*)(VkInstance, const VkAllocationCallbacks*, PlatformSurface*))init->destroy_surface;
     state->get_framebuffer_size = init->get_framebuffer_size;
     state->wait_events = init->wait_events;
-
-    // Logger
-    render_logger_init(&backend->logger, init->logger_config, "Vulkan");
-    state->logger = &backend->logger;
 
     // 1. Instance
     vk_create_instance(state);
@@ -517,9 +512,6 @@ RendererBackend* vulkan_renderer_backend(void) {
     backend.update_viewport = vulkan_renderer_update_viewport;
     backend.cleanup = vulkan_renderer_cleanup;
     backend.request_screenshot = vulkan_renderer_request_screenshot;
-    
-    // Compute hooks
-    // backend.run_compute_image = vk_run_compute_image_wrapper; 
     
     return &backend;
 }

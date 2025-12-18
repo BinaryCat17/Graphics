@@ -10,6 +10,7 @@
 #include "engine/ui/ui_renderer.h"
 #include "engine/ui/ui_layout.h"
 #include "engine/ui/ui_input.h"
+#include "engine/graphics/text/font.h"
 
 #include <string.h>
 #include <stdlib.h>
@@ -18,6 +19,11 @@
 #define KEY_C 67
 
 // --- Application State ---
+
+static float text_measure_wrapper(const char* text, void* user_data) {
+    (void)user_data;
+    return font_measure_text(text);
+}
 
 typedef struct AppState {
     MathGraph graph;
@@ -255,9 +261,11 @@ static void app_on_update(Engine* engine) {
         if (engine->show_compute_visualizer) {
             char* glsl = math_graph_transpile_glsl(&app->graph, TRANSPILE_MODE_IMAGE_2D);
             if (glsl) {
-                if (engine->render_system.backend->run_compute_image) {
-                    engine->render_system.backend->run_compute_image(engine->render_system.backend, glsl, 512, 512);
-                }
+                // TODO: Implement proper compute pipeline support
+                // if (engine->render_system.backend->run_compute_image) {
+                //     engine->render_system.backend->run_compute_image(engine->render_system.backend, glsl, 512, 512);
+                // }
+                LOG_INFO("Generated GLSL:\n%s", glsl);
                 free(glsl);
             }
         }
@@ -287,7 +295,7 @@ static void app_on_update(Engine* engine) {
         }
         
         PlatformWindowSize size = platform_get_framebuffer_size(engine->window);
-        ui_layout_root(app->ui_instance.root, (float)size.width, (float)size.height, engine->render_system.frame_count, false);
+        ui_layout_root(app->ui_instance.root, (float)size.width, (float)size.height, engine->render_system.frame_count, false, text_measure_wrapper, NULL);
     }
 
     math_graph_update(&app->graph);
