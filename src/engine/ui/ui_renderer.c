@@ -60,7 +60,7 @@ static void process_node(const UiElement* el, Scene* scene, const Assets* assets
         }
 
         // FORCE FLAT for debug
-        if (false && (el->spec->border_l > 0.0f || el->spec->texture_path)) {
+        if ((el->spec->border_l > 0.0f || el->spec->texture_path)) {
             // Use 9-Slice or Textured Quad
             quad.params.x = 3.0f; // 9-Slice
             

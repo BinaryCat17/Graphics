@@ -89,10 +89,6 @@ typedef struct UiNodeSpec {
     float width, height; // < 0 means Auto/Fill
     float padding;
     float spacing;
-    
-    // Slider/Input constraints
-    float min_value;
-    float max_value;
 
     // 6. Hierarchy
     struct UiNodeSpec* item_template; // For Lists

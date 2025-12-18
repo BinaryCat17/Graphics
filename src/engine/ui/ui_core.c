@@ -56,9 +56,6 @@ UiElement* ui_element_create(const UiNodeSpec* spec, void* data, const MetaStruc
         }
     }
     
-    // Handle List Expansion (TODO: This needs the Repeater logic from old ui_def)
-    // For this refactor step, we just structure basic creation.
-
     return el;
 }
 

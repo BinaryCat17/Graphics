@@ -4,6 +4,31 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+// --- Helpers ---
+
+static void get_field_as_string(void* data, const MetaField* field, char* out_buf, size_t buf_size) {
+    if (field->type == META_TYPE_STRING) {
+        const char* current = meta_get_string(data, field);
+        if (current) strncpy(out_buf, current, buf_size - 1);
+    } else if (field->type == META_TYPE_FLOAT) {
+        float val = meta_get_float(data, field);
+        snprintf(out_buf, buf_size, "%.2f", val);
+    } else if (field->type == META_TYPE_INT) {
+        int val = meta_get_int(data, field);
+        snprintf(out_buf, buf_size, "%d", val);
+    }
+}
+
+static void set_field_from_string(void* data, const MetaField* field, const char* val_str) {
+    if (field->type == META_TYPE_STRING) {
+        meta_set_string(data, field, val_str);
+    } else if (field->type == META_TYPE_FLOAT) {
+        meta_set_float(data, field, strtof(val_str, NULL));
+    } else if (field->type == META_TYPE_INT) {
+        meta_set_int(data, field, atoi(val_str));
+    }
+}
+
 void ui_input_init(UiInputContext* ctx) {
     memset(ctx, 0, sizeof(UiInputContext));
 }
@@ -144,34 +169,14 @@ void ui_input_update(UiInputContext* ctx, UiElement* root, const InputState* inp
                     const MetaField* field = meta_find_field(el->meta, el->spec->text_source);
                     if (field) {
                          char buf[256] = {0};
-                         
-                         // Get current value as string
-                         if (field->type == META_TYPE_STRING) {
-                             const char* current = meta_get_string(el->data_ptr, field);
-                             if (current) strncpy(buf, current, 255);
-                         } else if (field->type == META_TYPE_FLOAT) {
-                             float val = meta_get_float(el->data_ptr, field);
-                             snprintf(buf, 255, "%.2f", val); // Format matches display
-                             // Remove trailing zeros/dot for cleaner editing? Maybe later.
-                         } else if (field->type == META_TYPE_INT) {
-                             int val = meta_get_int(el->data_ptr, field);
-                             snprintf(buf, 255, "%d", val);
-                         }
+                         get_field_as_string(el->data_ptr, field, buf, sizeof(buf));
                          
                          size_t len = strlen(buf);
                          if (len < 255) {
                              buf[len] = (char)input->last_char;
                              buf[len+1] = '\0';
                              
-                             // Write back
-                             if (field->type == META_TYPE_STRING) {
-                                 meta_set_string(el->data_ptr, field, buf);
-                             } else if (field->type == META_TYPE_FLOAT) {
-                                 meta_set_float(el->data_ptr, field, strtof(buf, NULL));
-                             } else if (field->type == META_TYPE_INT) {
-                                 meta_set_int(el->data_ptr, field, atoi(buf));
-                             }
-                             
+                             set_field_from_string(el->data_ptr, field, buf);
                              el->cursor_idx++;
                          }
                     }
@@ -184,30 +189,13 @@ void ui_input_update(UiInputContext* ctx, UiElement* root, const InputState* inp
                     const MetaField* field = meta_find_field(el->meta, el->spec->text_source);
                     if (field) {
                          char buf[256] = {0};
-                         
-                         if (field->type == META_TYPE_STRING) {
-                             const char* current = meta_get_string(el->data_ptr, field);
-                             if (current) strncpy(buf, current, 255);
-                         } else if (field->type == META_TYPE_FLOAT) {
-                             float val = meta_get_float(el->data_ptr, field);
-                             snprintf(buf, 255, "%.2f", val);
-                         } else if (field->type == META_TYPE_INT) {
-                             int val = meta_get_int(el->data_ptr, field);
-                             snprintf(buf, 255, "%d", val);
-                         }
+                         get_field_as_string(el->data_ptr, field, buf, sizeof(buf));
 
                          size_t len = strlen(buf);
                          if (len > 0) {
                              buf[len-1] = '\0';
                              
-                             if (field->type == META_TYPE_STRING) {
-                                 meta_set_string(el->data_ptr, field, buf);
-                             } else if (field->type == META_TYPE_FLOAT) {
-                                 meta_set_float(el->data_ptr, field, strtof(buf, NULL));
-                             } else if (field->type == META_TYPE_INT) {
-                                 meta_set_int(el->data_ptr, field, atoi(buf));
-                             }
-                             
+                             set_field_from_string(el->data_ptr, field, buf);
                              if (el->cursor_idx > 0) el->cursor_idx--;
                          }
                     }

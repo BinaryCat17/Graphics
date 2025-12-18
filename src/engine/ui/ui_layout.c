@@ -171,16 +171,14 @@ static void layout_recursive(UiElement* el, Rect available, uint64_t frame_numbe
             // child->rect.x should stay 500 relative to origin.
             // But when drawing relative to parent, it should be 400?
             // Yes.
-            if (spec->flags & UI_FLAG_SCROLLABLE) {
-                 child->rect.x -= el->scroll_x;
-                 child->rect.y -= el->scroll_y;
-            }
-            // Canvas content size is tricky, assume it fits or max child
-            // Simple max logic for now
-             float child_bottom = child->rect.y + child->rect.h; // These are relative to parent
-             // We need to un-apply scroll to get "true" content size? 
-             // Actually, content size is the bounds of children in "unscrolled" space.
-             // If child is at 0, and we scrolled down 100, child.y is -100.
+                         if (spec->flags & UI_FLAG_SCROLLABLE) {
+                             child->rect.x -= el->scroll_x;
+                             child->rect.y -= el->scroll_y;
+                        }
+                        // Canvas content size is tricky, assume it fits or max child
+                        // Simple max logic for now
+                         // We need to un-apply scroll to get "true" content size? 
+                         // Actually, content size is the bounds of children in "unscrolled" space.             // If child is at 0, and we scrolled down 100, child.y is -100.
              // True Y is 0. 
              // content_h should be max(True Y + h)
              // True Y = child.rect.y + el->scroll_y - content.y
