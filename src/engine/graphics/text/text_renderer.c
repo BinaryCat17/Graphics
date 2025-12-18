@@ -42,7 +42,7 @@ void scene_add_text_clipped(Scene* scene, const char* text, Vec3 pos, float scal
             obj.color = color;
             
             // Texture Params (1.0 = use texture)
-            obj.params.x = 1.0f;
+            obj.shader_params_0.x = 1.0f;
             
             // UVs
             obj.uv_rect.x = g.u0;

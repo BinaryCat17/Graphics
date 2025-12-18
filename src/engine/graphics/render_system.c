@@ -69,7 +69,7 @@ static void try_sync_packet(RenderSystem* sys) {
         quad.position = (Vec3){600.0f, 100.0f, 0.0f};
         quad.scale = (Vec3){512.0f, 512.0f, 1.0f};
         quad.color = (Vec4){1.0f, 1.0f, 1.0f, 1.0f};
-        quad.params.x = 2.0f; // User Texture
+        quad.shader_params_0.x = 2.0f; // User Texture
         quad.uv_rect = (Vec4){0.0f, 0.0f, 1.0f, 1.0f};
         scene_add_object(&dest->scene, quad);
     }

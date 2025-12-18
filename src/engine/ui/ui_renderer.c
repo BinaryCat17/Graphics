@@ -44,23 +44,26 @@ static void render_background(const UiElement* el, Scene* scene, Vec4 clip_vec) 
 
     if ((el->spec->border_l > 0.0f || el->spec->texture_path)) {
         // Use 9-Slice or Textured Quad
-        quad.ui_style.texture_id = 3.0f; // 9-Slice (UI Shader Mode)
+        quad.shader_params_0.x = 3.0f; // 9-Slice (UI Shader Mode)
         
         float u0, v0, u1, v1;
         font_get_ui_rect_uv(&u0, &v0, &u1, &v1);
         quad.uv_rect = (Vec4){u0, v0, u1 - u0, v1 - v0};
         
         // Pass 9-slice data
-        quad.ui_style.tex_width = el->spec->tex_w > 0 ? el->spec->tex_w : 32.0f;
-        quad.ui_style.tex_height = el->spec->tex_h > 0 ? el->spec->tex_h : 32.0f;
-        quad.ui_style.border_top = el->spec->border_t;
-        quad.ui_style.border_right = el->spec->border_r;
-        quad.ui_style.border_bottom = el->spec->border_b;
-        quad.ui_style.border_left = el->spec->border_l;
+        // shader_params_0: x=type, y=unused, z=width, w=height
+        quad.shader_params_0.z = el->spec->tex_w > 0 ? el->spec->tex_w : 32.0f;
+        quad.shader_params_0.w = el->spec->tex_h > 0 ? el->spec->tex_h : 32.0f;
+        
+        // shader_params_1: borders (top, right, bottom, left)
+        quad.shader_params_1.x = el->spec->border_t;
+        quad.shader_params_1.y = el->spec->border_r;
+        quad.shader_params_1.z = el->spec->border_b;
+        quad.shader_params_1.w = el->spec->border_l;
         
     } else {
         // Flat Color Quad
-        quad.ui_style.texture_id = 0.0f;
+        quad.shader_params_0.x = 0.0f;
         float u, v;
         font_get_white_pixel_uv(&u, &v);
         quad.uv_rect = (Vec4){u, v, 0.001f, 0.001f}; 
@@ -117,7 +120,7 @@ static void render_content(const UiElement* el, Scene* scene, Vec4 clip_vec) {
             caret.color = (Vec4){1.0f, 1.0f, 1.0f, 1.0f}; // White cursor
             
             // Flat
-            caret.ui_style.texture_id = 0.0f;
+            caret.shader_params_0.x = 0.0f;
             float u, v;
             font_get_white_pixel_uv(&u, &v);
             caret.uv_rect = (Vec4){u, v, 0.001f, 0.001f};

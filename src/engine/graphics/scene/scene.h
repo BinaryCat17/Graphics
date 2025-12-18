@@ -55,28 +55,11 @@ typedef struct SceneObject {
     Vec4 clip_rect; // Clipping bounds (x,y,w,h). 0,0,0,0 means no clipping.
 
     // Unified Parameters (Maps to shader 'params' and 'extra')
-    union {
-        // Raw Access (Fast copy to GPU)
-        struct {
-            Vec4 params; // x=tex_id/type
-            Vec4 extra;  // 9-slice borders, etc.
-        };
+    // Generic storage for per-instance shader data.
+    // Usage is defined by the specific renderer/shader (e.g., UI, Graph, etc.)
+    Vec4 shader_params_0; 
+    Vec4 shader_params_1; 
 
-        // UI Semantics
-        struct {
-            // Params
-            float texture_id;       // params.x
-            float _ui_unused;       // params.y
-            float tex_width;        // params.z
-            float tex_height;       // params.w
-            
-            // Extra
-            float border_top;       // extra.x
-            float border_right;     // extra.y
-            float border_bottom;    // extra.z
-            float border_left;      // extra.w
-        } ui_style;
-    };
     
     // Instancing (Data-Driven Visualization)
     void* instance_buffer; // Pointer to GpuBuffer (if massive instancing)

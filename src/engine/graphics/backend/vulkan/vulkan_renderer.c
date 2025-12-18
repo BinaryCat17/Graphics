@@ -58,8 +58,8 @@ typedef struct GpuInstanceData {
     Mat4 model;
     Vec4 color;
     Vec4 uv_rect;
-    Vec4 params;
-    Vec4 extra;
+    Vec4 params_1;
+    Vec4 params_2;
     Vec4 clip_rect; // Added
 } GpuInstanceData;
 
@@ -279,8 +279,8 @@ static void vulkan_renderer_render_scene(RendererBackend* backend, const Scene* 
         instances[i].model = m;
         instances[i].color = obj->color;
         instances[i].uv_rect = obj->uv_rect;
-        instances[i].params = obj->params;
-        instances[i].extra = obj->extra; // Pass through extra data (9-slice or curves)
+        instances[i].params_1 = obj->shader_params_0;
+        instances[i].params_2 = obj->shader_params_1; // Pass through extra data (9-slice or curves)
         instances[i].clip_rect = obj->clip_rect;
     }
     
