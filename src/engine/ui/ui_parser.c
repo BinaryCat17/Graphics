@@ -9,15 +9,6 @@
 
 // --- Helper Functions ---
 
-static UiLayoutStrategy parse_layout_strategy(const char* str) {
-    if (!str) return UI_LAYOUT_FLEX_COLUMN;
-    if (strcmp(str, "row") == 0) return UI_LAYOUT_FLEX_ROW;
-    if (strcmp(str, "column") == 0) return UI_LAYOUT_FLEX_COLUMN;
-    if (strcmp(str, "canvas") == 0) return UI_LAYOUT_CANVAS;
-    if (strcmp(str, "overlay") == 0) return UI_LAYOUT_OVERLAY;
-    return UI_LAYOUT_FLEX_COLUMN;
-}
-
 static UiKind parse_kind(const char* type_str, uint32_t* out_flags) {
     *out_flags = UI_FLAG_NONE;
     if (!type_str) return UI_KIND_CONTAINER;
@@ -80,16 +71,15 @@ static UiNodeSpec* load_recursive(UiAsset* asset, const void* node_ptr) {
         const ConfigNode* val = node->pairs[i].value;
         if (!key || !val) continue;
 
-        // --- Special Handling for Enums / Complex Types / Recursion ---
+        // --- Special Handling for Recursion / Templates ---
         
         if (strcmp(key, "type") == 0) {
              spec->kind = parse_kind(val->scalar, &spec->flags);
              continue;
         }
-        if (strcmp(key, "layout") == 0) {
-            spec->layout = parse_layout_strategy(val->scalar);
-            continue;
-        }
+        
+        // Removed explicit "layout" handler -> handled by reflection now
+
         if (strcmp(key, "children") == 0) {
             if (val->type == CONFIG_NODE_SEQUENCE) {
                 spec->child_count = val->item_count;
@@ -143,39 +133,30 @@ static UiNodeSpec* load_recursive(UiAsset* asset, const void* node_ptr) {
                  float fv = val->scalar ? (float)atof(val->scalar) : 0.0f;
                  meta_set_float(spec, field, fv);
             } else if (field->type == META_TYPE_INT) {
-                 // Warning: Enums are INTs but we handle them manually above. 
-                 // This generic block handles simple ints if any.
                  int iv = val->scalar ? atoi(val->scalar) : 0;
                  meta_set_int(spec, field, iv);
+            } else if (field->type == META_TYPE_ENUM) {
+                 int enum_val = 0;
+                 const MetaEnum* e = meta_get_enum(field->type_name);
+                 if (e && val->scalar) {
+                     if (meta_enum_get_value(e, val->scalar, &enum_val)) {
+                         meta_set_int(spec, field, enum_val);
+                     } else {
+                         LOG_WARN("UiParser: Unknown enum value '%s' for type '%s'", val->scalar, field->type_name);
+                     }
+                 }
             } else if (field->type == META_TYPE_STRING) {
                  const char* s = val->scalar ? val->scalar : "";
-                 // Handle Bindings {binding} vs Static Text
-                 // Note: We need to distinguish fields that ARE sources vs literal fields
-                 // Logic: If the YAML value starts with '{', it's a binding.
-                 // But wait, if field is "value_source", we expect just "my_var". 
-                 // If field is "static_text", and value is "{my_var}", do we behave differently?
                  
-                 // Current logic: 
-                 // "text": "Hello" -> static_text = "Hello"
-                 // "text": "{Name}" -> text_source = "Name"
-                 
-                 // If we found 'static_text' field via alias "text":
                  if (strcmp(field->name, "static_text") == 0 && s[0] == '{') {
                      // Reroute to text_source
                      size_t len = strlen(s);
                      if (len > 2) {
                          char* buf = arena_push_string_n(&asset->arena, s + 1, len - 2);
                          spec->text_source = buf;
-                         // Clear static_text just in case
                          spec->static_text = NULL; 
                      }
                  } else {
-                     // Standard string set
-                     // We must allocate in arena, but meta_set_string does malloc!
-                     // FIXME: meta_set_string uses malloc/free. UiAsset uses Arena.
-                     // We cannot use meta_set_string here safely if we want to use the arena.
-                     
-                     // Solution: Manually set pointer via offset
                      char* str_copy = arena_push_string(&asset->arena, s);
                      char** field_ptr = (char**)meta_get_field_ptr(spec, field);
                      if (field_ptr) *field_ptr = str_copy;

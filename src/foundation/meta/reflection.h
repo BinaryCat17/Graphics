@@ -3,6 +3,7 @@
 
 #include <stddef.h>
 #include <stdint.h>
+#include <stdbool.h>
 
 // Типы данных, которые поддерживает наша система рефлексии
 typedef enum MetaTypeKind {
@@ -10,32 +11,47 @@ typedef enum MetaTypeKind {
     META_TYPE_INT,
     META_TYPE_FLOAT,
     META_TYPE_BOOL,
-    META_TYPE_STRING, // char* (null-terminated)
-    META_TYPE_STRUCT, // Вложенная структура
-    META_TYPE_ARRAY,  // Указатель + count (динамический массив)
-    META_TYPE_POINTER // Указатель на структуру
+    META_TYPE_STRING, 
+    META_TYPE_STRUCT, 
+    META_TYPE_ARRAY,  
+    META_TYPE_POINTER,
+    META_TYPE_ENUM    // Added: Enum support
 } MetaTypeKind;
+
+// Описание одного значения enum (например: "UI_LAYOUT_ROW" -> 1)
+typedef struct MetaEnumValue {
+    const char* name;
+    int value;
+} MetaEnumValue;
+
+// Описание типа Enum
+typedef struct MetaEnum {
+    const char* name;
+    const MetaEnumValue* values;
+    size_t count;
+} MetaEnum;
 
 // Описание одного поля структуры
 typedef struct MetaField {
     const char* name;
     MetaTypeKind type;
-    size_t offset;         // Смещение от начала структуры (offsetof)
-    const char* type_name; // Имя типа (для STRUCT/POINTER), например "MathNode"
+    size_t offset;         
+    const char* type_name; // Имя типа (для STRUCT/ENUM)
 } MetaField;
 
 // Описание всей структуры
 typedef struct MetaStruct {
-    const char* name;      // Имя структуры, например "MathNode"
-    size_t size;           // sizeof(MathNode)
+    const char* name;      
+    size_t size;           
     const MetaField* fields;
     size_t field_count;
 } MetaStruct;
 
 // Реестр типов
 const MetaStruct* meta_get_struct(const char* name);
+const MetaEnum* meta_get_enum(const char* name);
 
-// Хелперы для доступа к данным через рефлексию
+// Хелперы
 void* meta_get_field_ptr(void* instance, const MetaField* field);
 int meta_get_int(void* instance, const MetaField* field);
 float meta_get_float(void* instance, const MetaField* field);
@@ -46,5 +62,7 @@ void meta_set_string(void* instance, const MetaField* field, const char* value);
 
 // Helper to find a field by name in a struct definition
 const MetaField* meta_find_field(const MetaStruct* meta, const char* field_name);
+// Helper to find enum value by string name (returns true if found)
+bool meta_enum_get_value(const MetaEnum* meta_enum, const char* name_str, int* out_value);
 
 #endif // FOUNDATION_META_REFLECTION_H

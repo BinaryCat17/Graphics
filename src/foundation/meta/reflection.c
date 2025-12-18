@@ -3,15 +3,6 @@
 #include <stdlib.h>
 #include <stdio.h>
 
-// Реализация реестра будет сгенерирована в src/generated/reflection_registry.c
-// Здесь мы только объявляем внешнюю функцию поиска
-extern const MetaStruct* meta_registry_find(const char* name);
-
-const MetaStruct* meta_get_struct(const char* name) {
-    if (!name) return NULL;
-    return meta_registry_find(name);
-}
-
 void* meta_get_field_ptr(void* instance, const MetaField* field) {
     if (!instance || !field) return NULL;
     return (char*)instance + field->offset;
