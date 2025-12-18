@@ -1,6 +1,7 @@
 #include "engine/core/engine.h"
 #include "foundation/logger/logger.h"
 #include "foundation/platform/platform.h"
+#include "foundation/platform/fs.h"
 #include "foundation/meta/reflection.h"
 #include "engine/ui/ui_layout.h"
 #include "engine/graphics/text/font.h"
@@ -33,6 +34,23 @@ static void on_scroll(PlatformWindow* window, double xoff, double yoff, void* us
 
     engine->input.scroll_dx += (float)xoff;
     engine->input.scroll_dy += (float)yoff;
+}
+
+static void on_key(PlatformWindow* window, int key, int scancode, PlatformInputAction action, int mods, void* user_data) {
+    (void)window; (void)scancode; (void)mods;
+    Engine* engine = (Engine*)user_data;
+    if (!engine) return;
+    
+    engine->input.last_key = key;
+    engine->input.last_action = (int)action;
+}
+
+static void on_char(PlatformWindow* window, unsigned int codepoint, void* user_data) {
+    (void)window;
+    Engine* engine = (Engine*)user_data;
+    if (!engine) return;
+    
+    engine->input.last_char = codepoint;
 }
 
 static void on_cursor_pos(PlatformWindow* window, double x, double y, void* user_data) {
@@ -81,6 +99,8 @@ bool engine_init(Engine* engine, const EngineConfig* config) {
     platform_set_window_user_pointer(engine->window, engine);
     platform_set_mouse_button_callback(engine->window, on_mouse_button, engine);
     platform_set_scroll_callback(engine->window, on_scroll, engine);
+    platform_set_key_callback(engine->window, on_key, engine);
+    platform_set_char_callback(engine->window, on_char, engine);
     platform_set_cursor_pos_callback(engine->window, on_cursor_pos, engine);
     platform_set_framebuffer_size_callback(engine->window, on_framebuffer_size, engine);
 
@@ -113,6 +133,31 @@ bool engine_init(Engine* engine, const EngineConfig* config) {
     if (config->on_init) {
         config->on_init(engine);
     }
+    
+    // Screenshot Init
+    engine->screenshot_interval = config->screenshot_interval;
+    engine->last_screenshot_time = platform_get_time_ms() / 1000.0;
+    
+    // Clean old screenshots
+    if (engine->screenshot_interval > 0.0) {
+        if (!platform_mkdir("logs")) platform_mkdir("logs");
+        if (platform_mkdir("logs/screenshots")) {
+             // Directory exists or created, clean it
+             PlatformDir* dir = platform_dir_open("logs/screenshots");
+             if (dir) {
+                 PlatformDirEntry entry;
+                 while (platform_dir_read(dir, &entry)) {
+                     if (!entry.is_dir) {
+                         char path[512];
+                         snprintf(path, sizeof(path), "logs/screenshots/%s", entry.name);
+                         platform_remove_file(path);
+                     }
+                     free(entry.name);
+                 }
+                 platform_dir_close(dir);
+             }
+        }
+    }
 
     engine->running = true;
     return true;
@@ -126,11 +171,25 @@ void engine_run(Engine* engine) {
     RenderSystem* rs = &engine->render_system;
     
     while (engine->running && !platform_window_should_close(engine->window)) {
+        double now = platform_get_time_ms() / 1000.0;
+        
+        // Auto Screenshot
+        if (engine->screenshot_interval > 0.0 && (now - engine->last_screenshot_time) > engine->screenshot_interval) {
+            char path[256];
+            snprintf(path, sizeof(path), "logs/screenshots/screen_%.3f.png", now);
+            LOG_INFO("Requesting screenshot: %s", path);
+            render_system_request_screenshot(rs, path);
+            engine->last_screenshot_time = now;
+        }
+
         rs->frame_count++;
         
         // Reset per-frame input deltas
         engine->input.scroll_dx = 0;
         engine->input.scroll_dy = 0;
+        engine->input.last_char = 0;
+        engine->input.last_key = 0;
+        engine->input.last_action = -1;
         
         // Input Poll (Triggers callbacks)
         platform_poll_events();

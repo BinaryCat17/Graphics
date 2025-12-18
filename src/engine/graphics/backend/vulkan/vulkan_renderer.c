@@ -17,6 +17,9 @@
 #include <string.h>
 #include <math.h>
 
+#define STB_IMAGE_WRITE_IMPLEMENTATION
+#include "stb_image_write.h"
+
 // Must match shader struct layout (std140)
 typedef struct GpuInstanceData {
     Mat4 model;
@@ -26,6 +29,15 @@ typedef struct GpuInstanceData {
     Vec4 extra;
     Vec4 clip_rect; // Added
 } GpuInstanceData;
+
+static void vulkan_renderer_request_screenshot(RendererBackend* backend, const char* filepath) {
+    VulkanRendererState* state = (VulkanRendererState*)backend->state;
+    if (!state || !filepath) return;
+    
+    LOG_DEBUG("Vulkan: Queueing screenshot to %s", filepath);
+    platform_strncpy(state->screenshot_path, filepath, sizeof(state->screenshot_path) - 1);
+    state->screenshot_pending = true;
+}
 
 // Helper to resize instance buffer dynamically
 static void ensure_instance_capacity(VulkanRendererState* state, FrameResources* frame, size_t required_count) {
@@ -132,13 +144,16 @@ static bool vulkan_renderer_init(RendererBackend* backend, const RenderBackendIn
     vk_create_font_texture(state);
     vk_create_descriptor_pool_and_set(state);
 
-    // 9. Static Buffers (Quad)
+    // 9. Static Buffers (Quad - 2 Triangles, 0..1 range)
     float quad_verts[] = {
-        // Positions      // UVs
-        -0.5f, -0.5f, 0.0f,  0.0f, 0.0f,
-         0.5f, -0.5f, 0.0f,  1.0f, 0.0f,
-         0.5f,  0.5f, 0.0f,  1.0f, 1.0f,
-        -0.5f,  0.5f, 0.0f,  0.0f, 1.0f
+        // Pos (x,y,z)      // UV (u,v)
+        0.0f, 0.0f, 0.0f,   0.0f, 0.0f,
+        1.0f, 0.0f, 0.0f,   1.0f, 0.0f,
+        1.0f, 1.0f, 0.0f,   1.0f, 1.0f,
+        
+        0.0f, 0.0f, 0.0f,   0.0f, 0.0f,
+        1.0f, 1.0f, 0.0f,   1.0f, 1.0f,
+        0.0f, 1.0f, 0.0f,   0.0f, 1.0f
     };
     VkDeviceSize v_size = sizeof(quad_verts);
     vk_create_buffer(state, v_size, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, 
@@ -182,6 +197,7 @@ static void vulkan_renderer_render_scene(RendererBackend* backend, const Scene* 
     
     // Frame Sync
     vkWaitForFences(state->device, 1, &state->fences[state->current_frame_cursor], VK_TRUE, UINT64_MAX);
+    vkWaitForFences(state->device, 1, &state->fences[state->current_frame_cursor], VK_TRUE, UINT64_MAX);
     
     uint32_t image_index;
     VkResult result = vkAcquireNextImageKHR(state->device, state->swapchain, UINT64_MAX, 
@@ -218,7 +234,7 @@ static void vulkan_renderer_render_scene(RendererBackend* backend, const Scene* 
         instances[i].color = obj->color;
         instances[i].uv_rect = obj->uv_rect;
         instances[i].params = obj->params;
-        instances[i].extra = (Vec4){0,0,0,0}; // Curve data
+        instances[i].extra = obj->extra; // Pass through extra data (9-slice or curves)
         instances[i].clip_rect = obj->clip_rect;
     }
     
@@ -273,6 +289,60 @@ static void vulkan_renderer_render_scene(RendererBackend* backend, const Scene* 
     }
     
     vkCmdEndRenderPass(cmd);
+
+    // Screenshot Buffer
+    VkBuffer screenshot_buffer = VK_NULL_HANDLE;
+    VkDeviceMemory screenshot_memory = VK_NULL_HANDLE;
+
+    if (state->screenshot_pending) {
+        LOG_INFO("Screenshot: Starting capture sequence...");
+        // Prepare Buffer
+        uint32_t w = state->swapchain_extent.width;
+        uint32_t h = state->swapchain_extent.height;
+        VkDeviceSize size = w * h * 4;
+        
+        vk_create_buffer(state, size, VK_BUFFER_USAGE_TRANSFER_DST_BIT, 
+                         VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, 
+                         &screenshot_buffer, &screenshot_memory);
+                         
+        LOG_INFO("Screenshot: Buffer created (Handle: %p)", (void*)screenshot_buffer);
+
+        // Transition Image: PRESENT_SRC_KHR -> TRANSFER_SRC_OPTIMAL
+        VkImageMemoryBarrier barrier = {
+            .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
+            .srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT,
+            .dstAccessMask = VK_ACCESS_TRANSFER_READ_BIT,
+            .oldLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR, // Assumes renderpass finalLayout
+            .newLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+            .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+            .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+            .image = state->swapchain_imgs[image_index],
+            .subresourceRange = { VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1 }
+        };
+        vkCmdPipelineBarrier(cmd, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, 
+                             0, 0, NULL, 0, NULL, 1, &barrier);
+
+        // Copy
+        VkBufferImageCopy region = {
+            .bufferOffset = 0,
+            .bufferRowLength = 0,
+            .bufferImageHeight = 0,
+            .imageSubresource = { VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1 },
+            .imageOffset = {0, 0, 0},
+            .imageExtent = {w, h, 1}
+        };
+        vkCmdCopyImageToBuffer(cmd, state->swapchain_imgs[image_index], VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, screenshot_buffer, 1, &region);
+        
+        // Transition Back: TRANSFER_SRC -> PRESENT_SRC
+        barrier.srcAccessMask = VK_ACCESS_TRANSFER_READ_BIT;
+        barrier.dstAccessMask = 0;
+        barrier.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
+        barrier.newLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
+        
+        vkCmdPipelineBarrier(cmd, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, 
+                             0, 0, NULL, 0, NULL, 1, &barrier);
+    }
+
     vkEndCommandBuffer(cmd);
     
     // Submit
@@ -287,6 +357,48 @@ static void vulkan_renderer_render_scene(RendererBackend* backend, const Scene* 
     submit_info.pSignalSemaphores = &state->sem_render_done;
     
     vkQueueSubmit(state->queue, 1, &submit_info, state->fences[state->current_frame_cursor]);
+
+    // Save Screenshot (Stalling)
+    if (state->screenshot_pending && screenshot_buffer) {
+        LOG_INFO("Screenshot: Waiting for GPU...");
+        vkQueueWaitIdle(state->queue);
+        
+        uint32_t w = state->swapchain_extent.width;
+        uint32_t h = state->swapchain_extent.height;
+        
+        LOG_INFO("Screenshot: Mapping memory...");
+        uint8_t* data = NULL;
+        vkMapMemory(state->device, screenshot_memory, 0, VK_WHOLE_SIZE, 0, (void**)&data);
+        
+        if (data) {
+            LOG_INFO("Screenshot: Memory mapped. Swizzling...");
+            // Swizzle BGRA -> RGBA if needed
+            if (state->swapchain_format == VK_FORMAT_B8G8R8A8_UNORM || state->swapchain_format == VK_FORMAT_B8G8R8A8_SRGB) {
+                for (uint32_t i = 0; i < w * h; i++) {
+                    uint8_t b = data[i * 4 + 0];
+                    uint8_t r = data[i * 4 + 2];
+                    data[i * 4 + 0] = r;
+                    data[i * 4 + 2] = b;
+                }
+            }
+            
+            LOG_INFO("Screenshot: Writing to disk (%s)...", state->screenshot_path);
+            if (stbi_write_png(state->screenshot_path, (int)w, (int)h, 4, data, (int)(w * 4))) {
+                LOG_INFO("Screenshot saved to %s", state->screenshot_path);
+            } else {
+                LOG_ERROR("Failed to write screenshot to %s", state->screenshot_path);
+            }
+            vkUnmapMemory(state->device, screenshot_memory);
+        } else {
+            LOG_ERROR("Screenshot: Failed to map memory!");
+        }
+        
+        vkDestroyBuffer(state->device, screenshot_buffer, NULL);
+        vkFreeMemory(state->device, screenshot_memory, NULL);
+        
+        state->screenshot_pending = false;
+        LOG_INFO("Screenshot: Done.");
+    }
     
     // Present
     VkPresentInfoKHR present_info = {.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR};
@@ -333,6 +445,7 @@ RendererBackend* vulkan_renderer_backend(void) {
     backend.render_scene = vulkan_renderer_render_scene;
     backend.update_viewport = vulkan_renderer_update_viewport;
     backend.cleanup = vulkan_renderer_cleanup;
+    backend.request_screenshot = vulkan_renderer_request_screenshot;
     
     // Compute hooks
     // backend.run_compute_image = vk_run_compute_image_wrapper; 
