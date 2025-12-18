@@ -2,32 +2,45 @@
 #include "foundation/logger/logger.h"
 #include "features/graph_editor/transpiler.h"
 #include "foundation/platform/platform.h"
+#include "foundation/meta/reflection.h"
 #include "engine/graphics/backend/renderer_backend.h"
+#include "features/graph_editor/math_graph.h"
+#include "engine/ui/ui_loader.h"
+#include "engine/ui/ui_layout.h"
+
 #include <string.h>
 #include <stdlib.h>
 
 #define KEY_C 67
 
+// --- Application State ---
+
+typedef struct AppState {
+    MathGraph graph;
+    UiDef* ui_def;
+    UiView* ui_root;
+} AppState;
+
 // --- Application Logic ---
 
-static void app_setup_graph(Engine* engine) {
+static void app_setup_graph(AppState* app) {
     LOG_INFO("App: Setting up default Math Graph...");
     
     // Create Test Nodes (Visualizer Graph)
-    MathNode* uv = math_graph_add_node(&engine->graph, MATH_NODE_UV);
+    MathNode* uv = math_graph_add_node(&app->graph, MATH_NODE_UV);
     uv->name = strdup("UV.x");
     uv->x = 50; uv->y = 100;
 
-    MathNode* freq = math_graph_add_node(&engine->graph, MATH_NODE_VALUE);
+    MathNode* freq = math_graph_add_node(&app->graph, MATH_NODE_VALUE);
     freq->name = strdup("Frequency");
     freq->value = 20.0f;
     freq->x = 50; freq->y = 250;
     
-    MathNode* mul = math_graph_add_node(&engine->graph, MATH_NODE_MUL);
+    MathNode* mul = math_graph_add_node(&app->graph, MATH_NODE_MUL);
     mul->name = strdup("Multiply");
     mul->x = 250; mul->y = 175;
     
-    MathNode* s = math_graph_add_node(&engine->graph, MATH_NODE_SIN);
+    MathNode* s = math_graph_add_node(&app->graph, MATH_NODE_SIN);
     s->name = strdup("Sin");
     s->x = 450; s->y = 175;
     
@@ -37,10 +50,46 @@ static void app_setup_graph(Engine* engine) {
 }
 
 static void app_on_init(Engine* engine) {
-    app_setup_graph(engine);
+    // 1. Allocate State
+    AppState* app = (AppState*)calloc(1, sizeof(AppState));
+    engine->user_data = app;
+
+    // 2. Initialize Graph
+    math_graph_init(&app->graph);
+    app_setup_graph(app);
+
+    // 3. Initialize UI
+    // Note: We access config paths via a global or pass them? 
+    // For now hardcoding or we need to access EngineConfig inside Engine if we stored it?
+    // Let's assume standard paths for this MVP refactor.
+    const char* ui_path = "assets/ui/editor.yaml"; // Ideally from config
+    
+    app->ui_def = ui_loader_load_from_file(ui_path);
+    if (!app->ui_def) {
+        LOG_ERROR("App: Failed to load UI definition from '%s'", ui_path);
+        return;
+    }
+
+    const MetaStruct* graph_meta = meta_get_struct("MathGraph");
+    if (!graph_meta) {
+        LOG_FATAL("App: Reflection metadata for 'MathGraph' not found.");
+        return;
+    }
+    
+    app->ui_root = ui_view_create(app->ui_def, &app->graph, graph_meta);
+    if (!app->ui_root) {
+        LOG_ERROR("App: Failed to create UI View.");
+        return;
+    }
+
+    // 4. Bind UI to Renderer
+    render_system_bind_ui(&engine->render_system, app->ui_root);
 }
 
 static void app_on_update(Engine* engine) {
+    AppState* app = (AppState*)engine->user_data;
+    if (!app) return;
+
     static bool key_c_prev = false;
     bool key_c_curr = platform_get_key(engine->window, KEY_C);
     
@@ -53,7 +102,7 @@ static void app_on_update(Engine* engine) {
             LOG_INFO("App: Transpiling & Running Compute Graph...");
             
             // 1. Transpile Graph to GLSL
-            char* glsl = math_graph_transpile_glsl(&engine->graph, TRANSPILE_MODE_IMAGE_2D);
+            char* glsl = math_graph_transpile_glsl(&app->graph, TRANSPILE_MODE_IMAGE_2D);
             
             // 2. Run on GPU
             if (glsl) {
@@ -66,6 +115,19 @@ static void app_on_update(Engine* engine) {
         }
     }
     key_c_prev = key_c_curr;
+
+    // UI Update
+    if (app->ui_root) {
+        ui_view_process_input(app->ui_root, &engine->input);
+        ui_view_update(app->ui_root);
+        
+        PlatformWindowSize size = platform_get_framebuffer_size(engine->window);
+        ui_layout_root(app->ui_root, (float)size.width, (float)size.height, engine->render_system.frame_count, false);
+    }
+
+    // Graph Update
+    math_graph_update(&app->graph);
+    math_graph_update_visuals(&app->graph, false);
 }
 
 // --- Main Entry Point ---
@@ -108,6 +170,16 @@ int main(int argc, char** argv) {
     Engine engine;
     if (engine_init(&engine, &config)) {
         engine_run(&engine);
+        
+        // Cleanup App State
+        if (engine.user_data) {
+             AppState* app = (AppState*)engine.user_data;
+             if (app->ui_root) ui_view_free(app->ui_root);
+             if (app->ui_def) ui_def_free(app->ui_def);
+             math_graph_dispose(&app->graph);
+             free(app);
+        }
+        
         engine_shutdown(&engine);
     } else {
         LOG_FATAL("Engine failed to initialize.");

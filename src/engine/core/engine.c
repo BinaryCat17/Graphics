@@ -95,34 +95,7 @@ bool engine_init(Engine* engine, const EngineConfig* config) {
         return false;
     }
 
-    // 4. Math Graph (Model)
-    math_graph_init(&engine->graph);
-    
-    // Application Init Hook (App sets up the graph here)
-    if (config->on_init) {
-        config->on_init(engine);
-    }
-
-    // 5. UI (View)
-    engine->ui_def = ui_loader_load_from_file(config->ui_path);
-    if (!engine->ui_def) {
-        LOG_ERROR("Failed to load UI definition from '%s'", config->ui_path);
-        return false;
-    }
-
-    const MetaStruct* graph_meta = meta_get_struct("MathGraph");
-    if (!graph_meta) {
-        LOG_FATAL("Reflection metadata for 'MathGraph' not found.");
-        return false;
-    }
-    
-    engine->ui_root = ui_view_create(engine->ui_def, &engine->graph, graph_meta);
-    if (!engine->ui_root) {
-        LOG_ERROR("Failed to create UI View.");
-        return false;
-    }
-
-    // 6. Render System
+    // 4. Render System
     RenderSystemConfig rs_config = {
         .window = engine->window,
         .backend_type = "vulkan",
@@ -133,10 +106,14 @@ bool engine_init(Engine* engine, const EngineConfig* config) {
         return false;
     }
 
-    // Bindings (Legacy coupling, to be refactored)
+    // Bindings
     render_system_bind_assets(&engine->render_system, &engine->assets);
-    render_system_bind_ui(&engine->render_system, engine->ui_root);
     
+    // 5. Application Init Hook (App sets up Graph, UI, binds them to Renderer)
+    if (config->on_init) {
+        config->on_init(engine);
+    }
+
     engine->running = true;
     return true;
 }
@@ -163,23 +140,10 @@ void engine_run(Engine* engine) {
         engine->input.mouse_clicked = engine->input.mouse_down && !last_down;
         last_down = engine->input.mouse_down;
 
-        // Application Update Hook
+        // Application Update Hook (App updates Graph, UI Layout, etc.)
         if (engine->on_update) {
             engine->on_update(engine);
         }
-
-        // Update UI
-        if (engine->ui_root) {
-            ui_view_process_input(engine->ui_root, &engine->input);
-            ui_view_update(engine->ui_root);
-            
-            PlatformWindowSize size = platform_get_framebuffer_size(engine->window);
-            ui_layout_root(engine->ui_root, (float)size.width, (float)size.height, rs->frame_count, false);
-        }
-
-        // Update Graph
-        math_graph_update(&engine->graph);
-        math_graph_update_visuals(&engine->graph, false);
 
         // Render Update
         render_system_update(rs);
@@ -198,11 +162,6 @@ void engine_shutdown(Engine* engine) {
     if (!engine) return;
     
     render_system_shutdown(&engine->render_system);
-    
-    if (engine->ui_root) ui_view_free(engine->ui_root);
-    if (engine->ui_def) ui_def_free(engine->ui_def);
-    
-    math_graph_dispose(&engine->graph);
     assets_shutdown(&engine->assets);
     
     if (engine->window) {

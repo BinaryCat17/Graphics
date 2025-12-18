@@ -2,7 +2,6 @@
 
 #include "engine/graphics/render_system.h"
 #include "engine/assets/assets.h"
-#include "features/graph_editor/math_graph.h"
 #include "engine/ui/ui_loader.h"
 #include "foundation/platform/platform.h"
 #include "engine/ui/ui_def.h"
@@ -31,12 +30,8 @@ struct Engine {
     RenderSystem render_system;
     Assets assets;
     
-    // Domain Data
-    MathGraph graph;
-    
-    // UI
-    UiDef* ui_def;
-    UiView* ui_root;
+    // Application Data
+    void* user_data;
     
     // State
     bool running;
