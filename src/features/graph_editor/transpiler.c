@@ -1,26 +1,32 @@
 #include "transpiler.h"
+#include "foundation/memory/arena.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <stdarg.h>
 #include <stdbool.h>
 
-// --- String Buffer Helper ---
+// --- Arena String Stream ---
 
 typedef struct {
-    char* data;
-    size_t length;
-    size_t capacity;
-} StringBuilder;
+    MemoryArena* arena;
+    char* start;
+    char* cursor;
+    size_t capacity_left;
+} ArenaStream;
 
-static void sb_init(StringBuilder* sb) {
-    sb->capacity = 1024;
-    sb->data = malloc(sb->capacity);
-    sb->data[0] = '\0';
-    sb->length = 0;
+static void stream_init(ArenaStream* stream, MemoryArena* arena) {
+    stream->arena = arena;
+    stream->start = (char*)(arena->base + arena->offset);
+    stream->cursor = stream->start;
+    stream->capacity_left = arena->size - arena->offset;
+    // Ensure initial null terminator
+    if (stream->capacity_left > 0) *stream->cursor = '\0';
 }
 
-static void sb_append_fmt(StringBuilder* sb, const char* fmt, ...) {
+static void stream_printf(ArenaStream* stream, const char* fmt, ...) {
+    if (stream->capacity_left == 0) return;
+
     va_list args;
     va_start(args, fmt);
     
@@ -30,18 +36,27 @@ static void sb_append_fmt(StringBuilder* sb, const char* fmt, ...) {
     int len = vsnprintf(NULL, 0, fmt, args_copy);
     va_end(args_copy);
     
-    if (len < 0) return; 
-    
-    if (sb->length + len + 1 > sb->capacity) {
-        size_t new_cap = sb->capacity * 2 + len;
-        char* new_data = realloc(sb->data, new_cap);
-        if (!new_data) return; // OOM
-        sb->data = new_data;
-        sb->capacity = new_cap;
+    if (len < 0) {
+        va_end(args);
+        return;
     }
     
-    vsnprintf(sb->data + sb->length, len + 1, fmt, args);
-    sb->length += len;
+    if ((size_t)len + 1 > stream->capacity_left) {
+        // Overflow
+        va_end(args);
+        return;
+    }
+    
+    vsnprintf(stream->cursor, stream->capacity_left, fmt, args);
+    
+    stream->cursor += len;
+    stream->capacity_left -= len;
+    
+    // Update arena offset to reflect used memory
+    // Note: We don't update arena->offset on every print, just reserved capacity
+    // But for safety, we should mark it used.
+    // However, since we are the exclusive user of this arena block for the stream, 
+    // we can update it at the end or just rely on the fact that we don't alloc anything else.
     
     va_end(args);
 }
@@ -55,85 +70,76 @@ static bool is_visited(int* visited, int count, int id) {
     return false;
 }
 
-static void generate_node_code(MathNode* node, StringBuilder* sb, int* visited, int* visited_count) {
+static void generate_node_code(MathNode* node, ArenaStream* stream, int* visited, int* visited_count) {
     if (is_visited(visited, *visited_count, node->id)) return; 
     
-    // Visit inputs first (Post-order traversal ensures dependencies are defined)
+    // Visit inputs first (Post-order traversal)
     for (size_t i = 0; i < node->input_count; ++i) {
         if (node->inputs[i]) {
-            generate_node_code(node->inputs[i], sb, visited, visited_count);
+            generate_node_code(node->inputs[i], stream, visited, visited_count);
         }
     }
     
     // Generate code for this node
-    sb_append_fmt(sb, "    // Node %d (%s)\n", node->id, node->name ? node->name : "Unnamed");
+    stream_printf(stream, "    // Node %d (%s)\n", node->id, node->name ? node->name : "Unnamed");
     
     switch (node->type) {
         case MATH_NODE_VALUE:
-            sb_append_fmt(sb, "    float v_%d = %f;\n", node->id, node->value);
+            stream_printf(stream, "    float v_%d = %f;\n", node->id, node->value);
             break;
         
         case MATH_NODE_TIME:
-            sb_append_fmt(sb, "    float v_%d = params.time;\n", node->id);
+            stream_printf(stream, "    float v_%d = params.time;\n", node->id);
             break;
 
         case MATH_NODE_UV:
-             // uv is pre-calculated in main
-             // We can split uv.x and uv.y if needed, but here we assume nodes output floats.
-             // Let's assume UV node outputs x+y or length? 
-             // Ideally UV node should probably have 2 outputs, but our graph is 1-output per node (mostly).
-             // Let's make UV node return .x, and maybe add UV_Y later? 
-             // Or better: Let's treat it as a float for now (e.g. x coordinate).
-             // Actually, for a visualizer, usually we work with vec3/vec4. 
-             // But our current nodes are float-only.
-             // Hack: UV node returns uv.x.
-             sb_append_fmt(sb, "    float v_%d = uv.x;\n", node->id); 
+             stream_printf(stream, "    float v_%d = uv.x;\n", node->id); 
              break;
             
         case MATH_NODE_ADD:
             if (node->input_count >= 2 && node->inputs[0] && node->inputs[1])
-                sb_append_fmt(sb, "    float v_%d = v_%d + v_%d;\n", node->id, node->inputs[0]->id, node->inputs[1]->id);
+                stream_printf(stream, "    float v_%d = v_%d + v_%d;\n", node->id, node->inputs[0]->id, node->inputs[1]->id);
             else
-                sb_append_fmt(sb, "    float v_%d = 0.0;\n", node->id);
+                stream_printf(stream, "    float v_%d = 0.0;\n", node->id);
             break;
             
         case MATH_NODE_SUB:
             if (node->input_count >= 2 && node->inputs[0] && node->inputs[1])
-                sb_append_fmt(sb, "    float v_%d = v_%d - v_%d;\n", node->id, node->inputs[0]->id, node->inputs[1]->id);
+                stream_printf(stream, "    float v_%d = v_%d - v_%d;\n", node->id, node->inputs[0]->id, node->inputs[1]->id);
             else
-                sb_append_fmt(sb, "    float v_%d = 0.0;\n", node->id);
+                stream_printf(stream, "    float v_%d = 0.0;\n", node->id);
             break;
 
         case MATH_NODE_MUL:
             if (node->input_count >= 2 && node->inputs[0] && node->inputs[1])
-                sb_append_fmt(sb, "    float v_%d = v_%d * v_%d;\n", node->id, node->inputs[0]->id, node->inputs[1]->id);
+                stream_printf(stream, "    float v_%d = v_%d * v_%d;\n", node->id, node->inputs[0]->id, node->inputs[1]->id);
             else
-                sb_append_fmt(sb, "    float v_%d = 0.0;\n", node->id);
+                stream_printf(stream, "    float v_%d = 0.0;\n", node->id);
             break;
 
         case MATH_NODE_DIV:
             if (node->input_count >= 2 && node->inputs[0] && node->inputs[1])
-                sb_append_fmt(sb, "    float v_%d = v_%d / (v_%d + 0.0001);\n", node->id, node->inputs[0]->id, node->inputs[1]->id); // Prevent div by zero
+                stream_printf(stream, "    float v_%d = v_%d / (v_%d + 0.0001);\n", node->id, node->inputs[0]->id, node->inputs[1]->id); // Prevent div by zero
             else
-                sb_append_fmt(sb, "    float v_%d = 0.0;\n", node->id);
+                stream_printf(stream, "    float v_%d = 0.0;\n", node->id);
             break;
             
         case MATH_NODE_SIN:
             if (node->input_count >= 1 && node->inputs[0])
-                sb_append_fmt(sb, "    float v_%d = sin(v_%d);\n", node->id, node->inputs[0]->id);
+                stream_printf(stream, "    float v_%d = sin(v_%d);\n", node->id, node->inputs[0]->id);
             else
-                sb_append_fmt(sb, "    float v_%d = 0.0;\n", node->id);
+                stream_printf(stream, "    float v_%d = 0.0;\n", node->id);
             break;
 
         case MATH_NODE_COS:
             if (node->input_count >= 1 && node->inputs[0])
-                sb_append_fmt(sb, "    float v_%d = cos(v_%d);\n", node->id, node->inputs[0]->id);
+                stream_printf(stream, "    float v_%d = cos(v_%d);\n", node->id, node->inputs[0]->id);
             else
-                sb_append_fmt(sb, "    float v_%d = 0.0;\n", node->id);
+                stream_printf(stream, "    float v_%d = 0.0;\n", node->id);
             break;
 
         default:
-            sb_append_fmt(sb, "    float v_%d = 0.0; // Unknown Type\n", node->id);
+            stream_printf(stream, "    float v_%d = 0.0; // Unknown Type\n", node->id);
             break;
     }
     
@@ -142,69 +148,83 @@ static void generate_node_code(MathNode* node, StringBuilder* sb, int* visited, 
 
 char* math_graph_transpile_glsl(const MathGraph* graph, TranspilerMode mode) {
     if (!graph) return NULL; 
+
+    // Create Arena (64KB should be enough for any reasonable shader)
+    MemoryArena arena;
+    if (!arena_init(&arena, 64 * 1024)) return NULL;
     
-    StringBuilder sb;
-    sb_init(&sb);
+    ArenaStream stream;
+    stream_init(&stream, &arena);
     
-    sb_append_fmt(&sb, "#version 450\n");
-    
-    if (mode == TRANSPILE_MODE_IMAGE_2D) {
-        sb_append_fmt(&sb, "layout(local_size_x = 16, local_size_y = 16) in;\n\n");
-        sb_append_fmt(&sb, "layout(set=0, binding=0, rgba8) writeonly uniform image2D outImg;\n\n");
-        
-        sb_append_fmt(&sb, "layout(push_constant) uniform Params {\n");
-        sb_append_fmt(&sb, "    float time;\n");
-        sb_append_fmt(&sb, "    float width;\n");
-        sb_append_fmt(&sb, "    float height;\n");
-        sb_append_fmt(&sb, "} params;\n\n");
-    } else {
-        sb_append_fmt(&sb, "layout(local_size_x = 1) in;\n\n");
-        sb_append_fmt(&sb, "layout(set=0, binding=0) buffer OutBuf {\n");
-        sb_append_fmt(&sb, "    float result;\n");
-        sb_append_fmt(&sb, "} b_out;\n\n");
-        
-        // Dummy params for buffer mode to allow compilation if nodes use them
-        sb_append_fmt(&sb, "struct Params { float time; float width; float height; };\n");
-        sb_append_fmt(&sb, "const Params params = Params(0.0, 1.0, 1.0);\n\n");
-    }
-    
-    sb_append_fmt(&sb, "void main() {\n");
+    stream_printf(&stream, "#version 450\n");
     
     if (mode == TRANSPILE_MODE_IMAGE_2D) {
-        sb_append_fmt(&sb, "    ivec2 storePos = ivec2(gl_GlobalInvocationID.xy);\n");
-        sb_append_fmt(&sb, "    if (storePos.x >= int(params.width) || storePos.y >= int(params.height)) return;\n\n");
-        sb_append_fmt(&sb, "    vec2 uv = vec2(storePos) / vec2(params.width, params.height);\n\n");
+        stream_printf(&stream, "layout(local_size_x = 16, local_size_y = 16) in;\n\n");
+        stream_printf(&stream, "layout(set=0, binding=0, rgba8) writeonly uniform image2D outImg;\n\n");
+        
+        stream_printf(&stream, "layout(push_constant) uniform Params {\n");
+        stream_printf(&stream, "    float time;\n");
+        stream_printf(&stream, "    float width;\n");
+        stream_printf(&stream, "    float height;\n");
+        stream_printf(&stream, "} params;\n\n");
     } else {
-        sb_append_fmt(&sb, "    vec2 uv = vec2(0.0, 0.0);\n\n");
+        stream_printf(&stream, "layout(local_size_x = 1) in;\n\n");
+        stream_printf(&stream, "layout(set=0, binding=0) buffer OutBuf {\n");
+        stream_printf(&stream, "    float result;\n");
+        stream_printf(&stream, "} b_out;\n\n");
+        
+        stream_printf(&stream, "struct Params { float time; float width; float height; };\n");
+        stream_printf(&stream, "const Params params = Params(0.0, 1.0, 1.0);\n\n");
     }
     
-    // Tracking visited nodes to avoid duplicate declarations
-    int* visited = malloc(graph->node_count * sizeof(int));
+    stream_printf(&stream, "void main() {\n");
+    
+    if (mode == TRANSPILE_MODE_IMAGE_2D) {
+        stream_printf(&stream, "    ivec2 storePos = ivec2(gl_GlobalInvocationID.xy);\n");
+        stream_printf(&stream, "    if (storePos.x >= int(params.width) || storePos.y >= int(params.height)) return;\n\n");
+        stream_printf(&stream, "    vec2 uv = vec2(storePos) / vec2(params.width, params.height);\n\n");
+    } else {
+        stream_printf(&stream, "    vec2 uv = vec2(0.0, 0.0);\n\n");
+    }
+    
+    // Tracking visited nodes. Using Arena for this too!
+    // Since stream is using the arena head, we can allocate visited array BEFORE stream starts?
+    // Or just use malloc for visited since it's temporary struct data.
+    // Let's use malloc for visited array to keep stream contiguous.
+    int* visited = (int*)calloc(graph->node_count, sizeof(int));
     int visited_count = 0;
     
     for (int i = 0; i < graph->node_count; ++i) {
-        generate_node_code(graph->nodes[i], &sb, visited, &visited_count);
+        generate_node_code(graph->nodes[i], &stream, visited, &visited_count);
     }
     
     // Assign Output
     if (graph->node_count > 0) {
         int last_id = graph->nodes[graph->node_count - 1]->id;
         if (mode == TRANSPILE_MODE_IMAGE_2D) {
-            sb_append_fmt(&sb, "    float res = v_%d;\n", last_id);
-            sb_append_fmt(&sb, "    imageStore(outImg, storePos, vec4(res, res, res, 1.0));\n");
+            stream_printf(&stream, "    float res = v_%d;\n", last_id);
+            stream_printf(&stream, "    imageStore(outImg, storePos, vec4(res, res, res, 1.0));\n");
         } else {
-            sb_append_fmt(&sb, "    b_out.result = v_%d;\n", last_id);
+            stream_printf(&stream, "    b_out.result = v_%d;\n", last_id);
         }
     } else {
         if (mode == TRANSPILE_MODE_IMAGE_2D) {
-            sb_append_fmt(&sb, "    imageStore(outImg, storePos, vec4(0,0,0,1));\n");
+            stream_printf(&stream, "    imageStore(outImg, storePos, vec4(0,0,0,1));\n");
         } else {
-            sb_append_fmt(&sb, "    b_out.result = 0.0;\n");
+            stream_printf(&stream, "    b_out.result = 0.0;\n");
         }
     }
     
-    sb_append_fmt(&sb, "}\n");
+    stream_printf(&stream, "}\n");
     
     free(visited);
-    return sb.data;
+    
+    // The result is in arena.base. We must return a heap allocated string 
+    // because the caller is expected to free it (and we are destroying the arena).
+    // In a full arena-based system, we would pass an arena to this function and allocate result there.
+    // But to respect current API:
+    char* result = strdup(stream.start);
+    
+    arena_destroy(&arena);
+    return result;
 }

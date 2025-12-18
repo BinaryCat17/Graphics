@@ -104,7 +104,10 @@ if(UNIX)
 endif()
 
 # Memory
-set(FOUNDATION_MEMORY_SOURCES "src/foundation/memory/buffer.c")
+set(FOUNDATION_MEMORY_SOURCES 
+    "src/foundation/memory/buffer.c"
+    "src/foundation/memory/arena.c"
+)
 add_library(foundation_memory STATIC ${FOUNDATION_MEMORY_SOURCES})
 target_include_directories(foundation_memory PUBLIC "src/")
 target_link_libraries(foundation_memory PUBLIC foundation_logger)
@@ -169,7 +172,7 @@ set(FEATURE_GRAPH_EDITOR_SOURCES
     "src/features/graph_editor/transpiler.c")
 add_library(feature_graph_editor STATIC ${FEATURE_GRAPH_EDITOR_SOURCES})
 target_include_directories(feature_graph_editor PUBLIC "src/")
-target_link_libraries(feature_graph_editor PUBLIC foundation_math)
+target_link_libraries(feature_graph_editor PUBLIC foundation_math foundation_memory)
 if(UNIX)
     target_link_libraries(feature_graph_editor PUBLIC m)
 endif()
