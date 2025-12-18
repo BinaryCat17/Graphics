@@ -1,70 +1,97 @@
 #ifndef MATH_GRAPH_H
 #define MATH_GRAPH_H
 
-#include <stddef.h>
+#include "foundation/memory/arena.h"
+#include "foundation/math/layout_geometry.h" // For Vec2/Rect if needed, or just use floats
+
+#include <stdint.h>
 #include <stdbool.h>
 
+// --- Types ---
+
+typedef uint32_t MathNodeId;
+#define MATH_NODE_INVALID_ID 0xFFFFFFFF
+
 typedef enum MathNodeType {
-    MATH_NODE_VALUE = 0,
+    MATH_NODE_NONE = 0, // Slot is empty/free
+    MATH_NODE_VALUE,
     MATH_NODE_ADD,
     MATH_NODE_SUB,
     MATH_NODE_MUL,
     MATH_NODE_DIV,
     MATH_NODE_SIN,
     MATH_NODE_COS,
-    MATH_NODE_TIME, // New: u_time
-    MATH_NODE_UV,   // New: coordinates
-    MATH_NODE_OUTPUT, // New: Explicit Output
-    // Add more types as needed
-    MATH_NODE_SURFACE_GRID // Generates geometry
+    MATH_NODE_TIME, 
+    MATH_NODE_UV,   
+    MATH_NODE_OUTPUT, 
+    MATH_NODE_SURFACE_GRID,
+    MATH_NODE_COUNT
 } MathNodeType;
 
+#define MATH_NODE_MAX_INPUTS 4
+#define MATH_NODE_NAME_MAX 32
+
 typedef struct MathNode {
-    int id; // REFLECT
-    MathNodeType type; // REFLECT
-    float value; // REFLECT(Observable)
-    float x;     // REFLECT(Observable)
-    float y;     // REFLECT(Observable)
-    int dirty;   // REFLECT
+    MathNodeId id;          // REFLECT
+    MathNodeType type;      // REFLECT
     
-    // Inputs (dependencies)
-    struct MathNode** inputs;
-    size_t input_count;
+    // Logic Data
+    float value;            // REFLECT
+    float x, y;             // REFLECT
+    bool dirty;             // REFLECT
+    float cached_output;    // Last calculated result
     
-    // User data (e.g. name for UI)
-    char* name; // REFLECT
+    // Connections (Dependencies)
+    // Stores the IDs of the nodes connected to input slots.
+    MathNodeId inputs[MATH_NODE_MAX_INPUTS]; 
+    
+    // UI / Editor Data
+    float ui_x;             // REFLECT
+    float ui_y;             // REFLECT
+    char* name;             // REFLECT
 } MathNode;
 
-typedef struct VisualWire {
-    float x, y, width, height; // REFLECT
-    float u1, v1, u2, v2;      // REFLECT
-} VisualWire;
-
 typedef struct MathGraph {
-    MathNode** nodes; // REFLECT
-    int node_count;   // REFLECT
-    int node_capacity;
+    MemoryArena* arena;
     
-    VisualWire** wires; // REFLECT
-    int wire_count;    // REFLECT
+    // Flat array of nodes. Index == ID.
+    MathNode* nodes;
+    uint32_t node_count;     // Highest active ID + 1 (or count if packed)
+    uint32_t node_capacity;
     
-    char* graph_name; // REFLECT
-    
-    VisualWire* _wire_pool; // Internal storage
+    // In this simple ID-as-Index model, we don't Compact the array on delete.
+    // We just mark the slot as MATH_NODE_NONE.
 } MathGraph;
 
-void math_graph_init(MathGraph* graph);
-void math_graph_dispose(MathGraph* graph);
+// --- API ---
 
-MathNode* math_graph_add_node(MathGraph* graph, MathNodeType type);
-void math_graph_connect(MathNode* target, size_t input_index, MathNode* source);
-void math_graph_set_value(MathNode* node, float value);
-float math_graph_evaluate(MathNode* node);
+// Initialize graph using the provided arena for all internal allocations.
+void math_graph_init(MathGraph* graph, MemoryArena* arena);
 
-// Propagates dirty flags and recomputes values
-void math_graph_update(MathGraph* graph);
+// No explicit dispose needed if the arena is managed externally (e.g., per level/app).
+// But we can clear the graph struct.
+void math_graph_clear(MathGraph* graph);
 
-// Updates VisualWire array based on node connections
-void math_graph_update_visuals(MathGraph* graph, bool log_debug);
+// Create a new node. Returns the ID of the created node.
+MathNodeId math_graph_add_node(MathGraph* graph, MathNodeType type);
+
+// Remove a node (marks slot as free).
+void math_graph_remove_node(MathGraph* graph, MathNodeId id);
+
+// Connect source_node's output to target_node's input_slot.
+void math_graph_connect(MathGraph* graph, MathNodeId target, int input_index, MathNodeId source);
+
+// Set local value (for Value nodes).
+void math_graph_set_value(MathGraph* graph, MathNodeId id, float value);
+
+// Set node name (allocates string in arena).
+void math_graph_set_name(MathGraph* graph, MathNodeId id, const char* name);
+
+// Evaluate a specific node.
+float math_graph_evaluate(MathGraph* graph, MathNodeId id);
+
+// Get a pointer to the node data (Unsafe: pointer may be invalidated on array resize).
+// Use with care, prefer using IDs.
+MathNode* math_graph_get_node(MathGraph* graph, MathNodeId id);
 
 #endif // MATH_GRAPH_H

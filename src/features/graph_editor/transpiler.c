@@ -52,12 +52,6 @@ static void stream_printf(ArenaStream* stream, const char* fmt, ...) {
     stream->cursor += len;
     stream->capacity_left -= len;
     
-    // Update arena offset to reflect used memory
-    // Note: We don't update arena->offset on every print, just reserved capacity
-    // But for safety, we should mark it used.
-    // However, since we are the exclusive user of this arena block for the stream, 
-    // we can update it at the end or just rely on the fact that we don't alloc anything else.
-    
     va_end(args);
 }
 
@@ -70,18 +64,24 @@ static bool is_visited(int* visited, int count, int id) {
     return false;
 }
 
-static void generate_node_code(MathNode* node, ArenaStream* stream, int* visited, int* visited_count) {
-    if (is_visited(visited, *visited_count, node->id)) return; 
+static void generate_node_code(const MathGraph* graph, MathNodeId id, ArenaStream* stream, int* visited, int* visited_count) {
+    if (id == MATH_NODE_INVALID_ID) return;
+    if (is_visited(visited, *visited_count, (int)id)) return; 
     
+    // Access node directly since we are inside the module
+    if (id >= graph->node_count) return;
+    const MathNode* node = &graph->nodes[id];
+    if (node->type == MATH_NODE_NONE) return;
+
     // Visit inputs first (Post-order traversal)
-    for (size_t i = 0; i < node->input_count; ++i) {
-        if (node->inputs[i]) {
-            generate_node_code(node->inputs[i], stream, visited, visited_count);
+    for (int i = 0; i < MATH_NODE_MAX_INPUTS; ++i) {
+        if (node->inputs[i] != MATH_NODE_INVALID_ID) {
+            generate_node_code(graph, node->inputs[i], stream, visited, visited_count);
         }
     }
     
     // Generate code for this node
-    stream_printf(stream, "    // Node %d (%s)\n", node->id, node->name ? node->name : "Unnamed");
+    stream_printf(stream, "    // Node %d (%s)\n", node->id, node->name);
     
     switch (node->type) {
         case MATH_NODE_VALUE:
@@ -97,43 +97,43 @@ static void generate_node_code(MathNode* node, ArenaStream* stream, int* visited
              break;
             
         case MATH_NODE_ADD:
-            if (node->input_count >= 2 && node->inputs[0] && node->inputs[1])
-                stream_printf(stream, "    float v_%d = v_%d + v_%d;\n", node->id, node->inputs[0]->id, node->inputs[1]->id);
+            if (node->inputs[0] != MATH_NODE_INVALID_ID && node->inputs[1] != MATH_NODE_INVALID_ID)
+                stream_printf(stream, "    float v_%d = v_%d + v_%d;\n", node->id, node->inputs[0], node->inputs[1]);
             else
                 stream_printf(stream, "    float v_%d = 0.0;\n", node->id);
             break;
             
         case MATH_NODE_SUB:
-            if (node->input_count >= 2 && node->inputs[0] && node->inputs[1])
-                stream_printf(stream, "    float v_%d = v_%d - v_%d;\n", node->id, node->inputs[0]->id, node->inputs[1]->id);
+            if (node->inputs[0] != MATH_NODE_INVALID_ID && node->inputs[1] != MATH_NODE_INVALID_ID)
+                stream_printf(stream, "    float v_%d = v_%d - v_%d;\n", node->id, node->inputs[0], node->inputs[1]);
             else
                 stream_printf(stream, "    float v_%d = 0.0;\n", node->id);
             break;
 
         case MATH_NODE_MUL:
-            if (node->input_count >= 2 && node->inputs[0] && node->inputs[1])
-                stream_printf(stream, "    float v_%d = v_%d * v_%d;\n", node->id, node->inputs[0]->id, node->inputs[1]->id);
+            if (node->inputs[0] != MATH_NODE_INVALID_ID && node->inputs[1] != MATH_NODE_INVALID_ID)
+                stream_printf(stream, "    float v_%d = v_%d * v_%d;\n", node->id, node->inputs[0], node->inputs[1]);
             else
                 stream_printf(stream, "    float v_%d = 0.0;\n", node->id);
             break;
 
         case MATH_NODE_DIV:
-            if (node->input_count >= 2 && node->inputs[0] && node->inputs[1])
-                stream_printf(stream, "    float v_%d = v_%d / (v_%d + 0.0001);\n", node->id, node->inputs[0]->id, node->inputs[1]->id); // Prevent div by zero
+            if (node->inputs[0] != MATH_NODE_INVALID_ID && node->inputs[1] != MATH_NODE_INVALID_ID)
+                stream_printf(stream, "    float v_%d = v_%d / (v_%d + 0.0001);\n", node->id, node->inputs[0], node->inputs[1]); 
             else
                 stream_printf(stream, "    float v_%d = 0.0;\n", node->id);
             break;
             
         case MATH_NODE_SIN:
-            if (node->input_count >= 1 && node->inputs[0])
-                stream_printf(stream, "    float v_%d = sin(v_%d);\n", node->id, node->inputs[0]->id);
+            if (node->inputs[0] != MATH_NODE_INVALID_ID)
+                stream_printf(stream, "    float v_%d = sin(v_%d);\n", node->id, node->inputs[0]);
             else
                 stream_printf(stream, "    float v_%d = 0.0;\n", node->id);
             break;
 
         case MATH_NODE_COS:
-            if (node->input_count >= 1 && node->inputs[0])
-                stream_printf(stream, "    float v_%d = cos(v_%d);\n", node->id, node->inputs[0]->id);
+            if (node->inputs[0] != MATH_NODE_INVALID_ID)
+                stream_printf(stream, "    float v_%d = cos(v_%d);\n", node->id, node->inputs[0]);
             else
                 stream_printf(stream, "    float v_%d = 0.0;\n", node->id);
             break;
@@ -149,7 +149,6 @@ static void generate_node_code(MathNode* node, ArenaStream* stream, int* visited
 char* math_graph_transpile_glsl(const MathGraph* graph, TranspilerMode mode) {
     if (!graph) return NULL; 
 
-    // Create Arena (64KB should be enough for any reasonable shader)
     MemoryArena arena;
     if (!arena_init(&arena, 64 * 1024)) return NULL;
     
@@ -187,20 +186,27 @@ char* math_graph_transpile_glsl(const MathGraph* graph, TranspilerMode mode) {
         stream_printf(&stream, "    vec2 uv = vec2(0.0, 0.0);\n\n");
     }
     
-    // Tracking visited nodes. Using Arena for this too!
-    // Since stream is using the arena head, we can allocate visited array BEFORE stream starts?
-    // Or just use malloc for visited since it's temporary struct data.
-    // Let's use malloc for visited array to keep stream contiguous.
     int* visited = (int*)calloc(graph->node_count, sizeof(int));
     int visited_count = 0;
     
-    for (int i = 0; i < graph->node_count; ++i) {
-        generate_node_code(graph->nodes[i], &stream, visited, &visited_count);
+    // We only need to generate code for nodes that actually lead to the output?
+    // For now, let's just generate everything valid.
+    for (uint32_t i = 0; i < graph->node_count; ++i) {
+        if (graph->nodes[i].type != MATH_NODE_NONE) {
+            generate_node_code(graph, i, &stream, visited, &visited_count);
+        }
     }
     
-    // Assign Output
-    if (graph->node_count > 0) {
-        int last_id = graph->nodes[graph->node_count - 1]->id;
+    // Assign Output (Take the last non-free node as output for now)
+    int last_id = -1;
+    for (int i = (int)graph->node_count - 1; i >= 0; --i) {
+        if (graph->nodes[i].type != MATH_NODE_NONE) {
+            last_id = i;
+            break;
+        }
+    }
+
+    if (last_id != -1) {
         if (mode == TRANSPILE_MODE_IMAGE_2D) {
             stream_printf(&stream, "    float res = v_%d;\n", last_id);
             stream_printf(&stream, "    imageStore(outImg, storePos, vec4(res, res, res, 1.0));\n");
@@ -218,13 +224,7 @@ char* math_graph_transpile_glsl(const MathGraph* graph, TranspilerMode mode) {
     stream_printf(&stream, "}\n");
     
     free(visited);
-    
-    // The result is in arena.base. We must return a heap allocated string 
-    // because the caller is expected to free it (and we are destroying the arena).
-    // In a full arena-based system, we would pass an arena to this function and allocate result there.
-    // But to respect current API:
     char* result = strdup(stream.start);
-    
     arena_destroy(&arena);
     return result;
 }

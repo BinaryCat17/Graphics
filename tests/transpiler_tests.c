@@ -1,28 +1,28 @@
 #include "test_framework.h"
 #include "features/graph_editor/math_graph.h"
 #include "features/graph_editor/transpiler.h"
+#include "foundation/memory/arena.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
 int test_transpiler_simple_add() {
     MathGraph graph;
-    math_graph_init(&graph);
+    MemoryArena arena;
+    arena_init(&arena, 1024 * 1024);
+    math_graph_init(&graph, &arena);
     
     // Create nodes: 3.0 + 5.0
-    MathNode* n1 = math_graph_add_node(&graph, MATH_NODE_VALUE);
-    n1->value = 3.0f;
-    n1->id = 1; // Force ID for deterministic output
+    MathNodeId id1 = math_graph_add_node(&graph, MATH_NODE_VALUE);
+    math_graph_set_value(&graph, id1, 3.0f);
     
-    MathNode* n2 = math_graph_add_node(&graph, MATH_NODE_VALUE);
-    n2->value = 5.0f;
-    n2->id = 2;
+    MathNodeId id2 = math_graph_add_node(&graph, MATH_NODE_VALUE);
+    math_graph_set_value(&graph, id2, 5.0f);
     
-    MathNode* n_add = math_graph_add_node(&graph, MATH_NODE_ADD);
-    n_add->id = 3;
+    MathNodeId id_add = math_graph_add_node(&graph, MATH_NODE_ADD);
     
-    math_graph_connect(n_add, 0, n1);
-    math_graph_connect(n_add, 1, n2);
+    math_graph_connect(&graph, id_add, 0, id1);
+    math_graph_connect(&graph, id_add, 1, id2);
     
     char* glsl = math_graph_transpile_glsl(&graph, TRANSPILE_MODE_BUFFER_1D);
     TEST_ASSERT(glsl != NULL);
@@ -30,13 +30,23 @@ int test_transpiler_simple_add() {
     printf("\n--- Generated GLSL ---\n%s\n----------------------\n", glsl);
     
     // Basic checks
-    TEST_ASSERT(strstr(glsl, "float v_1 = 3.000000;") != NULL);
-    TEST_ASSERT(strstr(glsl, "float v_2 = 5.000000;") != NULL);
-    TEST_ASSERT(strstr(glsl, "float v_3 = v_1 + v_2;") != NULL);
-    TEST_ASSERT(strstr(glsl, "b_out.result = v_3;") != NULL);
+    // Note: IDs might vary, but since it's the first test in a fresh arena, they should be 0, 1, 2.
+    // However, transpiler output depends on node ID.
+    char buf[128];
+    snprintf(buf, 128, "float v_%d = 3.000000;", id1);
+    TEST_ASSERT(strstr(glsl, buf) != NULL);
+    
+    snprintf(buf, 128, "float v_%d = 5.000000;", id2);
+    TEST_ASSERT(strstr(glsl, buf) != NULL);
+    
+    snprintf(buf, 128, "float v_%d = v_%d + v_%d;", id_add, id1, id2);
+    TEST_ASSERT(strstr(glsl, buf) != NULL);
+    
+    snprintf(buf, 128, "b_out.result = v_%d;", id_add);
+    TEST_ASSERT(strstr(glsl, buf) != NULL);
     
     free(glsl);
-    math_graph_dispose(&graph);
+    arena_destroy(&arena);
     return 1;
 }
 

@@ -15,6 +15,7 @@
 #include <string.h>
 #include <stdlib.h>
 #include <stdio.h>
+#include <math.h>
 
 #define KEY_C 67
 
@@ -27,6 +28,7 @@ static float text_measure_wrapper(const char* text, void* user_data) {
 
 typedef struct AppState {
     MathGraph graph;
+    MemoryArena graph_arena;
     
     // UI State
     UiAsset* ui_asset;
@@ -37,7 +39,7 @@ typedef struct AppState {
     MemoryArena dynamic_ui_arena;
     
     // Selection
-    MathNode* selected_node;
+    MathNodeId selected_node_id;
     bool selection_dirty; 
 } AppState;
 
@@ -79,17 +81,18 @@ static void ui_rebuild_graph_view(AppState* app) {
     
     // Count Nodes
     int count = 0;
-    for(int i=0; i<app->graph.node_count; ++i) if(app->graph.nodes[i]) count++;
+    for(uint32_t i=0; i<app->graph.node_count; ++i) {
+        if (app->graph.nodes[i].type != MATH_NODE_NONE) count++;
+    }
 
     // Reallocate children array from Arena
-    // Old array is leaked in arena but that's fine for prototype/rare updates.
     canvas->children = (UiElement**)arena_alloc_zero(&app->ui_instance.arena, count * sizeof(UiElement*));
     canvas->child_count = count;
 
     int idx = 0;
-    for (int i = 0; i < app->graph.node_count; ++i) {
-        MathNode* node = app->graph.nodes[i];
-        if (!node) continue;
+    for (uint32_t i = 0; i < app->graph.node_count; ++i) {
+        MathNode* node = &app->graph.nodes[i];
+        if (node->type == MATH_NODE_NONE) continue;
 
         // Container Spec
         UiNodeSpec* container_spec = ui_create_spec(app, UI_KIND_CONTAINER);
@@ -97,107 +100,97 @@ static void ui_rebuild_graph_view(AppState* app) {
         container_spec->width = 150;
         container_spec->height = 100;
         container_spec->flags = UI_FLAG_DRAGGABLE | UI_FLAG_CLICKABLE;
-        container_spec->x_source = "x";
-        container_spec->y_source = "y";
-        container_spec->color = (Vec4){0.25f, 0.25f, 0.28f, 1.0f};
-        container_spec->border_l = container_spec->border_t = container_spec->border_r = container_spec->border_b = 4;
-        container_spec->texture_path = "ui_rect";
-        container_spec->tex_w = 32; container_spec->tex_h = 32;
+        container_spec->x_source = "ui_x"; // Use new ui_x field
+        container_spec->y_source = "ui_y";
+        container_spec->color = (Vec4){0.2f, 0.2f, 0.2f, 1.0f}; // Was bg_color
+        // container_spec->border_color = ... // Removed
+        // container_spec->border_width = ... // Removed
+        container_spec->padding = 5.0f; // Changed from Vec4 to float
 
-        UiElement* el = ui_element_create(&app->ui_instance, container_spec, node, node_meta);
+        // Bind directly to the node in the array
+        UiElement* container = ui_element_create(&app->ui_instance, container_spec, node, node_meta);
+        canvas->children[idx++] = container;
         
-        // Set up children manually
+        // Determine children count
         int child_cnt = (node->type == MATH_NODE_VALUE) ? 2 : 1;
-        el->child_count = child_cnt;
-        el->children = (UiElement**)arena_alloc_zero(&app->ui_instance.arena, child_cnt * sizeof(UiElement*));
+        container->children = (UiElement**)arena_alloc_zero(&app->ui_instance.arena, child_cnt * sizeof(UiElement*));
+        container->child_count = child_cnt;
         
-        // Label
+        // Header (Name)
         UiNodeSpec* label_spec = ui_create_spec(app, UI_KIND_TEXT);
         label_spec->text_source = "name";
-        label_spec->height = 20;
-        label_spec->padding = 5;
+        // label_spec->font_size = 16; // Removed
         label_spec->color = (Vec4){1,1,1,1};
+        label_spec->height = 20;
         
-        el->children[0] = ui_element_create(&app->ui_instance, label_spec, node, node_meta);
-        el->children[0]->parent = el;
-
-        // Value
+        UiElement* label = ui_element_create(&app->ui_instance, label_spec, node, node_meta);
+        container->children[0] = label;
+        label->parent = container;
+        
+        // Value (if Value node)
         if (node->type == MATH_NODE_VALUE) {
             UiNodeSpec* val_spec = ui_create_spec(app, UI_KIND_TEXT);
-            val_spec->text_source = "value"; 
-            val_spec->height = 20;
-            val_spec->padding = 5;
-            val_spec->color = (Vec4){0.8f, 0.8f, 0.8f, 1.0f};
+            val_spec->text_source = "value"; // Bind to float value
+            // val_spec->font_size = 14; // Removed
+            val_spec->color = (Vec4){0.8f,0.8f,0.8f,1};
             
-            el->children[1] = ui_element_create(&app->ui_instance, val_spec, node, node_meta);
-            el->children[1]->parent = el;
+            UiElement* val = ui_element_create(&app->ui_instance, val_spec, node, node_meta);
+            container->children[1] = val;
+            val->parent = container;
         }
-
-        canvas->children[idx] = el;
-        el->parent = canvas;
-        idx++;
     }
 }
 
 static void ui_rebuild_inspector(AppState* app) {
     if (!app->ui_instance.root) return;
-    UiElement* panel = ui_find_element_by_id(app->ui_instance.root, "prop_group");
-    if (!panel) return;
+    UiElement* inspector = ui_find_element_by_id(app->ui_instance.root, "inspector_area");
+    if (!inspector) return;
     
-    ui_input_reset(&app->input_ctx);
-
-    if (!app->selected_node) {
-        panel->child_count = 0;
-        panel->children = NULL;
+    if (app->selected_node_id == MATH_NODE_INVALID_ID) {
+        inspector->child_count = 0;
         return;
     }
-
-    const MetaStruct* meta = meta_get_struct("MathNode");
-    if (!meta) return;
-
-    // Count visible fields
-    int field_count = 0;
-    for (size_t i = 0; i < meta->field_count; ++i) {
-        const MetaField* field = &meta->fields[i];
-        if (field->type == META_TYPE_POINTER || field->type == META_TYPE_ARRAY) continue;
-        if (strcmp(field->name, "dirty") == 0) continue; 
-        if (strcmp(field->name, "id") == 0) continue;
-        field_count++;
-    }
-
-    // Each field needs Label + Input = 2 elements
-    panel->child_count = field_count * 2;
-    panel->children = (UiElement**)arena_alloc_zero(&app->ui_instance.arena, panel->child_count * sizeof(UiElement*));
     
-    int idx = 0;
-    for (size_t i = 0; i < meta->field_count; ++i) {
-        const MetaField* field = &meta->fields[i];
-        if (field->type == META_TYPE_POINTER || field->type == META_TYPE_ARRAY) continue;
-        if (strcmp(field->name, "dirty") == 0) continue; 
-        if (strcmp(field->name, "id") == 0) continue;
-
+    MathNode* node = math_graph_get_node(&app->graph, app->selected_node_id);
+    if (!node) {
+        inspector->child_count = 0;
+        return;
+    }
+    
+    const MetaStruct* node_meta = meta_get_struct("MathNode");
+    
+    // Determine inspector children count
+    int ins_count = 1; // Title
+    if (node->type == MATH_NODE_VALUE) ins_count += 2; // Label + Value
+    
+    inspector->children = (UiElement**)arena_alloc_zero(&app->ui_instance.arena, ins_count * sizeof(UiElement*));
+    inspector->child_count = 0;
+    
+    // Title
+    UiNodeSpec* title_spec = ui_create_spec(app, UI_KIND_TEXT);
+    title_spec->text_source = "name";
+    // title_spec->font_size = 20; // Removed
+    
+    UiElement* title = ui_element_create(&app->ui_instance, title_spec, node, node_meta);
+    inspector->children[inspector->child_count++] = title;
+    title->parent = inspector;
+    
+    // Value Editor (Only for Value nodes)
+    if (node->type == MATH_NODE_VALUE) {
         // Label
-        UiNodeSpec* label_spec = ui_create_spec(app, UI_KIND_TEXT);
-        label_spec->static_text = arena_push_string(&app->dynamic_ui_arena, field->name);
-        label_spec->height = 20;
-        label_spec->color = (Vec4){0.7f, 0.7f, 0.7f, 1.0f};
+        UiNodeSpec* lbl = ui_create_spec(app, UI_KIND_TEXT);
+        lbl->static_text = "Value:"; // Was text_content
+        UiElement* l = ui_element_create(&app->ui_instance, lbl, NULL, NULL);
+        inspector->children[inspector->child_count++] = l;
+        l->parent = inspector;
         
-        UiElement* label = ui_element_create(&app->ui_instance, label_spec, NULL, NULL);
-        panel->children[idx] = label;
-        label->parent = panel;
-        idx++;
-
-        // Input
-        UiNodeSpec* input_spec = ui_create_spec(app, UI_KIND_TEXT_INPUT);
-        input_spec->flags = UI_FLAG_EDITABLE | UI_FLAG_FOCUSABLE | UI_FLAG_CLICKABLE;
-        input_spec->text_source = arena_push_string(&app->dynamic_ui_arena, field->name);
-        input_spec->height = 25;
-        input_spec->color = (Vec4){0.1f, 0.1f, 0.1f, 1.0f};
-        
-        UiElement* input = ui_element_create(&app->ui_instance, input_spec, app->selected_node, meta);
-        panel->children[idx] = input;
-        input->parent = panel;
-        idx++;
+        // Input (Simplified as text for now, should be slider/input)
+        UiNodeSpec* val = ui_create_spec(app, UI_KIND_TEXT);
+        val->text_source = "value";
+        val->color = (Vec4){0,1,0,1};
+        UiElement* v = ui_element_create(&app->ui_instance, val, node, node_meta);
+        inspector->children[inspector->child_count++] = v;
+        v->parent = inspector;
     }
 }
 
@@ -205,23 +198,38 @@ static void ui_rebuild_inspector(AppState* app) {
 
 static void app_setup_graph(AppState* app) {
     LOG_INFO("App: Setting up default Math Graph...");
-    app->graph.graph_name = strdup("My Awesome Graph");
-    MathNode* uv = math_graph_add_node(&app->graph, MATH_NODE_UV);
-    uv->name = strdup("UV.x"); uv->x = 50; uv->y = 100;
-    MathNode* freq = math_graph_add_node(&app->graph, MATH_NODE_VALUE);
-    freq->name = strdup("Frequency"); freq->value = 20.0f; freq->x = 50; freq->y = 250;
-    MathNode* mul = math_graph_add_node(&app->graph, MATH_NODE_MUL);
-    mul->name = strdup("Multiply"); mul->x = 250; mul->y = 175;
-    MathNode* s = math_graph_add_node(&app->graph, MATH_NODE_SIN);
-    s->name = strdup("Sin"); s->x = 450; s->y = 175;
-    math_graph_connect(mul, 0, uv); math_graph_connect(mul, 1, freq); math_graph_connect(s, 0, mul);
+    
+    MathNodeId uv_id = math_graph_add_node(&app->graph, MATH_NODE_UV);
+    MathNode* uv = math_graph_get_node(&app->graph, uv_id);
+    if(uv) { math_graph_set_name(&app->graph, uv_id, "UV.x"); uv->ui_x = 50; uv->ui_y = 100; }
+    
+    MathNodeId freq_id = math_graph_add_node(&app->graph, MATH_NODE_VALUE);
+    MathNode* freq = math_graph_get_node(&app->graph, freq_id);
+    if(freq) { math_graph_set_name(&app->graph, freq_id, "Frequency"); freq->value = 20.0f; freq->ui_x = 50; freq->ui_y = 250; }
+    
+    MathNodeId mul_id = math_graph_add_node(&app->graph, MATH_NODE_MUL);
+    MathNode* mul = math_graph_get_node(&app->graph, mul_id);
+    if(mul) { math_graph_set_name(&app->graph, mul_id, "Multiply"); mul->ui_x = 250; mul->ui_y = 175; }
+    
+    MathNodeId sin_id = math_graph_add_node(&app->graph, MATH_NODE_SIN);
+    MathNode* s = math_graph_get_node(&app->graph, sin_id);
+    if(s) { math_graph_set_name(&app->graph, sin_id, "Sin"); s->ui_x = 450; s->ui_y = 175; }
+    
+    math_graph_connect(&app->graph, mul_id, 0, uv_id); 
+    math_graph_connect(&app->graph, mul_id, 1, freq_id); 
+    math_graph_connect(&app->graph, sin_id, 0, mul_id);
 }
 
 static void app_on_init(Engine* engine) {
     AppState* app = (AppState*)calloc(1, sizeof(AppState));
     engine->user_data = app;
 
-    math_graph_init(&app->graph);
+    // Init Graph Arena
+    arena_init(&app->graph_arena, 1024 * 1024); // 1MB
+    math_graph_init(&app->graph, &app->graph_arena);
+    
+    app->selected_node_id = MATH_NODE_INVALID_ID;
+    
     app_setup_graph(app);
 
     ui_input_init(&app->input_ctx);
@@ -239,10 +247,15 @@ static void app_on_init(Engine* engine) {
             render_system_bind_ui(&engine->render_system, app->ui_instance.root);
             
             ui_rebuild_graph_view(app);
-            if (app->graph.node_count > 0) {
-                app->selected_node = app->graph.nodes[0];
-                app->selection_dirty = true;
-                ui_rebuild_inspector(app);
+            
+            // Select first valid node
+            for(uint32_t i=0; i<app->graph.node_count; ++i) {
+                if(app->graph.nodes[i].type != MATH_NODE_NONE) {
+                    app->selected_node_id = app->graph.nodes[i].id;
+                    app->selection_dirty = true;
+                    ui_rebuild_inspector(app);
+                    break;
+                }
             }
         }
     }
@@ -261,10 +274,6 @@ static void app_on_update(Engine* engine) {
         if (engine->show_compute_visualizer) {
             char* glsl = math_graph_transpile_glsl(&app->graph, TRANSPILE_MODE_IMAGE_2D);
             if (glsl) {
-                // TODO: Implement proper compute pipeline support
-                // if (engine->render_system.backend->run_compute_image) {
-                //     engine->render_system.backend->run_compute_image(engine->render_system.backend, glsl, 512, 512);
-                // }
                 LOG_INFO("Generated GLSL:\n%s", glsl);
                 free(glsl);
             }
@@ -280,9 +289,11 @@ static void app_on_update(Engine* engine) {
              UiElement* hit = app->input_ctx.hovered;
              while (hit) {
                  if (hit->data_ptr && hit->meta && strcmp(hit->meta->name, "MathNode") == 0) {
-                     app->selected_node = (MathNode*)hit->data_ptr;
+                     // Safe extraction of ID
+                     MathNode* n = (MathNode*)hit->data_ptr;
+                     app->selected_node_id = n->id;
                      app->selection_dirty = true;
-                     LOG_INFO("Selected Node: %d", app->selected_node->id);
+                     LOG_INFO("Selected Node: %d", n->id);
                      break;
                  }
                  hit = hit->parent;
@@ -298,8 +309,12 @@ static void app_on_update(Engine* engine) {
         ui_layout_root(app->ui_instance.root, (float)size.width, (float)size.height, engine->render_system.frame_count, false, text_measure_wrapper, NULL);
     }
 
-    math_graph_update(&app->graph);
-    math_graph_update_visuals(&app->graph, false);
+    // Evaluate
+    for(uint32_t i=0; i<app->graph.node_count; ++i) {
+        if (app->graph.nodes[i].type != MATH_NODE_NONE) {
+            math_graph_evaluate(&app->graph, i);
+        }
+    }
 }
 
 int main(int argc, char** argv) {
@@ -329,10 +344,11 @@ int main(int argc, char** argv) {
         engine_run(&engine);
         if (engine.user_data) {
              AppState* app = (AppState*)engine.user_data;
-             ui_instance_destroy(&app->ui_instance); // Destroy Arena
+             ui_instance_destroy(&app->ui_instance);
+             arena_destroy(&app->graph_arena); // Free graph memory
              if (app->ui_asset) ui_asset_free(app->ui_asset);
              if (app->dynamic_ui_arena.base) arena_destroy(&app->dynamic_ui_arena);
-             math_graph_dispose(&app->graph);
+             // math_graph_clear(&app->graph); // No need as arena handles it
              free(app);
         }
         engine_shutdown(&engine);
