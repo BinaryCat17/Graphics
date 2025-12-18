@@ -174,7 +174,7 @@ void platform_wait_events(void) { glfwWaitEvents(); }
 
 double platform_get_time_ms(void) { return glfwGetTime() * 1000.0; }
 
-bool platform_get_required_vulkan_instance_extensions(const char*** names, uint32_t* count) {
+bool platform_get_required_extensions(const char*** names, uint32_t* count) {
     uint32_t ext_count = 0;
     const char** extensions = glfwGetRequiredInstanceExtensions(&ext_count);
     if (!extensions || ext_count == 0) return false;
@@ -183,23 +183,23 @@ bool platform_get_required_vulkan_instance_extensions(const char*** names, uint3
     return true;
 }
 
-bool platform_create_vulkan_surface(PlatformWindow* window, void* instance, const void* allocation_callbacks,
+bool platform_create_surface(PlatformWindow* window, void* instance, void* allocator,
                                     PlatformSurface* out_surface) {
     if (!window || !window->handle || !instance || !out_surface) return false;
     VkInstance vk_instance = (VkInstance)instance;
-    const VkAllocationCallbacks* vk_alloc = (const VkAllocationCallbacks*)allocation_callbacks;
+    const VkAllocationCallbacks* vk_alloc = (const VkAllocationCallbacks*)allocator;
 
     VkSurfaceKHR surface = VK_NULL_HANDLE;
     VkResult res = glfwCreateWindowSurface(vk_instance, window->handle, vk_alloc, &surface);
     if (res != VK_SUCCESS) return false;
-    out_surface->handle = surface;
+    out_surface->handle = (void*)surface;
     return true;
 }
 
-void platform_destroy_vulkan_surface(void* instance, const void* allocation_callbacks, PlatformSurface* surface) {
+void platform_destroy_surface(void* instance, void* allocator, PlatformSurface* surface) {
     if (!instance || !surface || !surface->handle) return;
     VkInstance vk_instance = (VkInstance)instance;
-    const VkAllocationCallbacks* vk_alloc = (const VkAllocationCallbacks*)allocation_callbacks;
+    const VkAllocationCallbacks* vk_alloc = (const VkAllocationCallbacks*)allocator;
     vkDestroySurfaceKHR(vk_instance, (VkSurfaceKHR)surface->handle, vk_alloc);
     surface->handle = NULL;
 }

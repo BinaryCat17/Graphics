@@ -71,10 +71,10 @@ void platform_poll_events(void);
 void platform_wait_events(void);
 double platform_get_time_ms(void);
 
-bool platform_get_required_vulkan_instance_extensions(const char*** names, uint32_t* count);
-bool platform_create_vulkan_surface(PlatformWindow* window, void* instance, const void* allocation_callbacks,
-                                    PlatformSurface* out_surface);
-void platform_destroy_vulkan_surface(void* instance, const void* allocation_callbacks, PlatformSurface* surface);
+// Graphics API Support
+bool platform_get_required_extensions(const char*** names, uint32_t* count);
+bool platform_create_surface(PlatformWindow* window, void* instance, void* allocator, PlatformSurface* out_surface);
+void platform_destroy_surface(void* instance, void* allocator, PlatformSurface* surface);
 
 // String utilities
 char* platform_strdup(const char* src);

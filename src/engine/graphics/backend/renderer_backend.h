@@ -49,10 +49,10 @@ typedef struct RenderLogger {
 typedef struct RenderBackendInit {
     PlatformWindow* window;
     PlatformSurface* surface;
-    bool (*get_required_instance_extensions)(const char*** names, uint32_t* count);
-    bool (*create_surface)(PlatformWindow* window, void* instance, const void* allocation_callbacks,
+    bool (*get_required_extensions)(const char*** names, uint32_t* count);
+    bool (*create_surface)(PlatformWindow* window, void* instance, void* allocator,
                            PlatformSurface* out_surface);
-    void (*destroy_surface)(void* instance, const void* allocation_callbacks, PlatformSurface* surface);
+    void (*destroy_surface)(void* instance, void* allocator, PlatformSurface* surface);
     PlatformWindowSize (*get_framebuffer_size)(PlatformWindow* window);
     void (*wait_events)(void);
     void (*poll_events)(void);

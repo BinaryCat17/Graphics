@@ -37,7 +37,7 @@ static bool vulkan_renderer_init(RendererBackend* backend, const RenderBackendIn
     state->font_path = init->font_path;
     
     // Callbacks
-    state->get_required_instance_extensions = (bool (*)(const char***, uint32_t*))init->get_required_instance_extensions;
+    state->get_required_instance_extensions = (bool (*)(const char***, uint32_t*))init->get_required_extensions;
     state->create_surface = (bool (*)(PlatformWindow*, VkInstance, const VkAllocationCallbacks*, PlatformSurface*))init->create_surface;
     state->destroy_surface = (void (*)(VkInstance, const VkAllocationCallbacks*, PlatformSurface*))init->destroy_surface;
     state->get_framebuffer_size = init->get_framebuffer_size;

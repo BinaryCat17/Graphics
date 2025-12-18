@@ -93,9 +93,9 @@ static void try_bootstrap_renderer(RenderSystem* sys) {
     RenderBackendInit init = {
         .window = sys->window,
         .surface = &surface, // Pass pointer to empty surface struct, backend/platform fills it
-        .get_required_instance_extensions = platform_get_required_vulkan_instance_extensions,
-        .create_surface = platform_create_vulkan_surface,
-        .destroy_surface = platform_destroy_vulkan_surface,
+        .get_required_extensions = platform_get_required_extensions,
+        .create_surface = platform_create_surface,
+        .destroy_surface = platform_destroy_surface,
         .get_framebuffer_size = platform_get_framebuffer_size,
         .wait_events = platform_wait_events,
         .poll_events = platform_poll_events,
