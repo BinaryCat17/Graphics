@@ -113,6 +113,7 @@ UiNodeSpec* ui_asset_push_node(UiAsset* asset);
 
 // --- UI INSTANCE (The Living Tree) ---
 // Created from a UiAsset + Data Context.
+// Managed by a UiInstance container.
 
 typedef struct UiElement {
     const UiNodeSpec* spec; // The DNA
@@ -121,19 +122,20 @@ typedef struct UiElement {
     struct UiElement* parent;
     struct UiElement** children;
     size_t child_count;
-    size_t child_capacity;
+    // size_t child_capacity; // Not needed if fixed by spec, but needed for dynamic add?
+    // If we use Arena, realloc is hard. 
+    // Usually we build the tree once. Dynamic children are usually rebuilt from scratch.
     
     // Data Context
     void* data_ptr;         // Pointer to C struct
     const MetaStruct* meta; // Type info
     
     // State
-    int id_hash;
     Rect rect;            // Computed layout relative to parent
     Rect screen_rect;     // Computed screen space (for hit testing)
     
     // Cached Bindings (to detect changes)
-    char* cached_text;
+    char cached_text[64];
     float cached_value;
     
     // Interaction
@@ -142,7 +144,6 @@ typedef struct UiElement {
     bool is_focused;      // Keyboard focus
     
     int cursor_idx;       // Text Input Cursor
-    int selection_len;    // Text Input Selection
     
     // Scrolling State (Internal or Bound)
     float scroll_x;
@@ -154,9 +155,18 @@ typedef struct UiElement {
 
 } UiElement;
 
+typedef struct UiInstance {
+    MemoryArena arena;
+    UiElement* root;
+} UiInstance;
+
 // API for Instance
-UiElement* ui_element_create(const UiNodeSpec* spec, void* data, const MetaStruct* meta);
-void ui_element_free(UiElement* element);
+void ui_instance_init(UiInstance* instance, size_t size);
+void ui_instance_destroy(UiInstance* instance);
+void ui_instance_reset(UiInstance* instance); // Clears all elements
+
+// Allocates element from instance arena.
+UiElement* ui_element_create(UiInstance* instance, const UiNodeSpec* spec, void* data, const MetaStruct* meta);
 
 // Core Loop
 void ui_element_update(UiElement* element); // Syncs data

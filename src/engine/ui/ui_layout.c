@@ -23,7 +23,7 @@ static float calculate_width(UiElement* el, float available_w) {
         bool parent_is_row = (el->parent && el->parent->spec->layout == UI_LAYOUT_FLEX_ROW);
         
         if (parent_is_row || spec->kind == UI_KIND_TEXT || (spec->flags & UI_FLAG_CLICKABLE)) {
-             const char* text = el->cached_text ? el->cached_text : spec->static_text;
+             const char* text = (el->cached_text[0] != '\0') ? el->cached_text : spec->static_text;
              if (text) {
                  if (g_measure_func) {
                      w = g_measure_func(text, g_measure_user_data) + spec->padding * 2;

@@ -42,8 +42,11 @@ int test_column_layout() {
     
     add_child_spec(asset, root, c1);
     add_child_spec(asset, root, c2);
+    
+    UiInstance instance;
+    ui_instance_init(&instance, 4096);
 
-    UiElement* el = ui_element_create(root, NULL, NULL);
+    UiElement* el = ui_element_create(&instance, root, NULL, NULL);
     ui_layout_root(el, 800, 600, 0, false);
 
     TEST_ASSERT_FLOAT_EQ(el->rect.w, 100.0f, 0.1f);
@@ -58,7 +61,7 @@ int test_column_layout() {
     TEST_ASSERT_FLOAT_EQ(v2->rect.x, 5.0f, 0.1f);
     TEST_ASSERT_FLOAT_EQ(v2->rect.y, 65.0f, 0.1f);
 
-    ui_element_free(el);
+    ui_instance_destroy(&instance);
     ui_asset_free(asset);
     return 1;
 }

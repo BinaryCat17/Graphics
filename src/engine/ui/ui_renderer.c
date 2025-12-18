@@ -72,9 +72,9 @@ static void render_background(const UiElement* el, Scene* scene, Vec4 clip_vec) 
 }
 
 static void render_content(const UiElement* el, Scene* scene, Vec4 clip_vec) {
-    if (!el->spec->static_text && !el->cached_text && el->spec->kind != UI_KIND_TEXT_INPUT) return;
+    if (!el->spec->static_text && el->cached_text[0] == '\0' && el->spec->kind != UI_KIND_TEXT_INPUT) return;
 
-    const char* text = el->cached_text ? el->cached_text : el->spec->static_text;
+    const char* text = (el->cached_text[0] != '\0') ? el->cached_text : el->spec->static_text;
     
     // For inputs without text, show nothing or placeholder?
     if (el->spec->kind == UI_KIND_TEXT_INPUT && !text) text = "";
