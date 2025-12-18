@@ -1,6 +1,8 @@
 #include "ui_input.h"
 #include "foundation/logger/logger.h"
 #include <string.h>
+#include <stdio.h>
+#include <stdlib.h>
 
 void ui_input_init(UiInputContext* ctx) {
     memset(ctx, 0, sizeof(UiInputContext));
@@ -140,27 +142,37 @@ void ui_input_update(UiInputContext* ctx, UiElement* root, const InputState* inp
             if (input->last_char >= 32 && input->last_char <= 126) {
                 if (el->data_ptr && el->meta && el->spec->text_source) {
                     const MetaField* field = meta_find_field(el->meta, el->spec->text_source);
-                    if (field && field->type == META_TYPE_STRING) {
-                         const char* current = meta_get_string(el->data_ptr, field);
-                         char buf[256];
-                         if (current) {
-                             strncpy(buf, current, 255);
-                             buf[255] = '\0';
-                         } else {
-                             buf[0] = '\0';
+                    if (field) {
+                         char buf[256] = {0};
+                         
+                         // Get current value as string
+                         if (field->type == META_TYPE_STRING) {
+                             const char* current = meta_get_string(el->data_ptr, field);
+                             if (current) strncpy(buf, current, 255);
+                         } else if (field->type == META_TYPE_FLOAT) {
+                             float val = meta_get_float(el->data_ptr, field);
+                             snprintf(buf, 255, "%.2f", val); // Format matches display
+                             // Remove trailing zeros/dot for cleaner editing? Maybe later.
+                         } else if (field->type == META_TYPE_INT) {
+                             int val = meta_get_int(el->data_ptr, field);
+                             snprintf(buf, 255, "%d", val);
                          }
                          
                          size_t len = strlen(buf);
                          if (len < 255) {
-                             // Insert at cursor or append? For now, append/insert at end.
-                             // TODO: Insert at cursor_idx
                              buf[len] = (char)input->last_char;
                              buf[len+1] = '\0';
-                             meta_set_string(el->data_ptr, field, buf);
+                             
+                             // Write back
+                             if (field->type == META_TYPE_STRING) {
+                                 meta_set_string(el->data_ptr, field, buf);
+                             } else if (field->type == META_TYPE_FLOAT) {
+                                 meta_set_float(el->data_ptr, field, strtof(buf, NULL));
+                             } else if (field->type == META_TYPE_INT) {
+                                 meta_set_int(el->data_ptr, field, atoi(buf));
+                             }
                              
                              el->cursor_idx++;
-                             // Update cached text immediately for responsiveness
-                             // (Assuming ui_element_update re-reads it next frame)
                          }
                     }
                 }
@@ -170,21 +182,33 @@ void ui_input_update(UiInputContext* ctx, UiElement* root, const InputState* inp
             if (input->last_key == 259 && input->last_action != 0) { // Press or Repeat
                 if (el->data_ptr && el->meta && el->spec->text_source) {
                     const MetaField* field = meta_find_field(el->meta, el->spec->text_source);
-                    if (field && field->type == META_TYPE_STRING) {
-                         const char* current = meta_get_string(el->data_ptr, field);
-                         if (current) {
-                             size_t len = strlen(current);
-                             if (len > 0) {
-                                 char buf[256];
-                                 strncpy(buf, current, 255);
-                                 buf[255] = '\0';
-                                 
-                                 // Remove last char
-                                 buf[len-1] = '\0';
-                                 
+                    if (field) {
+                         char buf[256] = {0};
+                         
+                         if (field->type == META_TYPE_STRING) {
+                             const char* current = meta_get_string(el->data_ptr, field);
+                             if (current) strncpy(buf, current, 255);
+                         } else if (field->type == META_TYPE_FLOAT) {
+                             float val = meta_get_float(el->data_ptr, field);
+                             snprintf(buf, 255, "%.2f", val);
+                         } else if (field->type == META_TYPE_INT) {
+                             int val = meta_get_int(el->data_ptr, field);
+                             snprintf(buf, 255, "%d", val);
+                         }
+
+                         size_t len = strlen(buf);
+                         if (len > 0) {
+                             buf[len-1] = '\0';
+                             
+                             if (field->type == META_TYPE_STRING) {
                                  meta_set_string(el->data_ptr, field, buf);
-                                 if (el->cursor_idx > 0) el->cursor_idx--;
+                             } else if (field->type == META_TYPE_FLOAT) {
+                                 meta_set_float(el->data_ptr, field, strtof(buf, NULL));
+                             } else if (field->type == META_TYPE_INT) {
+                                 meta_set_int(el->data_ptr, field, atoi(buf));
                              }
+                             
+                             if (el->cursor_idx > 0) el->cursor_idx--;
                          }
                     }
                 }
