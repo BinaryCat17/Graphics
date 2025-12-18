@@ -2,15 +2,12 @@
 #include "foundation/logger/logger.h"
 #include "foundation/platform/platform.h"
 #include "foundation/meta/reflection.h"
-#include "features/graph_editor/transpiler.h"
 #include "engine/ui/ui_layout.h"
 #include "engine/graphics/text/font.h"
 
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
-
-#define KEY_C 67
 
 // --- Input Callbacks ---
 
@@ -57,33 +54,12 @@ static void on_framebuffer_size(PlatformWindow* window, int width, int height, v
     }
 }
 
-static void engine_setup_default_graph(Engine* engine) {
-    // Create Test Nodes (Visualizer Graph)
-    MathNode* uv = math_graph_add_node(&engine->graph, MATH_NODE_UV);
-    uv->name = strdup("UV.x");
-    uv->x = 50; uv->y = 100;
-
-    MathNode* freq = math_graph_add_node(&engine->graph, MATH_NODE_VALUE);
-    freq->name = strdup("Frequency");
-    freq->value = 20.0f;
-    freq->x = 50; freq->y = 250;
-    
-    MathNode* mul = math_graph_add_node(&engine->graph, MATH_NODE_MUL);
-    mul->name = strdup("Multiply");
-    mul->x = 250; mul->y = 175;
-    
-    MathNode* s = math_graph_add_node(&engine->graph, MATH_NODE_SIN);
-    s->name = strdup("Sin");
-    s->x = 450; s->y = 175;
-    
-    math_graph_connect(mul, 0, uv);
-    math_graph_connect(mul, 1, freq);
-    math_graph_connect(s, 0, mul);
-}
-
 bool engine_init(Engine* engine, const EngineConfig* config) {
     if (!engine || !config) return false;
     memset(engine, 0, sizeof(Engine));
+
+    // Store Callbacks
+    engine->on_update = config->on_update;
 
     // 1. Logger
     logger_set_level(config->log_level);
@@ -121,7 +97,11 @@ bool engine_init(Engine* engine, const EngineConfig* config) {
 
     // 4. Math Graph (Model)
     math_graph_init(&engine->graph);
-    engine_setup_default_graph(engine);
+    
+    // Application Init Hook (App sets up the graph here)
+    if (config->on_init) {
+        config->on_init(engine);
+    }
 
     // 5. UI (View)
     engine->ui_def = ui_loader_load_from_file(config->ui_path);
@@ -156,8 +136,7 @@ bool engine_init(Engine* engine, const EngineConfig* config) {
     // Bindings (Legacy coupling, to be refactored)
     render_system_bind_assets(&engine->render_system, &engine->assets);
     render_system_bind_ui(&engine->render_system, engine->ui_root);
-    // render_system_bind_math_graph(&engine->render_system, &engine->graph); // Removed dependency
-
+    
     engine->running = true;
     return true;
 }
@@ -166,8 +145,6 @@ void engine_run(Engine* engine) {
     if (!engine) return;
 
     LOG_INFO("Engine Loop Starting...");
-    
-    static bool key_c_prev = false;
     
     RenderSystem* rs = &engine->render_system;
     
@@ -186,22 +163,10 @@ void engine_run(Engine* engine) {
         engine->input.mouse_clicked = engine->input.mouse_down && !last_down;
         last_down = engine->input.mouse_down;
 
-        // Key C (Compute)
-        bool key_c_curr = platform_get_key(engine->window, KEY_C);
-        if (key_c_curr && !key_c_prev) {
-             engine->show_compute_visualizer = !engine->show_compute_visualizer;
-             rs->show_compute_result = engine->show_compute_visualizer; // Sync to renderer
-             
-             if (engine->show_compute_visualizer) {
-                 LOG_INFO("Transpiling & Running Compute Graph (Image Mode)...");
-                 char* glsl = math_graph_transpile_glsl(&engine->graph, TRANSPILE_MODE_IMAGE_2D);
-                 if (glsl && rs->backend && rs->backend->run_compute_image) {
-                     rs->backend->run_compute_image(rs->backend, glsl, 512, 512);
-                     free(glsl);
-                 }
-             }
+        // Application Update Hook
+        if (engine->on_update) {
+            engine->on_update(engine);
         }
-        key_c_prev = key_c_curr;
 
         // Update UI
         if (engine->ui_root) {

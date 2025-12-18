@@ -7,6 +7,8 @@
 #include "foundation/platform/platform.h"
 #include "engine/ui/ui_def.h"
 
+typedef struct Engine Engine;
+
 typedef struct EngineConfig {
     int width;
     int height;
@@ -14,9 +16,13 @@ typedef struct EngineConfig {
     const char* assets_path;
     const char* ui_path;
     int log_level;
+
+    // Application Callbacks
+    void (*on_init)(Engine* engine);
+    void (*on_update)(Engine* engine);
 } EngineConfig;
 
-typedef struct Engine {
+struct Engine {
     // Platform
     PlatformWindow* window;
     InputState input;
@@ -35,7 +41,10 @@ typedef struct Engine {
     // State
     bool running;
     bool show_compute_visualizer;
-} Engine;
+    
+    // Callbacks
+    void (*on_update)(Engine* engine);
+};
 
 bool engine_init(Engine* engine, const EngineConfig* config);
 void engine_run(Engine* engine);
