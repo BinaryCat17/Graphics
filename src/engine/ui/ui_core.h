@@ -161,4 +161,7 @@ void ui_element_free(UiElement* element);
 // Core Loop
 void ui_element_update(UiElement* element); // Syncs data
 
+// --- Utils ---
+void ui_bind_read_string(void* data, const MetaField* field, char* out_buf, size_t buf_size);
+
 #endif // UI_CORE_H

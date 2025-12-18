@@ -80,24 +80,13 @@ void ui_element_update(UiElement* element) {
         // Find field
         const MetaField* field = meta_find_field(element->meta, element->spec->text_source);
         if (field) {
-            if (field->type == META_TYPE_FLOAT) {
-                float val = meta_get_float(element->data_ptr, field);
-                char buffer[32];
-                snprintf(buffer, sizeof(buffer), "%.2f", val);
-                
-                // Update cache if changed
-                if (!element->cached_text || strcmp(element->cached_text, buffer) != 0) {
-                    if (element->cached_text) free(element->cached_text);
-                    element->cached_text = strdup(buffer);
-                }
-            } else if (field->type == META_TYPE_STRING) {
-                const char* val = meta_get_string(element->data_ptr, field);
-                 if (val) {
-                    if (!element->cached_text || strcmp(element->cached_text, val) != 0) {
-                        if (element->cached_text) free(element->cached_text);
-                        element->cached_text = strdup(val);
-                    }
-                 }
+            char buffer[256];
+            ui_bind_read_string(element->data_ptr, field, buffer, sizeof(buffer));
+            
+            // Update cache if changed
+            if (!element->cached_text || strcmp(element->cached_text, buffer) != 0) {
+                if (element->cached_text) free(element->cached_text);
+                element->cached_text = strdup(buffer);
             }
         }
     }
@@ -109,27 +98,40 @@ void ui_element_update(UiElement* element) {
             const MetaField* fx = meta_find_field(element->meta, element->spec->x_source);
             if (fx) element->rect.x = meta_get_float(element->data_ptr, fx);
         }
-                if (element->spec->y_source) {
-                    const MetaField* fy = meta_find_field(element->meta, element->spec->y_source);
-                    if (fy) element->rect.y = meta_get_float(element->data_ptr, fy);
-                }
-                if (element->spec->w_source) {
-                    const MetaField* fw = meta_find_field(element->meta, element->spec->w_source);
-                    if (fw) element->rect.w = meta_get_float(element->data_ptr, fw);
-                }
-                if (element->spec->h_source) {
-                    const MetaField* fh = meta_find_field(element->meta, element->spec->h_source);
-                    if (fh) element->rect.h = meta_get_float(element->data_ptr, fh);
-                }
-            }
-        
-            // Recurse
-        for (size_t i = 0; i < element->child_count; ++i) {
-
-            ui_element_update(element->children[i]);
-
+        if (element->spec->y_source) {
+            const MetaField* fy = meta_find_field(element->meta, element->spec->y_source);
+            if (fy) element->rect.y = meta_get_float(element->data_ptr, fy);
         }
-
+        if (element->spec->w_source) {
+            const MetaField* fw = meta_find_field(element->meta, element->spec->w_source);
+            if (fw) element->rect.w = meta_get_float(element->data_ptr, fw);
+        }
+        if (element->spec->h_source) {
+            const MetaField* fh = meta_find_field(element->meta, element->spec->h_source);
+            if (fh) element->rect.h = meta_get_float(element->data_ptr, fh);
+        }
     }
 
+    // Recurse
+    for (size_t i = 0; i < element->child_count; ++i) {
+        ui_element_update(element->children[i]);
+    }
+}
+
+void ui_bind_read_string(void* data, const MetaField* field, char* out_buf, size_t buf_size) {
+    if (!data || !field || !out_buf || buf_size == 0) return;
     
+    out_buf[0] = '\0';
+
+    if (field->type == META_TYPE_STRING) {
+        const char* current = meta_get_string(data, field);
+        if (current) strncpy(out_buf, current, buf_size - 1);
+        out_buf[buf_size - 1] = '\0';
+    } else if (field->type == META_TYPE_FLOAT) {
+        float val = meta_get_float(data, field);
+        snprintf(out_buf, buf_size, "%.2f", val);
+    } else if (field->type == META_TYPE_INT) {
+        int val = meta_get_int(data, field);
+        snprintf(out_buf, buf_size, "%d", val);
+    }
+}

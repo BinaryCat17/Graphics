@@ -6,19 +6,6 @@
 
 // --- Helpers ---
 
-static void get_field_as_string(void* data, const MetaField* field, char* out_buf, size_t buf_size) {
-    if (field->type == META_TYPE_STRING) {
-        const char* current = meta_get_string(data, field);
-        if (current) strncpy(out_buf, current, buf_size - 1);
-    } else if (field->type == META_TYPE_FLOAT) {
-        float val = meta_get_float(data, field);
-        snprintf(out_buf, buf_size, "%.2f", val);
-    } else if (field->type == META_TYPE_INT) {
-        int val = meta_get_int(data, field);
-        snprintf(out_buf, buf_size, "%d", val);
-    }
-}
-
 static void set_field_from_string(void* data, const MetaField* field, const char* val_str) {
     if (field->type == META_TYPE_STRING) {
         meta_set_string(data, field, val_str);
@@ -169,7 +156,7 @@ void ui_input_update(UiInputContext* ctx, UiElement* root, const InputState* inp
                     const MetaField* field = meta_find_field(el->meta, el->spec->text_source);
                     if (field) {
                          char buf[256] = {0};
-                         get_field_as_string(el->data_ptr, field, buf, sizeof(buf));
+                         ui_bind_read_string(el->data_ptr, field, buf, sizeof(buf));
                          
                          size_t len = strlen(buf);
                          if (len < 255) {
@@ -189,7 +176,7 @@ void ui_input_update(UiInputContext* ctx, UiElement* root, const InputState* inp
                     const MetaField* field = meta_find_field(el->meta, el->spec->text_source);
                     if (field) {
                          char buf[256] = {0};
-                         get_field_as_string(el->data_ptr, field, buf, sizeof(buf));
+                         ui_bind_read_string(el->data_ptr, field, buf, sizeof(buf));
 
                          size_t len = strlen(buf);
                          if (len > 0) {
