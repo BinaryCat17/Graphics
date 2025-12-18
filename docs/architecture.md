@@ -1,80 +1,68 @@
-# Graphics Engine Architecture: The Reactive Unified Vision
+# Graphics Engine Architecture
 
-## Core Philosophy
-1.  **Unified Visual Space:** There is no "UI Layer" separate from the "3D World". A node in the graph editor, a particle in the simulation, and a connection wire are all `SceneObject` entities, rendered by the same pipeline.
-2.  **Data-Oriented Truth:** The state of the application lives in C structs (`MathGraph`, `Node`, `VisualWire`). The visuals are merely a projection of this data.
-3.  **Declarative Over Imperative:** We reject `draw_line()` or `custom_paint()`. Instead, we describe *what* to draw via data attributes and let the engine handle the *how*.
+## Overview
+This project implements a high-performance, data-oriented graphics engine in C11. It is designed to be a foundation for visual applications, specifically node-based editors and compute visualization tools.
 
----
+The architecture follows a strict layered approach (Foundation -> Engine -> Features -> App), although current implementation details show significant coupling that is being actively refactored.
 
-## 1. The Reactive UI Framework
-We adopt a **Data-Driven Template System** (Pure MVVM).
+## System Layers
 
-### The "Dual Repeater" Pattern (Editor Architecture)
-The Node Graph Editor is not a monolithic widget. It is composed of two overlaid `Repeater` lists:
+### 1. Foundation (`src/foundation/`)
+The bedrock of the system. Has **zero dependencies** on other layers.
+- **Platform:** Abstraction for OS windows, input, and file system (wrapping GLFW).
+- **Memory:** Custom memory allocators (Arenas, Pools) to avoid fragmentation and `malloc` overhead.
+- **Logger:** Thread-safe, leveled logging system.
+- **Math:** Linear algebra (vec3, mat4), geometry, and coordinate systems.
+- **Meta:** A reflection system enabling runtime introspection of C structs, critical for the UI and Serialization systems.
 
-1.  **Layer 1 (Wires):** A repeater bound to `Array<VisualWire>`.
-    *   **Template:** `UI_NODE_CURVE` (Primitive).
-    *   **Binding:** Binds to start/end coordinates of the wire.
-2.  **Layer 2 (Nodes):** A repeater bound to `Array<MathNode>`.
-    *   **Template:** `UI_NODE_PANEL` (Composite).
-    *   **Binding:** Binds to `Node.x`, `Node.y`.
+### 2. Engine (`src/engine/`)
+The core runtime. Depends only on **Foundation**.
+- **Graphics:** A render graph based renderer.
+    - *Frontend:* `RenderSystem`, `RenderPacket`, `Scene` (Generic).
+    - *Backend:* `RendererBackend` interface (currently Vulkan implementation).
+- **UI:** A reactive, data-driven UI framework ("The Dual Repeater" pattern).
+    - Uses YAML templates (`ui_loader`) and Reflection to bind directly to C-structs.
+    - *Layout:* Flexbox-like layout engine.
+- **Assets:** Resource management for fonts, shaders, and textures.
 
-### The ViewModel Layer
-The UI is "dumb". It does not calculate where lines go.
-*   **C-Side Logic:** A specific system (ViewModel) iterates the logical `MathGraph`, calculates connection coordinates (based on node positions and port offsets), and populates a flat `VisualWire` array.
-*   **UI-Side:** Simply renders the `VisualWire` array.
+### 3. Features (`src/features/`)
+Specific business logic modules. Should operate as plugins.
+- **Graph Editor:** A mathematical node graph model, transpiler (to GLSL), and interaction logic.
 
----
-
-## 2. The Unified Scene Primitives
-To support the UI without custom rendering code, the `Unified Scene` supports distinct primitives handled by the Uber-Shader (`unified.frag`).
-
-### Primitive Types
-*   **SCENE_PRIM_QUAD:** Standard textured rectangle (UI panels, text, sprites).
-*   **SCENE_PRIM_CURVE:** Procedural Bezier curve (SDF-based). Used for node connections.
-*   **SCENE_PRIM_LINE:** Simple line segments (Grid lines, debug gizmos).
+### 4. Application (`src/app/`)
+The entry point.
+- **Main:** Configures the engine, loads specific features, and runs the loop.
 
 ---
 
-## 3. Transpilation & Compute Pipeline
-The engine includes a runtime compiler to turn the Visual Graph into high-performance GPU kernels.
+## Key Architectural Patterns
 
-1.  **Transpiler (`transpiler.c`):**
-    *   Traverses the `MathGraph` topology.
-    *   Generates valid GLSL 450 Compute Shader code (e.g., `result = sin(t) + x;`).
-2.  **Runtime Compilation (`vk_compute.c`):**
-    *   Saves the generated GLSL to a temporary file.
-    *   Invokes `glslc` (Vulkan SDK) to compile GLSL -> SPIR-V.
-    *   Loads the SPIR-V bytecode into a new `VkShaderModule`.
-3.  **Execution:**
-    *   Creates a `VkComputePipeline` on the fly.
-    *   Allocates Storage Buffers for inputs/outputs.
-    *   Dispatches the compute kernel.
+### The "Unified Scene"
+Unlike traditional engines that separate UI and 3D rendering, this engine uses a single **Unified Scene**.
+- **Primitives:** UI Panels, Text, and Graph Wires are all `SceneObject`s.
+- **Rendering:** A single "Uber-Shader" (`unified.frag`) handles rendering based on the `type` field (Quad, SDF Curve, etc.).
+- **Benefit:** Massive batching efficiency. The UI is just 3D geometry.
 
----
+### Reactive UI (MVVM)
+The UI does not store state. It reflects the application state.
+1.  **Model:** C Structs (e.g., `MathNode`).
+2.  **ViewDefinition:** YAML file describing the hierarchy.
+3.  **ViewModel:** The Reflection system binds the YAML paths (`node.x`) to memory addresses.
+4.  **Layout:** Calculated every frame based on the Model.
 
-## 4. Module Structure (Refactored)
-
-*   **`src/engine/scene/`**:
-    *   `scene.h/.c`: Defines `Scene` and `SceneObject`. Pure data container.
-*   **`src/engine/text/`**:
-    *   `font.h/.c`: Font loading and atlas generation.
-    *   `text_renderer.h/.c`: Helper to generate text meshes for the scene.
-*   **`src/engine/render/backend/vulkan/`**:
-    *   `vulkan_renderer.c`: Main backend logic.
-    *   `vk_compute.c`: Runtime shader compilation and execution.
-*   **`src/domains/math_model/`**:
-    *   `math_graph.c`: The logical graph data.
-    *   `transpiler.c`: GLSL generation logic.
+### Transpilation Pipeline
+The engine includes a runtime compiler:
+1.  **Graph Data:** User connects nodes (Math, Logic).
+2.  **Transpiler:** Converts the graph topology into GLSL Compute Shader source code.
+3.  **JIT:** The Vulkan backend invokes `glslc` to compile SPIR-V at runtime and dispatches the compute job.
 
 ---
 
-## 5. Technology Stack
+## Current Architecture vs. Ideal State
 
-| Component | Technology | Role |
+| Aspect | Current Reality | Ideal Target |
 | :--- | :--- | :--- |
-| **Meta-System** | Python (`codegen.py`) | Generates Reflection & Signal code. |
-| **Logic** | C11 | Core Engine, Transpiler, Systems. |
-| **Rendering** | Vulkan 1.3 | Compute Shaders, Instancing, Unified Pipeline. |
-| **UI Description** | YAML / DSL | Declarative Templates & Styles. |
+| **Coupling** | `Engine` hardcodes `GraphEditor` headers. | `Engine` is generic; `App` plugs Feature into Engine. |
+| **Rendering** | `RenderSystem` calls `ui_build_scene`. | `SceneBuilder` (External) feeds both UI and 3D into Renderer. |
+| **Backend** | `RendererBackend` interface leaks Vulkan types. | Strict opaque handles (`BackendHandle`). |
+| **Memory** | Mixed usage of `malloc` and `Arena`. | 100% Arena/Pool usage for frame data. |
