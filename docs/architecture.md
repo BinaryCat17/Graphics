@@ -25,6 +25,7 @@ These are the tools that have **zero dependencies** on the rest of the engine.
 *   **Platform:** Wrappers for Windows/Linux stuff (Window creation, File IO).
 *   **Math:** Vectors, Matrices.
 *   **Logger:** `LOG_INFO`, `LOG_ERROR`.
+*   **Meta (Reflection):** A custom system allowing the engine to inspect C structs at runtime. Essential for UI Data Binding.
 
 ### ⚙️ Engine (`src/engine/`)
 **"The Machine"**
@@ -115,18 +116,22 @@ This is the **Low-Level Hardware Interface**. Only the `RenderSystem` talks to t
 
 ---
 
-## 4. The Build Pipeline (No Runtime Compilation)
+## 4. The Build Pipeline & Tools
 
-We do **not** compile shaders inside the game executable. Embedding a compiler (like `shaderc`) makes the game executable huge and slow to start.
+We automate the boring stuff using Python scripts invoked by CMake.
 
-### How it works (`tools/build_shaders.py`)
+### Code Generation (`tools/codegen.py`)
+*   **When:** Runs *before* C compilation.
+*   **What:** Scans source files for structs/enums marked with `// REFLECT`.
+*   **Output:** Generates `src/generated/reflection_registry.c`.
+*   **Why:** Enables the UI to automatically read/write C structs (Data Binding) without manual boilerplate.
 
-1.  **You write:** `assets/shaders/ui.frag` (GLSL).
-2.  **You build:** CMake runs our Python script.
-3.  **Script:** Calls `glslc` (from Vulkan SDK) to compile `.frag` -> `.spv` (Binary).
-4.  **Game runs:** Loads `ui.frag.spv` directly.
+### Shader Compilation (`tools/build_shaders.py`)
+*   **When:** Runs during the build.
+*   **What:** Scans `assets/shaders/` for `.vert` and `.frag` files.
+*   **Output:** Generates binary `.spv` files using `glslc`.
+*   **Why:** The game loads pre-compiled binaries, avoiding runtime compilation overhead and dependencies.
 
-This is the "Professional Way". It mimics how AAA engines cook assets.
 
 ---
 
