@@ -14,7 +14,8 @@ typedef enum MetaType {
     META_TYPE_BOOL,
     META_TYPE_STRUCT,
     META_TYPE_ENUM,
-    META_TYPE_POINTER
+    META_TYPE_POINTER,
+    META_TYPE_POINTER_ARRAY // e.g. MathNode**
 } MetaType;
 // Описание одного значения enum (например: "UI_LAYOUT_ROW" -> 1)
 typedef struct MetaEnumValue {

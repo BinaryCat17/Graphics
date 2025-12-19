@@ -102,60 +102,9 @@ static void math_editor_recompile_graph(MathEditorState* state, RenderSystem* rs
 static void math_editor_refresh_graph_view(MathEditorState* state) {
     if (!state->ui_instance.root) return;
     UiElement* canvas = ui_find_element_by_id(state->ui_instance.root, "canvas_area");
-    if (!canvas) return;
-
-    // Reset Input State to avoid stale IDs
-    ui_input_reset(&state->input_ctx);
-
-    const MetaStruct* node_meta = meta_get_struct("MathNode");
-    
-    // Count valid nodes
-    int count = 0;
-    for (uint32_t i = 0; i < state->graph.node_count; ++i) {
-        const MathNode* n = math_graph_get_node(&state->graph, i);
-        if (n && n->type != MATH_NODE_NONE) count++;
-    }
-
-    // Reallocate children array from Arena
-    // Note: We are relying on the linear arena. Old arrays are "leaked" inside the arena until frame reset?
-    // Actually, `ui_instance.arena` is a persistent arena for the UI tree. 
-    // Ideally, we should reset the arena or use a pool if we rebuild often.
-    // For now, we just allocate forward. This WILL eventually OOM if we don't reset.
-    // TODO: Implement Arena Reset for dynamic UI parts.
-    canvas->children = (UiElement**)arena_alloc_zero(&state->ui_instance.arena, count * sizeof(UiElement*));
-    canvas->child_count = count;
-
-    int idx = 0;
-    for (uint32_t i = 0; i < state->graph.node_count; ++i) {
-        MathNode* node = math_graph_get_node(&state->graph, i);
-        if (!node || node->type == MATH_NODE_NONE) continue;
-        
-        // --- Node Window (FROM TEMPLATE) ---
-        UiNodeSpec* node_spec = ui_asset_get_template(state->ui_asset, "GraphNode");
-        if (node_spec) {
-            // Instantiate from template
-            UiElement* container = ui_element_create(&state->ui_instance, node_spec, node, node_meta);
-            canvas->children[idx++] = container;
-            container->parent = canvas;
-            
-            // Value Row (Append if needed - dynamic hack)
-            if (node->type == MATH_NODE_VALUE) {
-                UiNodeSpec* val_spec = ui_asset_get_template(state->ui_asset, "ValueRow");
-                if (val_spec) {
-                    size_t old_cnt = container->child_count;
-                    UiElement** old_children = container->children;
-                    
-                    container->child_count++;
-                    container->children = arena_alloc_zero(&state->ui_instance.arena, container->child_count * sizeof(UiElement*));
-                    
-                    for(size_t k=0; k<old_cnt; ++k) container->children[k] = old_children[k];
-                    
-                    UiElement* row = ui_element_create(&state->ui_instance, val_spec, node, node_meta);
-                    container->children[old_cnt] = row;
-                    row->parent = container;
-                }
-            }
-        }
+    if (canvas) {
+        // Declarative Refresh
+        ui_element_rebuild_children(canvas, &state->ui_instance);
     }
 }
 
@@ -163,6 +112,10 @@ static void math_editor_refresh_inspector(MathEditorState* state) {
     if (!state->ui_instance.root) return;
     UiElement* inspector = ui_find_element_by_id(state->ui_instance.root, "inspector_area");
     if (!inspector) return;
+    
+    // Note: Inspector is still imperative for now as it depends on selection which is not a collection
+    // We could potentially make it declarative by binding "selected_node" but that requires Single-Item Binding logic
+    // which we haven't built yet. So we keep this imperative.
     
     if (state->selected_node_id == MATH_NODE_INVALID_ID) {
         inspector->child_count = 0;
@@ -282,9 +235,6 @@ void math_editor_init(MathEditorState* state, Engine* engine) {
 
             // Bind to Renderer
             render_system_bind_ui(&engine->render_system, state->ui_instance.root);
-            
-            // Generate Dynamic Parts
-            math_editor_refresh_graph_view(state);
             
             // Select first node (optional convenience)
             for(uint32_t i=0; i<state->graph.node_count; ++i) {

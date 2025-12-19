@@ -1,8 +1,8 @@
 templates:
-  GraphNode:
-    import: "assets/ui/templates/node.yaml"
   ValueRow:
     import: "assets/ui/templates/value_row.yaml"
+  GraphNode:
+    import: "assets/ui/templates/node.yaml"
   InspectorTitle:
     import: "assets/ui/templates/inspector_title.yaml"
   InspectorField:
@@ -29,6 +29,8 @@ children:
     width: -1 # Fill rest
     height: -1
     color: "#262626"
+    collection: "node_ptrs"
+    item_template: "GraphNode"
     
     children:
         - type: label

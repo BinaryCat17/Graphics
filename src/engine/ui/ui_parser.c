@@ -148,7 +148,13 @@ static UiNodeSpec* load_recursive(UiAsset* asset, const ConfigNode* node) {
         }
         // ... rest of overrides ...
         if (strcmp(key, "item_template") == 0) {
-            spec->item_template = load_recursive(asset, val);
+            if (val->type == CONFIG_NODE_SCALAR) {
+                UiNodeSpec* t = ui_asset_get_template(asset, val->scalar);
+                if (t) spec->item_template = ui_node_spec_copy(asset, t);
+                else LOG_ERROR("UiParser: Template '%s' not found for item_template", val->scalar);
+            } else {
+                spec->item_template = load_recursive(asset, val);
+            }
             continue;
         }
         if (strcmp(key, "color") == 0 || strcmp(key, "hover_color") == 0) {
@@ -188,6 +194,7 @@ static UiNodeSpec* load_recursive(UiAsset* asset, const ConfigNode* node) {
             else if (strcmp(key, "bind") == 0) field = meta_find_field(meta, "value_source");
             else if (strcmp(key, "bind_x") == 0) field = meta_find_field(meta, "x_source");
             else if (strcmp(key, "bind_y") == 0) field = meta_find_field(meta, "y_source");
+            else if (strcmp(key, "collection") == 0) field = meta_find_field(meta, "bind_collection");
             else if (strcmp(key, "on_click") == 0) field = meta_find_field(meta, "on_click_cmd");
             else if (strcmp(key, "on_change") == 0) field = meta_find_field(meta, "on_change_cmd");
         }

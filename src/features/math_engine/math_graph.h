@@ -56,9 +56,9 @@ typedef struct MathGraph {
     
     // Indirection table: ID -> MathNode*
     // This array grows, but the nodes themselves stay stable in the pool.
-    MathNode** node_ptrs;
-    uint32_t node_count;     // Highest active ID + 1
-    uint32_t node_capacity;  // Capacity of the ptrs array
+    MathNode** node_ptrs;    // REFLECT
+    uint32_t node_count;     // REFLECT
+    uint32_t node_capacity;  // Capacity
 } MathGraph;
 
 // --- API ---

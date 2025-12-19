@@ -13,3 +13,5 @@ children:
     bind: "name"
     height: 20
     color: "#FFFFFF"
+  - type: instance
+    instance: "ValueRow"

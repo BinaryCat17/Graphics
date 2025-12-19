@@ -99,6 +99,7 @@ typedef struct UiNodeSpec {
     char* text_source;      // REFLECT
     char* value_source;     // REFLECT
     char* data_source;      // REFLECT
+    char* bind_collection;  // REFLECT
     
     // 4. Geometry Bindings (For CANVAS layout or manual overrides)
     char* x_source;         // REFLECT
@@ -213,6 +214,9 @@ void ui_instance_reset(UiInstance* instance); // Clears all elements
 
 // Allocates element from instance arena.
 UiElement* ui_element_create(UiInstance* instance, const UiNodeSpec* spec, void* data, const MetaStruct* meta);
+
+// Rebuilds children (Static + Dynamic) for an existing element.
+void ui_element_rebuild_children(UiElement* element, UiInstance* instance);
 
 // Core Loop
 void ui_element_update(UiElement* element, float dt); // Syncs data

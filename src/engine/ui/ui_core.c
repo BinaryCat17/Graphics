@@ -70,6 +70,95 @@ static UiElement* element_alloc(UiInstance* instance, const UiNodeSpec* spec) {
     return el;
 }
 
+#include "foundation/logger/logger.h"
+
+// --- Helper: Collection Resolution ---
+
+static int ui_resolve_count(void* data, const MetaStruct* meta, const char* field_name) {
+    if (!data || !meta || !field_name) return 0;
+    
+    char count_name[128];
+    snprintf(count_name, sizeof(count_name), "%s_count", field_name);
+    const MetaField* f = meta_find_field(meta, count_name);
+    if (f && f->type == META_TYPE_INT) return meta_get_int(data, f);
+    
+    if (strstr(field_name, "_ptrs")) {
+        strncpy(count_name, field_name, sizeof(count_name));
+        char* p = strstr(count_name, "_ptrs");
+        if (p) {
+            strcpy(p, "_count");
+            f = meta_find_field(meta, count_name);
+            if (f && f->type == META_TYPE_INT) return meta_get_int(data, f);
+        }
+    }
+    
+    f = meta_find_field(meta, "count");
+    if (f && f->type == META_TYPE_INT) return meta_get_int(data, f);
+    
+    return 0;
+}
+
+void ui_element_rebuild_children(UiElement* el, UiInstance* instance) {
+    if (!el || !instance || !el->spec) return;
+    
+    // 1. Re-evaluate counts
+    size_t static_count = el->spec->child_count;
+    size_t dynamic_count = 0;
+    const MetaField* collection_field = NULL;
+    
+    if (el->spec->bind_collection && el->meta && el->data_ptr) {
+        collection_field = meta_find_field(el->meta, el->spec->bind_collection);
+        if (collection_field) {
+            int cnt = ui_resolve_count(el->data_ptr, el->meta, el->spec->bind_collection);
+            if (cnt > 0) dynamic_count = (size_t)cnt;
+            LOG_TRACE("UI Collection '%s': Count=%zu", el->spec->bind_collection, dynamic_count);
+        } else {
+            LOG_WARN("UI Collection field '%s' not found in meta '%s'", el->spec->bind_collection, el->meta->name);
+        }
+    }
+    
+    size_t total_count = static_count + dynamic_count;
+    // ...
+    
+    // 2. Re-allocate children array (Leak in Arena, accepted for now)
+    el->children = (UiElement**)arena_alloc_zero(&instance->arena, total_count * sizeof(UiElement*));
+    el->child_count = total_count;
+    
+    // 3. Re-create Static Children
+    for (size_t i = 0; i < static_count; ++i) {
+        el->children[i] = ui_element_create(instance, el->spec->children[i], el->data_ptr, el->meta);
+        if (el->children[i]) el->children[i]->parent = el;
+    }
+    
+    // 4. Create Dynamic Children
+    if (dynamic_count > 0 && collection_field && el->spec->item_template) {
+         const MetaStruct* item_meta = NULL;
+         // Resolve Item Type
+         if (collection_field->type == META_TYPE_POINTER_ARRAY) {
+             item_meta = meta_get_struct(collection_field->type_name);
+         }
+         
+         if (item_meta) {
+             void** ptr_array = *(void***)((char*)el->data_ptr + collection_field->offset);
+             
+             size_t write_idx = static_count;
+             for (size_t i = 0; i < dynamic_count; ++i) {
+                 void* item_ptr = ptr_array[i];
+                 if (item_ptr) {
+                     UiElement* child = ui_element_create(instance, el->spec->item_template, item_ptr, item_meta);
+                     if (child) {
+                         child->parent = el;
+                         el->children[write_idx++] = child;
+                     }
+                 }
+             }
+             el->child_count = write_idx; 
+         }
+    }
+    
+    el->dirty_flags |= UI_DIRTY_LAYOUT | UI_DIRTY_CHILDREN;
+}
+
 UiElement* ui_element_create(UiInstance* instance, const UiNodeSpec* spec, void* data, const MetaStruct* meta) {
     if (!instance || !spec) return NULL;
 
@@ -88,19 +177,8 @@ UiElement* ui_element_create(UiInstance* instance, const UiNodeSpec* spec, void*
         if (spec->h_source)     el->bind_h     = meta_find_field(meta, spec->h_source);
     }
 
-    // Create Children
-    if (spec->child_count > 0) {
-        el->child_count = spec->child_count;
-        // Allocate array in arena
-        el->children = (UiElement**)arena_alloc_zero(&instance->arena, spec->child_count * sizeof(UiElement*));
-        
-        for (size_t i = 0; i < spec->child_count; ++i) {
-            el->children[i] = ui_element_create(instance, spec->children[i], data, meta);
-            if (el->children[i]) {
-                el->children[i]->parent = el;
-            }
-        }
-    }
+    // Populate Children
+    ui_element_rebuild_children(el, instance);
     
     return el;
 }

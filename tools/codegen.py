@@ -182,7 +182,10 @@ def generate_code(enums, structs, headers, output_path):
                     meta_kind = 'META_TYPE_ENUM'
                     type_name_str = f'"{f_type}"'
                 elif is_ptr:
-                    meta_kind = 'META_TYPE_POINTER'
+                    if field['ptr_count'] == 2:
+                        meta_kind = 'META_TYPE_POINTER_ARRAY'
+                    else:
+                        meta_kind = 'META_TYPE_POINTER'
                     type_name_str = f'"{f_base}"'
                     
                 f.write(f'    {{ "{f_name}", {meta_kind}, offsetof({s_name}, {f_name}), {type_name_str} }},\n')
