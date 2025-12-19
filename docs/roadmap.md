@@ -25,7 +25,7 @@
 - [ ] **Conditional Visibility:** Add `bind_visible` / `bind_if` logic to declarative show/hide branches based on boolean flags.
 - [ ] **Refactor `main.c`:** Move command callbacks to `EditorLayer`.
 - [ ] **Input System Cleanup:** Refactor `ui_input.c`.
-- [ ] **Unused Code Removal:** Clean up structs.
+- [x] **Unused Code Removal:** Clean up structs.
 
 ### Phase 5: 3D & Scene Expansion
 **Objective:** Move beyond 2D quads.
