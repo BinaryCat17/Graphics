@@ -167,6 +167,15 @@ UiElement* ui_element_create(UiInstance* instance, const UiNodeSpec* spec, void*
     el->data_ptr = data;
     el->meta = meta;
     el->render_color = spec->color;
+    el->flags = spec->flags; // Init Flags
+
+    // Resolve Commands
+    if (spec->on_click_cmd) {
+        el->on_click_cmd_id = str_id(spec->on_click_cmd);
+    }
+    if (spec->on_change_cmd) {
+        el->on_change_cmd_id = str_id(spec->on_change_cmd);
+    }
 
     // Cache Bindings
     if (meta) {
@@ -177,6 +186,10 @@ UiElement* ui_element_create(UiInstance* instance, const UiNodeSpec* spec, void*
         if (spec->value_source) {
             el->bind_value = meta_find_field(meta, spec->value_source);
             if (!el->bind_value) LOG_ERROR("UiCore: Failed to bind 'value: %s' on Node '%s'. Field not found in struct '%s'", spec->value_source, spec->id ? spec->id : "anon", meta->name);
+        }
+        if (spec->visible_source) {
+            el->bind_visible = meta_find_field(meta, spec->visible_source);
+            if (!el->bind_visible) LOG_ERROR("UiCore: Failed to bind 'visible: %s' on Node '%s'. Field not found in struct '%s'", spec->visible_source, spec->id ? spec->id : "anon", meta->name);
         }
         if (spec->x_source) {
             el->bind_x = meta_find_field(meta, spec->x_source);
@@ -276,6 +289,12 @@ void ui_element_update(UiElement* element, float dt) {
                 element->rect.h = val;
                 element->dirty_flags |= UI_DIRTY_LAYOUT;
             }
+        }
+        // 3. Resolve Visibility
+        if (element->bind_visible) {
+             bool visible = meta_get_bool(element->data_ptr, element->bind_visible);
+             if (visible) element->flags &= ~UI_FLAG_HIDDEN;
+             else element->flags |= UI_FLAG_HIDDEN;
         }
     }
 

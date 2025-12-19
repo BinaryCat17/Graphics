@@ -28,6 +28,11 @@ const char* meta_get_string(void* instance, const MetaField* field) {
     return NULL;
 }
 
+bool meta_get_bool(void* instance, const MetaField* field) {
+    if (!instance || !field || field->type != META_TYPE_BOOL) return false;
+    return *(bool*)((char*)instance + field->offset);
+}
+
 void meta_set_int(void* instance, const MetaField* field, int value) {
     if (!instance || !field || field->type != META_TYPE_INT) return;
     *(int*)((char*)instance + field->offset) = value;
@@ -52,22 +57,18 @@ void meta_set_string(void* instance, const MetaField* field, const char* value) 
             *ptr = NULL;
         }
     } else if (field->type == META_TYPE_STRING_ARRAY) {
-        // TODO: Know the size? Assuming 32 or similar safe defaults is dangerous.
-        // For now, we trust the caller or just copy carefully.
-        // Ideally MetaField should store 'size' for arrays.
-        // Let's assume standard unsafe strcpy for now as we don't have size info in MetaField.
-        // Actually, we can't safely copy without size. 
-        // But for MathNode we know it's char[32].
-        // Let's just do a strncpy with a safe limit (e.g. 256) or just strcpy if we trust it.
-        // Given this is a specific fix for MathNode, and we don't have size in MetaField yet:
         char* ptr = (char*)instance + field->offset;
         if (value) {
-            // Dangerous but necessary without size info in metadata
             strcpy(ptr, value); 
         } else {
             ptr[0] = '\0';
         }
     }
+}
+
+void meta_set_bool(void* instance, const MetaField* field, bool value) {
+    if (!instance || !field || field->type != META_TYPE_BOOL) return;
+    *(bool*)((char*)instance + field->offset) = value;
 }
 
 const MetaField* meta_find_field(const MetaStruct* meta, const char* field_name) {

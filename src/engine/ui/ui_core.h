@@ -7,6 +7,8 @@
 #include "foundation/memory/arena.h"
 #include "foundation/math/coordinate_systems.h"
 
+#include "foundation/string/string_id.h"
+
 // --- CONSTANTS & FLAGS ---
 
 typedef enum UiLayoutStrategy {
@@ -46,6 +48,12 @@ typedef enum UiDirtyFlags {
     UI_DIRTY_CHILDREN = 1 << 2 // Structure changed
 } UiDirtyFlags;
 
+typedef enum UiLayer {
+    UI_LAYER_NORMAL = 0,
+    UI_LAYER_TOP,     // Renders after Normal, but before Overlay
+    UI_LAYER_OVERLAY  // Renders last, ignores parent clipping (popups)
+} UiLayer;
+
 typedef struct UiElement UiElement;
 
 typedef enum UiEventType {
@@ -81,6 +89,7 @@ typedef struct UiNodeSpec {
     char* id;               // REFLECT
     UiKind kind;            // REFLECT
     UiLayoutStrategy layout;// REFLECT
+    UiLayer layer;          // REFLECT
     uint32_t flags;         // REFLECT
     
     // 3. Styling (Reference to style sheet, not implemented yet)
@@ -99,6 +108,7 @@ typedef struct UiNodeSpec {
     char* text_source;      // REFLECT
     char* value_source;     // REFLECT
     char* data_source;      // REFLECT
+    char* visible_source;   // REFLECT
     char* bind_collection;  // REFLECT
     
     // 4. Geometry Bindings (For CANVAS layout or manual overrides)
@@ -168,12 +178,18 @@ typedef struct UiElement {
     // Cached Bindings (Resolved at creation)
     const MetaField* bind_text;
     const MetaField* bind_value;
+    const MetaField* bind_visible;
     const MetaField* bind_x;
     const MetaField* bind_y;
     const MetaField* bind_w;
     const MetaField* bind_h;
     
+    // Commands (Resolved at creation)
+    StringId on_click_cmd_id;
+    StringId on_change_cmd_id;
+    
     // State
+    uint32_t flags;       // Runtime flags (copy of spec->flags)
     Rect rect;            // Computed layout relative to parent
     Rect screen_rect;     // Computed screen space (for hit testing)
     
@@ -201,6 +217,7 @@ typedef struct UiElement {
     uint32_t dirty_flags;  // Bitmask of UiDirtyFlags
 
 } UiElement;
+
 
 typedef struct UiInstance {
     MemoryArena arena;

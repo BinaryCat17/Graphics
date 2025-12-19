@@ -14,7 +14,7 @@ static float calculate_width(UiElement* el, float available_w, UiTextMeasureFunc
     if (w < 0) {
         bool parent_is_row = (el->parent && el->parent->spec->layout == UI_LAYOUT_FLEX_ROW);
         
-        if (parent_is_row || spec->kind == UI_KIND_TEXT || (spec->flags & UI_FLAG_CLICKABLE)) {
+        if (parent_is_row || spec->kind == UI_KIND_TEXT || (el->flags & UI_FLAG_CLICKABLE)) {
              const char* text = el->cached_text;
              if (!text || text[0] == '\0') text = spec->static_text;
 
@@ -90,7 +90,7 @@ static void layout_row(UiElement* el, float start_x, float start_y, float* out_m
 }
 
 static void layout_canvas(UiElement* el) {
-    if (el->spec->flags & UI_FLAG_SCROLLABLE) {
+    if (el->flags & UI_FLAG_SCROLLABLE) {
         for (size_t i = 0; i < el->child_count; ++i) {
             el->children[i]->rect.x -= el->scroll_x;
             el->children[i]->rect.y -= el->scroll_y;

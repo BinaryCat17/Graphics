@@ -55,6 +55,10 @@ add_custom_command(
 add_library(foundation_logger STATIC "src/foundation/logger/logger.c")
 target_include_directories(foundation_logger PUBLIC "src/")
 
+# String
+add_library(foundation_string STATIC "src/foundation/string/string_id.c")
+target_include_directories(foundation_string PUBLIC "src/")
+
 # Meta (Reflection)
 set(FOUNDATION_META_SOURCES
     "src/foundation/meta/reflection.c"
@@ -62,7 +66,7 @@ set(FOUNDATION_META_SOURCES
 )
 add_library(foundation_meta STATIC ${FOUNDATION_META_SOURCES})
 target_include_directories(foundation_meta PUBLIC "src/")
-target_link_libraries(foundation_meta PUBLIC foundation_logger)
+target_link_libraries(foundation_meta PUBLIC foundation_logger foundation_string)
 
 # Platform
 set(FOUNDATION_PLATFORM_SOURCES
@@ -70,7 +74,7 @@ set(FOUNDATION_PLATFORM_SOURCES
     "src/foundation/platform/fs.c")
 add_library(foundation_platform STATIC ${FOUNDATION_PLATFORM_SOURCES})
 target_include_directories(foundation_platform PUBLIC "src/")
-target_link_libraries(foundation_platform PUBLIC glfw Vulkan::Vulkan foundation_logger)
+target_link_libraries(foundation_platform PUBLIC glfw Vulkan::Vulkan foundation_logger foundation_string)
 
 # Math
 set(FOUNDATION_MATH_SOURCES
