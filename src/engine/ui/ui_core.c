@@ -64,6 +64,16 @@ UiElement* ui_element_create(UiInstance* instance, const UiNodeSpec* spec, void*
     el->data_ptr = data;
     el->meta = meta;
 
+    // Cache Bindings
+    if (meta) {
+        if (spec->text_source)  el->bind_text  = meta_find_field(meta, spec->text_source);
+        if (spec->value_source) el->bind_value = meta_find_field(meta, spec->value_source);
+        if (spec->x_source)     el->bind_x     = meta_find_field(meta, spec->x_source);
+        if (spec->y_source)     el->bind_y     = meta_find_field(meta, spec->y_source);
+        if (spec->w_source)     el->bind_w     = meta_find_field(meta, spec->w_source);
+        if (spec->h_source)     el->bind_h     = meta_find_field(meta, spec->h_source);
+    }
+
     // Create Children
     if (spec->child_count > 0) {
         el->child_count = spec->child_count;
@@ -85,18 +95,15 @@ void ui_element_update(UiElement* element) {
     if (!element || !element->spec) return;
     
     // 1. Resolve Text Binding (Cached)
-    if (element->spec->text_source && element->data_ptr && element->meta) {
-        const MetaField* field = meta_find_field(element->meta, element->spec->text_source);
-        if (field) {
-            char new_text[128] = {0};
-            ui_bind_read_string(element->data_ptr, field, new_text, sizeof(new_text));
-            
-            if (strncmp(element->cached_text, new_text, 128) != 0) {
-                strncpy(element->cached_text, new_text, 128 - 1); // safe copy
-                element->cached_text[127] = '\0';
-                // Text change affects layout (size) and redraw
-                element->dirty_flags |= (UI_DIRTY_LAYOUT | UI_DIRTY_REDRAW);
-            }
+    if (element->bind_text && element->data_ptr) {
+        char new_text[128] = {0};
+        ui_bind_read_string(element->data_ptr, element->bind_text, new_text, sizeof(new_text));
+        
+        if (strncmp(element->cached_text, new_text, 128) != 0) {
+            strncpy(element->cached_text, new_text, 128 - 1); // safe copy
+            element->cached_text[127] = '\0';
+            // Text change affects layout (size) and redraw
+            element->dirty_flags |= (UI_DIRTY_LAYOUT | UI_DIRTY_REDRAW);
         }
     } else if (element->spec->static_text) {
         // Init cache from static text if empty (first run or if static text is used without binding)
@@ -109,45 +116,33 @@ void ui_element_update(UiElement* element) {
     }
     
     // 2. Resolve Geometry Bindings (X/Y)
-    if (element->data_ptr && element->meta) {
-        if (element->spec->x_source) {
-            const MetaField* fx = meta_find_field(element->meta, element->spec->x_source);
-            if (fx) {
-                float val = meta_get_float(element->data_ptr, fx);
-                if (element->rect.x != val) {
-                    element->rect.x = val;
-                    element->dirty_flags |= UI_DIRTY_LAYOUT;
-                }
+    if (element->data_ptr) {
+        if (element->bind_x) {
+            float val = meta_get_float(element->data_ptr, element->bind_x);
+            if (element->rect.x != val) {
+                element->rect.x = val;
+                element->dirty_flags |= UI_DIRTY_LAYOUT;
             }
         }
-        if (element->spec->y_source) {
-            const MetaField* fy = meta_find_field(element->meta, element->spec->y_source);
-            if (fy) {
-                float val = meta_get_float(element->data_ptr, fy);
-                if (element->rect.y != val) {
-                    element->rect.y = val;
-                    element->dirty_flags |= UI_DIRTY_LAYOUT;
-                }
+        if (element->bind_y) {
+            float val = meta_get_float(element->data_ptr, element->bind_y);
+            if (element->rect.y != val) {
+                element->rect.y = val;
+                element->dirty_flags |= UI_DIRTY_LAYOUT;
             }
         }
-        if (element->spec->w_source) {
-            const MetaField* fw = meta_find_field(element->meta, element->spec->w_source);
-            if (fw) {
-                float val = meta_get_float(element->data_ptr, fw);
-                if (element->rect.w != val) {
-                    element->rect.w = val;
-                    element->dirty_flags |= UI_DIRTY_LAYOUT;
-                }
+        if (element->bind_w) {
+            float val = meta_get_float(element->data_ptr, element->bind_w);
+            if (element->rect.w != val) {
+                element->rect.w = val;
+                element->dirty_flags |= UI_DIRTY_LAYOUT;
             }
         }
-        if (element->spec->h_source) {
-            const MetaField* fh = meta_find_field(element->meta, element->spec->h_source);
-            if (fh) {
-                float val = meta_get_float(element->data_ptr, fh);
-                if (element->rect.h != val) {
-                    element->rect.h = val;
-                    element->dirty_flags |= UI_DIRTY_LAYOUT;
-                }
+        if (element->bind_h) {
+            float val = meta_get_float(element->data_ptr, element->bind_h);
+            if (element->rect.h != val) {
+                element->rect.h = val;
+                element->dirty_flags |= UI_DIRTY_LAYOUT;
             }
         }
     }
