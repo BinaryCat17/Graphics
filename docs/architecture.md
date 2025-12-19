@@ -79,6 +79,23 @@ The `Math Engine` doesn't care about Vulkan or WebGPU. It just says "I need to M
 
 The graphics layer is split into two parts to keep things clean.
 
+### The Data: Unified Scene (`scene/scene.h`)
+Instead of having separate lists for UI, 2D Sprites, and 3D Models, the engine uses a **Single Linear Array** of `SceneObject`s.
+
+*   **Everything is an Object:** A UI button, a text character, and a 3D cube are all `SceneObject` structs.
+*   **The Struct:**
+    ```c
+    typedef struct SceneObject {
+        Vec3 position;
+        Vec3 rotation;
+        Vec3 scale;
+        ScenePrimitiveType prim_type; // SCENE_PRIM_QUAD or SCENE_PRIM_MESH
+        Vec4 color;
+        // ...
+    } SceneObject;
+    ```
+*   **Why?** This makes the `RenderSystem` incredibly simple. It doesn't need 10 different loops for 10 different types of things. It iterates the array **once**, sorts by Z-index (or Shader), and submits to the backend.
+
 ### The Manager: `RenderSystem` (`render_system.h`)
 This is the **High-Level API**. Features and the App talk to this.
 *   **You say:** "Draw this UI", "Render this scene", "Set the camera".
