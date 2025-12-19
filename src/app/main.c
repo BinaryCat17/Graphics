@@ -272,10 +272,17 @@ static void app_on_update(Engine* engine) {
         engine->show_compute_visualizer = !engine->show_compute_visualizer;
         engine->render_system.show_compute_result = engine->show_compute_visualizer;
         if (engine->show_compute_visualizer) {
-            char* glsl = math_graph_transpile_glsl(&app->graph, TRANSPILE_MODE_IMAGE_2D);
-            if (glsl) {
-                LOG_INFO("Generated GLSL:\n%s", glsl);
-                free(glsl);
+        // 1. Transpile Graph to GLSL
+        LOG_INFO("Transpiling graph...");
+        char* glsl_source = math_graph_transpile(&app->graph, TRANSPILE_MODE_IMAGE_2D, SHADER_TARGET_GLSL_VULKAN);
+        
+        if (!glsl_source) {
+            LOG_ERROR("Transpilation failed.");
+            return;
+        }
+        if (glsl_source) {
+                LOG_INFO("Generated GLSL:\n%s", glsl_source);
+                free(glsl_source);
             }
         }
     }

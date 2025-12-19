@@ -143,17 +143,25 @@ static void free_ir(ShaderIR* ir) {
     }
 }
 
-char* math_graph_transpile_glsl(const MathGraph* graph, TranspilerMode mode) {
+char* math_graph_transpile(const MathGraph* graph, TranspilerMode mode, ShaderTarget target) {
     if (!graph) return NULL; 
 
     // Phase 1: Generate IR
     ShaderIR ir = math_graph_to_ir(graph);
 
-    // Phase 2: Emit GLSL
-    char* glsl = ir_to_glsl(&ir, mode);
+    // Phase 2: Emit Code based on Target
+    char* result = NULL;
+    switch (target) {
+        case SHADER_TARGET_GLSL_VULKAN:
+            result = ir_to_glsl(&ir, mode);
+            break;
+        default:
+            // Fallback or error
+            break;
+    }
 
     // Cleanup
     free_ir(&ir);
 
-    return glsl;
+    return result;
 }

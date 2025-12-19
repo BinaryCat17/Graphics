@@ -26,7 +26,8 @@ int test_transpiler_simple_add() {
     math_graph_connect(&graph, id_add, 0, id1);
     math_graph_connect(&graph, id_add, 1, id2);
     
-    char* glsl = math_graph_transpile_glsl(&graph, TRANSPILE_MODE_BUFFER_1D);
+    // Transpile
+    char* glsl = math_graph_transpile(&graph, TRANSPILE_MODE_BUFFER_1D, SHADER_TARGET_GLSL_VULKAN);
     TEST_ASSERT(glsl != NULL);
     
     printf("\n--- Generated GLSL ---\n%s\n----------------------\n", glsl);

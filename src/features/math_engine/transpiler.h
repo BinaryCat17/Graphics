@@ -9,6 +9,14 @@ typedef enum TranspilerMode {
     TRANSPILE_MODE_IMAGE_2D   // Output: image2D (Storage Image)
 } TranspilerMode;
 
-char* math_graph_transpile_glsl(const MathGraph* graph, TranspilerMode mode);
+typedef enum ShaderTarget {
+    SHADER_TARGET_GLSL_VULKAN,
+    // Future: SHADER_TARGET_WGSL_WEBGPU,
+    // Future: SHADER_TARGET_MSL_METAL
+} ShaderTarget;
+
+// Generates shader source code for the specified target.
+// Returns a heap-allocated string that must be freed by the caller.
+char* math_graph_transpile(const MathGraph* graph, TranspilerMode mode, ShaderTarget target);
 
 #endif // TRANSPILER_H
