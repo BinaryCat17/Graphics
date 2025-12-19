@@ -25,10 +25,10 @@
 - [x] **UI Manifest System:** Decoupled template registration from layout definition.
 - [x] **Strict Import Validation:** Parser now forbids `import` inside `children`.
 - [x] **Strict Type Safety:** Enforce type checking in Data Bindings.
-- [ ] **String IDs:** Replace runtime `strcmp` with **Hash IDs**.
-- [ ] **Layer System (Z-Order & Clipping):** Implement `layer: top/overlay` to handle Z-depth naturally and **disable parent clipping** for popups/dropdowns so they can "break out" of containers.
-- [ ] **Conditional Visibility:** Add `bind_visible` / `bind_if` logic to declarative show/hide branches based on boolean flags.
-- [ ] **Refactor `main.c`:** Move command callbacks to `EditorLayer`.
+- [x] **String IDs:** Replace runtime `strcmp` with **Hash IDs** (UiCommandSystem).
+- [x] **Layer System (Z-Order & Clipping):** Implemented `layer: top/overlay` handling in `UiRenderer`.
+- [x] **Conditional Visibility:** Added `bind_visible` / `bind_if` logic.
+- [x] **Refactor `main.c`:** Command callbacks moved to `EditorLayer` (MathEditor).
 - [x] **Input System Cleanup:** Refactor `ui_input.c`.
 - [x] **Unused Code Removal:** Clean up structs.
 

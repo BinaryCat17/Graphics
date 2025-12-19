@@ -1,48 +1,48 @@
-[2025-12-19 21:27:35] [INFO ] engine.c:85: Engine Initializing...
-[2025-12-19 21:27:35] [INFO ] font.c:166: Font Module: Atlas Built 1024x1024, Glyphs: 351, Scale: 0.0141
-[2025-12-19 21:27:35] [TRACE] vk_context.c:46: vkCreateInstance (application)
-[2025-12-19 21:27:35] [DEBUG] vk_context.c:72: Candidate GPU [0]: Microsoft Direct3D12 (AMD Radeon RX 5700 XT) (Score: 1000)
-[2025-12-19 21:27:35] [DEBUG] vk_context.c:72: Candidate GPU [1]: llvmpipe (LLVM 20.1.8, 256 bits) (Score: 1)
-[2025-12-19 21:27:35] [INFO ] vk_context.c:21: Using GPU: Microsoft Direct3D12 (AMD Radeon RX 5700 XT) (Discrete) vendor=0x1002 device=0x731f driver=0x6403001 api=1.2.328
-[2025-12-19 21:27:35] [INFO ] vk_swapchain.c:160: Selected Present Mode: 2 (FIFO=2, MAILBOX=1, IMMEDIATE=0)
-[2025-12-19 21:27:35] [INFO ] vk_swapchain.c:181: vkCreateSwapchainKHR: Swapchain created.
-[2025-12-19 21:27:35] [TRACE] vulkan_renderer.c:125: Resized Instance Buffer to 1024 elements
-[2025-12-19 21:27:35] [TRACE] vulkan_renderer.c:125: Resized Instance Buffer to 1024 elements
-[2025-12-19 21:27:35] [INFO ] vulkan_renderer.c:332: Vulkan Initialized.
-[2025-12-19 21:27:35] [INFO ] math_editor.c:184: Editor: Setting up default Math Graph...
-[2025-12-19 21:27:35] [DEBUG] ui_command_system.c:49: CommandSystem: Registered command 'Graph.AddNode'
-[2025-12-19 21:27:35] [DEBUG] ui_command_system.c:49: CommandSystem: Registered command 'Graph.Clear'
-[2025-12-19 21:27:35] [DEBUG] ui_command_system.c:49: CommandSystem: Registered command 'Graph.Recompile'
-[2025-12-19 21:27:35] [TRACE] ui_parser.c:291: UiParser: Loading UI definition from file: assets/ui/editor.yaml
-[2025-12-19 21:27:35] [TRACE] ui_parser.c:332: UiParser: Registered template 'ValueRow'
-[2025-12-19 21:27:35] [TRACE] ui_parser.c:332: UiParser: Registered template 'GraphNode'
-[2025-12-19 21:27:35] [TRACE] ui_parser.c:332: UiParser: Registered template 'InspectorTitle'
-[2025-12-19 21:27:35] [TRACE] ui_parser.c:332: UiParser: Registered template 'InspectorField'
-[2025-12-19 21:27:35] [TRACE] ui_parser.c:332: UiParser: Registered template 'EditorSidebar'
-[2025-12-19 21:27:35] [TRACE] ui_core.c:114: UI Collection 'node_ptrs': Count=4
-[2025-12-19 21:27:35] [INFO ] math_editor.c:40: Editor: Recompiling Math Graph...
-[2025-12-19 21:27:35] [DEBUG] math_editor.c:66: Running: glslc logs/tmp_graph.comp -o logs/tmp_graph.spv
-[2025-12-19 21:27:35] [INFO ] render_system.c:197: RenderSystem: Active compute pipeline set to 1
-[2025-12-19 21:27:35] [INFO ] math_editor.c:97: Editor: Graph Recompiled Successfully (ID: 1)
-[2025-12-19 21:27:35] [INFO ] engine.c:169: Engine Loop Starting...
-[2025-12-19 21:27:37] [INFO ] engine.c:183: Requesting screenshot: logs/screenshots/screen_2.573.png
-[2025-12-19 21:27:37] [DEBUG] vulkan_renderer.c:70: Vulkan: Queueing screenshot to logs/screenshots/screen_2.573.png
-[2025-12-19 21:27:37] [TRACE] vulkan_renderer.c:478: Screenshot: Starting capture sequence...
-[2025-12-19 21:27:37] [TRACE] vulkan_renderer.c:488: Screenshot: Buffer created (Handle: 0x591e680219e0)
-[2025-12-19 21:27:37] [TRACE] vulkan_renderer.c:543: Screenshot: Waiting for GPU...
-[2025-12-19 21:27:37] [TRACE] vulkan_renderer.c:549: Screenshot: Mapping memory...
-[2025-12-19 21:27:37] [TRACE] vulkan_renderer.c:554: Screenshot: Copying to host buffer...
-[2025-12-19 21:27:37] [TRACE] vulkan_renderer.c:571: Screenshot: Offloaded to thread.
-[2025-12-19 21:27:37] [TRACE] vulkan_renderer.c:593: Screenshot: Done.
-[2025-12-19 21:27:37] [TRACE] vulkan_renderer.c:43: Screenshot Thread: Writing to disk (logs/screenshots/screen_2.573.png)...
-[2025-12-19 21:27:38] [TRACE] vulkan_renderer.c:46: Screenshot saved to logs/screenshots/screen_2.573.png
-[2025-12-19 21:27:39] [INFO ] engine.c:183: Requesting screenshot: logs/screenshots/screen_4.577.png
-[2025-12-19 21:27:39] [DEBUG] vulkan_renderer.c:70: Vulkan: Queueing screenshot to logs/screenshots/screen_4.577.png
-[2025-12-19 21:27:39] [TRACE] vulkan_renderer.c:478: Screenshot: Starting capture sequence...
-[2025-12-19 21:27:39] [TRACE] vulkan_renderer.c:488: Screenshot: Buffer created (Handle: 0x591e680219e0)
-[2025-12-19 21:27:39] [TRACE] vulkan_renderer.c:543: Screenshot: Waiting for GPU...
-[2025-12-19 21:27:39] [TRACE] vulkan_renderer.c:549: Screenshot: Mapping memory...
-[2025-12-19 21:27:39] [TRACE] vulkan_renderer.c:554: Screenshot: Copying to host buffer...
-[2025-12-19 21:27:39] [TRACE] vulkan_renderer.c:571: Screenshot: Offloaded to thread.
-[2025-12-19 21:27:39] [TRACE] vulkan_renderer.c:593: Screenshot: Done.
-[2025-12-19 21:27:39] [TRACE] vulkan_renderer.c:43: Screenshot Thread: Writing to disk (logs/screenshots/screen_4.577.png)...
+[2025-12-19 22:12:21] [INFO ] engine.c:85: Engine Initializing...
+[2025-12-19 22:12:21] [INFO ] font.c:166: Font Module: Atlas Built 1024x1024, Glyphs: 351, Scale: 0.0141
+[2025-12-19 22:12:21] [TRACE] vk_context.c:46: vkCreateInstance (application)
+[2025-12-19 22:12:21] [DEBUG] vk_context.c:72: Candidate GPU [0]: Microsoft Direct3D12 (AMD Radeon RX 5700 XT) (Score: 1000)
+[2025-12-19 22:12:21] [DEBUG] vk_context.c:72: Candidate GPU [1]: llvmpipe (LLVM 20.1.8, 256 bits) (Score: 1)
+[2025-12-19 22:12:21] [INFO ] vk_context.c:21: Using GPU: Microsoft Direct3D12 (AMD Radeon RX 5700 XT) (Discrete) vendor=0x1002 device=0x731f driver=0x6403001 api=1.2.328
+[2025-12-19 22:12:21] [INFO ] vk_swapchain.c:160: Selected Present Mode: 2 (FIFO=2, MAILBOX=1, IMMEDIATE=0)
+[2025-12-19 22:12:21] [INFO ] vk_swapchain.c:181: vkCreateSwapchainKHR: Swapchain created.
+[2025-12-19 22:12:21] [TRACE] vulkan_renderer.c:125: Resized Instance Buffer to 1024 elements
+[2025-12-19 22:12:21] [TRACE] vulkan_renderer.c:125: Resized Instance Buffer to 1024 elements
+[2025-12-19 22:12:21] [INFO ] vulkan_renderer.c:332: Vulkan Initialized.
+[2025-12-19 22:12:21] [INFO ] math_editor.c:184: Editor: Setting up default Math Graph...
+[2025-12-19 22:12:21] [DEBUG] ui_command_system.c:53: CommandSystem: Registered command 'Graph.AddNode' (Hash: 995678058)
+[2025-12-19 22:12:21] [DEBUG] ui_command_system.c:53: CommandSystem: Registered command 'Graph.Clear' (Hash: 3368406260)
+[2025-12-19 22:12:21] [DEBUG] ui_command_system.c:53: CommandSystem: Registered command 'Graph.Recompile' (Hash: 483766899)
+[2025-12-19 22:12:21] [TRACE] ui_parser.c:298: UiParser: Loading UI definition from file: assets/ui/manifest.yaml
+[2025-12-19 22:12:21] [TRACE] ui_parser.c:339: UiParser: Registered template 'ValueRow'
+[2025-12-19 22:12:21] [TRACE] ui_parser.c:339: UiParser: Registered template 'GraphNode'
+[2025-12-19 22:12:21] [TRACE] ui_parser.c:339: UiParser: Registered template 'InspectorTitle'
+[2025-12-19 22:12:21] [TRACE] ui_parser.c:339: UiParser: Registered template 'InspectorField'
+[2025-12-19 22:12:21] [TRACE] ui_parser.c:339: UiParser: Registered template 'EditorSidebar'
+[2025-12-19 22:12:21] [TRACE] ui_core.c:114: UI Collection 'node_ptrs': Count=4
+[2025-12-19 22:12:21] [INFO ] math_editor.c:40: Editor: Recompiling Math Graph...
+[2025-12-19 22:12:21] [DEBUG] math_editor.c:66: Running: glslc logs/tmp_graph.comp -o logs/tmp_graph.spv
+[2025-12-19 22:12:22] [INFO ] render_system.c:197: RenderSystem: Active compute pipeline set to 1
+[2025-12-19 22:12:22] [INFO ] math_editor.c:97: Editor: Graph Recompiled Successfully (ID: 1)
+[2025-12-19 22:12:22] [INFO ] engine.c:169: Engine Loop Starting...
+[2025-12-19 22:12:24] [INFO ] engine.c:183: Requesting screenshot: logs/screenshots/screen_2.569.png
+[2025-12-19 22:12:24] [DEBUG] vulkan_renderer.c:70: Vulkan: Queueing screenshot to logs/screenshots/screen_2.569.png
+[2025-12-19 22:12:24] [TRACE] vulkan_renderer.c:478: Screenshot: Starting capture sequence...
+[2025-12-19 22:12:24] [TRACE] vulkan_renderer.c:488: Screenshot: Buffer created (Handle: 0x5a3d431b8990)
+[2025-12-19 22:12:24] [TRACE] vulkan_renderer.c:543: Screenshot: Waiting for GPU...
+[2025-12-19 22:12:24] [TRACE] vulkan_renderer.c:549: Screenshot: Mapping memory...
+[2025-12-19 22:12:24] [TRACE] vulkan_renderer.c:554: Screenshot: Copying to host buffer...
+[2025-12-19 22:12:24] [TRACE] vulkan_renderer.c:571: Screenshot: Offloaded to thread.
+[2025-12-19 22:12:24] [TRACE] vulkan_renderer.c:593: Screenshot: Done.
+[2025-12-19 22:12:24] [TRACE] vulkan_renderer.c:43: Screenshot Thread: Writing to disk (logs/screenshots/screen_2.569.png)...
+[2025-12-19 22:12:24] [TRACE] vulkan_renderer.c:46: Screenshot saved to logs/screenshots/screen_2.569.png
+[2025-12-19 22:12:26] [INFO ] engine.c:183: Requesting screenshot: logs/screenshots/screen_4.571.png
+[2025-12-19 22:12:26] [DEBUG] vulkan_renderer.c:70: Vulkan: Queueing screenshot to logs/screenshots/screen_4.571.png
+[2025-12-19 22:12:26] [TRACE] vulkan_renderer.c:478: Screenshot: Starting capture sequence...
+[2025-12-19 22:12:26] [TRACE] vulkan_renderer.c:488: Screenshot: Buffer created (Handle: 0x5a3d431b8990)
+[2025-12-19 22:12:26] [TRACE] vulkan_renderer.c:543: Screenshot: Waiting for GPU...
+[2025-12-19 22:12:26] [TRACE] vulkan_renderer.c:549: Screenshot: Mapping memory...
+[2025-12-19 22:12:26] [TRACE] vulkan_renderer.c:554: Screenshot: Copying to host buffer...
+[2025-12-19 22:12:26] [TRACE] vulkan_renderer.c:571: Screenshot: Offloaded to thread.
+[2025-12-19 22:12:26] [TRACE] vulkan_renderer.c:593: Screenshot: Done.
+[2025-12-19 22:12:26] [TRACE] vulkan_renderer.c:43: Screenshot Thread: Writing to disk (logs/screenshots/screen_4.571.png)...
