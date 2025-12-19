@@ -1,15 +1,3 @@
-templates:
-  ValueRow:
-    import: "assets/ui/templates/value_row.yaml"
-  GraphNode:
-    import: "assets/ui/templates/node.yaml"
-  InspectorTitle:
-    import: "assets/ui/templates/inspector_title.yaml"
-  InspectorField:
-    import: "assets/ui/templates/inspector_field.yaml"
-  EditorSidebar:
-    import: "assets/ui/lib/sidebar.yaml"
-
 type: panel
 id: root
 layout: split_h
