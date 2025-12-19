@@ -5,6 +5,7 @@
 #include "engine/graphics/text/text_renderer.h" 
 #include "engine/graphics/text/font.h" 
 #include <string.h> 
+#include <stdlib.h>
 
 // Helper: Intersection
 static Rect rect_intersect(Rect a, Rect b) {
@@ -126,26 +127,51 @@ static void render_content(const UiElement* el, Scene* scene, Vec4 clip_vec, flo
     }
 }
 
-static void process_node(const UiElement* el, Scene* scene, Rect current_clip, float base_z, const UiElement** overlays, size_t* overlay_count) {
+// Internal Render Context to avoid passing too many args
+typedef struct UiRenderContext {
+    Scene* scene;
+    const UiElement** overlays;
+    size_t overlay_count;
+    size_t overlay_capacity;
+} UiRenderContext;
+
+static void push_overlay(UiRenderContext* ctx, const UiElement* el) {
+    if (ctx->overlay_count >= ctx->overlay_capacity) {
+        size_t new_cap = ctx->overlay_capacity == 0 ? 64 : ctx->overlay_capacity * 2;
+        const UiElement** new_arr = (const UiElement**)realloc(ctx->overlays, new_cap * sizeof(UiElement*));
+        if (new_arr) {
+            ctx->overlays = new_arr;
+            ctx->overlay_capacity = new_cap;
+        } else {
+            LOG_ERROR("UiRenderer: Failed to realloc overlay buffer");
+            return;
+        }
+    }
+    ctx->overlays[ctx->overlay_count++] = el;
+}
+
+static void process_node(const UiElement* el, UiRenderContext* ctx, Rect current_clip, float base_z, bool is_overlay_pass) {
     if (!el || !el->spec) return;
 
     // Skip hidden
     if (el->flags & UI_FLAG_HIDDEN) return;
 
-    // Check Overlay
-    bool is_overlay = (el->spec->layer == UI_LAYER_OVERLAY);
-    if (is_overlay && overlays) {
-        if (*overlay_count < 64) {
-            overlays[(*overlay_count)++] = el;
-        }
-        return; // Defer
+    // Check Overlay Logic
+    bool is_node_overlay = (el->spec->layer == UI_LAYER_OVERLAY);
+    
+    // If we are in the Normal pass, and encounter an Overlay node -> Defer it
+    if (!is_overlay_pass && is_node_overlay) {
+        push_overlay(ctx, el);
+        return; 
     }
 
     // Determine Clip
     Rect effective_clip = current_clip;
     
-    // If this IS an overlay (processed from queue), reset clip
-    if (is_overlay) {
+    // If this node IS an overlay root (and we are likely in overlay pass or processing it), reset clip
+    // Note: If we are recursively inside an overlay, we respect the parent clip, 
+    // but the root of the overlay resets it.
+    if (is_node_overlay) {
         effective_clip = (Rect){-10000.0f, -10000.0f, 20000.0f, 20000.0f};
     }
     
@@ -157,14 +183,14 @@ static void process_node(const UiElement* el, Scene* scene, Rect current_clip, f
     Vec4 clip_vec = {effective_clip.x, effective_clip.y, effective_clip.w, effective_clip.h};
 
     // 1. Draw Background
-    render_background(el, scene, clip_vec, base_z);
+    render_background(el, ctx->scene, clip_vec, base_z);
 
     // 2. Draw Content
-    render_content(el, scene, clip_vec, base_z);
+    render_content(el, ctx->scene, clip_vec, base_z);
 
     // 3. Recurse
     for (size_t i = 0; i < el->child_count; ++i) {
-        process_node(el->children[i], scene, effective_clip, base_z, overlays, overlay_count);
+        process_node(el->children[i], ctx, effective_clip, base_z, is_overlay_pass);
     }
 }
 
@@ -174,16 +200,20 @@ void ui_renderer_build_scene(const UiElement* root, Scene* scene, const Assets* 
     
     Rect infinite_clip = {-10000.0f, -10000.0f, 20000.0f, 20000.0f};
     
-    const UiElement* overlays[64];
-    size_t overlay_count = 0;
-
+    UiRenderContext ctx = {0};
+    ctx.scene = scene;
+    
     // Pass 1: Draw Normal, Defer Overlays
-    process_node(root, scene, infinite_clip, 0.0f, overlays, &overlay_count);
+    process_node(root, &ctx, infinite_clip, 0.0f, false);
     
     // Pass 2: Draw Overlays
-    // Note: We pass 'overlays' array again so that nested overlays are appended to the END of the list
-    // and processed in the same loop.
-    for (size_t i = 0; i < overlay_count; ++i) {
-        process_node(overlays[i], scene, infinite_clip, 0.8f, overlays, &overlay_count);
+    // We iterate the deferred list. Note that overlays might contain OTHER overlays (nested),
+    // but our logic above defers them during traversal. 
+    // However, usually overlays are top-level. 
+    // The current implementation flattens the first level of overlays.
+    for (size_t i = 0; i < ctx.overlay_count; ++i) {
+        process_node(ctx.overlays[i], &ctx, infinite_clip, 0.8f, true);
     }
+    
+    if (ctx.overlays) free(ctx.overlays);
 }
