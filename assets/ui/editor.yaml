@@ -3,109 +3,13 @@ id: root
 layout: row
 width: -1
 height: -1
-color: 
-  - 0.1
-  - 0.1
-  - 0.12
-  - 1.0
+color: "#1A1A1E"
 spacing: 10
 padding: 10
 
 children:
   # Left Panel (Editor)
-  - type: panel
-    id: left_panel
-    layout: column
-    width: 250
-    height: -1
-    color: 
-      - 0.2
-      - 0.2
-      - 0.22
-      - 1.0
-    padding: 10
-    spacing: 5
-    
-    # 9-Slice Test
-    border_l: 4
-    border_t: 4
-    border_r: 4
-    border_b: 4
-    tex_w: 32
-    tex_h: 32
-    texture: "ui_rect" # Signal to use UI rect from atlas
-
-    children:
-      - type: label
-        text: "Graph Editor"
-        height: 30
-        color: 
-          - 1.0
-          - 1.0
-          - 1.0
-          - 1.0
-
-      - type: panel
-        layout: row
-        height: 40
-        spacing: 5
-        children:
-            - type: button
-              text: "Add Node"
-              width: 100
-              height: 30
-              corner_radius: 8
-              color: 
-                - 0.3
-                - 0.3
-                - 0.35
-                - 1.0
-              
-            - type: button
-              text: "Clear"
-              width: 80
-              height: 30
-              corner_radius: 8
-              color: 
-                - 0.4
-                - 0.2
-                - 0.2
-                - 1.0
-
-      - type: label
-        text: "Properties"
-        height: 20
-        color: 
-          - 0.8
-          - 0.8
-          - 0.8
-          - 1.0
-        
-      - type: panel
-        id: prop_group
-        layout: column
-        height: 100
-        corner_radius: 4
-        border_t: 1 # Border Thickness
-        color: 
-          - 0.15
-          - 0.15
-          - 0.17
-          - 1.0
-        padding: 5
-        children:
-            - type: label
-              text: "Node Name:"
-              height: 20
-            - type: text_input
-              text: "{graph_name}"
-              height: 25
-              corner_radius: 4
-              color: 
-                - 0.1
-                - 0.1
-                - 0.1
-                - 1.0
+  - import: "assets/ui/lib/sidebar.yaml"
 
   # Right Area (Canvas)
   - type: panel
@@ -113,11 +17,7 @@ children:
     layout: canvas
     width: -1 # Fill rest
     height: -1
-    color: 
-      - 0.15
-      - 0.15
-      - 0.15
-      - 1.0
+    color: "#262626"
     
     children:
         - type: label
@@ -125,40 +25,4 @@ children:
           x: 20
           y: 20
           height: 30
-          
-        # Static Node Example
-        - type: panel
-          id: node_1
-          layout: column
-          width: 150
-          height: 100
-          x: 100
-          y: 100
-          draggable: true
-          color: 
-            - 0.25
-            - 0.25
-            - 0.28
-            - 1.0
-          border_l: 4
-          border_t: 4
-          border_r: 4
-          border_b: 4
-          tex_w: 32
-          tex_h: 32
-          texture: "ui_rect"
-          
-          children:
-             - type: label
-               text: "Math Node"
-               padding: 5
-               height: 20
-               color: 
-                 - 1.0
-                 - 1.0
-                 - 1.0
-                 - 1.0
-             - type: label
-               text: "Value: 42.0"
-               padding: 5
-               height: 20
+          color: "#888888"

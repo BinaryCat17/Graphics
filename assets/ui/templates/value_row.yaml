@@ -1,0 +1,4 @@
+type: text
+bind: "value"
+height: 20
+color: "#CCCCCC"

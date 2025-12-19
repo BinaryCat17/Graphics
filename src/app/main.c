@@ -32,6 +32,8 @@ typedef struct AppState {
     
     // UI State
     UiAsset* ui_asset;
+    UiAsset* node_template_asset;
+    UiAsset* value_template_asset;
     UiInstance ui_instance; // Manages UI Element memory
     UiInputContext input_ctx;
     
@@ -164,49 +166,27 @@ static void ui_rebuild_graph_view(AppState* app) {
         MathNode* node = math_graph_get_node(&app->graph, i);
         if (!node || node->type == MATH_NODE_NONE) continue;
         
-        // --- Node Window ---
-        UiNodeSpec* container_spec = ui_create_spec(app, UI_KIND_CONTAINER);
-        container_spec->layout = UI_LAYOUT_FLEX_COLUMN;
-        container_spec->width = 150;
-        container_spec->height = 100;
-        container_spec->flags = UI_FLAG_DRAGGABLE | UI_FLAG_CLICKABLE;
-        container_spec->x_source = "ui_x"; // Use new ui_x field
-        container_spec->y_source = "ui_y";
-        container_spec->color = (Vec4){0.2f, 0.2f, 0.2f, 1.0f}; // Was bg_color
-        // container_spec->border_color = ... // Removed
-        // container_spec->border_width = ... // Removed
-        container_spec->padding = 5.0f; // Changed from Vec4 to float
-
-        // Bind directly to the node in the array
-        UiElement* container = ui_element_create(&app->ui_instance, container_spec, node, node_meta);
-        canvas->children[idx++] = container;
-        
-        // Determine children count
-        int child_cnt = (node->type == MATH_NODE_VALUE) ? 2 : 1;
-        container->children = (UiElement**)arena_alloc_zero(&app->ui_instance.arena, child_cnt * sizeof(UiElement*));
-        container->child_count = child_cnt;
-        
-        // Header (Name)
-        UiNodeSpec* label_spec = ui_create_spec(app, UI_KIND_TEXT);
-        label_spec->text_source = "name";
-        // label_spec->font_size = 16; // Removed
-        label_spec->color = (Vec4){1,1,1,1};
-        label_spec->height = 20;
-        
-        UiElement* label = ui_element_create(&app->ui_instance, label_spec, node, node_meta);
-        container->children[0] = label;
-        label->parent = container;
-        
-        // Value (if Value node)
-        if (node->type == MATH_NODE_VALUE) {
-            UiNodeSpec* val_spec = ui_create_spec(app, UI_KIND_TEXT);
-            val_spec->text_source = "value"; // Bind to float value
-            // val_spec->font_size = 14; // Removed
-            val_spec->color = (Vec4){0.8f,0.8f,0.8f,1};
+        // --- Node Window (FROM TEMPLATE) ---
+        if (app->node_template_asset && app->node_template_asset->root) {
+            // Instantiate from template
+            UiElement* container = ui_element_create(&app->ui_instance, app->node_template_asset->root, node, node_meta);
+            canvas->children[idx++] = container;
             
-            UiElement* val = ui_element_create(&app->ui_instance, val_spec, node, node_meta);
-            container->children[1] = val;
-            val->parent = container;
+            // Value Row (Append if needed)
+            if (node->type == MATH_NODE_VALUE && app->value_template_asset && app->value_template_asset->root) {
+                // Resize children to add one more
+                size_t old_cnt = container->child_count;
+                UiElement** old_children = container->children;
+                
+                container->child_count++;
+                container->children = arena_alloc_zero(&app->ui_instance.arena, container->child_count * sizeof(UiElement*));
+                
+                for(size_t k=0; k<old_cnt; ++k) container->children[k] = old_children[k];
+                
+                UiElement* row = ui_element_create(&app->ui_instance, app->value_template_asset->root, node, node_meta);
+                container->children[old_cnt] = row;
+                row->parent = container;
+            }
         }
     }
 }
@@ -311,6 +291,10 @@ static void app_on_init(Engine* engine) {
 
     const char* ui_path = "assets/ui/editor.yaml"; 
     if (ui_path) {
+        // Load Templates
+        app->node_template_asset = ui_parser_load_from_file("assets/ui/templates/node.yaml");
+        app->value_template_asset = ui_parser_load_from_file("assets/ui/templates/value_row.yaml");
+
         app->ui_asset = ui_parser_load_from_file(ui_path);
         if (app->ui_asset) {
             const MetaStruct* graph_meta = meta_get_struct("MathGraph");

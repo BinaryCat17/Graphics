@@ -10,6 +10,28 @@
 
 // --- Helper Functions ---
 
+static bool parse_hex_color(const char* str, Vec4* out_color) {
+    if (!str || str[0] != '#') return false;
+    str++; // Skip '#'
+    
+    unsigned int r = 0, g = 0, b = 0, a = 255;
+    int len = (int)strlen(str);
+    
+    if (len == 6) {
+        if (sscanf(str, "%02x%02x%02x", &r, &g, &b) != 3) return false;
+    } else if (len == 8) {
+        if (sscanf(str, "%02x%02x%02x%02x", &r, &g, &b, &a) != 4) return false;
+    } else {
+        return false;
+    }
+    
+    out_color->x = (float)r / 255.0f;
+    out_color->y = (float)g / 255.0f;
+    out_color->z = (float)b / 255.0f;
+    out_color->w = (float)a / 255.0f;
+    return true;
+}
+
 static UiKind parse_kind(const char* type_str, uint32_t* out_flags) {
     *out_flags = UI_FLAG_NONE;
     if (!type_str) return UI_KIND_CONTAINER;
@@ -48,16 +70,50 @@ static UiKind parse_kind(const char* type_str, uint32_t* out_flags) {
 // --- Recursive Loader ---
 
 static UiNodeSpec* load_recursive(UiAsset* asset, const ConfigNode* node) {
-    if (!node || node->type != CONFIG_NODE_MAP) return NULL;
+    if (!node) return NULL;
+
+    // Handle Import (Replace 'node' with the root of the imported file)
+    ConfigNode* imported_root = NULL;
+    char* imported_text = NULL;
+
+    if (node->type == CONFIG_NODE_MAP) {
+        const ConfigNode* import_val = config_node_map_get(node, "import");
+        if (import_val && import_val->scalar) {
+            char* path = import_val->scalar;
+            imported_text = fs_read_text(path);
+            if (imported_text) {
+                ConfigError err;
+                if (simple_yaml_parse(imported_text, &imported_root, &err)) {
+                    // Successfully parsed. Use this as the source node.
+                    node = imported_root;
+                    LOG_INFO("UiParser: Imported %s", path);
+                } else {
+                    LOG_ERROR("UiParser: Failed to parse import %s: %s", path, err.message);
+                }
+            } else {
+                 LOG_ERROR("UiParser: Failed to read import %s", path);
+            }
+        }
+    }
+
+    if (node->type != CONFIG_NODE_MAP) {
+        if (imported_root) config_node_free(imported_root);
+        if (imported_text) free(imported_text);
+        return NULL;
+    }
 
     // Allocate Spec from Asset's Arena
     UiNodeSpec* spec = ui_asset_push_node(asset);
-    if (!spec) return NULL;
+    if (!spec) {
+        if (imported_root) config_node_free(imported_root);
+        if (imported_text) free(imported_text);
+        return NULL;
+    }
 
     const MetaStruct* meta = meta_get_struct("UiNodeSpec");
     if (!meta) {
         LOG_ERROR("UiParser: MetaStruct for UiNodeSpec not found!");
-        return spec; 
+        // We continue, but reflection won't work
     }
 
     // Default values
@@ -70,6 +126,9 @@ static UiNodeSpec* load_recursive(UiAsset* asset, const ConfigNode* node) {
         const char* key = node->pairs[i].key;
         const ConfigNode* val = node->pairs[i].value;
         if (!key || !val) continue;
+
+        // Skip 'import' as it was handled (or is redundant)
+        if (strcmp(key, "import") == 0) continue;
 
         // --- Special Handling for Recursion / Templates ---
         
@@ -100,6 +159,8 @@ static UiNodeSpec* load_recursive(UiAsset* asset, const ConfigNode* node) {
                  float a = 1.0f;
                  if (val->item_count > 3 && val->items[3]->scalar) a = (float)atof(val->items[3]->scalar);
                  spec->color = (Vec4){r, g, b, a};
+            } else if (val->type == CONFIG_NODE_SCALAR) {
+                parse_hex_color(val->scalar, &spec->color);
             }
             continue;
         }
