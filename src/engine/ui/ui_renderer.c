@@ -42,7 +42,7 @@ static void render_background(const UiElement* el, Scene* scene, Vec4 clip_vec) 
          quad.color.x *= 1.1f; quad.color.y *= 1.1f; quad.color.z *= 1.1f;
     }
 
-    if ((el->spec->border_l > 0.0f || el->spec->texture_path)) {
+    if ((el->spec->texture_path)) {
         // Use 9-Slice or Textured Quad
         quad.shader_params_0.x = 3.0f; // 9-Slice (UI Shader Mode)
         
@@ -62,8 +62,15 @@ static void render_background(const UiElement* el, Scene* scene, Vec4 clip_vec) 
         quad.shader_params_1.w = el->spec->border_l;
         
     } else {
-        // Flat Color Quad
-        quad.shader_params_0.x = 0.0f;
+        // SDF Rounded Box (Mode 4)
+        quad.shader_params_0.x = 4.0f; // Mode 4: SDF Rect
+        quad.shader_params_0.y = el->spec->corner_radius; // Radius
+        
+        // Pass borders for SDF stroke (use top border as uniform thickness for now, or implement per-side later)
+        // For SDF, we typically do uniform borders. Let's use border_t as thickness.
+        quad.shader_params_0.z = el->spec->border_t; 
+
+        // UVs don't matter much for pure SDF, but we pass white pixel for safety
         float u, v;
         font_get_white_pixel_uv(&u, &v);
         quad.uv_rect = (Vec4){u, v, 0.001f, 0.001f}; 

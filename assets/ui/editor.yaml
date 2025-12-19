@@ -54,6 +54,7 @@ children:
               text: "Add Node"
               width: 100
               height: 30
+              corner_radius: 8
               color: 
                 - 0.3
                 - 0.3
@@ -64,6 +65,7 @@ children:
               text: "Clear"
               width: 80
               height: 30
+              corner_radius: 8
               color: 
                 - 0.4
                 - 0.2
@@ -83,6 +85,8 @@ children:
         id: prop_group
         layout: column
         height: 100
+        corner_radius: 4
+        border_t: 1 # Border Thickness
         color: 
           - 0.15
           - 0.15
@@ -96,6 +100,7 @@ children:
             - type: text_input
               text: "{graph_name}"
               height: 25
+              corner_radius: 4
               color: 
                 - 0.1
                 - 0.1

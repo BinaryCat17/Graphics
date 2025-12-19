@@ -59,6 +59,14 @@ float sdWire(vec2 p, vec2 a, vec2 b) {
     return d;
 }
 
+float sdRoundedBox( in vec2 p, in vec2 b, in vec4 r )
+{
+    r.xy = (p.x>0.0)?r.xy : r.zw;
+    r.x  = (p.y>0.0)?r.x  : r.y;
+    vec2 q = abs(p)-b+r.x;
+    return min(max(q.x,q.y),0.0) + length(max(q,0.0)) - r.x;
+}
+
 void main() {
     // 0. Clipping
     if (inClipRect.z > 0.0 && inClipRect.w > 0.0) {
@@ -105,6 +113,54 @@ void main() {
              vec4 texColor = texture(texSampler, uv);
              color = texColor * inColor;
              alpha = texColor.a * inColor.a;
+        } else if (inParams.x < 4.5) {
+             // 4.0: SDF Rounded Box
+             // inParams.y = radius (px)
+             // inParams.z = border_thickness (px)
+             
+             vec2 size = inTargetSize; // W, H
+             vec2 p = (inOrigUV - 0.5) * size; // Center at 0,0
+             vec2 halfSize = size * 0.5;
+             float radius = inParams.y;
+             float border = inParams.z;
+             
+             // Clamp radius to half-size to avoid artifacts
+             radius = min(radius, min(halfSize.x, halfSize.y));
+             
+             float dist = sdRoundedBox(p, halfSize, vec4(radius));
+             
+             // Softness (AA)
+             float softness = 1.0; 
+             
+             // Fill
+             float fillAlpha = 1.0 - smoothstep(0.0, softness, dist);
+             
+             // Border
+             if (border > 0.0) {
+                 // Distance to inner edge is dist + border? No, dist is 0 at edge.
+                 // We want the stroke to be *inside* the shape usually, or centered?
+                 // Let's assume border is *inset*.
+                 // Inner edge is at dist = -border.
+                 
+                 float borderAlpha = 1.0 - smoothstep(border - softness, border, abs(dist + border * 0.5));
+                 // Wait, simpler: 
+                 // We want to render if dist <= 0.
+                 // If dist > -border, it's border color.
+                 // If dist < -border, it's fill color.
+                 
+                 // Let's just do a simple mix for now.
+                 // For now, let's assume the color passed IS the background color. 
+                 // If we want a separate border color, we need more inputs.
+                 // But typically borders are darker/lighter or specified separately.
+                 // As a hack for "Visual Polish", let's darken the border automatically if no color is provided.
+                 
+                 float insideBorder = smoothstep(-border - softness, -border, dist);
+                 // 0 = inside core, 1 = inside border area
+                 
+                 color.rgb = mix(color.rgb * 0.8, color.rgb, 1.0 - insideBorder);
+             }
+
+             alpha *= fillAlpha;
         }
     } 
     else if (inParams.y > 0.5) { // Curve (PrimType == 1)

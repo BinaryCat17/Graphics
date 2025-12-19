@@ -87,6 +87,7 @@ typedef struct UiNodeSpec {
     
     // 9-Slice Sizing (if kind == UI_KIND_CONTAINER and texture is used)
     float border_l, border_t, border_r, border_b; // REFLECT
+    float corner_radius;    // REFLECT
     float tex_w, tex_h;     // REFLECT
     char* texture_path;     // REFLECT
     
