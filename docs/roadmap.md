@@ -16,8 +16,8 @@
 
 ### Phase 4: Modern Data-Driven UI (New Architecture)
 **Objective:** Create a beautiful, reactive, and lightweight UI system without the bloat of web frameworks or the mess of Immediate Mode.
-- [ ] **Step 1: Visual Polish (SDF Rendering & Theming):** Implement Signed Distance Fields (SDF) in shaders for rounded corners, soft shadows, and borders. Implement a **Theming System** (Style sheets) to decouple colors/fonts from UI structure.
-- [ ] **Step 2: Optimized Binding (Fast Reactivity):** Use the **Reflection System** to pre-resolve data pointers (`void* direct_ptr`) at initialization, eliminating per-frame string lookups. Explore **Codegen** for "Dirty Proxy" setters.
+- [x] **Step 1: Visual Polish (SDF Rendering):** Implemented Signed Distance Fields (SDF) in shaders for rounded corners, soft shadows, and borders.
+- [x] **Step 2: Optimized Binding (Fast Reactivity):** Used the **Reflection System** to pre-resolve data pointers (`MetaField*`) at initialization, eliminating per-frame string lookups.
 - [ ] **Step 3: YAML Prefabs & Templates:** Implement a powerful templating system in the parser to reuse UI components (e.g., `type: Button`).
 - [ ] **Step 4: Declarative Animations:** Implement state transition logic (e.g., `hover -> scale: 1.2`) driven purely by data/YAML.
 - [ ] **Step 5: Advanced Layout (Docking):** Implement "Split Containers" logic to support dynamic docking without a monolithic manager.
@@ -36,5 +36,5 @@
 - **Plan:** Implement Glyph Batching (single vertex buffer for text strings).
 
 ### UI Layout Optimization
-- **Status:** Partially Resolved (Dirty Flags implemented).
-- **Next:** Implement "Cached Bindings" (Phase 4, Step 2) to eliminate reflection overhead during updates.
+- **Status:** Resolved (Cached Bindings implemented).
+- **Next:** Implement "YAML Prefabs" (Phase 4, Step 3) to reduce file verbosity.
