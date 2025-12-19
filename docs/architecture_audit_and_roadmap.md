@@ -14,34 +14,26 @@ The architecture strictly follows a **layered approach**:
 3.  **Vulkan Backend (Implementation):** Implements the contract, managing device resources, pipelines, and synchronization.
 4.  **Engine/Feature Layer:** High-level logic (Graph Editor, UI) that uses the Renderer Backend.
 
-**Key Achievement:** The Engine can now dispatch compute jobs without knowing *anything* about Vulkan types (`VkPipeline`, `VkFence`, etc.), preserving architectural purity.
+**Key Achievement:** The Engine uses a **Shader IR** to decouple logic from syntax. Compute jobs are dispatched via a clean `ShaderTarget` API.
 
 ## 2. Current Architecture State
 
 | Feature | Status | Analysis |
 | :--- | :--- | :--- |
-| **Compute Backend** | ✅ **Ready** | `renderer_backend.h` exposes `compute_pipeline_create/dispatch`. Vulkan backend implements full resource management (Pipelines, Fences, Storage Images). |
-| **Unified Scene** | ⚠️ Partial | Data structures exist for 2D/3D. Renderer focuses on 2D Instanced Quads. 3D Mesh rendering is pending. |
-| **Visual Graph Editor** | ⚠️ Air-Gapped | Transpiler works (generates GLSL), but is not yet connected to the runtime compiler or backend. |
-| **Data-Oriented** | ✅ Verified | Strict usage of Arenas/Pools. Compute Pipelines are managed via a fixed-size pool (`MAX_COMPUTE_PIPELINES = 32`) to avoid fragmentation. |
-| **Declarative UI** | ✅ Robust | Reflection-based UI system remains a strong pillar. |
+| **Compute Backend** | ✅ **Ready** | `renderer_backend.h` exposes `compute_pipeline_create/dispatch`. |
+| **Math Engine** | ✅ **Decoupled** | Uses IR + Emitters. Supports GLSL target. Ready for WebGPU. |
+| **Asset Pipeline** | ✅ **Robust** | `tools/build_shaders.py` handles offline compilation. No runtime `glslc` dependency. |
+| **Unified Scene** | ⚠️ Partial | Renderer focuses on 2D Instanced Quads. |
+| **Visual Graph Editor** | ⚠️ Partial | UI exists, but "Run" button is manual (Key 'C'). |
 
 ## 3. Phase 1: Compute Infrastructure (Completed)
-
-We have implemented the following capabilities in the Vulkan Backend:
-*   **Compute Pipeline Pool:** Fixed-size pool for managing shader pipelines.
-*   **Automatic Resource Management:** The backend automatically manages the "Compute Target" (Storage Image), resizing it and handling layout transitions (`GENERAL` <-> `SHADER_READ`).
-*   **Synchronization:** Dedicated `VkFence` and `VkCommandBuffer` for compute workloads, ensuring execution does not interfere with the graphics loop.
-*   **Descriptor Management:** Automatic creation of Descriptor Sets for:
-    *   **Set 0 (Compute Write):** Allows the compute shader to write to the global target image.
-    *   **Set 2 (Graphics Read):** Allows the main render pass to sample the compute result.
-
+...
 ## 4. Roadmap to v0.2 (Math Engine Prototype)
 
-### Phase 2: Runtime Shader Compilation & Bridge (Next)
-**Objective:** Connect the Graph Editor to the GPU.
-1.  **Runtime Compiler:** Implement `shader_compiler.c` to invoke `glslc` (via system call) to convert Transpiler GLSL -> SPIR-V.
-2.  **Graph Bridge:** Create a system that watches the `MathGraph`, triggers transpilation on change, compiles the shader, and updates the Compute Pipeline.
+### Phase 2: Shader Pipeline (Completed)
+*   [x] **Shader IR:** Decoupled `transpiler.c` from GLSL strings.
+*   [x] **Build Script:** Implemented `tools/build_shaders.py`.
+*   [x] **API:** `math_graph_transpile(..., TARGET_GLSL)`.
 
 ### Phase 3: The "Unified" Render Loop
 **Objective:** Visualize the Math.
