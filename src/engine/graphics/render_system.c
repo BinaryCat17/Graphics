@@ -174,7 +174,34 @@ void render_system_bind_ui(RenderSystem* sys, UiElement* root_view) {
 
 void render_system_update(RenderSystem* sys) {
     if (!sys || !sys->renderer_ready) return;
+
+    if (sys->active_compute_pipeline > 0 && sys->backend && sys->backend->compute_dispatch) {
+        // Must match generated GLSL push constant layout
+        struct {
+            float time;
+            float width;
+            float height;
+        } push = {
+            .time = (float)sys->current_time,
+            .width = 512.0f,
+            .height = 512.0f
+        };
+        
+        // Dispatch Compute (Target is 512x512, assuming 16x16 workgroups)
+        sys->backend->compute_dispatch(sys->backend, sys->active_compute_pipeline, 32, 32, 1, &push, sizeof(push));
+    }
+
     try_sync_packet(sys);
+}
+
+void render_system_set_compute_pipeline(RenderSystem* sys, uint32_t pipeline_id) {
+    if (!sys) return;
+    
+    // Cleanup old pipeline if it was dynamic? 
+    // Actually, RenderSystem doesn't know if it's dynamic.
+    // Let's just swap it.
+    sys->active_compute_pipeline = pipeline_id;
+    LOG_INFO("RenderSystem: Active compute pipeline set to %u", pipeline_id);
 }
 
 void render_system_request_screenshot(RenderSystem* sys, const char* filepath) {

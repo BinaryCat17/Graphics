@@ -167,10 +167,9 @@ src/
 
 Even good architectures have limits. Here are ours:
 
-### 1. The "1000 Object" Limit
-*   **What:** You can't draw more than 1000 items (quads/letters) at once.
-*   **Why:** We use a fixed-size buffer in Vulkan to keep things simple for now.
-*   **Fix:** We need to implement "Dynamic Buffer Resizing" (growing the buffer when full).
+### 1. Unified Scene Performance (Resolved)
+*   **Status:** Dynamic Buffer Resizing implemented.
+*   **Details:** The renderer now automatically grows its instance buffers when the object count exceeds the current capacity. The descriptor pool has also been expanded to support a larger number of per-frame and compute sets.
 
 ### 2. Slow Text
 *   **What:** Each letter is a separate object.

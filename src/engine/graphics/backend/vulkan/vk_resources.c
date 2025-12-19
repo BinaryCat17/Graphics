@@ -143,11 +143,17 @@ void vk_create_font_texture(VulkanRendererState* state) {
 }
 
 void vk_create_descriptor_pool_and_set(VulkanRendererState* state) {
-    VkDescriptorPoolSize pools[2] = {
-        { .type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, .descriptorCount = 2 }, // Reserve a bit more
-        { .type = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, .descriptorCount = 2 }
+    VkDescriptorPoolSize pools[] = {
+        { .type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, .descriptorCount = 16 },
+        { .type = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, .descriptorCount = 16 },
+        { .type = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, .descriptorCount = 16 }
     };
-    VkDescriptorPoolCreateInfo dpci = { .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO, .maxSets = 4, .poolSizeCount = 2, .pPoolSizes = pools };
+    VkDescriptorPoolCreateInfo dpci = { 
+        .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO, 
+        .maxSets = 16, 
+        .poolSizeCount = 3, 
+        .pPoolSizes = pools 
+    };
     state->res = vkCreateDescriptorPool(state->device, &dpci, NULL, &state->descriptor_pool);
     if (state->res != VK_SUCCESS) fatal_vk("vkCreateDescriptorPool", state->res);
 

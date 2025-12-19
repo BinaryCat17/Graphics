@@ -182,6 +182,7 @@ void engine_run(Engine* engine) {
         }
 
         rs->frame_count++;
+        rs->current_time = now;
         
         // Reset per-frame input deltas
         engine->input.scroll_dx = 0;

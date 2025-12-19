@@ -33,6 +33,8 @@ typedef struct RenderSystem {
     bool running;
     bool renderer_ready;
     bool show_compute_result;
+    uint32_t active_compute_pipeline;
+    double current_time;
     
     uint64_t frame_count;
 } RenderSystem;
@@ -51,6 +53,9 @@ void render_system_bind_ui(RenderSystem* sys, UiElement* root_view);
 
 // Updates the render system (Syncs logic to render packet)
 void render_system_update(RenderSystem* sys);
+
+// Sets the active compute pipeline for the next frames
+void render_system_set_compute_pipeline(RenderSystem* sys, uint32_t pipeline_id);
 
 // Shuts down the system
 void render_system_shutdown(RenderSystem* sys);
