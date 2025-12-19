@@ -28,6 +28,18 @@ UiNodeSpec* ui_asset_push_node(UiAsset* asset) {
     return (UiNodeSpec*)arena_alloc_zero(&asset->arena, sizeof(UiNodeSpec));
 }
 
+UiNodeSpec* ui_asset_get_template(UiAsset* asset, const char* name) {
+    if (!asset || !name) return NULL;
+    UiTemplate* t = asset->templates;
+    while (t) {
+        if (t->name && strcmp(t->name, name) == 0) {
+            return t->spec;
+        }
+        t = t->next;
+    }
+    return NULL;
+}
+
 // --- UiInstance (Memory Owner for Runtime) ---
 
 void ui_instance_init(UiInstance* instance, size_t size) {

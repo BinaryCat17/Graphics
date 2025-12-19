@@ -1,3 +1,9 @@
+templates:
+  GraphNode:
+    import: "assets/ui/templates/node.yaml"
+  ValueRow:
+    import: "assets/ui/templates/value_row.yaml"
+
 type: panel
 id: root
 layout: row

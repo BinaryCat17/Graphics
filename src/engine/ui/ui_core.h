@@ -118,15 +118,23 @@ typedef struct UiNodeSpec {
 // --- UI ASSET (The Resource) ---
 // Owns the memory. Created by the Parser.
 
+typedef struct UiTemplate {
+    char* name;
+    UiNodeSpec* spec;
+    struct UiTemplate* next;
+} UiTemplate;
+
 typedef struct UiAsset {
     MemoryArena arena;
     UiNodeSpec* root;
+    UiTemplate* templates;
 } UiAsset;
 
 // API for Asset
 UiAsset* ui_asset_create(size_t arena_size);
 void ui_asset_free(UiAsset* asset);
 UiNodeSpec* ui_asset_push_node(UiAsset* asset);
+UiNodeSpec* ui_asset_get_template(UiAsset* asset, const char* name);
 
 
 // --- UI INSTANCE (The Living Tree) ---

@@ -32,8 +32,6 @@ typedef struct AppState {
     
     // UI State
     UiAsset* ui_asset;
-    UiAsset* node_template_asset;
-    UiAsset* value_template_asset;
     UiInstance ui_instance; // Manages UI Element memory
     UiInputContext input_ctx;
     
@@ -167,25 +165,29 @@ static void ui_rebuild_graph_view(AppState* app) {
         if (!node || node->type == MATH_NODE_NONE) continue;
         
         // --- Node Window (FROM TEMPLATE) ---
-        if (app->node_template_asset && app->node_template_asset->root) {
+        UiNodeSpec* node_spec = ui_asset_get_template(app->ui_asset, "GraphNode");
+        if (node_spec) {
             // Instantiate from template
-            UiElement* container = ui_element_create(&app->ui_instance, app->node_template_asset->root, node, node_meta);
+            UiElement* container = ui_element_create(&app->ui_instance, node_spec, node, node_meta);
             canvas->children[idx++] = container;
             
             // Value Row (Append if needed)
-            if (node->type == MATH_NODE_VALUE && app->value_template_asset && app->value_template_asset->root) {
-                // Resize children to add one more
-                size_t old_cnt = container->child_count;
-                UiElement** old_children = container->children;
-                
-                container->child_count++;
-                container->children = arena_alloc_zero(&app->ui_instance.arena, container->child_count * sizeof(UiElement*));
-                
-                for(size_t k=0; k<old_cnt; ++k) container->children[k] = old_children[k];
-                
-                UiElement* row = ui_element_create(&app->ui_instance, app->value_template_asset->root, node, node_meta);
-                container->children[old_cnt] = row;
-                row->parent = container;
+            if (node->type == MATH_NODE_VALUE) {
+                UiNodeSpec* val_spec = ui_asset_get_template(app->ui_asset, "ValueRow");
+                if (val_spec) {
+                    // Resize children to add one more
+                    size_t old_cnt = container->child_count;
+                    UiElement** old_children = container->children;
+                    
+                    container->child_count++;
+                    container->children = arena_alloc_zero(&app->ui_instance.arena, container->child_count * sizeof(UiElement*));
+                    
+                    for(size_t k=0; k<old_cnt; ++k) container->children[k] = old_children[k];
+                    
+                    UiElement* row = ui_element_create(&app->ui_instance, val_spec, node, node_meta);
+                    container->children[old_cnt] = row;
+                    row->parent = container;
+                }
             }
         }
     }
@@ -291,10 +293,6 @@ static void app_on_init(Engine* engine) {
 
     const char* ui_path = "assets/ui/editor.yaml"; 
     if (ui_path) {
-        // Load Templates
-        app->node_template_asset = ui_parser_load_from_file("assets/ui/templates/node.yaml");
-        app->value_template_asset = ui_parser_load_from_file("assets/ui/templates/value_row.yaml");
-
         app->ui_asset = ui_parser_load_from_file(ui_path);
         if (app->ui_asset) {
             const MetaStruct* graph_meta = meta_get_struct("MathGraph");

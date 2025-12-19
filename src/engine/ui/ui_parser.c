@@ -253,6 +253,25 @@ UiAsset* ui_parser_load_from_file(const char* path) {
         return NULL;
     }
 
+    // Parse Templates (if any)
+    const ConfigNode* templates_node = config_node_map_get(root, "templates");
+    if (templates_node && templates_node->type == CONFIG_NODE_MAP) {
+        for (size_t i = 0; i < templates_node->pair_count; ++i) {
+            const char* t_name = templates_node->pairs[i].key;
+            const ConfigNode* t_val = templates_node->pairs[i].value;
+            
+            UiNodeSpec* spec = load_recursive(asset, t_val);
+            if (spec) {
+                UiTemplate* t = (UiTemplate*)arena_alloc_zero(&asset->arena, sizeof(UiTemplate));
+                t->name = arena_push_string(&asset->arena, t_name);
+                t->spec = spec;
+                t->next = asset->templates;
+                asset->templates = t;
+                LOG_INFO("UiParser: Registered template '%s'", t->name);
+            }
+        }
+    }
+
     asset->root = load_recursive(asset, root);
     
     config_node_free(root);
