@@ -42,7 +42,6 @@ void vk_create_instance(VulkanRendererState* state) {
     ici.enabledExtensionCount = extc; 
     ici.ppEnabledExtensionNames = exts;
     
-    // double start = vk_now_ms();
     state->res = vkCreateInstance(&ici, NULL, &state->instance);
     LOG_TRACE("vkCreateInstance (application)");
     

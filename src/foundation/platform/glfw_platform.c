@@ -1,4 +1,4 @@
-#include "foundation/platform/glfw_platform.h"
+#include "platform.h"
 #include "foundation/logger/logger.h"
 #include <stdio.h>
 

@@ -177,7 +177,6 @@ void vk_create_swapchain_and_views(VulkanRendererState* state, VkSwapchainKHR ol
         .oldSwapchain = old_swapchain 
     };
     
-    // double swapchain_start = vk_now_ms();
     state->res = vkCreateSwapchainKHR(state->device, &sci, NULL, &state->swapchain);
     LOG_INFO("vkCreateSwapchainKHR: Swapchain created.");
     

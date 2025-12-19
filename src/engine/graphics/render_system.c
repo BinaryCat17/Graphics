@@ -74,9 +74,6 @@ static void try_sync_packet(RenderSystem* sys) {
         scene_add_object(&dest->scene, quad);
     }
 
-    // DEBUG: Add Hello World Text
-    // scene_add_text(&dest->scene, "Hello Graphics Engine", (Vec3){100.0f, 100.0f, 0.0f}, 1.0f, (Vec4){1.0f, 1.0f, 1.0f, 1.0f});
-
     sys->packet_ready = true;
     mtx_unlock(&sys->packet_mutex);
 }
@@ -120,10 +117,6 @@ static void try_bootstrap_renderer(RenderSystem* sys) {
     };
 
     sys->renderer_ready = sys->backend->init(sys->backend, &init);
-
-    // if (sys->renderer_ready) {
-    //    ui_layout_set_measure_func(render_system_measure_text_wrapper, NULL);
-    // }
 }
 
 bool render_system_init(RenderSystem* sys, const RenderSystemConfig* config) {
@@ -208,5 +201,3 @@ void render_system_request_screenshot(RenderSystem* sys, const char* filepath) {
     if (!sys || !sys->backend || !sys->backend->request_screenshot) return;
     sys->backend->request_screenshot(sys->backend, filepath);
 }
-
-#define KEY_C 67
