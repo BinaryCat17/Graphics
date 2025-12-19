@@ -15,18 +15,10 @@ static float calculate_width(UiElement* el, float available_w, UiTextMeasureFunc
         bool parent_is_row = (el->parent && el->parent->spec->layout == UI_LAYOUT_FLEX_ROW);
         
         if (parent_is_row || spec->kind == UI_KIND_TEXT || (spec->flags & UI_FLAG_CLICKABLE)) {
-             char text_buf[128];
-             const char* text = spec->static_text;
+             const char* text = el->cached_text;
+             if (!text || text[0] == '\0') text = spec->static_text;
 
-             if (spec->text_source && el->data_ptr && el->meta) {
-                 const MetaField* field = meta_find_field(el->meta, spec->text_source);
-                 if (field) {
-                     ui_bind_read_string(el->data_ptr, field, text_buf, sizeof(text_buf));
-                     text = text_buf;
-                 }
-             }
-
-             if (text) {
+             if (text && text[0] != '\0') {
                  if (measure_func) {
                      w = measure_func(text, measure_data) + spec->padding * 2;
                  } else {

@@ -73,23 +73,17 @@ static void render_background(const UiElement* el, Scene* scene, Vec4 clip_vec) 
 }
 
 static void render_content(const UiElement* el, Scene* scene, Vec4 clip_vec) {
-    // Resolve Text
-    char text_buf[128];
-    const char* text = el->spec->static_text;
-
-    if (el->spec->text_source && el->data_ptr && el->meta) {
-        const MetaField* field = meta_find_field(el->meta, el->spec->text_source);
-        if (field) {
-            ui_bind_read_string(el->data_ptr, field, text_buf, sizeof(text_buf));
-            text = text_buf;
-        }
+    // Resolve Text (Use Cache)
+    const char* text = el->cached_text;
+    if (!text || text[0] == '\0') {
+        text = el->spec->static_text;
     }
     
     // For inputs without text, show nothing or placeholder?
     if (el->spec->kind == UI_KIND_TEXT_INPUT && !text) text = "";
 
     // Skip if nothing to draw
-    if (!text && el->spec->kind != UI_KIND_TEXT_INPUT) return;
+    if ((!text || text[0] == '\0') && el->spec->kind != UI_KIND_TEXT_INPUT) return;
 
     if (text) {
         Vec3 pos = {el->screen_rect.x + el->spec->padding, el->screen_rect.y + el->spec->padding, 0.1f};

@@ -21,10 +21,15 @@ typedef struct UiInputContext {
 
     // Helper to detect click vs drag
     bool possible_drag; 
+
+    // Event Queue
+    UiEvent events[64];
+    int event_count;
 } UiInputContext;
 
 void ui_input_init(UiInputContext* ctx);
 void ui_input_reset(UiInputContext* ctx); // Clears internal pointers (safe for rebuild)
 void ui_input_update(UiInputContext* ctx, UiElement* root, const InputState* input);
+bool ui_input_pop_event(UiInputContext* ctx, UiEvent* out_event);
 
 #endif // UI_INPUT_H

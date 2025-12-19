@@ -37,6 +37,28 @@ typedef enum UiKind {
     UI_KIND_CUSTOM     // Custom render callback (e.g. Curves)
 } UiKind;
 
+typedef enum UiDirtyFlags {
+    UI_DIRTY_NONE = 0,
+    UI_DIRTY_LAYOUT = 1 << 0,  // Size/Pos changed
+    UI_DIRTY_REDRAW = 1 << 1,  // Color/Text changed (but not size)
+    UI_DIRTY_CHILDREN = 1 << 2 // Structure changed
+} UiDirtyFlags;
+
+typedef struct UiElement UiElement;
+
+typedef enum UiEventType {
+    UI_EVENT_NONE = 0,
+    UI_EVENT_CLICK,         // Triggered on mouse up (if active)
+    UI_EVENT_VALUE_CHANGE,  // Triggered when input modifies data
+    UI_EVENT_DRAG_START,
+    UI_EVENT_DRAG_END
+} UiEventType;
+
+typedef struct UiEvent {
+    UiEventType type;
+    UiElement* target;
+} UiEvent;
+
 typedef struct InputState {
     float mouse_x, mouse_y;
     bool mouse_down;
@@ -143,6 +165,10 @@ typedef struct UiElement {
     // Layout State
     float content_w; // Total width of children
     float content_h; // Total height of children
+
+    // Caching
+    char cached_text[128]; // For text binding
+    uint32_t dirty_flags;  // Bitmask of UiDirtyFlags
 
 } UiElement;
 

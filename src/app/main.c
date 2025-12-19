@@ -41,7 +41,76 @@ typedef struct AppState {
     // Selection
     MathNodeId selected_node_id;
     bool selection_dirty; 
+    bool graph_dirty;
+    uint32_t current_pipeline;
 } AppState;
+
+// --- Runtime Compilation ---
+
+#include "engine/graphics/backend/vulkan/vk_utils.h"
+
+static void app_recompile_graph(AppState* app, RenderSystem* rs) {
+    if (!app || !rs || !rs->backend) return;
+
+    LOG_INFO("App: Recompiling Math Graph...");
+
+    // 1. Transpile to GLSL
+    char* glsl = math_graph_transpile(&app->graph, TRANSPILE_MODE_IMAGE_2D, SHADER_TARGET_GLSL_VULKAN);
+    if (!glsl) {
+        LOG_ERROR("Transpilation failed.");
+        return;
+    }
+
+    // 2. Save to temp file
+    const char* tmp_glsl = "logs/tmp_graph.comp";
+    FILE* f = fopen(tmp_glsl, "w");
+    if (!f) {
+        LOG_ERROR("Failed to create temp GLSL file");
+        free(glsl);
+        return;
+    }
+    fprintf(f, "%s", glsl);
+    fclose(f);
+    free(glsl);
+
+    // 3. Call glslc
+    const char* tmp_spv = "logs/tmp_graph.spv";
+    char cmd[512];
+    sprintf(cmd, "glslc %s -o %s", tmp_glsl, tmp_spv);
+    
+    LOG_DEBUG("Running: %s", cmd);
+    int res = system(cmd);
+    if (res != 0) {
+        LOG_ERROR("glslc failed with code %d", res);
+        return;
+    }
+
+    // 4. Load SPIR-V
+    size_t spv_size = 0;
+    uint32_t* spv_code = read_file_bin_u32(tmp_spv, &spv_size);
+    if (!spv_code) {
+        LOG_ERROR("Failed to read generated SPIR-V");
+        return;
+    }
+
+    // 5. Create Pipeline
+    uint32_t new_pipe = rs->backend->compute_pipeline_create(rs->backend, spv_code, spv_size, 0);
+    free(spv_code);
+
+    if (new_pipe == 0) {
+        LOG_ERROR("Failed to create compute pipeline");
+        return;
+    }
+
+    // 6. Swap
+    if (app->current_pipeline > 0) {
+        rs->backend->compute_pipeline_destroy(rs->backend, app->current_pipeline);
+    }
+    app->current_pipeline = new_pipe;
+    render_system_set_compute_pipeline(rs, new_pipe);
+    
+    LOG_INFO("App: Graph Recompiled Successfully (ID: %u)", new_pipe);
+}
 
 // --- Dynamic UI Helpers ---
 
@@ -236,6 +305,10 @@ static void app_on_init(Engine* engine) {
     ui_input_init(&app->input_ctx);
     ui_instance_init(&app->ui_instance, 1024 * 1024); // 1MB UI Arena
 
+    // Force visualizer on for Phase 3 testing
+    engine->show_compute_visualizer = true;
+    engine->render_system.show_compute_result = true;
+
     const char* ui_path = "assets/ui/editor.yaml"; 
     if (ui_path) {
         app->ui_asset = ui_parser_load_from_file(ui_path);
@@ -259,6 +332,9 @@ static void app_on_init(Engine* engine) {
             }
         }
     }
+
+    // Initial Compile
+    app_recompile_graph(app, &engine->render_system);
 }
 
 static void app_on_update(Engine* engine) {
@@ -272,18 +348,7 @@ static void app_on_update(Engine* engine) {
         engine->show_compute_visualizer = !engine->show_compute_visualizer;
         engine->render_system.show_compute_result = engine->show_compute_visualizer;
         if (engine->show_compute_visualizer) {
-        // 1. Transpile Graph to GLSL
-        LOG_INFO("Transpiling graph...");
-        char* glsl_source = math_graph_transpile(&app->graph, TRANSPILE_MODE_IMAGE_2D, SHADER_TARGET_GLSL_VULKAN);
-        
-        if (!glsl_source) {
-            LOG_ERROR("Transpilation failed.");
-            return;
-        }
-        if (glsl_source) {
-                LOG_INFO("Generated GLSL:\n%s", glsl_source);
-                free(glsl_source);
-            }
+            app->graph_dirty = true; // Trigger recompile
         }
     }
     key_c_prev = key_c_curr;
@@ -292,19 +357,30 @@ static void app_on_update(Engine* engine) {
         ui_element_update(app->ui_instance.root);
         ui_input_update(&app->input_ctx, app->ui_instance.root, &engine->input);
         
-        if (engine->input.mouse_clicked && app->input_ctx.hovered) {
-             UiElement* hit = app->input_ctx.hovered;
-             while (hit) {
-                 if (hit->data_ptr && hit->meta && strcmp(hit->meta->name, "MathNode") == 0) {
-                     // Safe extraction of ID
-                     MathNode* n = (MathNode*)hit->data_ptr;
-                     app->selected_node_id = n->id;
-                     app->selection_dirty = true;
-                     LOG_INFO("Selected Node: %d", n->id);
-                     break;
-                 }
-                 hit = hit->parent;
-             }
+        // Handle Events
+        UiEvent evt;
+        while (ui_input_pop_event(&app->input_ctx, &evt)) {
+            switch (evt.type) {
+                case UI_EVENT_VALUE_CHANGE:
+                case UI_EVENT_DRAG_END:
+                    app->graph_dirty = true;
+                    break;
+                case UI_EVENT_CLICK: {
+                    // Selection Logic
+                    UiElement* hit = evt.target;
+                    while (hit) {
+                        if (hit->data_ptr && hit->meta && strcmp(hit->meta->name, "MathNode") == 0) {
+                            MathNode* n = (MathNode*)hit->data_ptr;
+                            app->selected_node_id = n->id;
+                            app->selection_dirty = true;
+                            LOG_INFO("Selected Node: %d", n->id);
+                            break;
+                        }
+                        hit = hit->parent;
+                    }
+                } break;
+                default: break;
+            }
         }
         
         if (app->selection_dirty) {
@@ -322,6 +398,12 @@ static void app_on_update(Engine* engine) {
         if (n && n->type != MATH_NODE_NONE) {
             math_graph_evaluate(&app->graph, i);
         }
+    }
+
+    // Recompile if needed
+    if (app->graph_dirty && engine->show_compute_visualizer) {
+        app_recompile_graph(app, &engine->render_system);
+        app->graph_dirty = false;
     }
 }
 
