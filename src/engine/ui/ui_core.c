@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
+#include <math.h>
 
 // --- UiAsset (Memory Owner) ---
 
@@ -75,6 +76,7 @@ UiElement* ui_element_create(UiInstance* instance, const UiNodeSpec* spec, void*
     UiElement* el = element_alloc(instance, spec);
     el->data_ptr = data;
     el->meta = meta;
+    el->render_color = spec->color;
 
     // Cache Bindings
     if (meta) {
@@ -103,9 +105,30 @@ UiElement* ui_element_create(UiInstance* instance, const UiNodeSpec* spec, void*
     return el;
 }
 
-void ui_element_update(UiElement* element) {
+void ui_element_update(UiElement* element, float dt) {
     if (!element || !element->spec) return;
     
+    // 0. Animation Interpolation
+    const UiNodeSpec* spec = element->spec;
+    float target_t = element->is_hovered ? 1.0f : 0.0f;
+    float speed = spec->animation_speed > 0 ? spec->animation_speed : 10.0f; // Default speed
+    
+    if (element->hover_t != target_t) {
+        float diff = target_t - element->hover_t;
+        float step = speed * dt;
+        if (fabsf(diff) < step) element->hover_t = target_t;
+        else element->hover_t += (diff > 0 ? 1.0f : -1.0f) * step;
+        
+        // Update Animated Color
+        if (spec->hover_color.w > 0 || spec->hover_color.x > 0 || spec->hover_color.y > 0 || spec->hover_color.z > 0) {
+            element->render_color.x = spec->color.x + (spec->hover_color.x - spec->color.x) * element->hover_t;
+            element->render_color.y = spec->color.y + (spec->hover_color.y - spec->color.y) * element->hover_t;
+            element->render_color.z = spec->color.z + (spec->hover_color.z - spec->color.z) * element->hover_t;
+            element->render_color.w = spec->color.w + (spec->hover_color.w - spec->color.w) * element->hover_t;
+            element->dirty_flags |= UI_DIRTY_REDRAW;
+        }
+    }
+
     // 1. Resolve Text Binding (Cached)
     if (element->bind_text && element->data_ptr) {
         char new_text[128] = {0};
@@ -161,7 +184,7 @@ void ui_element_update(UiElement* element) {
 
     // Recurse
     for (size_t i = 0; i < element->child_count; ++i) {
-        ui_element_update(element->children[i]);
+        ui_element_update(element->children[i], dt);
     }
 }
 

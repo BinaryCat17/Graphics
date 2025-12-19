@@ -10,6 +10,7 @@
 #include "engine/ui/ui_renderer.h"
 #include "engine/ui/ui_layout.h"
 #include "engine/ui/ui_input.h"
+#include "engine/ui/ui_command_system.h"
 #include "engine/graphics/text/font.h"
 
 #include <string.h>
@@ -220,6 +221,30 @@ static void ui_rebuild_inspector(AppState* app) {
     }
 }
 
+// --- Commands ---
+
+static void cmd_add_node(void* user_data, UiElement* target) {
+    (void)target;
+    AppState* app = (AppState*)user_data;
+    LOG_INFO("Command: Graph.AddNode");
+    math_graph_add_node(&app->graph, MATH_NODE_VALUE);
+    ui_rebuild_graph_view(app);
+}
+
+static void cmd_clear_graph(void* user_data, UiElement* target) {
+    (void)target;
+    AppState* app = (AppState*)user_data;
+    LOG_INFO("Command: Graph.Clear");
+    // We can't easily clear without re-initing arena if we don't have a clear function
+    // For now just log
+}
+
+static void cmd_recompile(void* user_data, UiElement* target) {
+    (void)target;
+    AppState* app = (AppState*)user_data;
+    app->graph_dirty = true;
+}
+
 // --- Application Logic ---
 
 static void app_setup_graph(AppState* app) {
@@ -257,6 +282,11 @@ static void app_on_init(Engine* engine) {
     app->selected_node_id = MATH_NODE_INVALID_ID;
     
     app_setup_graph(app);
+
+    ui_command_init();
+    ui_command_register("Graph.AddNode", cmd_add_node, app);
+    ui_command_register("Graph.Clear", cmd_clear_graph, app);
+    ui_command_register("Graph.Recompile", cmd_recompile, app);
 
     ui_input_init(&app->input_ctx);
     ui_instance_init(&app->ui_instance, 1024 * 1024); // 1MB UI Arena
@@ -310,7 +340,7 @@ static void app_on_update(Engine* engine) {
     key_c_prev = key_c_curr;
 
     if (app->ui_instance.root) {
-        ui_element_update(app->ui_instance.root);
+        ui_element_update(app->ui_instance.root, engine->dt);
         ui_input_update(&app->input_ctx, app->ui_instance.root, &engine->input);
         
         // Handle Events

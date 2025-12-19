@@ -13,7 +13,9 @@ typedef enum UiLayoutStrategy {
     UI_LAYOUT_FLEX_COLUMN, // Vertical stack
     UI_LAYOUT_FLEX_ROW,    // Horizontal stack
     UI_LAYOUT_CANVAS,      // Absolute positioning (Floating nodes)
-    UI_LAYOUT_OVERLAY      // Z-stack (Layers)
+    UI_LAYOUT_OVERLAY,     // Z-stack (Layers)
+    UI_LAYOUT_SPLIT_H,     // 2-child horizontal split
+    UI_LAYOUT_SPLIT_V      // 2-child vertical split
 } UiLayoutStrategy;
 
 typedef enum UiFlags {
@@ -84,6 +86,8 @@ typedef struct UiNodeSpec {
     // 3. Styling (Reference to style sheet, not implemented yet)
     char* style_name;       // REFLECT
     Vec4 color;             // REFLECT
+    Vec4 hover_color;       // REFLECT
+    float animation_speed;  // REFLECT
     
     // 9-Slice Sizing (if kind == UI_KIND_CONTAINER and texture is used)
     float border_l, border_t, border_r, border_b; // REFLECT
@@ -107,12 +111,16 @@ typedef struct UiNodeSpec {
     float width, height;    // REFLECT
     float padding;          // REFLECT
     float spacing;          // REFLECT
+    float split_ratio;      // REFLECT
 
     // 6. Hierarchy
     struct UiNodeSpec* item_template; // REFLECT
     struct UiNodeSpec** children;     // REFLECT
     size_t child_count;               // REFLECT
     
+    // 7. Commands
+    char* on_click_cmd;     // REFLECT
+    char* on_change_cmd;    // REFLECT
 } UiNodeSpec;
 
 // --- UI ASSET (The Resource) ---
@@ -173,6 +181,10 @@ typedef struct UiElement {
     bool is_active;       // Pressed
     bool is_focused;      // Keyboard focus
     
+    // Animation State
+    Vec4 render_color;    // Animated color
+    float hover_t;        // 0.0 -> 1.0 (Interpolation factor)
+    
     int cursor_idx;       // Text Input Cursor
     
     // Scrolling State (Internal or Bound)
@@ -203,7 +215,7 @@ void ui_instance_reset(UiInstance* instance); // Clears all elements
 UiElement* ui_element_create(UiInstance* instance, const UiNodeSpec* spec, void* data, const MetaStruct* meta);
 
 // Core Loop
-void ui_element_update(UiElement* element); // Syncs data
+void ui_element_update(UiElement* element, float dt); // Syncs data
 
 // --- Utils ---
 void ui_bind_read_string(void* data, const MetaField* field, char* out_buf, size_t buf_size);

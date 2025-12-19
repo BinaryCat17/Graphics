@@ -168,9 +168,12 @@ void engine_run(Engine* engine) {
     LOG_INFO("Engine Loop Starting...");
     
     RenderSystem* rs = &engine->render_system;
+    engine->last_time = platform_get_time_ms() / 1000.0;
     
     while (engine->running && !platform_window_should_close(engine->window)) {
         double now = platform_get_time_ms() / 1000.0;
+        engine->dt = (float)(now - engine->last_time);
+        engine->last_time = now;
         
         // Auto Screenshot
         if (engine->screenshot_interval > 0.0 && (now - engine->last_screenshot_time) > engine->screenshot_interval) {

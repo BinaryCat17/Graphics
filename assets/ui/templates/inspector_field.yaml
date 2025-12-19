@@ -9,3 +9,4 @@ children:
   - type: text
     bind: "value"
     color: "#00FF00"
+    on_change: "Graph.Recompile"

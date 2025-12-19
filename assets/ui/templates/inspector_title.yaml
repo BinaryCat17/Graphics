@@ -2,3 +2,6 @@ type: text
 bind: "name"
 height: 30
 color: "#FFFFFF"
+hover_color: "#00FFFF"
+animation_speed: 10
+clickable: true

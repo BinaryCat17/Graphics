@@ -1,4 +1,5 @@
 #include "ui_input.h"
+#include "ui_command_system.h"
 #include "foundation/logger/logger.h"
 #include <string.h>
 #include <stdio.h>
@@ -201,7 +202,12 @@ void ui_input_update(UiInputContext* ctx, UiElement* root, const InputState* inp
                 }
             }
             
-            if (changed) push_event(ctx, UI_EVENT_VALUE_CHANGE, el);
+            if (changed) {
+                push_event(ctx, UI_EVENT_VALUE_CHANGE, el);
+                if (el->spec->on_change_cmd) {
+                    ui_command_execute(el->spec->on_change_cmd, el);
+                }
+            }
         }
     }
 
@@ -210,6 +216,9 @@ void ui_input_update(UiInputContext* ctx, UiElement* root, const InputState* inp
         if (ctx->active) {
             if (ctx->active == ctx->hovered) {
                 push_event(ctx, UI_EVENT_CLICK, ctx->active);
+                if (ctx->active->spec->on_click_cmd) {
+                    ui_command_execute(ctx->active->spec->on_click_cmd, ctx->active);
+                }
             }
             if (ctx->is_dragging) {
                 push_event(ctx, UI_EVENT_DRAG_END, ctx->active);
@@ -280,7 +289,12 @@ void ui_input_update(UiInputContext* ctx, UiElement* root, const InputState* inp
                  if (ctx->active->scroll_x > max_scroll_x) ctx->active->scroll_x = max_scroll_x;
             }
             
-            if (changed) push_event(ctx, UI_EVENT_VALUE_CHANGE, ctx->active);
+            if (changed) {
+                push_event(ctx, UI_EVENT_VALUE_CHANGE, ctx->active);
+                if (ctx->active->spec->on_change_cmd) {
+                    ui_command_execute(ctx->active->spec->on_change_cmd, ctx->active);
+                }
+            }
         }
     }
 }

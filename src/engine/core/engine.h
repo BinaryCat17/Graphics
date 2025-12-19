@@ -39,6 +39,8 @@ struct Engine {
     bool show_compute_visualizer;
     double screenshot_interval;
     double last_screenshot_time;
+    double last_time;
+    float dt;
     
     // Callbacks
     void (*on_update)(Engine* engine);

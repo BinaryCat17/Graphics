@@ -151,17 +151,22 @@ static UiNodeSpec* load_recursive(UiAsset* asset, const ConfigNode* node) {
             spec->item_template = load_recursive(asset, val);
             continue;
         }
-        if (strcmp(key, "color") == 0) {
+        if (strcmp(key, "color") == 0 || strcmp(key, "hover_color") == 0) {
+            Vec4* target_color = strcmp(key, "color") == 0 ? &spec->color : &spec->hover_color;
             if (val->type == CONFIG_NODE_SEQUENCE && val->item_count >= 3) {
                  float r = val->items[0]->scalar ? (float)atof(val->items[0]->scalar) : 1.0f;
                  float g = val->items[1]->scalar ? (float)atof(val->items[1]->scalar) : 1.0f;
                  float b = val->items[2]->scalar ? (float)atof(val->items[2]->scalar) : 1.0f;
                  float a = 1.0f;
                  if (val->item_count > 3 && val->items[3]->scalar) a = (float)atof(val->items[3]->scalar);
-                 spec->color = (Vec4){r, g, b, a};
+                 *target_color = (Vec4){r, g, b, a};
             } else if (val->type == CONFIG_NODE_SCALAR) {
-                parse_hex_color(val->scalar, &spec->color);
+                parse_hex_color(val->scalar, target_color);
             }
+            continue;
+        }
+        if (strcmp(key, "animation_speed") == 0) {
+            spec->animation_speed = val->scalar ? (float)atof(val->scalar) : 0.0f;
             continue;
         }
         // Flags manual overrides (mixes with kind)
@@ -183,6 +188,8 @@ static UiNodeSpec* load_recursive(UiAsset* asset, const ConfigNode* node) {
             else if (strcmp(key, "bind") == 0) field = meta_find_field(meta, "value_source");
             else if (strcmp(key, "bind_x") == 0) field = meta_find_field(meta, "x_source");
             else if (strcmp(key, "bind_y") == 0) field = meta_find_field(meta, "y_source");
+            else if (strcmp(key, "on_click") == 0) field = meta_find_field(meta, "on_click_cmd");
+            else if (strcmp(key, "on_change") == 0) field = meta_find_field(meta, "on_change_cmd");
         }
 
         if (field) {
@@ -247,6 +254,30 @@ static ConfigNode* resolve_import(const ConfigNode* node, char** out_imported_te
     return NULL;
 }
 
+// --- Validation ---
+
+static void validate_node(UiNodeSpec* spec, const char* path) {
+    if (!spec) return;
+    
+    const char* id = spec->id ? spec->id : "(anon)";
+    
+    if (spec->layout == UI_LAYOUT_FLEX_COLUMN || spec->layout == UI_LAYOUT_FLEX_ROW) {
+        if (spec->x_source || spec->y_source) {
+            LOG_WARN("UiParser: Node '%s' uses x/y bindings inside a Flex container. These will be ignored.", id);
+        }
+    }
+    
+    if (spec->layout == UI_LAYOUT_SPLIT_H || spec->layout == UI_LAYOUT_SPLIT_V) {
+        if (spec->child_count != 2) {
+            LOG_ERROR("UiParser: Split container '%s' MUST have exactly 2 children (has %zu).", id, spec->child_count);
+        }
+    }
+    
+    for (size_t i = 0; i < spec->child_count; ++i) {
+        validate_node(spec->children[i], path);
+    }
+}
+
 UiAsset* ui_parser_load_from_file(const char* path) {
     if (!path) return NULL;
 
@@ -305,6 +336,8 @@ UiAsset* ui_parser_load_from_file(const char* path) {
     
     if (root_actual) config_node_free(root_actual);
     if (root_imported_text) free(root_imported_text);
+    
+    validate_node(asset->root, path);
     
     config_node_free(root);
     free(text);

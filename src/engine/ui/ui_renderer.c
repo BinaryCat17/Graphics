@@ -28,14 +28,15 @@ static void render_background(const UiElement* el, Scene* scene, Vec4 clip_vec) 
     quad.scale = (Vec3){el->screen_rect.w, el->screen_rect.h, 1.0f};
     quad.clip_rect = clip_vec; 
     
-    // Default color from spec
-    quad.color = el->spec->color;
+    // Use animated color
+    quad.color = el->render_color;
     if (quad.color.w == 0) quad.color = (Vec4){0.1f, 0.1f, 0.1f, 0.8f}; // Fallback
 
     // Hover/Active tints
     if (el->is_active) {
         quad.color.x *= 0.5f; quad.color.y *= 0.5f; quad.color.z *= 0.5f;
-    } else if (el->is_hovered) {
+    } else if (el->is_hovered && (el->spec->hover_color.x == 0 && el->spec->hover_color.y == 0 && el->spec->hover_color.z == 0 && el->spec->hover_color.w == 0)) {
+        // Only apply legacy tint if no declarative hover color is set
         quad.color.x *= 1.2f; quad.color.y *= 1.2f; quad.color.z *= 1.2f;
     } else if (el->spec->kind == UI_KIND_TEXT_INPUT) {
          // Make inputs slightly lighter by default

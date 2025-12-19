@@ -98,6 +98,22 @@ static void layout_canvas(UiElement* el) {
     }
 }
 
+static void layout_split_h(UiElement* el, float start_x, float start_y) {
+    if (el->child_count < 2) return;
+    el->children[0]->rect.x = start_x;
+    el->children[0]->rect.y = start_y;
+    el->children[1]->rect.x = start_x + el->children[0]->rect.w;
+    el->children[1]->rect.y = start_y;
+}
+
+static void layout_split_v(UiElement* el, float start_x, float start_y) {
+    if (el->child_count < 2) return;
+    el->children[0]->rect.x = start_x;
+    el->children[0]->rect.y = start_y;
+    el->children[1]->rect.x = start_x;
+    el->children[1]->rect.y = start_y + el->children[0]->rect.h;
+}
+
 static void layout_recursive(UiElement* el, Rect available, uint64_t frame_number, bool log_debug, UiTextMeasureFunc measure_func, void* measure_data) {
     if (!el || !el->spec) return;
     const UiNodeSpec* spec = el->spec;
@@ -121,6 +137,17 @@ static void layout_recursive(UiElement* el, Rect available, uint64_t frame_numbe
     // Recurse First (Depth-first sizing)
     for (size_t i = 0; i < el->child_count; ++i) {
         Rect child_avail = { 0, 0, content.w, content.h };
+        
+        if (spec->layout == UI_LAYOUT_SPLIT_H && el->child_count >= 2) {
+             float ratio = spec->split_ratio > 0 ? spec->split_ratio : 0.5f;
+             if (i == 0) child_avail.w = content.w * ratio;
+             else child_avail.w = content.w * (1.0f - ratio);
+        } else if (spec->layout == UI_LAYOUT_SPLIT_V && el->child_count >= 2) {
+             float ratio = spec->split_ratio > 0 ? spec->split_ratio : 0.5f;
+             if (i == 0) child_avail.h = content.h * ratio;
+             else child_avail.h = content.h * (1.0f - ratio);
+        }
+
         layout_recursive(el->children[i], child_avail, frame_number, log_debug, measure_func, measure_data);
     }
 
@@ -148,6 +175,16 @@ static void layout_recursive(UiElement* el, Rect available, uint64_t frame_numbe
             // Canvas content size not fully implemented yet
             el->content_w = 0; 
             el->content_h = 0;
+            break;
+        case UI_LAYOUT_SPLIT_H:
+            layout_split_h(el, start_x, start_y);
+            el->content_w = el->rect.w;
+            el->content_h = el->rect.h;
+            break;
+        case UI_LAYOUT_SPLIT_V:
+            layout_split_v(el, start_x, start_y);
+            el->content_w = el->rect.w;
+            el->content_h = el->rect.h;
             break;
         default: break;
     }
