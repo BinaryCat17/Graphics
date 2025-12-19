@@ -116,11 +116,21 @@ This is the **Low-Level Hardware Interface**. Only the `RenderSystem` talks to t
     *   **Current:** Efficient polling using `Dirty Flags`.
     *   **Planned:** **Reflection-based Binding**. The engine will use metadata to resolve direct memory pointers to data fields, enabling near-zero cost updates.
     *   **Planned:** **Codegen Proxies**. We may generate "setter" macros that automatically toggle dirty flags when data changes.
-*   **Layout:** A flexible `FLEX` engine (Column/Row/Canvas) that supports nesting. Future plans include "Split Containers" for docking.
+*   **Layout:** A flexible `FLEX` engine (Column/Row/Canvas) that supports nesting. Future plans include "Split Containers" logic to support dynamic docking without a monolithic manager.
+*   **Styling & Theming:** UI elements do not hold hardcoded style data. They reference a central **Theme**, allowing for instant global visual changes (e.g., Light/Dark mode).
+
+### 4. MVVM & Logic Separation
+The UI follows the **Model-View-ViewModel** pattern.
+*   **Model:** C structs in `src/features`.
+*   **View:** YAML definitions in `assets/ui`.
+*   **ViewModel (Bindings):** The `UiElement` state that bridges the two via Reflection.
+
+**Key Advantage: Undo/Redo & State Management**
+Because the UI is a "pure reflection" of the data, the application logic can implement complex features like **Undo/Redo** or **Multiplayer Sync** by simply manipulating the C structs. The UI system will detect the data changes and update the visuals automatically.
 
 ---
 
-## 4. The Build Pipeline & Tools
+## 5. The Build Pipeline & Tools
 
 We automate the boring stuff using Python scripts invoked by CMake.
 
