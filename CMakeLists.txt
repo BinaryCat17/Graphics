@@ -27,32 +27,14 @@ find_package(glfw3 CONFIG REQUIRED)
 find_package(Vulkan REQUIRED)
 
 # --- Shaders ---
-# (Keeping shader compilation logic as is)
-find_program(GLSLC_EXECUTABLE glslc HINTS ENV VULKAN_SDK PATH_SUFFIXES Bin)
-if (NOT GLSLC_EXECUTABLE)
-    message(FATAL_ERROR "glslc compiler not found. Install Vulkan SDK or ensure glslc is on PATH.")
-endif()
 
-set(SHADER_DIR ${CMAKE_CURRENT_SOURCE_DIR}/assets/shaders)
-set(SHADER_OUTPUTS "")
+find_package(Python3 REQUIRED)
 
-function(add_shader_compile FILE_NAME)
-    set(INPUT "${SHADER_DIR}/${FILE_NAME}")
-    set(OUTPUT "${SHADER_DIR}/${FILE_NAME}.spv")
-    add_custom_command(
-        OUTPUT ${OUTPUT}
-        COMMAND ${GLSLC_EXECUTABLE} ${INPUT} -o ${OUTPUT}
-        DEPENDS ${INPUT}
-        COMMENT "Compiling shader ${FILE_NAME}"
-        VERBATIM
-    )
-    set(SHADER_OUTPUTS ${SHADER_OUTPUTS} ${OUTPUT} PARENT_SCOPE)
-endfunction()
-
-add_shader_compile("ui_default.vert")
-add_shader_compile("ui_default.frag")
-
-add_custom_target(Shaders DEPENDS ${SHADER_OUTPUTS})
+add_custom_target(Shaders
+    COMMAND ${Python3_EXECUTABLE} "${CMAKE_CURRENT_SOURCE_DIR}/tools/build_shaders.py"
+    WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
+    COMMENT "Building Shaders..."
+)
 
 # --- CODE GENERATION ---
 
