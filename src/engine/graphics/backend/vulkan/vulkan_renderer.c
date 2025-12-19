@@ -40,10 +40,10 @@ static int save_screenshot_task(void* arg) {
             }
         }
         
-        LOG_INFO("Screenshot Thread: Writing to disk (%s)...", ctx->path);
+        LOG_TRACE("Screenshot Thread: Writing to disk (%s)...", ctx->path);
         // Using default compression (which is slow but standard). Threading hides the latency.
         if (stbi_write_png(ctx->path, ctx->width, ctx->height, 4, ctx->data, ctx->width * 4)) {
-            LOG_INFO("Screenshot saved to %s", ctx->path);
+            LOG_TRACE("Screenshot saved to %s", ctx->path);
         } else {
             LOG_ERROR("Failed to write screenshot to %s", ctx->path);
         }
@@ -122,7 +122,7 @@ static void ensure_instance_capacity(VulkanRendererState* state, FrameResources*
     };
     vkUpdateDescriptorSets(state->device, 1, &w, 0, NULL);
     
-    LOG_INFO("Resized Instance Buffer to %zu elements", new_cap);
+    LOG_TRACE("Resized Instance Buffer to %zu elements", new_cap);
 }
 
 // --- COMPUTE SUBSYSTEM ---
@@ -475,7 +475,7 @@ static void vulkan_renderer_render_scene(RendererBackend* backend, const Scene* 
     VkDeviceMemory screenshot_memory = VK_NULL_HANDLE;
 
     if (state->screenshot_pending) {
-        LOG_INFO("Screenshot: Starting capture sequence...");
+        LOG_TRACE("Screenshot: Starting capture sequence...");
         // Prepare Buffer
         uint32_t w = state->swapchain_extent.width;
         uint32_t h = state->swapchain_extent.height;
@@ -485,7 +485,7 @@ static void vulkan_renderer_render_scene(RendererBackend* backend, const Scene* 
                          VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, 
                          &screenshot_buffer, &screenshot_memory);
                          
-        LOG_INFO("Screenshot: Buffer created (Handle: %p)", (void*)screenshot_buffer);
+        LOG_TRACE("Screenshot: Buffer created (Handle: %p)", (void*)screenshot_buffer);
 
         // Transition Image: PRESENT_SRC_KHR -> TRANSFER_SRC_OPTIMAL
         VkImageMemoryBarrier barrier = {
@@ -540,18 +540,18 @@ static void vulkan_renderer_render_scene(RendererBackend* backend, const Scene* 
 
     // Save Screenshot (Offloaded to thread)
     if (state->screenshot_pending && screenshot_buffer) {
-        LOG_INFO("Screenshot: Waiting for GPU...");
+        LOG_TRACE("Screenshot: Waiting for GPU...");
         vkQueueWaitIdle(state->queue);
         
         uint32_t w = state->swapchain_extent.width;
         uint32_t h = state->swapchain_extent.height;
         
-        LOG_INFO("Screenshot: Mapping memory...");
+        LOG_TRACE("Screenshot: Mapping memory...");
         uint8_t* data = NULL;
         vkMapMemory(state->device, screenshot_memory, 0, VK_WHOLE_SIZE, 0, (void**)&data);
         
         if (data) {
-            LOG_INFO("Screenshot: Copying to host buffer...");
+            LOG_TRACE("Screenshot: Copying to host buffer...");
             size_t size = w * h * 4;
             uint8_t* host_copy = (uint8_t*)malloc(size);
             if (host_copy) {
@@ -568,7 +568,7 @@ static void vulkan_renderer_render_scene(RendererBackend* backend, const Scene* 
                     thrd_t t;
                     if (thrd_create(&t, save_screenshot_task, ctx) == thrd_success) {
                         thrd_detach(t);
-                        LOG_INFO("Screenshot: Offloaded to thread.");
+                        LOG_TRACE("Screenshot: Offloaded to thread.");
                     } else {
                         LOG_ERROR("Screenshot: Failed to create thread!");
                         free(host_copy);
@@ -590,7 +590,7 @@ static void vulkan_renderer_render_scene(RendererBackend* backend, const Scene* 
         vkFreeMemory(state->device, screenshot_memory, NULL);
         
         state->screenshot_pending = false;
-        LOG_INFO("Screenshot: Done.");
+        LOG_TRACE("Screenshot: Done.");
     }
     
     // Present

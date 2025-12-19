@@ -281,7 +281,7 @@ static void validate_node(UiNodeSpec* spec, const char* path) {
 UiAsset* ui_parser_load_from_file(const char* path) {
     if (!path) return NULL;
 
-    LOG_INFO("UiParser: Loading UI definition from file: %s", path);
+    LOG_TRACE("UiParser: Loading UI definition from file: %s", path);
 
     char* text = fs_read_text(path);
     if (!text) {
@@ -322,7 +322,7 @@ UiAsset* ui_parser_load_from_file(const char* path) {
                 t->spec = spec;
                 t->next = asset->templates;
                 asset->templates = t;
-                LOG_INFO("UiParser: Registered template '%s'", t->name);
+                LOG_TRACE("UiParser: Registered template '%s'", t->name);
             }
             
             if (t_actual) config_node_free(t_actual);
