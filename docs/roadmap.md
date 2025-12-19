@@ -22,6 +22,8 @@
 - [x] **Refactor `main.c`:** Extract `MathEditor` logic into `src/features/math_engine/math_editor.c`.
     *   Move `AppState`, `MathGraph`, and UI generation logic out of `main.c`.
     *   Prepare for future "Collection Binding" by isolating imperative UI construction.
+- [x] **UI Manifest System:** Decoupled template registration from layout definition.
+- [x] **Strict Import Validation:** Parser now forbids `import` inside `children`.
 - [ ] **Strict Type Safety:** Enforce type checking in Data Bindings.
 - [ ] **String IDs:** Replace runtime `strcmp` with **Hash IDs**.
 - [ ] **Layer System (Z-Order & Clipping):** Implement `layer: top/overlay` to handle Z-depth naturally and **disable parent clipping** for popups/dropdowns so they can "break out" of containers.

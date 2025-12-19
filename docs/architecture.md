@@ -53,20 +53,18 @@ This is the entry point (`main.c`). It connects everything together.
 The UI system follows a **Data-Driven, Reactive, MVVM** architecture.
 
 ### The Philosophy
-1.  **View (YAML):** The look and structure are defined entirely in data.
-2.  **Model (C Structs):** The state is plain C data.
-3.  **ViewModel (Bindings):** The engine uses Reflection to glue them together.
+1.  **Manifest (`manifest.yaml`):** The entry point that registers **Templates** (The Registry) and imports the **Root Layout**.
+2.  **View (YAML Layouts)::** The structure defined in files like `editor_layout.yaml`.
+3.  **Model (C Structs):** The state is plain C data.
+4.  **ViewModel (Bindings):** The engine uses Reflection to glue them together.
 
 ### Key Features
-*   **Templates & Instances:** UI components (like `Node.yaml`) are loaded as templates and instantiated at runtime. We support **Recursive Composition** via `type: instance`.
-*   **Strict Imports:** Imports are only allowed at the top level to keep the structure predictable.
-*   **Zero-Cost Reactivity:** Data bindings (e.g., `bind: "value"`) are resolved to pointer offsets (`MetaField*`) at creation time. Updating the UI is just a memory read; no string lookups per frame.
-*   **Declarative Animations:** State transitions (e.g., `hover_color`, `animation_speed`) are defined in YAML. The engine handles interpolation automatically (`ui_core.c`).
-*   **Layout Strategies:**
-    *   `FLEX_COLUMN` / `FLEX_ROW`: Standard stacks.
-    *   `SPLIT_H` / `SPLIT_V`: Dynamic split containers with `split_ratio`.
-    *   `CANVAS`: Absolute positioning (used for Graph Editors).
-    *   `OVERLAY`: Z-layering.
+*   **Manifest-Based Loading:** The engine loads a single manifest that acts as a "Library" of available components. This separates component definitions from the main layout.
+*   **Templates & Instances:** UI components are loaded as templates and instantiated via `type: instance`.
+*   **Strict Import Rules:**
+    *   Imports are ONLY allowed at the top level of a file (Manifest or Root).
+    *   **NEVER** use `import` inside a `children` list. Use a Template and instantiate it instead. The parser will throw an error if this is violated.
+*   **Recursive Composition:** Supported via `type: instance`.
 
 ### The Command System
 We decouple the UI from the App logic using the **Command Pattern**.
