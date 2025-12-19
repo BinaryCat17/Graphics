@@ -55,12 +55,6 @@ void ui_instance_destroy(UiInstance* instance) {
     instance->root = NULL;
 }
 
-void ui_instance_reset(UiInstance* instance) {
-    if (!instance) return;
-    arena_reset(&instance->arena);
-    instance->root = NULL;
-}
-
 // --- UiElement (Instance) ---
 
 static UiElement* element_alloc(UiInstance* instance, const UiNodeSpec* spec) {
@@ -156,8 +150,6 @@ void ui_element_rebuild_children(UiElement* el, UiInstance* instance) {
              el->child_count = write_idx; 
          }
     }
-    
-    el->dirty_flags |= UI_DIRTY_LAYOUT | UI_DIRTY_CHILDREN;
 }
 
 UiElement* ui_element_create(UiInstance* instance, const UiNodeSpec* spec, void* data, const MetaStruct* meta) {
@@ -182,10 +174,6 @@ UiElement* ui_element_create(UiInstance* instance, const UiNodeSpec* spec, void*
         if (spec->text_source) {
             el->bind_text = meta_find_field(meta, spec->text_source);
             if (!el->bind_text) LOG_ERROR("UiCore: Failed to bind 'text: %s' on Node '%s'. Field not found in struct '%s'", spec->text_source, spec->id ? spec->id : "anon", meta->name);
-        }
-        if (spec->value_source) {
-            el->bind_value = meta_find_field(meta, spec->value_source);
-            if (!el->bind_value) LOG_ERROR("UiCore: Failed to bind 'value: %s' on Node '%s'. Field not found in struct '%s'", spec->value_source, spec->id ? spec->id : "anon", meta->name);
         }
         if (spec->visible_source) {
             el->bind_visible = meta_find_field(meta, spec->visible_source);
@@ -235,7 +223,6 @@ void ui_element_update(UiElement* element, float dt) {
             element->render_color.y = spec->color.y + (spec->hover_color.y - spec->color.y) * element->hover_t;
             element->render_color.z = spec->color.z + (spec->hover_color.z - spec->color.z) * element->hover_t;
             element->render_color.w = spec->color.w + (spec->hover_color.w - spec->color.w) * element->hover_t;
-            element->dirty_flags |= UI_DIRTY_REDRAW;
         }
     }
 
@@ -247,8 +234,6 @@ void ui_element_update(UiElement* element, float dt) {
         if (strncmp(element->cached_text, new_text, 128) != 0) {
             strncpy(element->cached_text, new_text, 128 - 1); // safe copy
             element->cached_text[127] = '\0';
-            // Text change affects layout (size) and redraw
-            element->dirty_flags |= (UI_DIRTY_LAYOUT | UI_DIRTY_REDRAW);
         }
     } else if (element->spec->static_text) {
         // Init cache from static text if empty (first run or if static text is used without binding)
@@ -256,7 +241,6 @@ void ui_element_update(UiElement* element, float dt) {
         if (strncmp(element->cached_text, element->spec->static_text, 128) != 0) {
             strncpy(element->cached_text, element->spec->static_text, 128 - 1);
             element->cached_text[127] = '\0';
-            element->dirty_flags |= UI_DIRTY_LAYOUT;
         }
     }
     
@@ -266,28 +250,24 @@ void ui_element_update(UiElement* element, float dt) {
             float val = meta_get_float(element->data_ptr, element->bind_x);
             if (element->rect.x != val) {
                 element->rect.x = val;
-                element->dirty_flags |= UI_DIRTY_LAYOUT;
             }
         }
         if (element->bind_y) {
             float val = meta_get_float(element->data_ptr, element->bind_y);
             if (element->rect.y != val) {
                 element->rect.y = val;
-                element->dirty_flags |= UI_DIRTY_LAYOUT;
             }
         }
         if (element->bind_w) {
             float val = meta_get_float(element->data_ptr, element->bind_w);
             if (element->rect.w != val) {
                 element->rect.w = val;
-                element->dirty_flags |= UI_DIRTY_LAYOUT;
             }
         }
         if (element->bind_h) {
             float val = meta_get_float(element->data_ptr, element->bind_h);
             if (element->rect.h != val) {
                 element->rect.h = val;
-                element->dirty_flags |= UI_DIRTY_LAYOUT;
             }
         }
         // 3. Resolve Visibility

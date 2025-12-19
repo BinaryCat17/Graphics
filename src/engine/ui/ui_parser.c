@@ -76,7 +76,7 @@ static UiKind parse_kind(const char* type_str, uint32_t* out_flags) {
     
     if (strcmp(type_str, "checkbox") == 0) {
         *out_flags |= UI_FLAG_CLICKABLE;
-        return UI_KIND_ICON; 
+        return UI_KIND_CONTAINER; 
     }
 
     if (strcmp(type_str, "slider") == 0) {
@@ -84,7 +84,7 @@ static UiKind parse_kind(const char* type_str, uint32_t* out_flags) {
         return UI_KIND_CONTAINER; 
     }
 
-    if (strcmp(type_str, "curve") == 0) return UI_KIND_CUSTOM;
+    if (strcmp(type_str, "curve") == 0) return UI_KIND_CONTAINER;
 
     return UI_KIND_CONTAINER;
 }

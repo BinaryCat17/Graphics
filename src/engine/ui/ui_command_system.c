@@ -20,13 +20,6 @@ void ui_command_init(void) {
     g_command_count = 0;
 }
 
-void ui_command_shutdown(void) {
-    for (int i = 0; i < g_command_count; ++i) {
-        if (g_commands[i].name) free(g_commands[i].name);
-    }
-    g_command_count = 0;
-}
-
 void ui_command_register(const char* name, UiCommandCallback callback, void* user_data) {
     if (g_command_count >= MAX_COMMANDS) {
         LOG_ERROR("CommandSystem: Max commands reached (%d)", MAX_COMMANDS);
@@ -51,11 +44,6 @@ void ui_command_register(const char* name, UiCommandCallback callback, void* use
     g_command_count++;
     
     LOG_DEBUG("CommandSystem: Registered command '%s' (Hash: %u)", name, id);
-}
-
-void ui_command_execute(const char* name, UiElement* target) {
-    if (!name || name[0] == '\0') return;
-    ui_command_execute_id(str_id(name), target);
 }
 
 void ui_command_execute_id(StringId id, UiElement* target) {

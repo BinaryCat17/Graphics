@@ -12,9 +12,6 @@ void ui_command_shutdown(void);
 // Register a command by name
 void ui_command_register(const char* name, UiCommandCallback callback, void* user_data);
 
-// Execute a command by name
-void ui_command_execute(const char* name, UiElement* target);
-
 // Execute a command by ID (Faster)
 void ui_command_execute_id(StringId id, UiElement* target);
 

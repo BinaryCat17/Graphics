@@ -31,16 +31,6 @@ void ui_input_init(UiInputContext* ctx) {
     memset(ctx, 0, sizeof(UiInputContext));
 }
 
-void ui_input_reset(UiInputContext* ctx) {
-    if (!ctx) return;
-    ctx->hovered = NULL;
-    ctx->active = NULL;
-    ctx->focused = NULL;
-    ctx->possible_drag = false;
-    ctx->is_dragging = false;
-    ctx->event_count = 0;
-}
-
 bool ui_input_pop_event(UiInputContext* ctx, UiEvent* out_event) {
     if (!ctx || ctx->event_count == 0) return false;
     *out_event = ctx->events[0];
@@ -137,14 +127,12 @@ static void handle_mouse_press(UiInputContext* ctx, const InputState* input) {
              ctx->drag_start_elem_y = ctx->active->scroll_y;
         } else if (ctx->active->flags & UI_FLAG_DRAGGABLE) {
              // Cache bound values
-             if (ctx->active->data_ptr && ctx->active->meta) {
-                 if (ctx->active->spec->x_source) {
-                     const MetaField* fx = meta_find_field(ctx->active->meta, ctx->active->spec->x_source);
-                     ctx->drag_start_elem_x = meta_get_float(ctx->active->data_ptr, fx);
+             if (ctx->active->data_ptr) {
+                 if (ctx->active->bind_x) {
+                     ctx->drag_start_elem_x = meta_get_float(ctx->active->data_ptr, ctx->active->bind_x);
                  }
-                 if (ctx->active->spec->y_source) {
-                     const MetaField* fy = meta_find_field(ctx->active->meta, ctx->active->spec->y_source);
-                     ctx->drag_start_elem_y = meta_get_float(ctx->active->data_ptr, fy);
+                 if (ctx->active->bind_y) {
+                     ctx->drag_start_elem_y = meta_get_float(ctx->active->data_ptr, ctx->active->bind_y);
                  }
              }
         }
@@ -187,9 +175,8 @@ static void handle_keyboard_input(UiInputContext* ctx, const InputState* input) 
     bool changed = false;
     
     // Ensure we have binding
-    if (!el->data_ptr || !el->meta || !el->spec->text_source) return;
-    const MetaField* field = meta_find_field(el->meta, el->spec->text_source);
-    if (!field) return;
+    if (!el->data_ptr || !el->bind_text) return;
+    const MetaField* field = el->bind_text;
 
     // 1. Typing
     if (input->last_char >= 32 && input->last_char <= 126) {
@@ -247,15 +234,13 @@ static void handle_drag_logic(UiInputContext* ctx, const InputState* input) {
 
         // Case A: Draggable Object (updates data model)
         if (ctx->active->flags & UI_FLAG_DRAGGABLE) {
-            if (ctx->active->data_ptr && ctx->active->meta) {
-                if (ctx->active->spec->x_source) {
-                    const MetaField* fx = meta_find_field(ctx->active->meta, ctx->active->spec->x_source);
-                    meta_set_float(ctx->active->data_ptr, fx, ctx->drag_start_elem_x + dx);
+            if (ctx->active->data_ptr) {
+                if (ctx->active->bind_x) {
+                    meta_set_float(ctx->active->data_ptr, ctx->active->bind_x, ctx->drag_start_elem_x + dx);
                     changed = true;
                 }
-                if (ctx->active->spec->y_source) {
-                    const MetaField* fy = meta_find_field(ctx->active->meta, ctx->active->spec->y_source);
-                    meta_set_float(ctx->active->data_ptr, fy, ctx->drag_start_elem_y + dy);
+                if (ctx->active->bind_y) {
+                    meta_set_float(ctx->active->data_ptr, ctx->active->bind_y, ctx->drag_start_elem_y + dy);
                     changed = true;
                 }
             }

@@ -15,7 +15,6 @@ typedef enum UiLayoutStrategy {
     UI_LAYOUT_FLEX_COLUMN, // Vertical stack
     UI_LAYOUT_FLEX_ROW,    // Horizontal stack
     UI_LAYOUT_CANVAS,      // Absolute positioning (Floating nodes)
-    UI_LAYOUT_OVERLAY,     // Z-stack (Layers)
     UI_LAYOUT_SPLIT_H,     // 2-child horizontal split
     UI_LAYOUT_SPLIT_V      // 2-child vertical split
 } UiLayoutStrategy;
@@ -36,21 +35,11 @@ typedef enum UiFlags {
 typedef enum UiKind {
     UI_KIND_CONTAINER, // Generic Rect
     UI_KIND_TEXT,      // Renders text
-    UI_KIND_TEXT_INPUT, // Text Field
-    UI_KIND_ICON,      // Renders an image/icon
-    UI_KIND_CUSTOM     // Custom render callback (e.g. Curves)
+    UI_KIND_TEXT_INPUT // Text Field
 } UiKind;
-
-typedef enum UiDirtyFlags {
-    UI_DIRTY_NONE = 0,
-    UI_DIRTY_LAYOUT = 1 << 0,  // Size/Pos changed
-    UI_DIRTY_REDRAW = 1 << 1,  // Color/Text changed (but not size)
-    UI_DIRTY_CHILDREN = 1 << 2 // Structure changed
-} UiDirtyFlags;
 
 typedef enum UiLayer {
     UI_LAYER_NORMAL = 0,
-    UI_LAYER_TOP,     // Renders after Normal, but before Overlay
     UI_LAYER_OVERLAY  // Renders last, ignores parent clipping (popups)
 } UiLayer;
 
@@ -93,7 +82,6 @@ typedef struct UiNodeSpec {
     uint32_t flags;         // REFLECT
     
     // 3. Styling (Reference to style sheet, not implemented yet)
-    char* style_name;       // REFLECT
     Vec4 color;             // REFLECT
     Vec4 hover_color;       // REFLECT
     float animation_speed;  // REFLECT
@@ -107,7 +95,6 @@ typedef struct UiNodeSpec {
     // 4. Data Bindings (Sources)
     char* text_source;      // REFLECT
     char* value_source;     // REFLECT
-    char* data_source;      // REFLECT
     char* visible_source;   // REFLECT
     char* bind_collection;  // REFLECT
     
@@ -177,7 +164,6 @@ typedef struct UiElement {
 
     // Cached Bindings (Resolved at creation)
     const MetaField* bind_text;
-    const MetaField* bind_value;
     const MetaField* bind_visible;
     const MetaField* bind_x;
     const MetaField* bind_y;
@@ -214,7 +200,6 @@ typedef struct UiElement {
 
     // Caching
     char cached_text[128]; // For text binding
-    uint32_t dirty_flags;  // Bitmask of UiDirtyFlags
 
 } UiElement;
 
@@ -227,7 +212,6 @@ typedef struct UiInstance {
 // API for Instance
 void ui_instance_init(UiInstance* instance, size_t size);
 void ui_instance_destroy(UiInstance* instance);
-void ui_instance_reset(UiInstance* instance); // Clears all elements
 
 // Allocates element from instance arena.
 UiElement* ui_element_create(UiInstance* instance, const UiNodeSpec* spec, void* data, const MetaStruct* meta);
