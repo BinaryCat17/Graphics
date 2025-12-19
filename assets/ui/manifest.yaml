@@ -8,6 +8,6 @@ templates:
   InspectorField:
     import: "assets/ui/templates/inspector_field.yaml"
   EditorSidebar:
-    import: "assets/ui/lib/sidebar.yaml"
+    import: "assets/ui/templates/sidebar.yaml"
 
 import: "assets/ui/layouts/editor_layout.yaml"

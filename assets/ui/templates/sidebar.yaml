@@ -1,0 +1,60 @@
+type: panel
+id: left_panel
+layout: column
+width: 250
+height: -1
+color: "#333338"
+padding: 10
+spacing: 5
+
+# 9-Slice Test
+border_l: 4
+border_t: 4
+border_r: 4
+border_b: 4
+tex_w: 32
+tex_h: 32
+texture: "ui_rect"
+
+children:
+  - type: label
+    text: "Graph Editor"
+    height: 30
+    color: "#FFFFFF"
+
+  - type: panel
+    layout: row
+    height: 40
+    spacing: 5
+    children:
+        - type: button
+          text: "Add Node"
+          width: 100
+          height: 30
+          corner_radius: 8
+          color: "#4D4D59"
+          hover_color: "#6D6D7F"
+          animation_speed: 15
+          on_click: "Graph.AddNode"
+          
+        - type: button
+          text: "Clear"
+          width: 80
+          height: 30
+          corner_radius: 8
+          color: "#663333"
+          on_click: "Graph.Clear"
+
+  - type: label
+    text: "Properties"
+    height: 20
+    color: "#CCCCCC"
+    
+  - type: panel
+    id: inspector_area
+    layout: column
+    height: -1 # Fill rest
+    corner_radius: 4
+    border_t: 1 
+    color: "#26262B"
+    padding: 5
