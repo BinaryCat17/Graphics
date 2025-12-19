@@ -25,7 +25,14 @@
 - [x] **Visualization:** Render a full-screen quad (or UI Image) displaying the result texture (Descriptor Set 2).
 - [x] **Auto-Update:** Automatically re-transpile and re-run compute when graph nodes change.
 
-### Phase 4: 3D & Scene Expansion
+### Phase 4: Modern Data-Driven UI (New Architecture)
+**Objective:** Create a beautiful, reactive, and lightweight UI system without the bloat of web frameworks or the mess of Immediate Mode.
+- [ ] **Step 1: Visual Polish (SDF Rendering):** Implement Signed Distance Fields (SDF) in shaders for rounded corners, soft shadows, and borders.
+- [ ] **Step 2: Optimized Binding (Fast Reactivity):** Replace per-frame string lookups with cached pointer bindings (`void* direct_ptr`).
+- [ ] **Step 3: Declarative Animations:** Implement state transition logic (e.g., `hover -> scale: 1.2`) driven purely by data/YAML.
+- [ ] **Step 4: Advanced Layout (Docking):** Implement "Split Containers" logic to support dynamic docking without a monolithic manager.
+
+### Phase 5: 3D & Scene Expansion
 **Objective:** Move beyond 2D quads.
 - [ ] **Mesh Rendering:** Implement 3D mesh loading and rendering in `vulkan_renderer.c`.
 - [ ] **Camera System:** Implement a proper 3D camera controller (Perspective/Orthographic).
@@ -38,6 +45,6 @@
 - **Issue:** Current implementation creates 1 draw call per character (via `SceneObject`).
 - **Plan:** Implement Glyph Batching (single vertex buffer for text strings).
 
-### UI System
-- **Issue:** UI layout and interaction are tightly coupled in `ui_core.c`.
-- **Plan:** Further refine the Event System and separate Layout from Rendering logic.
+### UI Layout Optimization
+- **Status:** Partially Resolved (Dirty Flags implemented).
+- **Next:** Implement "Cached Bindings" (Phase 4, Step 2) to eliminate reflection overhead during updates.

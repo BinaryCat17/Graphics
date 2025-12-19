@@ -110,9 +110,10 @@ This is the **Low-Level Hardware Interface**. Only the `RenderSystem` talks to t
 > **Rule:** `src/features` should NEVER include `renderer_backend.h`. If a feature needs to do something complex (like Compute), the Engine should provide a clean abstraction for it.
 
 ### 3. UI System
-*   **Mode:** **Retained Mode UI**. We build a persistent tree of `UiElement` objects (usually from YAML).
-*   **Logic:** The system handles input, focus, and state. You don't rebuild the tree every frame; you only update the data it points to.
-*   **Constraint:** Currently, the layout logic is "hungry" (it recalculates positions for the entire tree every frame).
+*   **Philosophy:** **Data-Driven Retained Mode**. We separate the **View** (YAML/Templates) from the **Model** (C Data).
+*   **No "Immediate Mode" Spaghetti:** Unlike ImGui, we do not interleave logic and drawing. The App updates data; the UI system observes changes and updates the view.
+*   **Reactivity:** The system uses a **Push/Pull hybrid**. It polls for changes efficiently using dirty flags and (future) direct pointer bindings, avoiding expensive per-frame logic.
+*   **Layout:** A flexible `FLEX` engine (Column/Row/Canvas) that supports nesting. Future plans include "Split Containers" for docking.
 
 ---
 
@@ -176,7 +177,7 @@ Even good architectures have limits. Here are ours:
 *   **Why:** It was the fastest way to get text on screen for the prototype.
 *   **Fix:** "Glyph Batching" (merging text into one big mesh).
 
-### 3. Per-Frame Layout Recalculation
-*   **What:** The UI engine recalculates the position and size of every element every single frame.
-*   **Why:** It was simpler to implement than a complex "Dirty Flag" system (which only updates what changed).
-*   **Fix:** Implement a "Dirty" system so layout only runs when a window is resized or content changes.
+### 3. Per-Frame Layout Recalculation (Resolved)
+*   **Status:** Dirty Flags System Implemented.
+*   **Details:** `UiElement` now tracks `UI_DIRTY_LAYOUT` and `UI_DIRTY_REDRAW` flags. The layout engine skips recalculations for subtrees that haven't changed.
+*   **Next Step:** Implement "Cached Bindings" to further reduce the cost of checking for data changes.
