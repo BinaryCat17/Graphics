@@ -115,6 +115,7 @@ This is the **Low-Level Hardware Interface**. Only the `RenderSystem` talks to t
 *   **Reactivity:** The system uses a **Push/Pull hybrid**.
     *   **Current:** Efficient polling using `Dirty Flags`.
     *   **Implemented:** **Cached Reflection Binding**. The engine uses metadata to resolve pointers to data fields at creation time (`UiElement` holds `MetaField*`), enabling near-zero cost updates without string lookups.
+    *   **Implemented:** **Modular Definitions**. The YAML parser supports `import: "path/to/file.yaml"` for splitting interfaces into components and uses **Hex Colors** (`#RRGGBB`) for compact styling.
     *   **Planned:** **Codegen Proxies**. We may generate "setter" macros that automatically toggle dirty flags when data changes.
 *   **Layout:** A flexible `FLEX` engine (Column/Row/Canvas) that supports nesting. Future plans include "Split Containers" logic to support dynamic docking without a monolithic manager.
 *   **Styling & Theming:** UI elements do not hold hardcoded style data. They reference a central **Theme**, allowing for instant global visual changes (e.g., Light/Dark mode). **SDF Rendering** is used for high-quality rounded corners and borders.
@@ -185,7 +186,3 @@ Even good architectures have limits. Here are ours:
 *   **What:** Each letter is a separate object.
 *   **Why:** It was the fastest way to get text on screen for the prototype.
 *   **Fix:** "Glyph Batching" (merging text into one big mesh).
-
-### 2. Manual UI Specs
-*   **What:** Constructing UI in C code is verbose and error-prone.
-*   **Fix:** Implement "YAML Prefabs" and a "Immediate Mode Wrapper" to simplify API usage (Planned Phase 4).

@@ -18,7 +18,7 @@
 **Objective:** Create a beautiful, reactive, and lightweight UI system without the bloat of web frameworks or the mess of Immediate Mode.
 - [x] **Step 1: Visual Polish (SDF Rendering):** Implemented Signed Distance Fields (SDF) in shaders for rounded corners, soft shadows, and borders.
 - [x] **Step 2: Optimized Binding (Fast Reactivity):** Used the **Reflection System** to pre-resolve data pointers (`MetaField*`) at initialization, eliminating per-frame string lookups.
-- [ ] **Step 3: YAML Prefabs & Templates:** Implement a powerful templating system in the parser to reuse UI components (e.g., `type: Button`).
+- [x] **Step 3: YAML Prefabs & Templates:** Implemented `import` directive for modular UI files and C-side template instantiation. Added support for **Hex Colors** (`#RRGGBB`).
 - [ ] **Step 4: Declarative Animations:** Implement state transition logic (e.g., `hover -> scale: 1.2`) driven purely by data/YAML.
 - [ ] **Step 5: Advanced Layout (Docking):** Implement "Split Containers" logic to support dynamic docking without a monolithic manager.
 
