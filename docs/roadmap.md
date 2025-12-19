@@ -26,11 +26,10 @@
 - [x] **Strict Import Validation:** Parser now forbids `import` inside `children`.
 - [x] **Strict Type Safety:** Enforce type checking in Data Bindings.
 - [ ] **String IDs:** Replace runtime `strcmp` with **Hash IDs**.
-- [ ] **String IDs:** Replace runtime `strcmp` with **Hash IDs**.
 - [ ] **Layer System (Z-Order & Clipping):** Implement `layer: top/overlay` to handle Z-depth naturally and **disable parent clipping** for popups/dropdowns so they can "break out" of containers.
 - [ ] **Conditional Visibility:** Add `bind_visible` / `bind_if` logic to declarative show/hide branches based on boolean flags.
 - [ ] **Refactor `main.c`:** Move command callbacks to `EditorLayer`.
-- [ ] **Input System Cleanup:** Refactor `ui_input.c`.
+- [x] **Input System Cleanup:** Refactor `ui_input.c`.
 - [x] **Unused Code Removal:** Clean up structs.
 
 ### Phase 5: 3D & Scene Expansion
