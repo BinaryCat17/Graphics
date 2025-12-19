@@ -22,6 +22,8 @@
 - [ ] **Step 3.5: Advanced Composition (Strict Imports):** Implement `type: instance` to allow YAML-in-YAML instantiation using registered templates. Refactor parser to enforce top-level imports and **ban** inline `import` in children arrays.
 - [ ] **Step 4: Declarative Animations:** Implement state transition logic (e.g., `hover -> scale: 1.2`) driven purely by data/YAML.
 - [ ] **Step 5: Advanced Layout (Docking):** Implement "Split Containers" logic to support dynamic docking without a monolithic manager.
+- [ ] **Step 6: Command System:** Implement a "Command Pattern" registry to decouple UI events from C logic (e.g., `on_click: "Graph.AddNode"`).
+- [ ] **Step 7: Strict Layout Validation:** Add a validation pass to ensure UI specs adhere to layout rules (e.g., error if `x/y` is used inside a Flex container).
 
 ### Phase 5: 3D & Scene Expansion
 **Objective:** Move beyond 2D quads.
@@ -31,6 +33,9 @@
 ---
 
 ## 🛠 Technical Debt & backlog
+
+### Core Optimization
+- **String Hashing:** Replace string comparisons with `StringID` (FNV-1a hash) across the engine (UI, Assets, Registry) for O(1) lookups and reduced memory usage.
 
 ### Text Rendering
 - **Issue:** Current implementation creates 1 draw call per character (via `SceneObject`).
