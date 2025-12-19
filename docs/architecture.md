@@ -168,16 +168,11 @@ src/
 
 Even good architectures have limits. Here are ours:
 
-### 1. Unified Scene Performance (Resolved)
-*   **Status:** Dynamic Buffer Resizing implemented.
-*   **Details:** The renderer now automatically grows its instance buffers when the object count exceeds the current capacity. The descriptor pool has also been expanded to support a larger number of per-frame and compute sets.
-
-### 2. Slow Text
+### 1. Slow Text
 *   **What:** Each letter is a separate object.
 *   **Why:** It was the fastest way to get text on screen for the prototype.
 *   **Fix:** "Glyph Batching" (merging text into one big mesh).
 
-### 3. Per-Frame Layout Recalculation (Resolved)
-*   **Status:** Dirty Flags System Implemented.
-*   **Details:** `UiElement` now tracks `UI_DIRTY_LAYOUT` and `UI_DIRTY_REDRAW` flags. The layout engine skips recalculations for subtrees that haven't changed.
-*   **Next Step:** Implement "Cached Bindings" to further reduce the cost of checking for data changes.
+### 2. Manual UI Specs
+*   **What:** Constructing UI in C code is verbose and error-prone.
+*   **Fix:** Implement "YAML Prefabs" and a "Immediate Mode Wrapper" to simplify API usage (Planned Phase 4).
