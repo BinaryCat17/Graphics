@@ -19,7 +19,7 @@
 
 ### Phase 4.5: Code Cleanup & Strict Architecture
 **Objective:** Harden the codebase after the rapid UI prototyping phase.
-- [ ] **Refactor `main.c`:** Extract `MathEditor` logic into `src/features/math_engine/math_editor.c`.
+- [x] **Refactor `main.c`:** Extract `MathEditor` logic into `src/features/math_engine/math_editor.c`.
     *   Move `AppState`, `MathGraph`, and UI generation logic out of `main.c`.
     *   Prepare for future "Collection Binding" by isolating imperative UI construction.
 - [ ] **Strict Type Safety:** Enforce type checking in Data Bindings.
