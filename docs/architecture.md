@@ -1,6 +1,6 @@
 # The Architecture Guide
 
-**Version:** 0.2 (Math Engine Update)
+**Version:** 0.3 (UI Modernization)
 **Date:** December 19, 2025
 
 This document explains **how** the system is built and, more importantly, **why** it is built that way.
@@ -31,7 +31,7 @@ These are the tools that have **zero dependencies** on the rest of the engine.
 **"The Machine"**
 This layer manages the lifecycle of the application. It knows how to draw things, play sounds, and handle input, but it doesn't know *what* game you are making.
 *   **Graphics:** The renderer.
-*   **UI:** The layout and widget system.
+*   **UI:** The layout, widget, and command system.
 *   **Assets:** Loading files from disk.
 
 ### 🧩 Features (`src/features/`)
@@ -43,36 +43,36 @@ These are reusable modules that define specific business logic. They use the Eng
 **"The Glue"**
 This is the entry point (`main.c`). It connects everything together.
 *   It initializes the **Engine**.
-*   It creates the **Feature** (Math Graph).
+*   It registers **Commands** (e.g., `Graph.AddNode`).
 *   It tells the Engine to render the Feature.
 
 ---
 
-## 2. Deep Dive: The Math Engine
+## 2. Deep Dive: The UI System (v0.3)
 
-The `math_engine` is designed to be a "Code Generator", not a "Renderer".
+The UI system follows a **Data-Driven, Reactive, MVVM** architecture.
 
-### The Problem
-We want to run a math graph on the GPU.
-*   If we generate **GLSL**, we can run on Vulkan/OpenGL.
-*   If we want to run on WebGPU later, we need **WGSL**.
-*   If we want to run on Metal, we need **MSL**.
+### The Philosophy
+1.  **View (YAML):** The look and structure are defined entirely in data.
+2.  **Model (C Structs):** The state is plain C data.
+3.  **ViewModel (Bindings):** The engine uses Reflection to glue them together.
 
-### The Solution: Shader IR (Intermediate Representation)
-We don't generate GLSL text directly. We generate a generic "list of instructions".
+### Key Features
+*   **Templates & Instances:** UI components (like `Node.yaml`) are loaded as templates and instantiated at runtime. We support **Recursive Composition** via `type: instance`.
+*   **Strict Imports:** Imports are only allowed at the top level to keep the structure predictable.
+*   **Zero-Cost Reactivity:** Data bindings (e.g., `bind: "value"`) are resolved to pointer offsets (`MetaField*`) at creation time. Updating the UI is just a memory read; no string lookups per frame.
+*   **Declarative Animations:** State transitions (e.g., `hover_color`, `animation_speed`) are defined in YAML. The engine handles interpolation automatically (`ui_core.c`).
+*   **Layout Strategies:**
+    *   `FLEX_COLUMN` / `FLEX_ROW`: Standard stacks.
+    *   `SPLIT_H` / `SPLIT_V`: Dynamic split containers with `split_ratio`.
+    *   `CANVAS`: Absolute positioning (used for Graph Editors).
+    *   `OVERLAY`: Z-layering.
 
-```
-[Math Graph] --> [Shader IR] --> [Emitter] --> [Final Code]
-```
-
-1.  **Math Graph:** The user's nodes (Add, Sin, Mul).
-2.  **Shader IR:** A simplified assembly language (`OP_ADD`, `OP_SIN`). It knows nothing about `{}` or `;`.
-3.  **Emitter:** A small translator that converts IR to text.
-    *   `glsl_emitter.c` -> Writes "vec3 x = ..."
-    *   `wgsl_emitter.c` -> Writes "var x: vec3 = ..." (Future)
-
-### Why this is cool
-The `Math Engine` doesn't care about Vulkan or WebGPU. It just says "I need to Multiply these numbers". The **Emitter** handles the syntax.
+### The Command System
+We decouple the UI from the App logic using the **Command Pattern**.
+*   **Registry:** The App registers callbacks (e.g., `ui_command_register("Graph.Clear", ...)`).
+*   **Trigger:** The UI triggers them via strings (e.g., `on_click: "Graph.Clear"`).
+*   **Benefit:** The UI parser doesn't need to know about "Graphs" or "Nodes". It just fires string events.
 
 ---
 
@@ -84,18 +84,7 @@ The graphics layer is split into two parts to keep things clean.
 Instead of having separate lists for UI, 2D Sprites, and 3D Models, the engine uses a **Single Linear Array** of `SceneObject`s.
 
 *   **Everything is an Object:** A UI button, a text character, and a 3D cube are all `SceneObject` structs.
-*   **The Struct:**
-    ```c
-    typedef struct SceneObject {
-        Vec3 position;
-        Vec3 rotation;
-        Vec3 scale;
-        ScenePrimitiveType prim_type; // SCENE_PRIM_QUAD or SCENE_PRIM_MESH
-        Vec4 color;
-        // ...
-    } SceneObject;
-    ```
-*   **Why?** This makes the `RenderSystem` incredibly simple. It doesn't need 10 different loops for 10 different types of things. It iterates the array **once**, sorts by Z-index (or Shader), and submits to the backend.
+*   **Why?** This makes the `RenderSystem` incredibly simple. It iterates the array **once**, sorts by Z-index, and submits to the backend.
 
 ### The Manager: `RenderSystem` (`render_system.h`)
 This is the **High-Level API**. Features and the App talk to this.
@@ -105,33 +94,10 @@ This is the **High-Level API**. Features and the App talk to this.
 ### The Worker: `RendererBackend` (`renderer_backend.h`)
 This is the **Low-Level Hardware Interface**. Only the `RenderSystem` talks to this.
 *   **It does:** "Bind Vulkan Pipeline", "Copy Memory to GPU", "Submit Command Buffer".
-*   **Why split it?** If we switch from Vulkan to DirectX 12, we only rewrite the Backend. The rest of the engine (UI, Game Logic) doesn't even notice.
-
-> **Rule:** `src/features` should NEVER include `renderer_backend.h`. If a feature needs to do something complex (like Compute), the Engine should provide a clean abstraction for it.
-
-### 3. UI System
-*   **Philosophy:** **Data-Driven Retained Mode**. We separate the **View** (YAML/Templates) from the **Model** (C Data).
-*   **No "Immediate Mode" Spaghetti:** Unlike ImGui, we do not interleave logic and drawing. The App updates data; the UI system observes changes and updates the view.
-*   **Reactivity:** The system uses a **Push/Pull hybrid**.
-    *   **Current:** Efficient polling using `Dirty Flags`.
-    *   **Implemented:** **Cached Reflection Binding**. The engine uses metadata to resolve pointers to data fields at creation time (`UiElement` holds `MetaField*`), enabling near-zero cost updates without string lookups.
-    *   **Implemented:** **Modular Definitions**. The YAML parser supports `import: "path/to/file.yaml"` for splitting interfaces into components and uses **Hex Colors** (`#RRGGBB`) for compact styling.
-    *   **Planned:** **Codegen Proxies**. We may generate "setter" macros that automatically toggle dirty flags when data changes.
-*   **Layout:** A flexible `FLEX` engine (Column/Row/Canvas) that supports nesting. Future plans include "Split Containers" logic to support dynamic docking without a monolithic manager.
-*   **Styling & Theming:** UI elements do not hold hardcoded style data. They reference a central **Theme**, allowing for instant global visual changes (e.g., Light/Dark mode). **SDF Rendering** is used for high-quality rounded corners and borders.
-
-### 4. MVVM & Logic Separation
-The UI follows the **Model-View-ViewModel** pattern.
-*   **Model:** C structs in `src/features`.
-*   **View:** YAML definitions in `assets/ui`.
-*   **ViewModel (Bindings):** The `UiElement` state that bridges the two via Reflection.
-
-**Key Advantage: Undo/Redo & State Management**
-Because the UI is a "pure reflection" of the data, the application logic can implement complex features like **Undo/Redo** or **Multiplayer Sync** by simply manipulating the C structs. The UI system will detect the data changes and update the visuals automatically.
 
 ---
 
-## 5. The Build Pipeline & Tools
+## 4. The Build Pipeline & Tools
 
 We automate the boring stuff using Python scripts invoked by CMake.
 
@@ -145,8 +111,6 @@ We automate the boring stuff using Python scripts invoked by CMake.
 *   **When:** Runs during the build.
 *   **What:** Scans `assets/shaders/` for `.vert` and `.frag` files.
 *   **Output:** Generates binary `.spv` files using `glslc`.
-*   **Why:** The game loads pre-compiled binaries, avoiding runtime compilation overhead and dependencies.
-
 
 ---
 
@@ -155,23 +119,17 @@ We automate the boring stuff using Python scripts invoked by CMake.
 ```text
 src/
 ├── app/                  
-│   └── main.c            # The "Glue" code.
+│   └── main.c            # The "Glue" code. Registers Commands.
 │
 ├── features/             
 │   └── math_engine/      # The Logic Layer
-│       ├── math_graph.c  # Node data structures.
-│       ├── transpiler.c  # The "Compiler" (Graph -> IR).
-│       ├── shader_ir.h   # The "Assembly Language" definitions.
-│       └── emitters/     # The Translators
-│           └── glsl_emitter.c
 │
 ├── engine/               
 │   ├── core/             # Application lifecycle.
 │   ├── graphics/         
-│   │   ├── render_system.c # The Manager (Logic).
-│   │   └── backend/      
-│   │       └── vulkan/   # The Worker (Driver calls).
-│   └── ui/               
+│   └── ui/               # The UI System (Parser, Layout, Input, Renderer)
+│       ├── ui_command_system.c
+│       └── ...
 │
 └── foundation/           # Independent Utilities (Memory, Math, Logs).
 ```
@@ -180,9 +138,5 @@ src/
 
 ## 6. Known Constraints (Technical Debt)
 
-Even good architectures have limits. Here are ours:
-
-### 1. Slow Text
-*   **What:** Each letter is a separate object.
-*   **Why:** It was the fastest way to get text on screen for the prototype.
-*   **Fix:** "Glyph Batching" (merging text into one big mesh).
+*   **Text Rendering:** Each letter is a separate object (inefficient). Needs batching.
+*   **String Hashing:** The engine still uses `strcmp` in many places (Registry, UI lookups). Should move to `StringID` (FNV-1a).
