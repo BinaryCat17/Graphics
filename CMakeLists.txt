@@ -62,7 +62,7 @@ set(FOUNDATION_META_SOURCES
 )
 add_library(foundation_meta STATIC ${FOUNDATION_META_SOURCES})
 target_include_directories(foundation_meta PUBLIC "src/")
-target_link_libraries(foundation_meta PUBLIC foundation_logger foundation_event)
+target_link_libraries(foundation_meta PUBLIC foundation_logger)
 
 # Platform
 set(FOUNDATION_PLATFORM_SOURCES
@@ -83,17 +83,12 @@ endif()
 
 # Memory
 set(FOUNDATION_MEMORY_SOURCES 
-    "src/foundation/memory/buffer.c"
     "src/foundation/memory/arena.c"
     "src/foundation/memory/pool.c"
 )
 add_library(foundation_memory STATIC ${FOUNDATION_MEMORY_SOURCES})
 target_include_directories(foundation_memory PUBLIC "src/")
 target_link_libraries(foundation_memory PUBLIC foundation_logger)
-
-# Event
-add_library(foundation_event STATIC "src/foundation/event/event_system.c")
-target_include_directories(foundation_event PUBLIC "src/")
 
 # Config
 set(FOUNDATION_CONFIG_SOURCES
@@ -180,7 +175,6 @@ target_link_libraries(Graphics PRIVATE
     foundation_meta
     foundation_math
     foundation_memory
-    foundation_event
     glfw
     Vulkan::Vulkan
     Threads::Threads)

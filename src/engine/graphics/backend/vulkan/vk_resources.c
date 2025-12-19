@@ -86,7 +86,7 @@ bool vk_create_vertex_buffer(VulkanRendererState* state, FrameResources *frame, 
     
     VkResult create = vkCreateBuffer(state->device, &bci, NULL, &new_buffer);
     if (create != VK_SUCCESS) {
-        fprintf(stderr, "vkCreateBuffer failed for vertex buffer\n");
+        LOG_ERROR("vkCreateBuffer failed for vertex buffer");
         return false;
     }
 
@@ -95,7 +95,7 @@ bool vk_create_vertex_buffer(VulkanRendererState* state, FrameResources *frame, 
     
     VkResult alloc = vkAllocateMemory(state->device, &mai, NULL, &new_memory);
     if (alloc != VK_SUCCESS) {
-        fprintf(stderr, "vkAllocateMemory failed for vertex buffer\n");
+        LOG_ERROR("vkAllocateMemory failed for vertex buffer");
         vkDestroyBuffer(state->device, new_buffer, NULL);
         return false;
     }

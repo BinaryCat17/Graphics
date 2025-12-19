@@ -19,11 +19,13 @@
 
 ### Phase 4.5: Code Cleanup & Strict Architecture
 **Objective:** Harden the codebase after the rapid UI prototyping phase.
-- [ ] **Strict Type Safety:** Enforce type checking in Data Bindings (e.g., error if binding a `float` field to a text input).
-- [ ] **String IDs:** Replace runtime `strcmp` with **Hash IDs (StringID)** in the Registry, Assets, and UI System for O(1) performance.
-- [ ] **Refactor `main.c`:** Move command callbacks and application logic into a dedicated `EditorLayer` module.
-- [ ] **Input System Cleanup:** Refactor `ui_input.c` to fully rely on the Command System and remove ad-hoc event handling logic.
-- [ ] **Unused Code Removal:** Scan for and remove unused struct fields (`UiFlags`, old layout params) and legacy functions.
+- [ ] **Strict Type Safety:** Enforce type checking in Data Bindings.
+- [ ] **String IDs:** Replace runtime `strcmp` with **Hash IDs**.
+- [ ] **Layer System (Z-Order & Clipping):** Implement `layer: top/overlay` to handle Z-depth naturally and **disable parent clipping** for popups/dropdowns so they can "break out" of containers.
+- [ ] **Conditional Visibility:** Add `bind_visible` / `bind_if` logic to declarative show/hide branches based on boolean flags.
+- [ ] **Refactor `main.c`:** Move command callbacks to `EditorLayer`.
+- [ ] **Input System Cleanup:** Refactor `ui_input.c`.
+- [ ] **Unused Code Removal:** Clean up structs.
 
 ### Phase 5: 3D & Scene Expansion
 **Objective:** Move beyond 2D quads.

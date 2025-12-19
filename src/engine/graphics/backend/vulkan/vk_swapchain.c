@@ -157,7 +157,7 @@ void vk_create_swapchain_and_views(VulkanRendererState* state, VkSwapchainKHR ol
     if (!(caps.supportedUsageFlags & usage)) LOG_FATAL("swapchain color usage unsupported");
 
     VkPresentModeKHR present_mode = VK_PRESENT_MODE_FIFO_KHR;
-    printf("Selected Present Mode: %d (FIFO=%d, MAILBOX=%d, IMMEDIATE=%d)\n", 
+    LOG_INFO("Selected Present Mode: %d (FIFO=%d, MAILBOX=%d, IMMEDIATE=%d)", 
            present_mode, VK_PRESENT_MODE_FIFO_KHR, VK_PRESENT_MODE_MAILBOX_KHR, VK_PRESENT_MODE_IMMEDIATE_KHR);
 
     VkSwapchainCreateInfoKHR sci = { 

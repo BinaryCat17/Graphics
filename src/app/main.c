@@ -233,7 +233,7 @@ static void cmd_add_node(void* user_data, UiElement* target) {
 
 static void cmd_clear_graph(void* user_data, UiElement* target) {
     (void)target;
-    AppState* app = (AppState*)user_data;
+    (void)user_data;
     LOG_INFO("Command: Graph.Clear");
     // We can't easily clear without re-initing arena if we don't have a clear function
     // For now just log
