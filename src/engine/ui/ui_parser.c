@@ -127,6 +127,12 @@ static UiNodeSpec* load_recursive(UiAsset* asset, const ConfigNode* node) {
         const ConfigNode* val = node->pairs[i].value;
         if (!key || !val) continue;
 
+        if (strcmp(key, "import") == 0) {
+            LOG_ERROR("UiParser: 'import' is not supported inside children (Node: %s). Use a Template and 'type: instance' instead.", 
+                      spec->id ? spec->id : "anonymous");
+            continue;
+        }
+
         if (strcmp(key, "type") == 0) {
              // If it's a template name, we already handled it. 
              // If not, parse as kind.
