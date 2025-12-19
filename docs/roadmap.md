@@ -37,5 +37,9 @@
 - **Plan:** Implement Glyph Batching (single vertex buffer for text strings).
 
 ### UI Layout Optimization
-- **Status:** Resolved (Cached Bindings implemented).
-- **Next:** Implement "YAML Prefabs" (Phase 4, Step 3) to reduce file verbosity.
+- **Status:** Resolved (Cached Bindings & YAML Templates implemented).
+
+### Legacy UI Cleanup
+- **Inspector Refactor:** Convert `ui_rebuild_inspector` in `main.c` to use YAML Templates (e.g., `inspector_row.yaml`).
+- **Dead Code:** Remove `ui_create_spec` and manual styling constants from `main.c`.
+- **Parser Cleanup:** Remove support for inline `import` in `children` arrays once Step 3.5 is complete.
