@@ -108,3 +108,20 @@ src/
 
 3.  **Cross-Platform Builds:**
     *   Use `tools/build_shaders.py` as the single source of truth for shader compilation logic. Extend it to call `spirv-cross` for non-Vulkan targets.
+
+---
+
+## 5. Known Constraints & Technical Debt
+
+### 1. Rendering Instance Cap
+*   **Constraint:** The Vulkan backend currently has a hardcoded limit of **1000 instances** (quads/chars) per frame.
+*   **Cause:** Fixed-size uniform/storage buffers in `vulkan_renderer.c`.
+*   **Impact:** Attempting to render complex scenes or long text will cause visual glitches or crashes.
+
+### 2. Text Rendering
+*   **Constraint:** Naive implementation where 1 character = 1 SceneObject.
+*   **Impact:** High CPU overhead and rapid exhaustion of the Instance Cap.
+
+### 3. UI System
+*   **Constraint:** Immediate-mode style layout but persistent state storage.
+*   **Impact:** High memory churn if not carefully managed (currently mitigated by Arenas).
