@@ -6,18 +6,16 @@
 #include <stdbool.h>
 
 // Типы данных, которые поддерживает наша система рефлексии
-typedef enum MetaTypeKind {
-    META_TYPE_VOID = 0,
+typedef enum MetaType {
     META_TYPE_INT,
     META_TYPE_FLOAT,
+    META_TYPE_STRING,        // char* (pointer)
+    META_TYPE_STRING_ARRAY,  // char[N] (inline buffer)
     META_TYPE_BOOL,
-    META_TYPE_STRING, 
-    META_TYPE_STRUCT, 
-    META_TYPE_ARRAY,  
-    META_TYPE_POINTER,
-    META_TYPE_ENUM    // Added: Enum support
-} MetaTypeKind;
-
+    META_TYPE_STRUCT,
+    META_TYPE_ENUM,
+    META_TYPE_POINTER
+} MetaType;
 // Описание одного значения enum (например: "UI_LAYOUT_ROW" -> 1)
 typedef struct MetaEnumValue {
     const char* name;
@@ -34,7 +32,7 @@ typedef struct MetaEnum {
 // Описание одного поля структуры
 typedef struct MetaField {
     const char* name;
-    MetaTypeKind type;
+    MetaType type;
     size_t offset;         
     const char* type_name; // Имя типа (для STRUCT/ENUM)
 } MetaField;

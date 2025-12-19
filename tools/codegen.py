@@ -3,31 +3,41 @@ import re
 import sys
 
 # Regex Patterns
-ENUM_PATTERN = re.compile(r'typedef\s+enum\s*(\w+)?\s*\{([^}]*)\}\s*(\w+);', re.MULTILINE | re.DOTALL)
-STRUCT_PATTERN = re.compile(r'typedef\s+struct\s*(\w+)?\s*\{([^}]*)\}\s*(\w+);', re.MULTILINE | re.DOTALL)
+ENUM_PATTERN = re.compile(r'typedef\s+enum\s*\w*\s*\{([^}]*)\}\s*(\w+);', re.MULTILINE | re.DOTALL)
+STRUCT_PATTERN = re.compile(r'typedef\s+struct\s*\w*\s*\{([^}]*)\}\s*(\w+);', re.MULTILINE | re.DOTALL)
 REFLECT_PATTERN = re.compile(r'^\s*(.+?);\s*//\s*REFLECT(.*)', re.MULTILINE)
 
 BASE_TYPES = {
     'int': 'META_TYPE_INT',
     'float': 'META_TYPE_FLOAT',
-    'char*': 'META_TYPE_STRING',
     'bool': 'META_TYPE_BOOL',
+    'char*': 'META_TYPE_STRING',
+    'const char*': 'META_TYPE_STRING',
     'size_t': 'META_TYPE_INT',
     'uint32_t': 'META_TYPE_INT',
-    'uint8_t': 'META_TYPE_INT',
     'int32_t': 'META_TYPE_INT',
+    'uint8_t': 'META_TYPE_INT',
+    'int8_t': 'META_TYPE_INT',
+    'uint16_t': 'META_TYPE_INT',
+    'int16_t': 'META_TYPE_INT',
+    'uint64_t': 'META_TYPE_INT',
+    'int64_t': 'META_TYPE_INT',
+    'f32': 'META_TYPE_FLOAT',
+    'f64': 'META_TYPE_FLOAT',
+    'b8': 'META_TYPE_BOOL',
+    'b32': 'META_TYPE_BOOL',
 }
 
 def parse_enum_body(body_text):
     entries = []
     lines = body_text.split('\n')
-    clean_body = ""
+    clean_text = ""
     for line in lines:
         if '//' in line:
             line = line.split('//')[0]
-        clean_body += line + " "
+        clean_text += line + " "
     
-    parts = clean_body.split(',')
+    parts = clean_text.split(',')
     for part in parts:
         part = part.strip()
         if not part: continue
@@ -39,127 +49,160 @@ def parse_enum_body(body_text):
             entries.append(name)
     return entries
 
+def parse_struct_field(decl_str):
+    decl_str = decl_str.strip()
+    is_array = False
+    if ']' in decl_str:
+        match = re.search(r'\[(.*?)\]', decl_str)
+        if match:
+            is_array = True
+            decl_str = re.sub(r'\[.*?\]', '', decl_str).strip()
+
+    ptr_count = decl_str.count('*')
+    is_pointer = ptr_count > 0
+    clean_decl = decl_str.replace('*', ' ').strip()
+    
+    tokens = clean_decl.split()
+    if not tokens:
+        return None
+        
+    var_name = tokens[-1]
+    type_tokens = tokens[:-1]
+    type_name = " ".join(type_tokens)
+    
+    full_type_str = type_name
+    if ptr_count > 0:
+        full_type_str += "*" * ptr_count
+
+    return {
+        'name': var_name,
+        'type': full_type_str,
+        'base_type': type_name,
+        'is_pointer': is_pointer,
+        'ptr_count': ptr_count,
+        'is_array': is_array
+    }
+
 def scan_files(src_dir):
     enums = {}
     structs = {}
     headers = []
     
     for root, _, files in os.walk(src_dir):
-        # Skip backend directories to avoid platform-specific dependencies
-        if 'backend' in root:
+        root = root.replace('\\', '/')
+        if 'backend' in root or 'generated' in root:
             continue
 
         for file in files:
             if file.endswith('.h'):
-                path = os.path.join(root, file)
+                path = os.path.join(root, file).replace('\\', '/')
                 with open(path, 'r', encoding='utf-8') as f:
                     content = f.read()
                 
-                has_content = False
+                has_reflection = False
 
                 for match in ENUM_PATTERN.finditer(content):
-                    body = match.group(2)
-                    name = match.group(3)
+                    body = match.group(1)
+                    name = match.group(2)
                     values = parse_enum_body(body)
                     if values:
                         enums[name] = values
-                        has_content = True
+                        has_reflection = True
 
                 for match in STRUCT_PATTERN.finditer(content):
-                    body = match.group(2)
-                    name = match.group(3)
+                    body = match.group(1)
+                    name = match.group(2)
                     fields = []
                     for f_match in REFLECT_PATTERN.finditer(body):
                         decl = f_match.group(1).strip()
-                        tokens = decl.split()
-                        var_name = tokens[-1]
-                        type_part = " ".join(tokens[:-1])
-                        stars = var_name.count('*')
-                        var_name = var_name.replace('*', '')
-                        if stars:
-                            type_part += '*' * stars
-                        if '[' in var_name:
-                            var_name = var_name.split('[')[0]
-                        
-                        fields.append({
-                            'name': var_name,
-                            'c_type': type_part
-                        })
+                        parsed = parse_struct_field(decl)
+                        if parsed:
+                            fields.append(parsed)
                     
                     if fields:
                         structs[name] = fields
-                        has_content = True
+                        has_reflection = True
                 
-                if has_content:
-                    headers.append(path.replace('\\', '/'))
+                if has_reflection:
+                    headers.append(path)
                     
     return enums, structs, headers
 
 def generate_code(enums, structs, headers, output_path):
-    with open(output_path, 'w') as f:
+    with open(output_path, 'w', encoding='utf-8') as f:
+        f.write('// GENERATED FILE - DO NOT EDIT\n')
+        f.write('// Generated by tools/codegen.py\n\n')
         f.write('#include "foundation/meta/reflection.h"\n')
         f.write('#include <string.h>\n')
+        f.write('#include <strings.h>\n')
         f.write('#include <stddef.h>\n')
         f.write('#include <stdbool.h>\n')
+        f.write('\n#ifdef _MSC_VER\n')
+        f.write('#define strcasecmp _stricmp\n')
+        f.write('#endif\n\n')
         
         for h in headers:
-            if 'src/' in h:
-                f.write('#include "' + h.split('src/')[1] + '"\n')
+            if '/src/' in h:
+                include_path = h.split('/src/')[1]
+                f.write(f'#include "{include_path}"\n')
             else:
-                f.write('#include "' + h + '"\n')
+                f.write(f'#include "{h}"\n')
         f.write('\n')
 
-        # --- Generate Enums ---
         f.write('// --- ENUMS ---\n\n')
         for name, values in enums.items():
-            f.write('static const MetaEnumValue values_' + name + '[] = {\n')
+            f.write(f'static const MetaEnumValue values_{name}[] = {{\n')
             for v in values:
-                f.write('    { "' + v + '", (int)' + v + ' },\n')
+                f.write(f'    {{ "{v}", (int){v} }},\n')
             f.write('};\n\n')
 
-        # --- Generate Struct Fields ---
         f.write('// --- STRUCTS ---\n\n')
         for s_name, fields in structs.items():
-            f.write('static const MetaField fields_' + s_name + '[] = {\n')
+            f.write(f'static const MetaField fields_{s_name}[] = {{\n')
             for field in fields:
-                c_type = field['c_type']
                 f_name = field['name']
-                kind = 'META_TYPE_STRUCT'
-                type_name = '"' + c_type + '"'
+                f_type = field['type']
+                f_base = field['base_type']
+                is_ptr = field['is_pointer']
+                is_arr = field['is_array']
                 
-                if c_type in BASE_TYPES:
-                    kind = BASE_TYPES[c_type]
-                    type_name = "NULL"
-                elif c_type in enums:
-                    kind = 'META_TYPE_ENUM'
-                    type_name = '"' + c_type + '"'
-                elif c_type == 'char*':
-                    kind = 'META_TYPE_STRING'
-                    type_name = "NULL"
-                elif '*' in c_type:
-                    kind = 'META_TYPE_POINTER'
-                    base = c_type.replace('*', '').strip()
-                    type_name = '"' + base + '"'
-
-                f.write('    { "' + f_name + '", ' + kind + ', offsetof(' + s_name + ', ' + f_name + '), ' + type_name + ' },\n')
+                meta_kind = 'META_TYPE_STRUCT'
+                type_name_str = f'"{f_type}"'
+                
+                if f_type in BASE_TYPES:
+                    meta_kind = BASE_TYPES[f_type]
+                    type_name_str = "NULL"
+                elif f_base == 'char' and is_ptr:
+                    meta_kind = 'META_TYPE_STRING'
+                    type_name_str = "NULL"
+                elif f_base == 'char' and is_arr:
+                    meta_kind = 'META_TYPE_STRING_ARRAY'
+                    type_name_str = "NULL"
+                elif f_type in enums:
+                    meta_kind = 'META_TYPE_ENUM'
+                    type_name_str = f'"{f_type}"'
+                elif is_ptr:
+                    meta_kind = 'META_TYPE_POINTER'
+                    type_name_str = f'"{f_base}"'
+                    
+                f.write(f'    {{ "{f_name}", {meta_kind}, offsetof({s_name}, {f_name}), {type_name_str} }},\n')
             f.write('};\n\n')
 
-        # --- Registry ---
         f.write('// --- REGISTRY ---\n\n')
         f.write('static const MetaEnum enum_registry[] = {\n')
         for name, values in enums.items():
-             f.write('    { "' + name + '", values_' + name + ', ' + str(len(values)) + ' },\n')
+             f.write(f'    {{ "{name}", values_{name}, {len(values)} }},\n')
         f.write('    { NULL, NULL, 0 }\n')
         f.write('};\n\n')
         
         f.write('static const MetaStruct struct_registry[] = {\n')
         for name, fields in structs.items():
-            f.write('    { "' + name + '", sizeof(' + name + '), fields_' + name + ', ' + str(len(fields)) + ' },\n')
+            f.write(f'    {{ "{name}", sizeof({name}), fields_{name}, {len(fields)} }},\n')
         f.write('    { NULL, 0, NULL, 0 }\n')
         f.write('};\n\n')
 
-        # --- Implementation ---
         f.write('const MetaStruct* meta_get_struct(const char* name) {\n')
+        f.write('    if (!name) return NULL;\n')
         f.write('    for (const MetaStruct* s = struct_registry; s->name; ++s) {\n')
         f.write('        if (strcmp(s->name, name) == 0) return s;\n')
         f.write('    }\n')
@@ -167,36 +210,48 @@ def generate_code(enums, structs, headers, output_path):
         f.write('}\n\n')
 
         f.write('const MetaEnum* meta_get_enum(const char* name) {\n')
+        f.write('    if (!name) return NULL;\n')
         f.write('    for (const MetaEnum* e = enum_registry; e->name; ++e) {\n')
         f.write('        if (strcmp(e->name, name) == 0) return e;\n')
         f.write('    }\n')
         f.write('    return NULL;\n')
         f.write('}\n\n')
-        
+
         f.write('bool meta_enum_get_value(const MetaEnum* meta_enum, const char* name_str, int* out_value) {\n')
         f.write('    if (!meta_enum || !name_str) return false;\n')
         f.write('    for (size_t i = 0; i < meta_enum->count; ++i) {\n')
         f.write('        if (strcasecmp(meta_enum->values[i].name, name_str) == 0) {\n')
-        f.write('            *out_value = meta_enum->values[i].value;\n')
+        f.write('            if (out_value) *out_value = meta_enum->values[i].value;\n')
         f.write('            return true;\n')
         f.write('        }\n')
-        f.write('        size_t n_len = strlen(name_str);\n')
-        f.write('        size_t v_len = strlen(meta_enum->values[i].name);\n')
-        f.write('        if (v_len >= n_len) {\n')
-        f.write('             const char* suffix = meta_enum->values[i].name + (v_len - n_len);\n')
-        f.write('             if (strcasecmp(suffix, name_str) == 0) {\n')
-        f.write("                  if (v_len == n_len || *(suffix - 1) == '_') {\n")
-        f.write('                       *out_value = meta_enum->values[i].value;\n')
-        f.write('                       return true;\n')
-        f.write('                  }\n')
-        f.write('             }\n')
+        f.write('    }\n')
+        f.write('    size_t n_len = strlen(name_str);\n')
+        f.write('    for (size_t i = 0; i < meta_enum->count; ++i) {\n')
+        f.write('        const char* val_name = meta_enum->values[i].name;\n')
+        f.write('        size_t v_len = strlen(val_name);\n')
+        f.write('        if (v_len > n_len) {\n')
+        f.write('            if (strcasecmp(val_name + (v_len - n_len), name_str) == 0) {\n')
+        f.write('                 if (out_value) *out_value = meta_enum->values[i].value;\n')
+        f.write('                 return true;\n')
+        f.write('            }\n')
         f.write('        }\n')
         f.write('    }\n')
         f.write('    return false;\n')
-        f.write('}\n\n')
+        f.write('}\n')
 
 if __name__ == '__main__':
-    src_dir = sys.argv[1]
-    output_file = sys.argv[2]
+    project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    src_dir = os.path.join(project_root, 'src')
+    output_dir = os.path.join(src_dir, 'generated')
+    output_path = os.path.join(output_dir, 'reflection_registry.c')
+    
+    if not os.path.exists(output_dir):
+        os.makedirs(output_dir)
+        
+    print(f"Scanning {src_dir}...")
     enums, structs, headers = scan_files(src_dir)
-    generate_code(enums, structs, headers, output_file)
+    print(f"Found {len(enums)} enums and {len(structs)} structs.")
+    
+    print(f"Generating {output_path}...")
+    generate_code(enums, structs, headers, output_path)
+    print("Done.")
