@@ -1,0 +1,11 @@
+type: panel
+layout: row
+height: 25
+children:
+  - type: label
+    text: "Value:"
+    width: 60
+    color: "#AAAAAA"
+  - type: text
+    bind: "value"
+    color: "#00FF00"

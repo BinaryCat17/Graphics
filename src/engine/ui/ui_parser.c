@@ -10,6 +10,28 @@
 
 // --- Helper Functions ---
 
+static UiNodeSpec* ui_node_spec_copy(UiAsset* asset, const UiNodeSpec* src) {
+    if (!src) return NULL;
+    UiNodeSpec* dst = ui_asset_push_node(asset);
+    memcpy(dst, src, sizeof(UiNodeSpec));
+    
+    // We share string pointers because they are all in the same Asset Arena
+    
+    // Deep copy children
+    if (src->child_count > 0) {
+        dst->children = (UiNodeSpec**)arena_alloc_zero(&asset->arena, src->child_count * sizeof(UiNodeSpec*));
+        for (size_t i = 0; i < src->child_count; ++i) {
+            dst->children[i] = ui_node_spec_copy(asset, src->children[i]);
+        }
+    }
+    
+    if (src->item_template) {
+        dst->item_template = ui_node_spec_copy(asset, src->item_template);
+    }
+    
+    return dst;
+}
+
 static bool parse_hex_color(const char* str, Vec4* out_color) {
     if (!str || str[0] != '#') return false;
     str++; // Skip '#'
@@ -70,70 +92,47 @@ static UiKind parse_kind(const char* type_str, uint32_t* out_flags) {
 // --- Recursive Loader ---
 
 static UiNodeSpec* load_recursive(UiAsset* asset, const ConfigNode* node) {
-    if (!node) return NULL;
+    if (!node || node->type != CONFIG_NODE_MAP) return NULL;
 
-    // Handle Import (Replace 'node' with the root of the imported file)
-    ConfigNode* imported_root = NULL;
-    char* imported_text = NULL;
+    UiNodeSpec* spec = NULL;
 
-    if (node->type == CONFIG_NODE_MAP) {
-        const ConfigNode* import_val = config_node_map_get(node, "import");
-        if (import_val && import_val->scalar) {
-            char* path = import_val->scalar;
-            imported_text = fs_read_text(path);
-            if (imported_text) {
-                ConfigError err;
-                if (simple_yaml_parse(imported_text, &imported_root, &err)) {
-                    // Successfully parsed. Use this as the source node.
-                    node = imported_root;
-                    LOG_INFO("UiParser: Imported %s", path);
-                } else {
-                    LOG_ERROR("UiParser: Failed to parse import %s: %s", path, err.message);
-                }
-            } else {
-                 LOG_ERROR("UiParser: Failed to read import %s", path);
+    // 1. Determine Base (Template or Kind)
+    const ConfigNode* type_node = config_node_map_get(node, "type");
+    if (type_node && type_node->scalar) {
+        if (strcmp(type_node->scalar, "instance") == 0) {
+            const ConfigNode* inst_node = config_node_map_get(node, "instance");
+            if (inst_node && inst_node->scalar) {
+                UiNodeSpec* template_spec = ui_asset_get_template(asset, inst_node->scalar);
+                if (template_spec) spec = ui_node_spec_copy(asset, template_spec);
             }
+        } else {
+            UiNodeSpec* template_spec = ui_asset_get_template(asset, type_node->scalar);
+            if (template_spec) spec = ui_node_spec_copy(asset, template_spec);
         }
     }
 
-    if (node->type != CONFIG_NODE_MAP) {
-        if (imported_root) config_node_free(imported_root);
-        if (imported_text) free(imported_text);
-        return NULL;
-    }
-
-    // Allocate Spec from Asset's Arena
-    UiNodeSpec* spec = ui_asset_push_node(asset);
     if (!spec) {
-        if (imported_root) config_node_free(imported_root);
-        if (imported_text) free(imported_text);
-        return NULL;
+        spec = ui_asset_push_node(asset);
+        // Default values for new nodes
+        spec->width = -1.0f;
+        spec->height = -1.0f;
+        spec->color = (Vec4){1,1,1,1};
     }
 
     const MetaStruct* meta = meta_get_struct("UiNodeSpec");
-    if (!meta) {
-        LOG_ERROR("UiParser: MetaStruct for UiNodeSpec not found!");
-        // We continue, but reflection won't work
-    }
 
-    // Default values
-    spec->width = -1.0f;
-    spec->height = -1.0f;
-    spec->color = (Vec4){1,1,1,1};
-
-    // Iterate all pairs in the YAML map
+    // Iterate all pairs in the YAML map to apply overrides
     for (size_t i = 0; i < node->pair_count; ++i) {
         const char* key = node->pairs[i].key;
         const ConfigNode* val = node->pairs[i].value;
         if (!key || !val) continue;
 
-        // Skip 'import' as it was handled (or is redundant)
-        if (strcmp(key, "import") == 0) continue;
-
-        // --- Special Handling for Recursion / Templates ---
-        
         if (strcmp(key, "type") == 0) {
-             spec->kind = parse_kind(val->scalar, &spec->flags);
+             // If it's a template name, we already handled it. 
+             // If not, parse as kind.
+             if (ui_asset_get_template(asset, val->scalar) == NULL) {
+                 spec->kind = parse_kind(val->scalar, &spec->flags);
+             }
              continue;
         }
         
@@ -147,6 +146,7 @@ static UiNodeSpec* load_recursive(UiAsset* asset, const ConfigNode* node) {
             }
             continue;
         }
+        // ... rest of overrides ...
         if (strcmp(key, "item_template") == 0) {
             spec->item_template = load_recursive(asset, val);
             continue;
@@ -226,6 +226,27 @@ static UiNodeSpec* load_recursive(UiAsset* asset, const ConfigNode* node) {
     return spec;
 }
 
+// --- Generic Reflection for Scalars ---
+
+static ConfigNode* resolve_import(const ConfigNode* node, char** out_imported_text) {
+    if (node->type == CONFIG_NODE_MAP) {
+        const ConfigNode* import_val = config_node_map_get(node, "import");
+        if (import_val && import_val->scalar) {
+            char* text = fs_read_text(import_val->scalar);
+            if (text) {
+                ConfigNode* imported_root = NULL;
+                ConfigError err;
+                if (simple_yaml_parse(text, &imported_root, &err)) {
+                    *out_imported_text = text;
+                    return imported_root;
+                }
+                free(text);
+            }
+        }
+    }
+    return NULL;
+}
+
 UiAsset* ui_parser_load_from_file(const char* path) {
     if (!path) return NULL;
 
@@ -260,7 +281,10 @@ UiAsset* ui_parser_load_from_file(const char* path) {
             const char* t_name = templates_node->pairs[i].key;
             const ConfigNode* t_val = templates_node->pairs[i].value;
             
-            UiNodeSpec* spec = load_recursive(asset, t_val);
+            char* t_imported_text = NULL;
+            ConfigNode* t_actual = resolve_import(t_val, &t_imported_text);
+            
+            UiNodeSpec* spec = load_recursive(asset, t_actual ? t_actual : t_val);
             if (spec) {
                 UiTemplate* t = (UiTemplate*)arena_alloc_zero(&asset->arena, sizeof(UiTemplate));
                 t->name = arena_push_string(&asset->arena, t_name);
@@ -269,10 +293,18 @@ UiAsset* ui_parser_load_from_file(const char* path) {
                 asset->templates = t;
                 LOG_INFO("UiParser: Registered template '%s'", t->name);
             }
+            
+            if (t_actual) config_node_free(t_actual);
+            if (t_imported_text) free(t_imported_text);
         }
     }
 
-    asset->root = load_recursive(asset, root);
+    char* root_imported_text = NULL;
+    ConfigNode* root_actual = resolve_import(root, &root_imported_text);
+    asset->root = load_recursive(asset, root_actual ? root_actual : root);
+    
+    if (root_actual) config_node_free(root_actual);
+    if (root_imported_text) free(root_imported_text);
     
     config_node_free(root);
     free(text);

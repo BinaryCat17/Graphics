@@ -3,6 +3,10 @@ templates:
     import: "assets/ui/templates/node.yaml"
   ValueRow:
     import: "assets/ui/templates/value_row.yaml"
+  InspectorTitle:
+    import: "assets/ui/templates/inspector_title.yaml"
+  InspectorField:
+    import: "assets/ui/templates/inspector_field.yaml"
 
 type: panel
 id: root

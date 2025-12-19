@@ -1,0 +1,4 @@
+type: text
+bind: "name"
+height: 30
+color: "#FFFFFF"

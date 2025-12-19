@@ -35,9 +35,6 @@ typedef struct AppState {
     UiInstance ui_instance; // Manages UI Element memory
     UiInputContext input_ctx;
     
-    // Dynamic UI Generation (Specs only)
-    MemoryArena dynamic_ui_arena;
-    
     // Selection
     MathNodeId selected_node_id;
     bool selection_dirty; 
@@ -124,20 +121,6 @@ static UiElement* ui_find_element_by_id(UiElement* root, const char* id) {
     return NULL;
 }
 
-static void* ui_alloc_spec(AppState* app, size_t size) {
-    if (!app->dynamic_ui_arena.base) {
-        arena_init(&app->dynamic_ui_arena, 256 * 1024); // 256KB for specs
-    }
-    return arena_alloc_zero(&app->dynamic_ui_arena, size);
-}
-
-static UiNodeSpec* ui_create_spec(AppState* app, UiKind kind) {
-    UiNodeSpec* spec = (UiNodeSpec*)ui_alloc_spec(app, sizeof(UiNodeSpec));
-    spec->kind = kind;
-    spec->color = (Vec4){1,1,1,1}; 
-    return spec;
-}
-
 static void ui_rebuild_graph_view(AppState* app) {
     if (!app->ui_instance.root) return;
     UiElement* canvas = ui_find_element_by_id(app->ui_instance.root, "canvas_area");
@@ -213,36 +196,27 @@ static void ui_rebuild_inspector(AppState* app) {
     
     // Determine inspector children count
     int ins_count = 1; // Title
-    if (node->type == MATH_NODE_VALUE) ins_count += 2; // Label + Value
+    if (node->type == MATH_NODE_VALUE) ins_count += 1; // Field (Row)
     
     inspector->children = (UiElement**)arena_alloc_zero(&app->ui_instance.arena, ins_count * sizeof(UiElement*));
     inspector->child_count = 0;
     
     // Title
-    UiNodeSpec* title_spec = ui_create_spec(app, UI_KIND_TEXT);
-    title_spec->text_source = "name";
-    // title_spec->font_size = 20; // Removed
-    
-    UiElement* title = ui_element_create(&app->ui_instance, title_spec, node, node_meta);
-    inspector->children[inspector->child_count++] = title;
-    title->parent = inspector;
+    UiNodeSpec* title_spec = ui_asset_get_template(app->ui_asset, "InspectorTitle");
+    if (title_spec) {
+        UiElement* title = ui_element_create(&app->ui_instance, title_spec, node, node_meta);
+        inspector->children[inspector->child_count++] = title;
+        title->parent = inspector;
+    }
     
     // Value Editor (Only for Value nodes)
     if (node->type == MATH_NODE_VALUE) {
-        // Label
-        UiNodeSpec* lbl = ui_create_spec(app, UI_KIND_TEXT);
-        lbl->static_text = "Value:"; // Was text_content
-        UiElement* l = ui_element_create(&app->ui_instance, lbl, NULL, NULL);
-        inspector->children[inspector->child_count++] = l;
-        l->parent = inspector;
-        
-        // Input (Simplified as text for now, should be slider/input)
-        UiNodeSpec* val = ui_create_spec(app, UI_KIND_TEXT);
-        val->text_source = "value";
-        val->color = (Vec4){0,1,0,1};
-        UiElement* v = ui_element_create(&app->ui_instance, val, node, node_meta);
-        inspector->children[inspector->child_count++] = v;
-        v->parent = inspector;
+        UiNodeSpec* field_spec = ui_asset_get_template(app->ui_asset, "InspectorField");
+        if (field_spec) {
+            UiElement* field = ui_element_create(&app->ui_instance, field_spec, node, node_meta);
+            inspector->children[inspector->child_count++] = field;
+            field->parent = inspector;
+        }
     }
 }
 
@@ -419,7 +393,6 @@ int main(int argc, char** argv) {
              ui_instance_destroy(&app->ui_instance);
              arena_destroy(&app->graph_arena); // Free graph memory
              if (app->ui_asset) ui_asset_free(app->ui_asset);
-             if (app->dynamic_ui_arena.base) arena_destroy(&app->dynamic_ui_arena);
              // math_graph_clear(&app->graph); // No need as arena handles it
              free(app);
         }
