@@ -6,6 +6,11 @@
 #include <stdbool.h>
 #include <string.h>
 
+#define UI_DEFAULT_WIDTH 100.0f
+#define UI_DEFAULT_HEIGHT 30.0f
+#define UI_CHAR_WIDTH_EST 10.0f
+#define UI_INFINITY 10000.0f
+
 static float calculate_width(UiElement* el, float available_w, UiTextMeasureFunc measure_func, void* measure_data) {
     const UiNodeSpec* spec = el->spec;
     float w = spec->width;
@@ -22,10 +27,10 @@ static float calculate_width(UiElement* el, float available_w, UiTextMeasureFunc
                  if (measure_func) {
                      w = measure_func(text, measure_data) + spec->padding * 2;
                  } else {
-                     w = strlen(text) * 10.0f + spec->padding * 2 + 10.0f;
+                     w = strlen(text) * UI_CHAR_WIDTH_EST + spec->padding * 2 + UI_CHAR_WIDTH_EST;
                  }
              } else {
-                 w = 100.0f;
+                 w = UI_DEFAULT_WIDTH;
              }
         } else {
              w = available_w; // Fill
@@ -44,16 +49,16 @@ static float calculate_height(UiElement* el, float available_h) {
             h = spec->padding * 2;
              for (size_t i = 0; i < el->child_count; ++i) {
                 float child_h = el->children[i]->spec->height;
-                if (child_h < 0) child_h = 30.0f; 
+                if (child_h < 0) child_h = UI_DEFAULT_HEIGHT; 
                 h += child_h + spec->spacing;
             }
             if (el->child_count > 0) h -= spec->spacing;
             
-            if (available_h > 0 && available_h < 10000.0f && h < available_h) {
+            if (available_h > 0 && available_h < UI_INFINITY && h < available_h) {
                 h = available_h;
             }
         } else {
-             h = (available_h > 0 && available_h < 10000.0f) ? available_h : 30.0f;
+             h = (available_h > 0 && available_h < UI_INFINITY) ? available_h : UI_DEFAULT_HEIGHT;
         }
     }
     return h;
@@ -89,12 +94,23 @@ static void layout_row(UiElement* el, float start_x, float start_y, float* out_m
     *out_max_x = cursor_x;
 }
 
-static void layout_canvas(UiElement* el) {
-    if (el->flags & UI_FLAG_SCROLLABLE) {
-        for (size_t i = 0; i < el->child_count; ++i) {
+static void layout_canvas(UiElement* el, float* out_max_x, float* out_max_y) {
+    *out_max_x = 0;
+    *out_max_y = 0;
+    for (size_t i = 0; i < el->child_count; ++i) {
+        if (el->flags & UI_FLAG_SCROLLABLE) {
             el->children[i]->rect.x -= el->scroll_x;
             el->children[i]->rect.y -= el->scroll_y;
         }
+        
+        // Calculate content bounds (using logical coordinates, reverting scroll)
+        float logical_x = el->children[i]->rect.x + (el->flags & UI_FLAG_SCROLLABLE ? el->scroll_x : 0);
+        float logical_y = el->children[i]->rect.y + (el->flags & UI_FLAG_SCROLLABLE ? el->scroll_y : 0);
+        float right = logical_x + el->children[i]->rect.w;
+        float bottom = logical_y + el->children[i]->rect.h;
+        
+        if (right > *out_max_x) *out_max_x = right;
+        if (bottom > *out_max_y) *out_max_y = bottom;
     }
 }
 
@@ -171,10 +187,9 @@ static void layout_recursive(UiElement* el, Rect available, uint64_t frame_numbe
             el->content_h = max_y - start_y;
             break;
         case UI_LAYOUT_CANVAS:
-            layout_canvas(el);
-            // Canvas content size not fully implemented yet
-            el->content_w = 0; 
-            el->content_h = 0;
+            layout_canvas(el, &max_x, &max_y);
+            el->content_w = max_x;
+            el->content_h = max_y;
             break;
         case UI_LAYOUT_SPLIT_H:
             layout_split_h(el, start_x, start_y);

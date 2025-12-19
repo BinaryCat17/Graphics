@@ -130,24 +130,27 @@ static void render_content(const UiElement* el, Scene* scene, Vec4 clip_vec, flo
 // Internal Render Context to avoid passing too many args
 typedef struct UiRenderContext {
     Scene* scene;
-    const UiElement** overlays;
-    size_t overlay_count;
-    size_t overlay_capacity;
 } UiRenderContext;
 
+// Persistent overlay buffer to avoid per-frame allocation
+static const UiElement** g_overlay_buffer = NULL;
+static size_t g_overlay_count = 0;
+static size_t g_overlay_capacity = 0;
+
 static void push_overlay(UiRenderContext* ctx, const UiElement* el) {
-    if (ctx->overlay_count >= ctx->overlay_capacity) {
-        size_t new_cap = ctx->overlay_capacity == 0 ? 64 : ctx->overlay_capacity * 2;
-        const UiElement** new_arr = (const UiElement**)realloc(ctx->overlays, new_cap * sizeof(UiElement*));
+    (void)ctx; // Unused in this implementation
+    if (g_overlay_count >= g_overlay_capacity) {
+        size_t new_cap = g_overlay_capacity == 0 ? 64 : g_overlay_capacity * 2;
+        const UiElement** new_arr = (const UiElement**)realloc((void*)g_overlay_buffer, new_cap * sizeof(UiElement*));
         if (new_arr) {
-            ctx->overlays = new_arr;
-            ctx->overlay_capacity = new_cap;
+            g_overlay_buffer = new_arr;
+            g_overlay_capacity = new_cap;
         } else {
             LOG_ERROR("UiRenderer: Failed to realloc overlay buffer");
             return;
         }
     }
-    ctx->overlays[ctx->overlay_count++] = el;
+    g_overlay_buffer[g_overlay_count++] = el;
 }
 
 static void process_node(const UiElement* el, UiRenderContext* ctx, Rect current_clip, float base_z, bool is_overlay_pass) {
@@ -203,6 +206,9 @@ void ui_renderer_build_scene(const UiElement* root, Scene* scene, const Assets* 
     UiRenderContext ctx = {0};
     ctx.scene = scene;
     
+    // Reset global overlay count for this frame
+    g_overlay_count = 0;
+    
     // Pass 1: Draw Normal, Defer Overlays
     process_node(root, &ctx, infinite_clip, 0.0f, false);
     
@@ -211,9 +217,9 @@ void ui_renderer_build_scene(const UiElement* root, Scene* scene, const Assets* 
     // but our logic above defers them during traversal. 
     // However, usually overlays are top-level. 
     // The current implementation flattens the first level of overlays.
-    for (size_t i = 0; i < ctx.overlay_count; ++i) {
-        process_node(ctx.overlays[i], &ctx, infinite_clip, 0.8f, true);
+    for (size_t i = 0; i < g_overlay_count; ++i) {
+        process_node(g_overlay_buffer[i], &ctx, infinite_clip, 0.8f, true);
     }
     
-    if (ctx.overlays) free(ctx.overlays);
+    // Do NOT free g_overlay_buffer here. It persists.
 }

@@ -1,6 +1,6 @@
 # The Architecture Guide
 
-**Version:** 0.3 (UI Modernization)
+**Version:** 0.4 (UI Optimization & Stability)
 **Date:** December 19, 2025
 
 This document explains **how** the system is built and, more importantly, **why** it is built that way.
@@ -48,7 +48,37 @@ This is the entry point (`main.c`). It connects everything together.
 
 ---
 
-## 2. Deep Dive: The UI System (v0.3)
+## 2. Core Principles
+
+These are the non-negotiable rules that guide every architectural decision in the project.
+
+### 🧠 Data-Driven Design
+*   **Definition:** Behavior and structure should be defined in data (YAML, C Structs), not hardcoded in logic.
+*   **Implementation:** The UI is built entirely from `manifest.yaml` and layout files. The engine logic simply interprets this data.
+*   **Benefit:** faster iteration time and separation of design from engineering.
+
+### ⚡ Reactivity (MVVM)
+*   **Definition:** The UI automatically reflects the state of the application without manual updates.
+*   **Implementation:** We use a custom **Reflection System**. UI components bind to C struct fields (e.g., `text_source: "node_name"`). When the C data changes, the UI updates automatically.
+
+### 🛡 Memory Safety & Performance
+*   **Definition:** No garbage collection, predictable memory usage, and zero leaks.
+*   **Implementation:**
+    *   **Arenas:** Used for permanent frame-agnostic data (Assets, Specs).
+    *   **Pools:** Used for dynamic objects that need frequent allocation/deallocation (UI Elements).
+    *   **Stack/Temp:** Used for per-frame data.
+*   **Rule:** `malloc`/`free` are forbidden in the hot loop.
+
+### 🔗 Strict Decoupling
+*   **Definition:** Systems should not know about each other unless absolutely necessary.
+*   **Implementation:**
+    *   The **UI Engine** knows nothing about the **Math Engine**.
+    *   They communicate via a **Command System** using String IDs (FNV-1a).
+    *   The UI sends a string event ("Graph.AddNode"), and the App handles it.
+
+---
+
+## 3. Deep Dive: The UI System (v0.3)
 
 The UI system follows a **Data-Driven, Reactive, MVVM** architecture.
 
@@ -61,16 +91,11 @@ The UI system follows a **Data-Driven, Reactive, MVVM** architecture.
 ### Key Features
 *   **Manifest-Based Loading:** The engine loads a single manifest that acts as a "Library" of available components. This separates component definitions from the main layout.
 *   **Templates & Instances:** UI components are loaded as templates and instantiated via `type: instance`.
-*   **Strict Import Rules:**
-    *   Imports are ONLY allowed at the top level of a file (Manifest or Root).
-    *   **NEVER** use `import` inside a `children` list. Use a Template and instantiate it instead. The parser will throw an error if this is violated.
-*   **Recursive Composition:** Supported via `type: instance`.
-
-### The Command System
-We decouple the UI from the App logic using the **Command Pattern**.
-*   **Registry:** The App registers callbacks (e.g., `ui_command_register("Graph.Clear", ...)`).
-*   **Trigger:** The UI triggers them via strings (e.g., `on_click: "Graph.Clear"`).
-*   **Benefit:** The UI parser doesn't need to know about "Graphs" or "Nodes". It just fires string events.
+*   **Strict Import Rules:** Imports are ONLY allowed at the top level. `import` inside `children` is forbidden.
+*   **Memory Management:** 
+    *   **Spec (Assets):** Stored in a permanent Arena.
+    *   **Elements (Instances):** Allocated from a **Memory Pool** to allow efficient reuse and freeing of dynamic UI trees (like Graph Nodes).
+*   **Command System:** Decoupled via **String IDs** (FNV-1a). The UI triggers events by ID, and the App executes registered callbacks.
 
 ---
 
@@ -88,6 +113,7 @@ Instead of having separate lists for UI, 2D Sprites, and 3D Models, the engine u
 This is the **High-Level API**. Features and the App talk to this.
 *   **You say:** "Draw this UI", "Render this scene", "Set the camera".
 *   **It does:** Sorts objects, culls invisible items, and prepares packets for the backend.
+*   **Optimization:** Uses a static overlay buffer to avoid per-frame allocations for popup/tooltip rendering.
 
 ### The Worker: `RendererBackend` (`renderer_backend.h`)
 This is the **Low-Level Hardware Interface**. Only the `RenderSystem` talks to this.
@@ -137,4 +163,3 @@ src/
 ## 6. Known Constraints (Technical Debt)
 
 *   **Text Rendering:** Each letter is a separate object (inefficient). Needs batching.
-*   **String Hashing:** The engine still uses `strcmp` in many places (Registry, UI lookups). Should move to `StringID` (FNV-1a).

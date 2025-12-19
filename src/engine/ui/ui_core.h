@@ -7,6 +7,7 @@
 #include "foundation/memory/arena.h"
 #include "foundation/math/coordinate_systems.h"
 
+#include "foundation/memory/pool.h"
 #include "foundation/string/string_id.h"
 
 // --- CONSTANTS & FLAGS ---
@@ -206,6 +207,7 @@ typedef struct UiElement {
 
 typedef struct UiInstance {
     MemoryArena arena;
+    MemoryPool* element_pool;
     UiElement* root;
 } UiInstance;
 

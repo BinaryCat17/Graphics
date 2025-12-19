@@ -1,51 +1,35 @@
 # Project Roadmap
 
-**Current Focus:** v0.3 - UI Modernization & Strictness
+**Current Focus:** v0.4 - UI Stability & Pre-3D
 **Date:** December 19, 2025
 
-## ✅ Recent Achievements
+## 🏁 Current State (v0.4)
 
-*   **UI Architecture (v0.3):**
-    *   **Data-Driven:** Fully declarative YAML UI with Templates and Instantiation.
-    *   **Reactivity:** Optimized Reflection Binding (cached pointers).
-    *   **Layouts:** Implemented Flex, Canvas, and **Split Containers** (H/V).
-    *   **Animations:** Declarative state transitions (`hover_color`, `animation_speed`).
-    *   **Decoupling:** Implemented **Command System** (`Graph.AddNode`) to separate UI from Logic.
-    *   **Strictness:** Added parser validation for layout rules.
+The project has successfully completed a major UI modernization phase.
+*   **Architecture:** Stable, Memory-Safe, Data-Driven MVVM.
+*   **UI Engine:** Feature-complete for 2D tools (Canvas, Flex, Splitters, Inputs).
+*   **Optimization:** Zero per-frame allocations in the renderer.
+
+We are now shifting focus from **Tooling/UI** to **Core Graphics/3D**.
 
 ---
 
 ## 🚀 Active Phases
 
-### Phase 4.5: Code Cleanup & Strict Architecture
-**Objective:** Harden the codebase after the rapid UI prototyping phase.
-- [x] **Refactor `main.c`:** Extract `MathEditor` logic into `src/features/math_engine/math_editor.c`.
-    *   Move `AppState`, `MathGraph`, and UI generation logic out of `main.c`.
-    *   Prepare for future "Collection Binding" by isolating imperative UI construction.
-- [x] **UI Manifest System:** Decoupled template registration from layout definition.
-- [x] **Strict Import Validation:** Parser now forbids `import` inside `children`.
-- [x] **Strict Type Safety:** Enforce type checking in Data Bindings.
-- [x] **String IDs:** Replace runtime `strcmp` with **Hash IDs** (UiCommandSystem).
-- [x] **Layer System (Z-Order & Clipping):** Implemented `layer: top/overlay` handling in `UiRenderer`.
-- [x] **Conditional Visibility:** Added `bind_visible` / `bind_if` logic.
-- [x] **Refactor `main.c`:** Command callbacks moved to `EditorLayer` (MathEditor).
-- [x] **Input System Cleanup:** Refactor `ui_input.c`.
-- [x] **Unused Code Removal:** Clean up structs.
-
 ### Phase 5: 3D & Scene Expansion
-**Objective:** Move beyond 2D quads.
-- [ ] **Mesh Rendering:** Implement 3D mesh loading and rendering in `vulkan_renderer.c`.
-- [ ] **Camera System:** Implement a proper 3D camera controller (Perspective/Orthographic).
+**Objective:** Move beyond 2D quads and prepare the engine for 3D content.
+- [ ] **Mesh Rendering:** Implement 3D mesh loading (OBJ/GLTF) and rendering in `vulkan_renderer.c`.
+- [ ] **Camera System:** Implement a proper 3D camera controller (Perspective/Orthographic) with input handling.
+- [ ] **Transform Hierarchy:** Upgrade `SceneObject` to support parent-child transforms (currently flat).
 
 ---
 
-## 🛠 Technical Debt & backlog
-
-### Core Optimization
-- **String Hashing:** See Phase 4.5.
+## 🛠 Technical Debt & Backlog
 
 ### Text Rendering
-
 - **Issue:** Current implementation creates 1 draw call per character (via `SceneObject`).
-
 - **Plan:** Implement Glyph Batching (single vertex buffer for text strings).
+
+### Input System
+- **Issue:** Input state is currently polled. 
+- **Plan:** Move to an Event-Based input queue for more reliable handling of fast keypresses.

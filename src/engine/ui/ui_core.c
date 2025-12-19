@@ -43,14 +43,26 @@ UiNodeSpec* ui_asset_get_template(UiAsset* asset, const char* name) {
 
 // --- UiInstance (Memory Owner for Runtime) ---
 
+static void destroy_recursive(UiInstance* instance, UiElement* el) {
+    if (!el) return;
+    for (size_t i = 0; i < el->child_count; ++i) {
+        destroy_recursive(instance, el->children[i]);
+    }
+    if (el->children) free(el->children);
+    pool_free(instance->element_pool, el);
+}
+
 void ui_instance_init(UiInstance* instance, size_t size) {
     if (!instance) return;
     arena_init(&instance->arena, size);
+    instance->element_pool = pool_create(sizeof(UiElement), 256);
     instance->root = NULL;
 }
 
 void ui_instance_destroy(UiInstance* instance) {
     if (!instance) return;
+    if (instance->root) destroy_recursive(instance, instance->root);
+    pool_destroy(instance->element_pool);
     arena_destroy(&instance->arena);
     instance->root = NULL;
 }
@@ -58,8 +70,8 @@ void ui_instance_destroy(UiInstance* instance) {
 // --- UiElement (Instance) ---
 
 static UiElement* element_alloc(UiInstance* instance, const UiNodeSpec* spec) {
-    // Arena allocation guarantees zero-init
-    UiElement* el = (UiElement*)arena_alloc_zero(&instance->arena, sizeof(UiElement));
+    // Pool allocation guarantees zero-init
+    UiElement* el = (UiElement*)pool_alloc(instance->element_pool);
     el->spec = spec;
     return el;
 }
@@ -115,8 +127,19 @@ void ui_element_rebuild_children(UiElement* el, UiInstance* instance) {
     size_t total_count = static_count + dynamic_count;
     // ...
     
-    // 2. Re-allocate children array (Leak in Arena, accepted for now)
-    el->children = (UiElement**)arena_alloc_zero(&instance->arena, total_count * sizeof(UiElement*));
+    // 2. Re-allocate children array
+    // Free existing children to prevent leaks
+    for (size_t i = 0; i < el->child_count; ++i) {
+        destroy_recursive(instance, el->children[i]);
+    }
+    if (el->children) {
+        free(el->children);
+        el->children = NULL;
+    }
+
+    if (total_count > 0) {
+        el->children = (UiElement**)calloc(total_count, sizeof(UiElement*));
+    }
     el->child_count = total_count;
     
     // 3. Re-create Static Children

@@ -5,10 +5,15 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+#define UI_MAX_EVENTS 64
+#define UI_KEY_BACKSPACE 259
+#define UI_SCROLL_SPEED 20.0f
+#define UI_DRAG_THRESHOLD_SQ 9.0f
+
 // --- Helper Functions ---
 
 static void push_event(UiInputContext* ctx, UiEventType type, UiElement* target) {
-    if (ctx->event_count < 64) {
+    if (ctx->event_count < UI_MAX_EVENTS) {
         ctx->events[ctx->event_count].type = type;
         ctx->events[ctx->event_count].target = target;
         ctx->event_count++;
@@ -91,8 +96,8 @@ static void handle_scroll(UiInputContext* ctx, const InputState* input) {
     UiElement* target = ctx->hovered;
     while (target) {
         if (target->flags & UI_FLAG_SCROLLABLE) {
-            target->scroll_y -= input->scroll_dy * 20.0f; 
-            target->scroll_x += input->scroll_dx * 20.0f;
+            target->scroll_y -= input->scroll_dy * UI_SCROLL_SPEED; 
+            target->scroll_x += input->scroll_dx * UI_SCROLL_SPEED;
 
             // Clamp Y
             float max_scroll_y = target->content_h - (target->rect.h - target->spec->padding * 2);
@@ -194,7 +199,7 @@ static void handle_keyboard_input(UiInputContext* ctx, const InputState* input) 
          }
     }
     // 2. Backspace
-    if (input->last_key == 259 && input->last_action != 0) { // 259 = GLFW_KEY_BACKSPACE
+    if (input->last_key == UI_KEY_BACKSPACE && input->last_action != 0) { // UI_KEY_BACKSPACE
          char buf[256] = {0};
          ui_bind_read_string(el->data_ptr, field, buf, sizeof(buf));
          size_t len = strlen(buf);
@@ -221,7 +226,7 @@ static void handle_drag_logic(UiInputContext* ctx, const InputState* input) {
     if (ctx->possible_drag && !ctx->is_dragging) {
         float dx = input->mouse_x - ctx->drag_start_mouse_x;
         float dy = input->mouse_y - ctx->drag_start_mouse_y;
-        if (dx*dx + dy*dy > 9.0f) { 
+        if (dx*dx + dy*dy > UI_DRAG_THRESHOLD_SQ) { 
             ctx->is_dragging = true;
             push_event(ctx, UI_EVENT_DRAG_START, ctx->active);
         }
