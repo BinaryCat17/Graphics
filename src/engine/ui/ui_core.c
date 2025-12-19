@@ -113,7 +113,8 @@ void ui_element_rebuild_children(UiElement* el, UiInstance* instance) {
             if (cnt > 0) dynamic_count = (size_t)cnt;
             LOG_TRACE("UI Collection '%s': Count=%zu", el->spec->bind_collection, dynamic_count);
         } else {
-            LOG_WARN("UI Collection field '%s' not found in meta '%s'", el->spec->bind_collection, el->meta->name);
+            LOG_ERROR("UiCore: Collection field '%s' not found in struct '%s' (Node: %s)", 
+                el->spec->bind_collection, el->meta->name, el->spec->id ? el->spec->id : "anon");
         }
     }
     
@@ -169,12 +170,30 @@ UiElement* ui_element_create(UiInstance* instance, const UiNodeSpec* spec, void*
 
     // Cache Bindings
     if (meta) {
-        if (spec->text_source)  el->bind_text  = meta_find_field(meta, spec->text_source);
-        if (spec->value_source) el->bind_value = meta_find_field(meta, spec->value_source);
-        if (spec->x_source)     el->bind_x     = meta_find_field(meta, spec->x_source);
-        if (spec->y_source)     el->bind_y     = meta_find_field(meta, spec->y_source);
-        if (spec->w_source)     el->bind_w     = meta_find_field(meta, spec->w_source);
-        if (spec->h_source)     el->bind_h     = meta_find_field(meta, spec->h_source);
+        if (spec->text_source) {
+            el->bind_text = meta_find_field(meta, spec->text_source);
+            if (!el->bind_text) LOG_ERROR("UiCore: Failed to bind 'text: %s' on Node '%s'. Field not found in struct '%s'", spec->text_source, spec->id ? spec->id : "anon", meta->name);
+        }
+        if (spec->value_source) {
+            el->bind_value = meta_find_field(meta, spec->value_source);
+            if (!el->bind_value) LOG_ERROR("UiCore: Failed to bind 'value: %s' on Node '%s'. Field not found in struct '%s'", spec->value_source, spec->id ? spec->id : "anon", meta->name);
+        }
+        if (spec->x_source) {
+            el->bind_x = meta_find_field(meta, spec->x_source);
+            if (!el->bind_x) LOG_ERROR("UiCore: Failed to bind 'x: %s' on Node '%s'. Field not found in struct '%s'", spec->x_source, spec->id ? spec->id : "anon", meta->name);
+        }
+        if (spec->y_source) {
+            el->bind_y = meta_find_field(meta, spec->y_source);
+            if (!el->bind_y) LOG_ERROR("UiCore: Failed to bind 'y: %s' on Node '%s'. Field not found in struct '%s'", spec->y_source, spec->id ? spec->id : "anon", meta->name);
+        }
+        if (spec->w_source) {
+            el->bind_w = meta_find_field(meta, spec->w_source);
+            if (!el->bind_w) LOG_ERROR("UiCore: Failed to bind 'w: %s' on Node '%s'. Field not found in struct '%s'", spec->w_source, spec->id ? spec->id : "anon", meta->name);
+        }
+        if (spec->h_source) {
+            el->bind_h = meta_find_field(meta, spec->h_source);
+            if (!el->bind_h) LOG_ERROR("UiCore: Failed to bind 'h: %s' on Node '%s'. Field not found in struct '%s'", spec->h_source, spec->id ? spec->id : "anon", meta->name);
+        }
     }
 
     // Populate Children
