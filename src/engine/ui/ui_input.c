@@ -5,18 +5,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-// --- Helpers ---
-
-bool ui_input_pop_event(UiInputContext* ctx, UiEvent* out_event) {
-    if (!ctx || ctx->event_count == 0) return false;
-    *out_event = ctx->events[0];
-    // Shift
-    for (int i = 0; i < ctx->event_count - 1; ++i) {
-        ctx->events[i] = ctx->events[i+1];
-    }
-    ctx->event_count--;
-    return true;
-}
+// --- Helper Functions ---
 
 static void push_event(UiInputContext* ctx, UiEventType type, UiElement* target) {
     if (ctx->event_count < 64) {
@@ -36,6 +25,8 @@ static void set_field_from_string(void* data, const MetaField* field, const char
     }
 }
 
+// --- Public API ---
+
 void ui_input_init(UiInputContext* ctx) {
     memset(ctx, 0, sizeof(UiInputContext));
 }
@@ -50,12 +41,23 @@ void ui_input_reset(UiInputContext* ctx) {
     ctx->event_count = 0;
 }
 
-// --- Hit Testing ---
+bool ui_input_pop_event(UiInputContext* ctx, UiEvent* out_event) {
+    if (!ctx || ctx->event_count == 0) return false;
+    *out_event = ctx->events[0];
+    // Shift remaining events
+    for (int i = 0; i < ctx->event_count - 1; ++i) {
+        ctx->events[i] = ctx->events[i+1];
+    }
+    ctx->event_count--;
+    return true;
+}
+
+// --- Internal Logic Breakdown ---
 
 static UiElement* hit_test_recursive(UiElement* el, float x, float y) {
     if (!el || !el->spec) return NULL;
     
-    // Skip hidden or non-interactive
+    // Skip hidden or non-interactive (unless specifically handled)
     if (el->spec->flags & UI_FLAG_HIDDEN) return NULL;
     
     // Check clip rect if clipped
@@ -66,7 +68,7 @@ static UiElement* hit_test_recursive(UiElement* el, float x, float y) {
         }
     }
 
-    // Check children first
+    // Check children first (reverse order for Z-sorting: last drawn is top)
     for (int i = (int)el->child_count - 1; i >= 0; --i) {
         UiElement* hit = hit_test_recursive(el->children[i], x, y);
         if (hit) return hit;
@@ -81,12 +83,7 @@ static UiElement* hit_test_recursive(UiElement* el, float x, float y) {
     return NULL;
 }
 
-// --- Logic ---
-
-void ui_input_update(UiInputContext* ctx, UiElement* root, const InputState* input) {
-    if (!ctx || !root || !input) return;
-
-    // 1. Hit Test
+static void update_hover_state(UiInputContext* ctx, UiElement* root, const InputState* input) {
     UiElement* prev_hovered = ctx->hovered;
     ctx->hovered = hit_test_recursive(root, input->mouse_x, input->mouse_y);
 
@@ -96,205 +93,231 @@ void ui_input_update(UiInputContext* ctx, UiElement* root, const InputState* inp
     if (ctx->hovered) {
         ctx->hovered->is_hovered = true;
     }
-    
-    // 1.5 Scrolling
-    if (input->scroll_dy != 0.0f || input->scroll_dx != 0.0f) {
-        UiElement* scroll_target = ctx->hovered;
-        while (scroll_target) {
-            if (scroll_target->spec->flags & UI_FLAG_SCROLLABLE) {
-                scroll_target->scroll_y -= input->scroll_dy * 20.0f; 
-                scroll_target->scroll_x += input->scroll_dx * 20.0f;
+}
 
-                float max_scroll_y = scroll_target->content_h - (scroll_target->rect.h - scroll_target->spec->padding * 2);
-                if (max_scroll_y < 0) max_scroll_y = 0;
-                
-                if (scroll_target->scroll_y < 0) scroll_target->scroll_y = 0;
-                if (scroll_target->scroll_y > max_scroll_y) scroll_target->scroll_y = max_scroll_y;
+static void handle_scroll(UiInputContext* ctx, const InputState* input) {
+    if (input->scroll_dy == 0.0f && input->scroll_dx == 0.0f) return;
 
-                float max_scroll_x = scroll_target->content_w - (scroll_target->rect.w - scroll_target->spec->padding * 2);
-                if (max_scroll_x < 0) max_scroll_x = 0;
-                if (scroll_target->scroll_x < 0) scroll_target->scroll_x = 0;
-                if (scroll_target->scroll_x > max_scroll_x) scroll_target->scroll_x = max_scroll_x;
-                
-                break;
-            }
-            scroll_target = scroll_target->parent;
-        }
-    }
+    UiElement* target = ctx->hovered;
+    while (target) {
+        if (target->spec->flags & UI_FLAG_SCROLLABLE) {
+            target->scroll_y -= input->scroll_dy * 20.0f; 
+            target->scroll_x += input->scroll_dx * 20.0f;
 
-    // 2. Mouse Press
-    if (input->mouse_clicked) {
-        if (ctx->hovered) {
-            ctx->active = ctx->hovered;
-            ctx->possible_drag = true;
-            ctx->drag_start_mouse_x = input->mouse_x;
-            ctx->drag_start_mouse_y = input->mouse_y;
+            // Clamp Y
+            float max_scroll_y = target->content_h - (target->rect.h - target->spec->padding * 2);
+            if (max_scroll_y < 0) max_scroll_y = 0;
+            if (target->scroll_y < 0) target->scroll_y = 0;
+            if (target->scroll_y > max_scroll_y) target->scroll_y = max_scroll_y;
+
+            // Clamp X
+            float max_scroll_x = target->content_w - (target->rect.w - target->spec->padding * 2);
+            if (max_scroll_x < 0) max_scroll_x = 0;
+            if (target->scroll_x < 0) target->scroll_x = 0;
+            if (target->scroll_x > max_scroll_x) target->scroll_x = max_scroll_x;
             
-            if (ctx->active->spec->flags & UI_FLAG_SCROLLABLE) {
-                 ctx->drag_start_elem_x = ctx->active->scroll_x;
-                 ctx->drag_start_elem_y = ctx->active->scroll_y;
-            }
+            break; // Handled
+        }
+        target = target->parent;
+    }
+}
 
-            if (ctx->hovered->spec->flags & UI_FLAG_FOCUSABLE) {
-                if (ctx->focused && ctx->focused != ctx->hovered) {
-                    ctx->focused->is_focused = false;
-                }
-                ctx->focused = ctx->hovered;
-                ctx->focused->is_focused = true;
-            } else {
-                if (ctx->focused) {
-                    ctx->focused->is_focused = false;
-                }
-                ctx->focused = NULL;
+static void handle_mouse_press(UiInputContext* ctx, const InputState* input) {
+    if (!input->mouse_clicked) return;
+
+    if (ctx->hovered) {
+        ctx->active = ctx->hovered;
+        ctx->possible_drag = true;
+        ctx->drag_start_mouse_x = input->mouse_x;
+        ctx->drag_start_mouse_y = input->mouse_y;
+        
+        // Cache start values for potential drag
+        if (ctx->active->spec->flags & UI_FLAG_SCROLLABLE) {
+             ctx->drag_start_elem_x = ctx->active->scroll_x;
+             ctx->drag_start_elem_y = ctx->active->scroll_y;
+        } else if (ctx->active->spec->flags & UI_FLAG_DRAGGABLE) {
+             // Cache bound values
+             if (ctx->active->data_ptr && ctx->active->meta) {
+                 if (ctx->active->spec->x_source) {
+                     const MetaField* fx = meta_find_field(ctx->active->meta, ctx->active->spec->x_source);
+                     ctx->drag_start_elem_x = meta_get_float(ctx->active->data_ptr, fx);
+                 }
+                 if (ctx->active->spec->y_source) {
+                     const MetaField* fy = meta_find_field(ctx->active->meta, ctx->active->spec->y_source);
+                     ctx->drag_start_elem_y = meta_get_float(ctx->active->data_ptr, fy);
+                 }
+             }
+        }
+
+        // Handle Focus
+        if (ctx->hovered->spec->flags & UI_FLAG_FOCUSABLE) {
+            if (ctx->focused && ctx->focused != ctx->hovered) {
+                ctx->focused->is_focused = false;
             }
+            ctx->focused = ctx->hovered;
+            ctx->focused->is_focused = true;
         } else {
+            // Clicked something non-focusable (like a button), lose focus on text field?
+            // Usually buttons don't steal focus from text inputs in desktop apps, 
+            // but for now let's clear focus to be safe or strict.
             if (ctx->focused) {
                 ctx->focused->is_focused = false;
             }
             ctx->focused = NULL;
         }
+    } else {
+        // Clicked void
+        if (ctx->focused) {
+            ctx->focused->is_focused = false;
+        }
+        ctx->focused = NULL;
     }
     
     if (ctx->active) {
         ctx->active->is_active = true;
     }
+}
 
-    // 2.5 Keyboard
-    if (ctx->focused) {
-        UiElement* el = ctx->focused;
-        if ((el->spec->flags & UI_FLAG_EDITABLE) && el->spec->kind == UI_KIND_TEXT_INPUT) {
-            
-            bool changed = false;
-            // 1. Typing
-            if (input->last_char >= 32 && input->last_char <= 126) {
-                if (el->data_ptr && el->meta && el->spec->text_source) {
-                    const MetaField* field = meta_find_field(el->meta, el->spec->text_source);
-                    if (field) {
-                         char buf[256] = {0};
-                         ui_bind_read_string(el->data_ptr, field, buf, sizeof(buf));
-                         
-                         size_t len = strlen(buf);
-                         if (len < 255) {
-                             buf[len] = (char)input->last_char;
-                             buf[len+1] = '\0';
-                             set_field_from_string(el->data_ptr, field, buf);
-                             el->cursor_idx++;
-                             changed = true;
-                         }
-                    }
-                }
-            }
-            // 2. Backspace
-            if (input->last_key == 259 && input->last_action != 0) { 
-                if (el->data_ptr && el->meta && el->spec->text_source) {
-                    const MetaField* field = meta_find_field(el->meta, el->spec->text_source);
-                    if (field) {
-                         char buf[256] = {0};
-                         ui_bind_read_string(el->data_ptr, field, buf, sizeof(buf));
-                         size_t len = strlen(buf);
-                         if (len > 0) {
-                             buf[len-1] = '\0';
-                             set_field_from_string(el->data_ptr, field, buf);
-                             if (el->cursor_idx > 0) el->cursor_idx--;
-                             changed = true;
-                         }
-                    }
-                }
-            }
-            
-            if (changed) {
-                push_event(ctx, UI_EVENT_VALUE_CHANGE, el);
-                if (el->spec->on_change_cmd) {
-                    ui_command_execute(el->spec->on_change_cmd, el);
-                }
-            }
+static void handle_keyboard_input(UiInputContext* ctx, const InputState* input) {
+    if (!ctx->focused) return;
+    
+    UiElement* el = ctx->focused;
+    if (!((el->spec->flags & UI_FLAG_EDITABLE) && el->spec->kind == UI_KIND_TEXT_INPUT)) return;
+
+    bool changed = false;
+    
+    // Ensure we have binding
+    if (!el->data_ptr || !el->meta || !el->spec->text_source) return;
+    const MetaField* field = meta_find_field(el->meta, el->spec->text_source);
+    if (!field) return;
+
+    // 1. Typing
+    if (input->last_char >= 32 && input->last_char <= 126) {
+         char buf[256] = {0};
+         ui_bind_read_string(el->data_ptr, field, buf, sizeof(buf));
+         
+         size_t len = strlen(buf);
+         if (len < 255) {
+             // Simple insertion at end (TODO: Use cursor_idx for insertion)
+             buf[len] = (char)input->last_char;
+             buf[len+1] = '\0';
+             set_field_from_string(el->data_ptr, field, buf);
+             el->cursor_idx++;
+             changed = true;
+         }
+    }
+    // 2. Backspace
+    if (input->last_key == 259 && input->last_action != 0) { // 259 = GLFW_KEY_BACKSPACE
+         char buf[256] = {0};
+         ui_bind_read_string(el->data_ptr, field, buf, sizeof(buf));
+         size_t len = strlen(buf);
+         if (len > 0) {
+             buf[len-1] = '\0';
+             set_field_from_string(el->data_ptr, field, buf);
+             if (el->cursor_idx > 0) el->cursor_idx--;
+             changed = true;
+         }
+    }
+    
+    if (changed) {
+        push_event(ctx, UI_EVENT_VALUE_CHANGE, el);
+        if (el->spec->on_change_cmd) {
+            ui_command_execute(el->spec->on_change_cmd, el);
+        }
+    }
+}
+
+static void handle_drag_logic(UiInputContext* ctx, const InputState* input) {
+    if (!ctx->active || !input->mouse_down) return;
+
+    // Check start threshold
+    if (ctx->possible_drag && !ctx->is_dragging) {
+        float dx = input->mouse_x - ctx->drag_start_mouse_x;
+        float dy = input->mouse_y - ctx->drag_start_mouse_y;
+        if (dx*dx + dy*dy > 9.0f) { 
+            ctx->is_dragging = true;
+            push_event(ctx, UI_EVENT_DRAG_START, ctx->active);
         }
     }
 
-    // 3. Mouse Release
-    if (!input->mouse_down) {
-        if (ctx->active) {
-            if (ctx->active == ctx->hovered) {
-                push_event(ctx, UI_EVENT_CLICK, ctx->active);
-                if (ctx->active->spec->on_click_cmd) {
-                    ui_command_execute(ctx->active->spec->on_click_cmd, ctx->active);
+    if (ctx->is_dragging) {
+        float dx = input->mouse_x - ctx->drag_start_mouse_x;
+        float dy = input->mouse_y - ctx->drag_start_mouse_y;
+        bool changed = false;
+
+        // Case A: Draggable Object (updates data model)
+        if (ctx->active->spec->flags & UI_FLAG_DRAGGABLE) {
+            if (ctx->active->data_ptr && ctx->active->meta) {
+                if (ctx->active->spec->x_source) {
+                    const MetaField* fx = meta_find_field(ctx->active->meta, ctx->active->spec->x_source);
+                    meta_set_float(ctx->active->data_ptr, fx, ctx->drag_start_elem_x + dx);
+                    changed = true;
+                }
+                if (ctx->active->spec->y_source) {
+                    const MetaField* fy = meta_find_field(ctx->active->meta, ctx->active->spec->y_source);
+                    meta_set_float(ctx->active->data_ptr, fy, ctx->drag_start_elem_y + dy);
+                    changed = true;
                 }
             }
-            if (ctx->is_dragging) {
-                push_event(ctx, UI_EVENT_DRAG_END, ctx->active);
-            }
-            
-            ctx->active->is_active = false;
-            ctx->active = NULL;
         }
-        ctx->is_dragging = false;
-        ctx->possible_drag = false;
+        // Case B: Scrollable (internal state)
+        else if (ctx->active->spec->flags & UI_FLAG_SCROLLABLE) {
+             ctx->active->scroll_x = ctx->drag_start_elem_x - dx;
+             ctx->active->scroll_y = ctx->drag_start_elem_y - dy;
+             
+             // Clamp
+             float max_scroll_y = ctx->active->content_h - (ctx->active->rect.h - ctx->active->spec->padding * 2);
+             if (max_scroll_y < 0) max_scroll_y = 0;
+             if (ctx->active->scroll_y < 0) ctx->active->scroll_y = 0;
+             if (ctx->active->scroll_y > max_scroll_y) ctx->active->scroll_y = max_scroll_y;
+
+             float max_scroll_x = ctx->active->content_w - (ctx->active->rect.w - ctx->active->spec->padding * 2);
+             if (max_scroll_x < 0) max_scroll_x = 0;
+             if (ctx->active->scroll_x < 0) ctx->active->scroll_x = 0;
+             if (ctx->active->scroll_x > max_scroll_x) ctx->active->scroll_x = max_scroll_x;
+        }
+        
+        if (changed) {
+            push_event(ctx, UI_EVENT_VALUE_CHANGE, ctx->active);
+            if (ctx->active->spec->on_change_cmd) {
+                ui_command_execute(ctx->active->spec->on_change_cmd, ctx->active);
+            }
+        }
     }
+}
 
-    // 4. Drag Logic
-    if (ctx->active && input->mouse_down) {
-        if (ctx->possible_drag && !ctx->is_dragging) {
-            float dx = input->mouse_x - ctx->drag_start_mouse_x;
-            float dy = input->mouse_y - ctx->drag_start_mouse_y;
-            if (dx*dx + dy*dy > 9.0f) { 
-                ctx->is_dragging = true;
-                push_event(ctx, UI_EVENT_DRAG_START, ctx->active);
-                
-                if (ctx->active->data_ptr && ctx->active->meta) {
-                    if (ctx->active->spec->x_source) {
-                        const MetaField* fx = meta_find_field(ctx->active->meta, ctx->active->spec->x_source);
-                        ctx->drag_start_elem_x = meta_get_float(ctx->active->data_ptr, fx);
-                    }
-                    if (ctx->active->spec->y_source) {
-                        const MetaField* fy = meta_find_field(ctx->active->meta, ctx->active->spec->y_source);
-                        ctx->drag_start_elem_y = meta_get_float(ctx->active->data_ptr, fy);
-                    }
-                }
+static void handle_mouse_release(UiInputContext* ctx, const InputState* input) {
+    if (input->mouse_down) return; // Only on release
+
+    if (ctx->active) {
+        // Click?
+        if (ctx->active == ctx->hovered && !ctx->is_dragging) {
+            push_event(ctx, UI_EVENT_CLICK, ctx->active);
+            if (ctx->active->spec->on_click_cmd) {
+                ui_command_execute(ctx->active->spec->on_click_cmd, ctx->active);
             }
         }
-
+        // Drag End?
         if (ctx->is_dragging) {
-            float dx = input->mouse_x - ctx->drag_start_mouse_x;
-            float dy = input->mouse_y - ctx->drag_start_mouse_y;
-            bool changed = false;
-
-            // Case A: Draggable Object
-            if (ctx->active->spec->flags & UI_FLAG_DRAGGABLE) {
-                if (ctx->active->data_ptr && ctx->active->meta) {
-                    if (ctx->active->spec->x_source) {
-                        const MetaField* fx = meta_find_field(ctx->active->meta, ctx->active->spec->x_source);
-                        meta_set_float(ctx->active->data_ptr, fx, ctx->drag_start_elem_x + dx);
-                        changed = true;
-                    }
-                    if (ctx->active->spec->y_source) {
-                        const MetaField* fy = meta_find_field(ctx->active->meta, ctx->active->spec->y_source);
-                        meta_set_float(ctx->active->data_ptr, fy, ctx->drag_start_elem_y + dy);
-                        changed = true;
-                    }
-                }
-            }
-            // Case B: Scrollable
-            else if (ctx->active->spec->flags & UI_FLAG_SCROLLABLE) {
-                 ctx->active->scroll_x = ctx->drag_start_elem_x - dx;
-                 ctx->active->scroll_y = ctx->drag_start_elem_y - dy;
-                 
-                 float max_scroll_y = ctx->active->content_h - (ctx->active->rect.h - ctx->active->spec->padding * 2);
-                 if (max_scroll_y < 0) max_scroll_y = 0;
-                 if (ctx->active->scroll_y < 0) ctx->active->scroll_y = 0;
-                 if (ctx->active->scroll_y > max_scroll_y) ctx->active->scroll_y = max_scroll_y;
-
-                 float max_scroll_x = ctx->active->content_w - (ctx->active->rect.w - ctx->active->spec->padding * 2);
-                 if (max_scroll_x < 0) max_scroll_x = 0;
-                 if (ctx->active->scroll_x < 0) ctx->active->scroll_x = 0;
-                 if (ctx->active->scroll_x > max_scroll_x) ctx->active->scroll_x = max_scroll_x;
-            }
-            
-            if (changed) {
-                push_event(ctx, UI_EVENT_VALUE_CHANGE, ctx->active);
-                if (ctx->active->spec->on_change_cmd) {
-                    ui_command_execute(ctx->active->spec->on_change_cmd, ctx->active);
-                }
-            }
+            push_event(ctx, UI_EVENT_DRAG_END, ctx->active);
         }
+        
+        ctx->active->is_active = false;
+        ctx->active = NULL;
     }
+    ctx->is_dragging = false;
+    ctx->possible_drag = false;
+}
+
+// --- Main Update Loop ---
+
+void ui_input_update(UiInputContext* ctx, UiElement* root, const InputState* input) {
+    if (!ctx || !root || !input) return;
+
+    update_hover_state(ctx, root, input);
+    handle_scroll(ctx, input);
+    handle_mouse_press(ctx, input);
+    handle_keyboard_input(ctx, input);
+    handle_drag_logic(ctx, input);
+    handle_mouse_release(ctx, input);
 }
