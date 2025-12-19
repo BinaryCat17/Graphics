@@ -108,6 +108,11 @@ This is the **Low-Level Hardware Interface**. Only the `RenderSystem` talks to t
 
 > **Rule:** `src/features` should NEVER include `renderer_backend.h`. If a feature needs to do something complex (like Compute), the Engine should provide a clean abstraction for it.
 
+### 3. UI System
+*   **Mode:** **Retained Mode UI**. We build a persistent tree of `UiElement` objects (usually from YAML).
+*   **Logic:** The system handles input, focus, and state. You don't rebuild the tree every frame; you only update the data it points to.
+*   **Constraint:** Currently, the layout logic is "hungry" (it recalculates positions for the entire tree every frame).
+
 ---
 
 ## 4. The Build Pipeline (No Runtime Compilation)
@@ -167,7 +172,7 @@ Even good architectures have limits. Here are ours:
 *   **Why:** It was the fastest way to get text on screen for the prototype.
 *   **Fix:** "Glyph Batching" (merging text into one big mesh).
 
-### 3. Immediate Mode UI
-*   **What:** The UI rebuilds itself every frame.
-*   **Why:** Great for prototyping, bad for battery life.
-*   **Fix:** Caching the layout so we only rebuild when something changes.
+### 3. Per-Frame Layout Recalculation
+*   **What:** The UI engine recalculates the position and size of every element every single frame.
+*   **Why:** It was simpler to implement than a complex "Dirty Flag" system (which only updates what changed).
+*   **Fix:** Implement a "Dirty" system so layout only runs when a window is resized or content changes.
