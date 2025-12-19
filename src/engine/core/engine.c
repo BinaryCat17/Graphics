@@ -75,6 +75,7 @@ static void on_framebuffer_size(PlatformWindow* window, int width, int height, v
 bool engine_init(Engine* engine, const EngineConfig* config) {
     if (!engine || !config) return false;
     memset(engine, 0, sizeof(Engine));
+    engine->config = *config;
 
     // Store Callbacks
     engine->on_update = config->on_update;

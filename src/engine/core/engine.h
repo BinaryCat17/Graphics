@@ -37,6 +37,7 @@ struct Engine {
     // State
     bool running;
     bool show_compute_visualizer;
+    EngineConfig config;
     double screenshot_interval;
     double last_screenshot_time;
     double last_time;

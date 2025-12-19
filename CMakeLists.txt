@@ -142,11 +142,13 @@ target_link_libraries(engine_ui PUBLIC foundation_config engine_assets foundatio
 # Math Engine (Feature)
 set(FEATURE_MATH_ENGINE_SOURCES
     "src/features/math_engine/math_graph.c"
+    "src/features/math_engine/math_editor.c"
     "src/features/math_engine/transpiler.c"
     "src/features/math_engine/emitters/glsl_emitter.c")
 add_library(feature_math_engine STATIC ${FEATURE_MATH_ENGINE_SOURCES})
 target_include_directories(feature_math_engine PUBLIC "src/")
 target_link_libraries(feature_math_engine PUBLIC foundation_math foundation_memory)
+target_link_libraries(feature_math_engine PRIVATE engine_graphics engine_ui foundation_platform foundation_config foundation_logger foundation_meta Vulkan::Vulkan)
 if(UNIX)
     target_link_libraries(feature_math_engine PUBLIC m)
 endif()
