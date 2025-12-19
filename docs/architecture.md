@@ -112,7 +112,10 @@ This is the **Low-Level Hardware Interface**. Only the `RenderSystem` talks to t
 ### 3. UI System
 *   **Philosophy:** **Data-Driven Retained Mode**. We separate the **View** (YAML/Templates) from the **Model** (C Data).
 *   **No "Immediate Mode" Spaghetti:** Unlike ImGui, we do not interleave logic and drawing. The App updates data; the UI system observes changes and updates the view.
-*   **Reactivity:** The system uses a **Push/Pull hybrid**. It polls for changes efficiently using dirty flags and (future) direct pointer bindings, avoiding expensive per-frame logic.
+*   **Reactivity:** The system uses a **Push/Pull hybrid**.
+    *   **Current:** Efficient polling using `Dirty Flags`.
+    *   **Planned:** **Reflection-based Binding**. The engine will use metadata to resolve direct memory pointers to data fields, enabling near-zero cost updates.
+    *   **Planned:** **Codegen Proxies**. We may generate "setter" macros that automatically toggle dirty flags when data changes.
 *   **Layout:** A flexible `FLEX` engine (Column/Row/Canvas) that supports nesting. Future plans include "Split Containers" for docking.
 
 ---
