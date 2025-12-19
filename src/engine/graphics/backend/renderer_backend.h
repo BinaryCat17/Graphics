@@ -33,6 +33,27 @@ typedef struct RendererBackend {
 
     // Utilities
     void (*request_screenshot)(struct RendererBackend* backend, const char* filepath);
+
+    // --- Compute Subsystem ---
+    
+    // Create a compute pipeline from SPIR-V bytecode.
+    // Returns a handle > 0 on success, 0 on failure.
+    // 'layout_index' allows selecting pre-defined layouts (0 = Default: Output Image + UBO).
+    uint32_t (*compute_pipeline_create)(struct RendererBackend* backend, const void* spirv_code, size_t size, int layout_index);
+    
+    // Destroy a compute pipeline.
+    void (*compute_pipeline_destroy)(struct RendererBackend* backend, uint32_t pipeline_id);
+    
+    // Dispatch a compute shader.
+    // 'work_group_x/y/z': Number of local workgroups.
+    // 'push_constants': Pointer to data (max 128 bytes usually).
+    // 'push_constants_size': Size of data.
+    // The backend handles binding the output image associated with the context or graph.
+    void (*compute_dispatch)(struct RendererBackend* backend, uint32_t pipeline_id, uint32_t group_x, uint32_t group_y, uint32_t group_z, void* push_constants, size_t push_constants_size);
+    
+    // Sync: Wait for compute to finish (memory barrier).
+    void (*compute_wait)(struct RendererBackend* backend);
+
 } RendererBackend;
 
 // Registry / Factory

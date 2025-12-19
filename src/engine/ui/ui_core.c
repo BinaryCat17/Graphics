@@ -115,7 +115,7 @@ void ui_bind_read_string(void* data, const MetaField* field, char* out_buf, size
     
     out_buf[0] = '\0';
 
-    if (field->type == META_TYPE_STRING) {
+    if (field->type == META_TYPE_STRING || field->type == META_TYPE_STRING_ARRAY) {
         const char* current = meta_get_string(data, field);
         if (current) strncpy(out_buf, current, buf_size - 1);
         out_buf[buf_size - 1] = '\0';

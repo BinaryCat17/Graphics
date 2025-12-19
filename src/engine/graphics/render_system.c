@@ -98,10 +98,7 @@ const RenderFramePacket* render_system_acquire_packet(RenderSystem* sys) {
 
 // --- Init & Bootstrap ---
 
-static float render_system_measure_text_wrapper(const char* text, void* user_data) {
-    (void)user_data;
-    return font_measure_text(text);
-}
+
 
 static void try_bootstrap_renderer(RenderSystem* sys) {
     if (!sys) return;

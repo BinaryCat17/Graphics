@@ -58,6 +58,84 @@ void vk_create_descriptor_layout(VulkanRendererState* state) {
     };
     state->res = vkCreateDescriptorSetLayout(state->device, &lci1, NULL, &state->instance_layout);
     if (state->res != VK_SUCCESS) fatal_vk("vkCreateDescriptorSetLayout (Set 1)", state->res);
+
+    // Compute Layout: Set 0 = Storage Image (Write)
+    VkDescriptorSetLayoutBinding bindingC = {
+        .binding = 0,
+        .descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE,
+        .descriptorCount = 1,
+        .stageFlags = VK_SHADER_STAGE_COMPUTE_BIT
+    };
+    VkDescriptorSetLayoutCreateInfo lciC = {
+        .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO,
+        .bindingCount = 1,
+        .pBindings = &bindingC
+    };
+    state->res = vkCreateDescriptorSetLayout(state->device, &lciC, NULL, &state->compute_write_layout);
+    if (state->res != VK_SUCCESS) fatal_vk("vkCreateDescriptorSetLayout (Compute)", state->res);
+}
+
+VkResult vk_create_compute_pipeline_shader(VulkanRendererState* state, const uint32_t* code, size_t size, int layout_idx, VkPipeline* out_pipeline, VkPipelineLayout* out_layout) {
+    (void)layout_idx; // Unused for now
+    // 1. Create Shader Module
+    VkShaderModuleCreateInfo ci = { 
+        .sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO,
+        .codeSize = size,
+        .pCode = code
+    };
+    VkShaderModule mod;
+    VkResult res = vkCreateShaderModule(state->device, &ci, NULL, &mod);
+    if (res != VK_SUCCESS) return res;
+
+    // 2. Create Layout
+    // For now, layout_idx is ignored and we always use the default:
+    // Set 0: Compute Write (Storage Image)
+    // Push Constants: 128 bytes
+    
+    VkPushConstantRange pcr = { 
+        .stageFlags = VK_SHADER_STAGE_COMPUTE_BIT, 
+        .offset = 0, 
+        .size = 128 
+    };
+    
+    VkPipelineLayoutCreateInfo plci = { 
+        .sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO, 
+        .setLayoutCount = 1, 
+        .pSetLayouts = &state->compute_write_layout, 
+        .pushConstantRangeCount = 1, 
+        .pPushConstantRanges = &pcr 
+    };
+    
+    res = vkCreatePipelineLayout(state->device, &plci, NULL, out_layout);
+    if (res != VK_SUCCESS) {
+        vkDestroyShaderModule(state->device, mod, NULL);
+        return res;
+    }
+
+    // 3. Create Pipeline
+    VkPipelineShaderStageCreateInfo stage = {
+        .sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
+        .stage = VK_SHADER_STAGE_COMPUTE_BIT,
+        .module = mod,
+        .pName = "main"
+    };
+
+    VkComputePipelineCreateInfo cpci = {
+        .sType = VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO,
+        .stage = stage,
+        .layout = *out_layout
+    };
+    
+    res = vkCreateComputePipelines(state->device, VK_NULL_HANDLE, 1, &cpci, NULL, out_pipeline);
+    
+    // Module can be destroyed after pipeline creation
+    vkDestroyShaderModule(state->device, mod, NULL);
+    
+    if (res != VK_SUCCESS) {
+        vkDestroyPipelineLayout(state->device, *out_layout, NULL);
+    }
+    
+    return res;
 }
 
 void vk_create_pipeline(VulkanRendererState* state, const char* vert_spv, const char* frag_spv) {

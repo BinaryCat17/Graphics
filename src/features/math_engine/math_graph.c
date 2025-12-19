@@ -1,76 +1,86 @@
 #include "math_graph.h"
+#include "foundation/memory/pool.h"
 #include "foundation/logger/logger.h"
 #include <string.h>
 #include <math.h>
 #include <stdio.h>
+#include <stdlib.h> // for realloc
 
 // --- Helper: Get Node ---
 MathNode* math_graph_get_node(MathGraph* graph, MathNodeId id) {
-    if (!graph || !graph->nodes || id >= graph->node_count) return NULL;
-    // Check if slot is actually valid
-    if (graph->nodes[id].type == MATH_NODE_NONE) return NULL;
-    return &graph->nodes[id];
+    if (!graph || !graph->node_ptrs || id >= graph->node_count) return NULL;
+    MathNode* node = graph->node_ptrs[id];
+    if (!node) return NULL; // Should not happen if count is correct, unless deleted?
+    if (node->type == MATH_NODE_NONE) return NULL;
+    return node;
 }
 
 // --- Init / Clear ---
 
 void math_graph_init(MathGraph* graph, MemoryArena* arena) {
-    if (!graph || !arena) return;
+    (void)arena; // Arena is no longer used for the graph itself
+    if (!graph) return;
     memset(graph, 0, sizeof(MathGraph));
-    graph->arena = arena;
     
-    // Initial capacity
+    // Create Pool: Elements are MathNode size, 256 per block
+    graph->node_pool = pool_create(sizeof(MathNode), 256);
+    
+    // Initial capacity for ID table
     graph->node_capacity = 32; 
-    graph->nodes = arena_alloc_zero(arena, sizeof(MathNode) * graph->node_capacity);
+    graph->node_ptrs = (MathNode**)calloc(graph->node_capacity, sizeof(MathNode*));
     graph->node_count = 0;
 }
 
 void math_graph_clear(MathGraph* graph) {
     if (!graph) return;
-    // We can't free arena memory individually, but we can reset the struct.
-    // The arena itself must be reset externally if we want to reclaim memory.
-    // However, if we just want to clear the graph logic:
-    if (graph->nodes) {
-        memset(graph->nodes, 0, sizeof(MathNode) * graph->node_capacity);
+    
+    if (graph->node_ptrs) {
+        free(graph->node_ptrs);
+        graph->node_ptrs = NULL;
     }
+    
+    if (graph->node_pool) {
+        pool_destroy(graph->node_pool);
+        graph->node_pool = NULL;
+    }
+    
     graph->node_count = 0;
+    graph->node_capacity = 0;
 }
 
 // --- Node Management ---
 
 MathNodeId math_graph_add_node(MathGraph* graph, MathNodeType type) {
-    if (!graph || !graph->arena) return MATH_NODE_INVALID_ID;
+    if (!graph || !graph->node_pool) return MATH_NODE_INVALID_ID;
 
-    // 1. Find a free slot (simple linear search for now, optimization: free list)
-    /* 
-       Optimization Note: In a professional engine, we'd use a free-list.
-       For <1000 nodes, we can just append or linear scan. 
-       Let's Stick to Append-Only + Re-use if at end for now to keep indices stable and code simple.
-       Actually, let's just Append. Re-using slots requires Generation IDs to avoid stale handle bugs.
-       Since we don't have Generation IDs in MathNodeId yet, we strictly Append.
-    */
-
+    // 1. Ensure ID table capacity
     if (graph->node_count >= graph->node_capacity) {
-        // Resize
         uint32_t new_cap = graph->node_capacity * 2;
-        MathNode* new_nodes = arena_alloc_zero(graph->arena, sizeof(MathNode) * new_cap);
+        if (new_cap == 0) new_cap = 32;
         
-        if (!new_nodes) {
-            LOG_ERROR("MathGraph: Out of memory during resize!");
+        MathNode** new_ptrs = (MathNode**)realloc(graph->node_ptrs, sizeof(MathNode*) * new_cap);
+        if (!new_ptrs) {
+            LOG_ERROR("MathGraph: Out of memory for ID table!");
             return MATH_NODE_INVALID_ID;
         }
-
-        // Copy old data
-        memcpy(new_nodes, graph->nodes, sizeof(MathNode) * graph->node_count);
         
-        // Update graph
-        graph->nodes = new_nodes;
+        // Zero out new slots
+        memset(new_ptrs + graph->node_capacity, 0, (new_cap - graph->node_capacity) * sizeof(MathNode*));
+        
+        graph->node_ptrs = new_ptrs;
         graph->node_capacity = new_cap;
-        LOG_INFO("MathGraph: Resized to capacity %d", new_cap);
+        LOG_INFO("MathGraph: Resized ID table to %d", new_cap);
+    }
+
+    // 2. Alloc from Pool
+    MathNode* node = (MathNode*)pool_alloc(graph->node_pool);
+    if (!node) {
+        LOG_ERROR("MathGraph: Pool exhausted (System OOM)!");
+        return MATH_NODE_INVALID_ID;
     }
 
     MathNodeId id = graph->node_count++;
-    MathNode* node = &graph->nodes[id];
+    graph->node_ptrs[id] = node;
     
     node->id = id;
     node->type = type;
@@ -91,30 +101,37 @@ MathNodeId math_graph_add_node(MathGraph* graph, MathNodeType type) {
 
 void math_graph_set_name(MathGraph* graph, MathNodeId id, const char* name) {
     MathNode* node = math_graph_get_node(graph, id);
-    if (!node || !graph->arena) return;
+    if (!node) return;
     
-    node->name = arena_push_string(graph->arena, name);
+    if (name) {
+        strncpy(node->name, name, 31);
+        node->name[31] = '\0';
+    } else {
+        node->name[0] = '\0';
+    }
 }
 
 void math_graph_remove_node(MathGraph* graph, MathNodeId id) {
     MathNode* node = math_graph_get_node(graph, id);
     if (!node) return;
     
-    // Mark as free
-    node->type = MATH_NODE_NONE;
-    
-    // Iterate all nodes to remove connections TO this node
-    // (Optimization: Maintain back-links or connection list)
+    // Remove connections TO this node first
     for (uint32_t i = 0; i < graph->node_count; ++i) {
-        if (graph->nodes[i].type == MATH_NODE_NONE) continue;
+        // Direct pointer access for speed, skipping NULLs
+        MathNode* other = graph->node_ptrs[i];
+        if (!other || other->type == MATH_NODE_NONE) continue;
         
         for (int k = 0; k < MATH_NODE_MAX_INPUTS; ++k) {
-            if (graph->nodes[i].inputs[k] == id) {
-                graph->nodes[i].inputs[k] = MATH_NODE_INVALID_ID;
-                graph->nodes[i].dirty = true;
+            if (other->inputs[k] == id) {
+                other->inputs[k] = MATH_NODE_INVALID_ID;
+                other->dirty = true;
             }
         }
     }
+    
+    // Free memory
+    pool_free(graph->node_pool, node);
+    graph->node_ptrs[id] = NULL; // Mark as dead
 }
 
 void math_graph_connect(MathGraph* graph, MathNodeId target_id, int input_index, MathNodeId source_id) {

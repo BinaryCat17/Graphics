@@ -59,11 +59,9 @@ add_custom_target(Shaders DEPENDS ${SHADER_OUTPUTS})
 find_package(Python3 REQUIRED)
 set(GENERATED_DIR "${CMAKE_CURRENT_SOURCE_DIR}/src/generated")
 set(REFLECTION_REGISTRY "${GENERATED_DIR}/reflection_registry.c")
-set(GENERATED_ACCESSORS_C "${GENERATED_DIR}/accessors.c")
-set(GENERATED_ACCESSORS_H "${GENERATED_DIR}/accessors.h")
 
 add_custom_command(
-    OUTPUT ${REFLECTION_REGISTRY} ${GENERATED_ACCESSORS_C} ${GENERATED_ACCESSORS_H}
+    OUTPUT ${REFLECTION_REGISTRY}
     COMMAND ${Python3_EXECUTABLE} "${CMAKE_CURRENT_SOURCE_DIR}/tools/codegen.py" "${CMAKE_CURRENT_SOURCE_DIR}/src" "${REFLECTION_REGISTRY}"
     DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/tools/codegen.py"
     COMMENT "Generating reflection metadata..."
@@ -79,7 +77,6 @@ target_include_directories(foundation_logger PUBLIC "src/")
 set(FOUNDATION_META_SOURCES
     "src/foundation/meta/reflection.c"
     ${REFLECTION_REGISTRY}
-    ${GENERATED_ACCESSORS_C}
 )
 add_library(foundation_meta STATIC ${FOUNDATION_META_SOURCES})
 target_include_directories(foundation_meta PUBLIC "src/")
@@ -106,6 +103,7 @@ endif()
 set(FOUNDATION_MEMORY_SOURCES 
     "src/foundation/memory/buffer.c"
     "src/foundation/memory/arena.c"
+    "src/foundation/memory/pool.c"
 )
 add_library(foundation_memory STATIC ${FOUNDATION_MEMORY_SOURCES})
 target_include_directories(foundation_memory PUBLIC "src/")
@@ -163,15 +161,17 @@ target_link_libraries(engine_ui PUBLIC foundation_config engine_assets foundatio
 
 # --- FEATURES LAYER ---
 
-# Graph Editor (Feature)
-set(FEATURE_GRAPH_EDITOR_SOURCES
-    "src/features/graph_editor/math_graph.c"
-    "src/features/graph_editor/transpiler.c")
-add_library(feature_graph_editor STATIC ${FEATURE_GRAPH_EDITOR_SOURCES})
-target_include_directories(feature_graph_editor PUBLIC "src/")
-target_link_libraries(feature_graph_editor PUBLIC foundation_math foundation_memory)
+# Math Engine (Feature)
+set(FEATURE_MATH_ENGINE_SOURCES
+    "src/features/math_engine/math_graph.c"
+    "src/features/math_engine/transpiler.c"
+    "src/features/math_engine/emitters/glsl_emitter.c"
+    "src/foundation/config/simple_yaml.c")
+add_library(feature_math_engine STATIC ${FEATURE_MATH_ENGINE_SOURCES})
+target_include_directories(feature_math_engine PUBLIC "src/")
+target_link_libraries(feature_math_engine PUBLIC foundation_math foundation_memory)
 if(UNIX)
-    target_link_libraries(feature_graph_editor PUBLIC m)
+    target_link_libraries(feature_math_engine PUBLIC m)
 endif()
 
 # Engine Core
@@ -180,7 +180,7 @@ set(ENGINE_CORE_SOURCES
 )
 add_library(engine_core STATIC ${ENGINE_CORE_SOURCES})
 target_include_directories(engine_core PUBLIC "src/")
-target_link_libraries(engine_core PUBLIC engine_graphics engine_ui engine_assets feature_graph_editor foundation_meta foundation_logger)
+target_link_libraries(engine_core PUBLIC engine_graphics engine_ui engine_assets feature_math_engine foundation_meta foundation_logger)
 
 # --- APP ---
 
@@ -188,7 +188,7 @@ add_executable(Graphics "src/app/main.c")
 target_include_directories(Graphics PRIVATE "src/" ${Vulkan_INCLUDE_DIRS} ${Stb_INCLUDE_DIR})
 target_link_libraries(Graphics PRIVATE
     engine_core
-    feature_graph_editor
+    feature_math_engine
     engine_graphics
     engine_ui
     engine_assets
@@ -215,5 +215,5 @@ endfunction()
 
 # Update test paths and libs
 add_graphics_test(transform_tests tests/transform_tests.c foundation_math engine_graphics)
-add_graphics_test(transpiler_tests tests/transpiler_tests.c feature_graph_editor)
-add_graphics_test(ui_tests tests/ui_tests.c engine_ui foundation_logger feature_graph_editor)
+add_graphics_test(transpiler_tests tests/transpiler_tests.c feature_math_engine)
+add_graphics_test(ui_tests tests/ui_tests.c engine_ui foundation_logger feature_math_engine)

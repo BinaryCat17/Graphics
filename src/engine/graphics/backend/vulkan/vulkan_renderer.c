@@ -125,6 +125,126 @@ static void ensure_instance_capacity(VulkanRendererState* state, FrameResources*
     LOG_INFO("Resized Instance Buffer to %zu elements", new_cap);
 }
 
+// --- COMPUTE SUBSYSTEM ---
+
+static uint32_t vulkan_compute_pipeline_create(RendererBackend* backend, const void* spirv_code, size_t size, int layout_index) {
+    VulkanRendererState* state = (VulkanRendererState*)backend->state;
+    
+    // Find free slot
+    int slot = -1;
+    for (int i = 0; i < MAX_COMPUTE_PIPELINES; ++i) {
+        if (!state->compute_pipelines[i].active) {
+            slot = i;
+            break;
+        }
+    }
+    
+    if (slot == -1) {
+        LOG_ERROR("Max compute pipelines reached (%d)", MAX_COMPUTE_PIPELINES);
+        return 0;
+    }
+    
+    VkPipeline pipeline;
+    VkPipelineLayout layout;
+    
+    // Convert void* to uint32_t* (assume 4-byte aligned and size is bytes)
+    VkResult res = vk_create_compute_pipeline_shader(state, (const uint32_t*)spirv_code, size, layout_index, &pipeline, &layout);
+    
+    if (res != VK_SUCCESS) {
+        LOG_ERROR("Failed to create compute pipeline: %d", res);
+        return 0;
+    }
+    
+    state->compute_pipelines[slot].active = true;
+    state->compute_pipelines[slot].pipeline = pipeline;
+    state->compute_pipelines[slot].layout = layout;
+    
+    return (uint32_t)(slot + 1);
+}
+
+static void vulkan_compute_pipeline_destroy(RendererBackend* backend, uint32_t pipeline_id) {
+    VulkanRendererState* state = (VulkanRendererState*)backend->state;
+    if (pipeline_id == 0 || pipeline_id > MAX_COMPUTE_PIPELINES) return;
+    
+    int idx = (int)pipeline_id - 1;
+    if (state->compute_pipelines[idx].active) {
+        vkDestroyPipeline(state->device, state->compute_pipelines[idx].pipeline, NULL);
+        vkDestroyPipelineLayout(state->device, state->compute_pipelines[idx].layout, NULL);
+        state->compute_pipelines[idx].active = false;
+    }
+}
+
+static void vulkan_compute_dispatch(RendererBackend* backend, uint32_t pipeline_id, uint32_t group_x, uint32_t group_y, uint32_t group_z, void* push_constants, size_t push_constants_size) {
+    VulkanRendererState* state = (VulkanRendererState*)backend->state;
+    if (pipeline_id == 0 || pipeline_id > MAX_COMPUTE_PIPELINES) return;
+    
+    int idx = (int)pipeline_id - 1;
+    if (!state->compute_pipelines[idx].active) return;
+    
+    VkPipeline pipeline = state->compute_pipelines[idx].pipeline;
+    VkPipelineLayout layout = state->compute_pipelines[idx].layout;
+    
+    // Use the dedicated compute command buffer
+    // Wait for fence to ensure previous submission is done
+    vkWaitForFences(state->device, 1, &state->compute_fence, VK_TRUE, UINT64_MAX);
+    vkResetFences(state->device, 1, &state->compute_fence);
+    
+    vkResetCommandBuffer(state->compute_cmd, 0);
+    
+    VkCommandBufferBeginInfo begin_info = { .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO };
+    if (vkBeginCommandBuffer(state->compute_cmd, &begin_info) != VK_SUCCESS) {
+        LOG_ERROR("Failed to begin compute cmd");
+        return;
+    }
+    
+    // Bind Pipeline
+    vkCmdBindPipeline(state->compute_cmd, VK_PIPELINE_BIND_POINT_COMPUTE, pipeline);
+    
+    // Bind Descriptor Set 0 (Write Target)
+    if (state->compute_write_descriptor) {
+        vkCmdBindDescriptorSets(state->compute_cmd, VK_PIPELINE_BIND_POINT_COMPUTE, layout, 0, 1, &state->compute_write_descriptor, 0, NULL);
+    }
+    
+    // Push Constants
+    if (push_constants && push_constants_size > 0) {
+        vkCmdPushConstants(state->compute_cmd, layout, VK_SHADER_STAGE_COMPUTE_BIT, 0, (uint32_t)push_constants_size, push_constants);
+    }
+    
+    // Dispatch
+    vkCmdDispatch(state->compute_cmd, group_x, group_y, group_z);
+    
+    // Barrier (Make sure writes are visible to fragment shader)
+    VkImageMemoryBarrier barrier = {
+        .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
+        .oldLayout = VK_IMAGE_LAYOUT_GENERAL,
+        .newLayout = VK_IMAGE_LAYOUT_GENERAL, // Keep it general for now
+        .srcAccessMask = VK_ACCESS_SHADER_WRITE_BIT,
+        .dstAccessMask = VK_ACCESS_SHADER_READ_BIT,
+        .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+        .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+        .image = state->compute_target_image,
+        .subresourceRange = { VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1 }
+    };
+    
+    vkCmdPipelineBarrier(state->compute_cmd, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, 0, 0, NULL, 0, NULL, 1, &barrier);
+    
+    vkEndCommandBuffer(state->compute_cmd);
+    
+    // Submit
+    VkSubmitInfo submit_info = { 
+        .sType = VK_STRUCTURE_TYPE_SUBMIT_INFO, 
+        .commandBufferCount = 1, 
+        .pCommandBuffers = &state->compute_cmd 
+    };
+    
+    vkQueueSubmit(state->queue, 1, &submit_info, state->compute_fence);
+}
+
+static void vulkan_compute_wait(RendererBackend* backend) {
+    VulkanRendererState* state = (VulkanRendererState*)backend->state;
+    vkWaitForFences(state->device, 1, &state->compute_fence, VK_TRUE, UINT64_MAX);
+}
+
 static bool vulkan_renderer_init(RendererBackend* backend, const RenderBackendInit* init) {
     VulkanRendererState* state = (VulkanRendererState*)backend->state;
     
@@ -194,6 +314,20 @@ static bool vulkan_renderer_init(RendererBackend* backend, const RenderBackendIn
         state->frame_resources[i].instance_set = VK_NULL_HANDLE;
         ensure_instance_capacity(state, &state->frame_resources[i], 1024); // Initial allocation
     }
+
+    // 11. Compute Infrastructure
+    VkFenceCreateInfo fci = { .sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO, .flags = VK_FENCE_CREATE_SIGNALED_BIT };
+    vkCreateFence(state->device, &fci, NULL, &state->compute_fence);
+    
+    VkCommandBufferAllocateInfo cbai = { 
+        .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO, 
+        .commandPool = state->cmdpool, 
+        .level = VK_COMMAND_BUFFER_LEVEL_PRIMARY, 
+        .commandBufferCount = 1 
+    };
+    vkAllocateCommandBuffers(state->device, &cbai, &state->compute_cmd);
+    
+    vk_ensure_compute_target(state, 512, 512);
 
     LOG_INFO("Vulkan Initialized.");
     return true;
@@ -517,6 +651,12 @@ RendererBackend* vulkan_renderer_backend(void) {
     backend->update_viewport = vulkan_renderer_update_viewport;
     backend->cleanup = vulkan_renderer_cleanup;
     backend->request_screenshot = vulkan_renderer_request_screenshot;
+    
+    // Compute
+    backend->compute_pipeline_create = vulkan_compute_pipeline_create;
+    backend->compute_pipeline_destroy = vulkan_compute_pipeline_destroy;
+    backend->compute_dispatch = vulkan_compute_dispatch;
+    backend->compute_wait = vulkan_compute_wait;
     
     return backend;
 }

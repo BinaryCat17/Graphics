@@ -170,6 +170,11 @@ void vk_create_descriptor_pool_and_set(VulkanRendererState* state) {
     state->res = vkAllocateDescriptorSets(state->device, &dsai2, &state->compute_target_descriptor);
     if (state->res != VK_SUCCESS) fatal_vk("vkAllocateDescriptorSets (Set 2)", state->res);
     
+    // Set 0 (Compute): Write Target
+    VkDescriptorSetAllocateInfo dsaiC = { .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO, .descriptorPool = state->descriptor_pool, .descriptorSetCount = 1, .pSetLayouts = &state->compute_write_layout };
+    state->res = vkAllocateDescriptorSets(state->device, &dsaiC, &state->compute_write_descriptor);
+    if (state->res != VK_SUCCESS) fatal_vk("vkAllocateDescriptorSets (Compute Write)", state->res);
+
     // Bind placeholder (font) initially so it's valid
     VkDescriptorImageInfo dii2 = { .sampler = state->font_sampler, .imageView = state->font_image_view, .imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL };
     VkWriteDescriptorSet w2 = { .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET, .dstSet = state->compute_target_descriptor, .dstBinding = 0, .descriptorCount = 1, .descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, .pImageInfo = &dii2 };
@@ -242,6 +247,23 @@ void vk_ensure_compute_target(VulkanRendererState* state, int width, int height)
             .pImageInfo = &dii 
         };
         vkUpdateDescriptorSets(state->device, 1, &w, 0, NULL);
+    }
+    
+    // Update Compute Write Descriptor (Set 0)
+    if (state->compute_write_descriptor) {
+        VkDescriptorImageInfo diiC = { 
+            .imageView = state->compute_target_view, 
+            .imageLayout = VK_IMAGE_LAYOUT_GENERAL
+        };
+        VkWriteDescriptorSet wC = { 
+            .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET, 
+            .dstSet = state->compute_write_descriptor, 
+            .dstBinding = 0, 
+            .descriptorCount = 1, 
+            .descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 
+            .pImageInfo = &diiC 
+        };
+        vkUpdateDescriptorSets(state->device, 1, &wC, 0, NULL);
     }
 }
 

@@ -48,19 +48,17 @@ typedef struct MathNode {
     // UI / Editor Data
     float ui_x;             // REFLECT
     float ui_y;             // REFLECT
-    char* name;             // REFLECT
+    char name[32];          // REFLECT
 } MathNode;
 
 typedef struct MathGraph {
-    MemoryArena* arena;
+    struct MemoryPool* node_pool; // From foundation/memory/pool.h
     
-    // Flat array of nodes. Index == ID.
-    MathNode* nodes;
-    uint32_t node_count;     // Highest active ID + 1 (or count if packed)
-    uint32_t node_capacity;
-    
-    // In this simple ID-as-Index model, we don't Compact the array on delete.
-    // We just mark the slot as MATH_NODE_NONE.
+    // Indirection table: ID -> MathNode*
+    // This array grows, but the nodes themselves stay stable in the pool.
+    MathNode** node_ptrs;
+    uint32_t node_count;     // Highest active ID + 1
+    uint32_t node_capacity;  // Capacity of the ptrs array
 } MathGraph;
 
 // --- API ---

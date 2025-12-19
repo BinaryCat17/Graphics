@@ -1,10 +1,10 @@
 #include "engine/core/engine.h"
 #include "foundation/logger/logger.h"
-#include "features/graph_editor/transpiler.h"
+#include "features/math_engine/transpiler.h"
 #include "foundation/platform/platform.h"
 #include "foundation/meta/reflection.h"
 #include "engine/graphics/backend/renderer_backend.h"
-#include "features/graph_editor/math_graph.h"
+#include "features/math_engine/math_graph.h"
 #include "engine/ui/ui_parser.h"
 #include "engine/ui/ui_core.h"
 #include "engine/ui/ui_renderer.h"
@@ -79,10 +79,11 @@ static void ui_rebuild_graph_view(AppState* app) {
 
     const MetaStruct* node_meta = meta_get_struct("MathNode");
     
-    // Count Nodes
+    // Count valid nodes
     int count = 0;
-    for(uint32_t i=0; i<app->graph.node_count; ++i) {
-        if (app->graph.nodes[i].type != MATH_NODE_NONE) count++;
+    for (uint32_t i = 0; i < app->graph.node_count; ++i) {
+        const MathNode* n = math_graph_get_node(&app->graph, i);
+        if (n && n->type != MATH_NODE_NONE) count++;
     }
 
     // Reallocate children array from Arena
@@ -91,10 +92,10 @@ static void ui_rebuild_graph_view(AppState* app) {
 
     int idx = 0;
     for (uint32_t i = 0; i < app->graph.node_count; ++i) {
-        MathNode* node = &app->graph.nodes[i];
-        if (node->type == MATH_NODE_NONE) continue;
-
-        // Container Spec
+        MathNode* node = math_graph_get_node(&app->graph, i);
+        if (!node || node->type == MATH_NODE_NONE) continue;
+        
+        // --- Node Window ---
         UiNodeSpec* container_spec = ui_create_spec(app, UI_KIND_CONTAINER);
         container_spec->layout = UI_LAYOUT_FLEX_COLUMN;
         container_spec->width = 150;
@@ -248,12 +249,11 @@ static void app_on_init(Engine* engine) {
             
             ui_rebuild_graph_view(app);
             
-            // Select first valid node
+            // Select first node
             for(uint32_t i=0; i<app->graph.node_count; ++i) {
-                if(app->graph.nodes[i].type != MATH_NODE_NONE) {
-                    app->selected_node_id = app->graph.nodes[i].id;
-                    app->selection_dirty = true;
-                    ui_rebuild_inspector(app);
+                const MathNode* n = math_graph_get_node(&app->graph, i);
+                if(n && n->type != MATH_NODE_NONE) {
+                    app->selected_node_id = n->id;
                     break;
                 }
             }
@@ -309,9 +309,10 @@ static void app_on_update(Engine* engine) {
         ui_layout_root(app->ui_instance.root, (float)size.width, (float)size.height, engine->render_system.frame_count, false, text_measure_wrapper, NULL);
     }
 
-    // Evaluate
-    for(uint32_t i=0; i<app->graph.node_count; ++i) {
-        if (app->graph.nodes[i].type != MATH_NODE_NONE) {
+    // Evaluate all nodes (Naive)
+    for (uint32_t i = 0; i < app->graph.node_count; ++i) {
+        const MathNode* n = math_graph_get_node(&app->graph, i);
+        if (n && n->type != MATH_NODE_NONE) {
             math_graph_evaluate(&app->graph, i);
         }
     }

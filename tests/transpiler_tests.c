@@ -1,6 +1,6 @@
 #include "test_framework.h"
-#include "features/graph_editor/math_graph.h"
-#include "features/graph_editor/transpiler.h"
+#include "features/math_engine/math_graph.h"
+#include "features/math_engine/transpiler.h"
 #include "foundation/memory/arena.h"
 #include <stdio.h>
 #include <stdlib.h>
@@ -8,9 +8,11 @@
 
 int test_transpiler_simple_add() {
     MathGraph graph;
-    MemoryArena arena;
-    arena_init(&arena, 1024 * 1024);
-    math_graph_init(&graph, &arena);
+    // Arena no longer needed for MathGraph initialization
+    // MemoryArena arena;
+    // arena_init(&arena, 1024 * 1024);
+    
+    math_graph_init(&graph, NULL); // Pass NULL as arena is unused
     
     // Create nodes: 3.0 + 5.0
     MathNodeId id1 = math_graph_add_node(&graph, MATH_NODE_VALUE);
@@ -30,8 +32,6 @@ int test_transpiler_simple_add() {
     printf("\n--- Generated GLSL ---\n%s\n----------------------\n", glsl);
     
     // Basic checks
-    // Note: IDs might vary, but since it's the first test in a fresh arena, they should be 0, 1, 2.
-    // However, transpiler output depends on node ID.
     char buf[128];
     snprintf(buf, 128, "float v_%d = 3.000000;", id1);
     TEST_ASSERT(strstr(glsl, buf) != NULL);
@@ -46,7 +46,8 @@ int test_transpiler_simple_add() {
     TEST_ASSERT(strstr(glsl, buf) != NULL);
     
     free(glsl);
-    arena_destroy(&arena);
+    math_graph_clear(&graph); // Clean up pool
+    // arena_destroy(&arena);
     return 1;
 }
 

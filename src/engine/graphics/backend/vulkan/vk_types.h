@@ -42,7 +42,6 @@ typedef struct {
 typedef struct VulkanRendererState {
     PlatformWindow* window;
     PlatformSurface* platform_surface;
-    // UiDrawList ui_draw_list; // Removed
     VkInstance instance;
     VkPhysicalDevice physical_device;
     VkDevice device;
@@ -105,6 +104,19 @@ typedef struct VulkanRendererState {
     VkDescriptorSetLayout compute_write_layout;
     int compute_width;
     int compute_height;
+    
+    // Compute Sync
+    VkFence compute_fence;
+    VkCommandBuffer compute_cmd;
+
+    // --- Compute Pipeline Pool ---
+#define MAX_COMPUTE_PIPELINES 32
+    struct {
+        bool active;
+        VkPipeline pipeline;
+        VkPipelineLayout layout;
+    } compute_pipelines[MAX_COMPUTE_PIPELINES];
+
 } VulkanRendererState;
 
 #endif // VK_TYPES_H
