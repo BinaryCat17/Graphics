@@ -1,4 +1,5 @@
 #include "font.h"
+#include "internal/font_internal.h"
 #include "stb_truetype.h"
 #include "foundation/platform/platform.h"
 #include "foundation/logger/logger.h"
@@ -92,7 +93,6 @@ bool font_init(const char* font_path) {
             
             // Border (2px)
             float inner = radius - 2.0f;
-            // float border = smoothstep(inner, inner + 1.0f, d);
             
             unsigned char val = (unsigned char)(alpha * 255);
             // We want it to be a bit thicker at borders for visibility
@@ -182,7 +182,19 @@ void font_cleanup(void) {
     g_font_state.initialized = false;
 }
 
-const FontAtlas* font_get_atlas(void) {
+void font_get_atlas_data(int* width, int* height, unsigned char** pixels) {
+    if (!g_font_state.initialized) {
+        if (width) *width = 0;
+        if (height) *height = 0;
+        if (pixels) *pixels = NULL;
+        return;
+    }
+    if (width) *width = g_font_state.atlas.width;
+    if (height) *height = g_font_state.atlas.height;
+    if (pixels) *pixels = g_font_state.atlas.pixels;
+}
+
+const FontAtlas* font_get_atlas_internal(void) {
     if (!g_font_state.initialized) return NULL;
     return &g_font_state.atlas;
 }

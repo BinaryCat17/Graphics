@@ -108,12 +108,15 @@ bool vk_create_vertex_buffer(VulkanRendererState* state, FrameResources *frame, 
 }
 
 void vk_create_font_texture(VulkanRendererState* state) {
-    const FontAtlas* atlas = font_get_atlas();
-    if (!atlas || !atlas->pixels) {
+    int width, height;
+    unsigned char* pixels;
+    font_get_atlas_data(&width, &height, &pixels);
+
+    if (!pixels) {
         LOG_FATAL("Font atlas not available from Font Module");
     }
 
-    VkImageCreateInfo ici = { .sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO, .imageType = VK_IMAGE_TYPE_2D, .format = VK_FORMAT_R8_UNORM, .extent = { (uint32_t)atlas->width, (uint32_t)atlas->height, 1 }, .mipLevels = 1, .arrayLayers = 1, .samples = VK_SAMPLE_COUNT_1_BIT, .tiling = VK_IMAGE_TILING_OPTIMAL, .usage = VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, .sharingMode = VK_SHARING_MODE_EXCLUSIVE, .initialLayout = VK_IMAGE_LAYOUT_UNDEFINED }; 
+    VkImageCreateInfo ici = { .sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO, .imageType = VK_IMAGE_TYPE_2D, .format = VK_FORMAT_R8_UNORM, .extent = { (uint32_t)width, (uint32_t)height, 1 }, .mipLevels = 1, .arrayLayers = 1, .samples = VK_SAMPLE_COUNT_1_BIT, .tiling = VK_IMAGE_TILING_OPTIMAL, .usage = VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, .sharingMode = VK_SHARING_MODE_EXCLUSIVE, .initialLayout = VK_IMAGE_LAYOUT_UNDEFINED }; 
     state->res = vkCreateImage(state->device, &ici, NULL, &state->font_image);
     if (state->res != VK_SUCCESS) fatal_vk("vkCreateImage", state->res);
     VkMemoryRequirements mr; vkGetImageMemoryRequirements(state->device, state->font_image, &mr);
@@ -123,11 +126,11 @@ void vk_create_font_texture(VulkanRendererState* state) {
     vkBindImageMemory(state->device, state->font_image, state->font_image_mem, 0);
 
     VkBuffer staging = VK_NULL_HANDLE; VkDeviceMemory staging_mem = VK_NULL_HANDLE;
-    vk_create_buffer(state, atlas->width * atlas->height, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, &staging, &staging_mem);
-    void* mapped = NULL; vkMapMemory(state->device, staging_mem, 0, VK_WHOLE_SIZE, 0, &mapped); memcpy(mapped, atlas->pixels, atlas->width * atlas->height); vkUnmapMemory(state->device, staging_mem);
+    vk_create_buffer(state, width * height, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, &staging, &staging_mem);
+    void* mapped = NULL; vkMapMemory(state->device, staging_mem, 0, VK_WHOLE_SIZE, 0, &mapped); memcpy(mapped, pixels, width * height); vkUnmapMemory(state->device, staging_mem);
 
     transition_image_layout(state, state->font_image, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
-    copy_buffer_to_image(state, staging, state->font_image, (uint32_t)atlas->width, (uint32_t)atlas->height);
+    copy_buffer_to_image(state, staging, state->font_image, (uint32_t)width, (uint32_t)height);
     transition_image_layout(state, state->font_image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
 
     vkDestroyBuffer(state->device, staging, NULL);

@@ -116,7 +116,7 @@ set(ENGINE_GRAPHICS_SOURCES
     "src/engine/graphics/scene/scene.c"
     "src/engine/graphics/text/text_renderer.c"
     "src/engine/graphics/text/font.c"
-    "src/engine/graphics/text/stb_impl.c"
+    "src/engine/graphics/text/internal/stb_impl.c"
 )
 add_library(engine_graphics STATIC ${ENGINE_GRAPHICS_SOURCES})
 target_include_directories(engine_graphics PUBLIC "src/" ${Stb_INCLUDE_DIR})
