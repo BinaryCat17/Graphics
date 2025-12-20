@@ -12,10 +12,16 @@ typedef struct RenderBackendInit {
     PlatformWindow* window;
     PlatformSurface* surface;
     
-    // Resources
-    const char* vert_spv;
-    const char* frag_spv;
-    const char* font_path;
+    // Resources (Data Blobs)
+    struct {
+        const void* data;
+        size_t size;
+    } vert_shader;
+    
+    struct {
+        const void* data;
+        size_t size;
+    } frag_shader;
 } RenderBackendInit;
 
 // The Abstract Renderer Interface (V-Table)

@@ -9,8 +9,6 @@ struct Assets {
 
     // Resource Paths
     const char* root_dir;
-    const char* ui_default_vert_spv;
-    const char* ui_default_frag_spv;
     const char* font_path;
     
     // Built-in Resources

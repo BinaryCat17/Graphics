@@ -279,9 +279,18 @@ static bool vulkan_renderer_init(RendererBackend* backend, const RenderBackendIn
     // Config
     state->window = init->window;
     state->platform_surface = init->surface;
-    state->vert_spv = init->vert_spv;
-    state->frag_spv = init->frag_spv;
-    state->font_path = init->font_path;
+    
+    // Copy Shader Data
+    if (init->vert_shader.data && init->vert_shader.size > 0) {
+        state->vert_shader_src.size = init->vert_shader.size;
+        state->vert_shader_src.code = malloc(init->vert_shader.size);
+        memcpy(state->vert_shader_src.code, init->vert_shader.data, init->vert_shader.size);
+    }
+    if (init->frag_shader.data && init->frag_shader.size > 0) {
+        state->frag_shader_src.size = init->frag_shader.size;
+        state->frag_shader_src.code = malloc(init->frag_shader.size);
+        memcpy(state->frag_shader_src.code, init->frag_shader.data, init->frag_shader.size);
+    }
     
     // 1. Instance
     vk_create_instance(state);
@@ -308,7 +317,7 @@ static bool vulkan_renderer_init(RendererBackend* backend, const RenderBackendIn
     
     // 7. Descriptor & Pipeline
     vk_create_descriptor_layout(state);
-    vk_create_pipeline(state, state->vert_spv, state->frag_spv);
+    vk_create_pipeline(state);
 
     // 8. Fonts & Textures
     vk_create_font_texture(state);
@@ -393,7 +402,7 @@ static void vulkan_renderer_update_viewport(RendererBackend* backend, int width,
     vk_create_cmds_and_sync(state);
     
     // Recreate Pipeline (which depends on Render Pass and was destroyed)
-    vk_create_pipeline(state, state->vert_spv, state->frag_spv);
+    vk_create_pipeline(state);
     
     // Reset frame cursor as sync objects were recreated
     state->current_frame_cursor = 0;
@@ -662,6 +671,9 @@ static void vulkan_renderer_cleanup(RendererBackend* backend) {
                 vkFreeMemory(state->device, state->frame_resources[i].instance_memory, NULL);
             }
         }
+        
+        if (state->vert_shader_src.code) free(state->vert_shader_src.code);
+        if (state->frag_shader_src.code) free(state->frag_shader_src.code);
 
         vk_destroy_device_resources(state);
         

@@ -71,20 +71,34 @@ static void try_bootstrap_renderer(RenderSystem* sys) {
     
     // Dependencies Check
     if (!sys->window) return;
-    if (!sys->assets || !assets_get_ui_default_vert_shader_path(sys->assets)) return;
+    if (!sys->assets) return;
     if (!sys->backend) return;
+
+    // Load Shaders into Memory
+    AssetData vert_shader = assets_load_file(sys->assets, "shaders/ui_default.vert.spv");
+    AssetData frag_shader = assets_load_file(sys->assets, "shaders/ui_default.frag.spv");
+    
+    if (!vert_shader.data || !frag_shader.data) {
+        LOG_ERROR("RenderSystem: Failed to load default shaders from assets.");
+        assets_free_file(&vert_shader);
+        assets_free_file(&frag_shader);
+        return;
+    }
 
     PlatformSurface surface = {0};
     
     RenderBackendInit init = {
         .window = sys->window,
         .surface = &surface, // Pass pointer to empty surface struct, backend/platform fills it
-        .vert_spv = assets_get_ui_default_vert_shader_path(sys->assets),
-        .frag_spv = assets_get_ui_default_frag_shader_path(sys->assets),
-        .font_path = assets_get_font_path(sys->assets),
+        .vert_shader = { .data = vert_shader.data, .size = vert_shader.size },
+        .frag_shader = { .data = frag_shader.data, .size = frag_shader.size },
     };
 
     sys->renderer_ready = sys->backend->init(sys->backend, &init);
+    
+    // Cleanup loaded assets (Backend should have copied what it needs)
+    assets_free_file(&vert_shader);
+    assets_free_file(&frag_shader);
 }
 
 RenderSystem* render_system_create(const RenderSystemConfig* config) {

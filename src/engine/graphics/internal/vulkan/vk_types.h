@@ -49,9 +49,18 @@ typedef struct VulkanRendererState {
     VkQueue queue;
     VkSurfaceKHR surface;
     VkSwapchainKHR swapchain;
-    const char* vert_spv;
-    const char* frag_spv;
-    const char* font_path;
+    
+    // Shader Sources (Persisted for Pipeline Recreation)
+    struct {
+        uint32_t* code;
+        size_t size;
+    } vert_shader_src;
+    
+    struct {
+        uint32_t* code;
+        size_t size;
+    } frag_shader_src;
+
     uint32_t swapchain_img_count;
     VkImage* swapchain_imgs;
     VkImageView* swapchain_imgviews;

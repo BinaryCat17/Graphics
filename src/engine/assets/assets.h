@@ -6,14 +6,21 @@
 
 typedef struct Assets Assets;
 
+typedef struct AssetData {
+    void* data;
+    size_t size;
+} AssetData;
+
 // Public API
 Assets* assets_create(const char* assets_dir);
 void assets_destroy(Assets* assets);
 
+// I/O
+AssetData assets_load_file(const Assets* assets, const char* relative_path);
+void assets_free_file(AssetData* data);
+
 // Accessors
 const char* assets_get_root_dir(const Assets* assets);
-const char* assets_get_ui_default_vert_shader_path(const Assets* assets);
-const char* assets_get_ui_default_frag_shader_path(const Assets* assets);
 const char* assets_get_font_path(const Assets* assets);
 Mesh* assets_get_unit_quad(Assets* assets);
 

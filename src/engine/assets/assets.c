@@ -1,10 +1,36 @@
 #include "engine/assets/assets.h"
 #include "engine/assets/internal/assets_internal.h"
 #include "foundation/platform/platform.h"
+#include "foundation/platform/fs.h"
 #include "foundation/logger/logger.h"
 
 #include <string.h>
 #include <stdlib.h>
+#include <stdio.h>
+
+AssetData assets_load_file(const Assets* assets, const char* relative_path) {
+    AssetData ad = {0};
+    if (!assets || !relative_path) return ad;
+    
+    // Construct full path
+    // We use a small temporary buffer on stack, assuming paths are reasonable
+    char full_path[512];
+    snprintf(full_path, sizeof(full_path), "%s/%s", assets->root_dir, relative_path);
+    
+    ad.data = fs_read_bin(NULL, full_path, &ad.size);
+    if (!ad.data) {
+        LOG_ERROR("Assets: Failed to load file '%s'", full_path);
+    }
+    return ad;
+}
+
+void assets_free_file(AssetData* data) {
+    if (data && data->data) {
+        free(data->data);
+        data->data = NULL;
+        data->size = 0;
+    }
+}
 
 bool assets_init_internal(Assets* out_assets, const char* assets_dir) {
     if (!out_assets) return false;
@@ -18,8 +44,6 @@ bool assets_init_internal(Assets* out_assets, const char* assets_dir) {
     }
 
     out_assets->root_dir = arena_push_string(&out_assets->arena, assets_dir);
-    out_assets->ui_default_vert_spv = arena_sprintf(&out_assets->arena, "%s/shaders/ui_default.vert.spv", assets_dir);
-    out_assets->ui_default_frag_spv = arena_sprintf(&out_assets->arena, "%s/shaders/ui_default.frag.spv", assets_dir);
     out_assets->font_path = arena_sprintf(&out_assets->arena, "%s/fonts/font.ttf", assets_dir);
 
     // Create Unit Quad (0,0 to 1,1)
@@ -61,14 +85,6 @@ void assets_destroy(Assets* assets) {
 
 const char* assets_get_root_dir(const Assets* assets) {
     return assets->root_dir;
-}
-
-const char* assets_get_ui_default_vert_shader_path(const Assets* assets) {
-    return assets->ui_default_vert_spv;
-}
-
-const char* assets_get_ui_default_frag_shader_path(const Assets* assets) {
-    return assets->ui_default_frag_spv;
 }
 
 const char* assets_get_font_path(const Assets* assets) {
