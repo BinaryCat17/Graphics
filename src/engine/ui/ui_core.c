@@ -233,16 +233,26 @@ void ui_element_rebuild_children(UiElement* el, UiInstance* instance) {
     // 4. Create Dynamic Children
     if (dynamic_count > 0 && collection_field && el->spec->item_template) {
          const MetaStruct* item_meta = NULL;
-         // Resolve Item Type
-         if (collection_field->type == META_TYPE_POINTER_ARRAY) {
+         bool is_pointer_array = (collection_field->type == META_TYPE_POINTER_ARRAY);
+         bool is_flat_array = (collection_field->type == META_TYPE_POINTER); 
+
+         if (is_pointer_array || is_flat_array) {
              item_meta = meta_get_struct(collection_field->type_name);
          }
          
          if (item_meta) {
-             void** ptr_array = *(void***)((char*)el->data_ptr + collection_field->offset);
+             void* base_ptr = *(void**)((char*)el->data_ptr + collection_field->offset);
              
              for (size_t i = 0; i < dynamic_count; ++i) {
-                 void* item_ptr = ptr_array[i];
+                 void* item_ptr = NULL;
+                 if (is_pointer_array) {
+                     // T** -> dereference to get T*
+                     item_ptr = ((void**)base_ptr)[i];
+                 } else {
+                     // T* -> pointer arithmetic (T[])
+                     item_ptr = (char*)base_ptr + (i * item_meta->size);
+                 }
+
                  if (item_ptr) {
                      UiElement* child = ui_element_create(instance, el->spec->item_template, item_ptr, item_meta);
                      if (child) {

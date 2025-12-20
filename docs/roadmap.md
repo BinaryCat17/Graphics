@@ -5,7 +5,16 @@
 
 ## 🏁 Current State 0.7.1 (Standardized)
 
-Structural standardization (Phase 6) is complete. The codebase enforces strict Public/Internal API boundaries across all modules. The Math Engine is fully encapsulated, and the foundation is covered by unit tests. The system is now ready for 3D procedural geometry and compute shader integration.
+Structural standardization (Phase 6) is largely complete, but critical limitations in the UI module were identified during the Phase 7 kickoff.
+
+### Phase 6: Structural Standardization (Refinement)
+**Objective:** Address architectural limitations in the UI system to support complex editors.
+- [x] **UI Data Binding:** Support iteration over contiguous arrays and generic pointer arrays (currently limited to specific pointer arrays).
+- [ ] **UI Conditional Templates:** Support logic-based template selection (e.g., `template_selector: "type"`) to handle polymorphic collections (like heterogeneous node lists).
+- [ ] **UI Event Safety:** Implement typesafe wrappers for event callbacks to replace brittle `void*` casting and string-based logic.
+- [ ] **UI Layout:** Implement Flexbox-style properties (`flex-grow`, `justify-content`) for robust responsive layouts.
+
+The codebase enforces strict Public/Internal API boundaries across all modules. The Math Engine is fully encapsulated, and the foundation is covered by unit tests. The system is now ready for 3D procedural geometry and compute shader integration.
 
 ---
 
