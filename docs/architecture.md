@@ -112,6 +112,11 @@ Systems communicate via **IDs** (integers) or **Commands**, never raw pointers. 
 *   **Internal:** `RendererBackend`, `VulkanContext`.
 *   **Goal:** The App should never know Vulkan exists. Only renders what is in the Scene.
 
+### Assets
+*   **Public:** `Assets` (Opaque handle).
+*   **Internal:** `MemoryArena`, Path storage.
+*   **Goal:** Centralized resource management and path resolution.
+
 ### Scene
 *   **Public:** `Scene`, `SceneObject`, `SceneCamera`.
 *   **Goal:** Logic representation of the world. Decoupled from rendering implementation.
