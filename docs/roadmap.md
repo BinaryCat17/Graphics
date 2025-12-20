@@ -21,6 +21,10 @@ The project is undergoing a structural standardization to enforce strict public/
 - [x] **UI Styling Data-Drive:** Remove hardcoded visual logic (e.g., `color *= 1.1f` for inputs) from `ui_renderer.c`. Move state-based visual changes into `UiStyle` or config data.
 - [x] **Uniform Error Handling:** Refactor `engine_create` and subsystem initializers to use a standardized `goto cleanup` pattern or shared destructor helper to prevent resource leaks and reduce code duplication on failure.
 - [ ] **Strict Compiler Compliance:** Enable `-Werror` (treat warnings as errors) in CMake and resolve all existing warnings to ensure code hygiene.
+- [ ] **Static Analysis Integration:** Integrate `cppcheck` or `clang-tidy` into the CMake pipeline to automatically detect bugs and memory issues.
+- [ ] **Debug String Database:** Implement a debug-only global hash map in `string_id` to store original strings, allowing reverse lookup (Hash -> String) for easier debugging.
+- [ ] **Const Correctness Audit:** Review public APIs to enforce `const` correctness for input pointers, improving safety and compiler optimization potential.
+- [ ] **Header Dependency Cleanup:** Refactor headers to reduce inclusion pollution, ensuring each header includes what it uses (IWYU) and uses forward declarations where possible.
 - [x] **Unified Frame Memory:** Implement a central `FrameArena` in `Engine` that is reset daily. Refactor `UiRenderer` and other systems to use this arena instead of managing their own scratch memory.
 - [ ] **Input Action Mapping:** Implement an abstraction layer to map physical keys (e.g., `KEY_Z`) to logical actions (e.g., `ACTION_UNDO`), removing hardcoded key checks from game logic.
 
