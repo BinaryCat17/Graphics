@@ -1,6 +1,7 @@
 #include "engine/core/engine.h"
 #include "foundation/logger/logger.h"
 #include "features/math_engine/math_editor.h"
+#include "foundation/config/config_system.h"
 
 #include <string.h>
 #include <stdlib.h>
@@ -73,62 +74,170 @@ static void app_on_shutdown(Engine* engine) {
 
 int main(int argc, char** argv) {
 
-    EngineConfig config = {
 
-        .width = 1280, .height = 720, .title = "Graphics Engine",
 
-        .assets_path = "assets", .ui_path = "assets/ui/editor.yaml",
+    config_system_load(argc, argv);
 
-        .log_level = LOG_LEVEL_INFO,
 
-        .on_init = app_on_init, .on_update = app_on_update
-
-    };
-
-    logger_init("logs/graphics.log");
 
     
 
-    for (int i = 1; i < argc; ++i) {
 
-        if (strcmp(argv[i], "--assets") == 0) config.assets_path = argv[++i];
 
-        else if (strcmp(argv[i], "--ui") == 0) config.ui_path = argv[++i];
+    // Parse Log Level
 
-        else if (strcmp(argv[i], "--log-level") == 0) {
 
-            const char* l = argv[++i];
 
-            if (strcmp(l, "debug") == 0) config.log_level = LOG_LEVEL_DEBUG;
+    int log_level = LOG_LEVEL_INFO;
 
-        } else if (strcmp(argv[i], "--log-interval") == 0) {
 
-             float interval = atof(argv[++i]);
 
-             logger_set_trace_interval(interval);
+    const char* log_lvl_str = config_get_string("log_level", "info");
 
-             config.screenshot_interval = (double)interval;
 
-        }
+
+    if (strcmp(log_lvl_str, "debug") == 0) log_level = LOG_LEVEL_DEBUG;
+
+
+
+    else if (strcmp(log_lvl_str, "trace") == 0) log_level = LOG_LEVEL_TRACE;
+
+
+
+    else if (strcmp(log_lvl_str, "warn") == 0) log_level = LOG_LEVEL_WARN;
+
+
+
+    else if (strcmp(log_lvl_str, "error") == 0) log_level = LOG_LEVEL_ERROR;
+
+
+
+    else if (strcmp(log_lvl_str, "fatal") == 0) log_level = LOG_LEVEL_FATAL;
+
+
+
+
+
+
+
+    EngineConfig config = {
+
+
+
+        .width = config_get_int("width", 1280), 
+
+
+
+        .height = config_get_int("height", 720), 
+
+
+
+        .title = config_get_string("title", "Graphics Engine"),
+
+
+
+        .assets_path = config_get_string("assets", "assets"), 
+
+
+
+        .ui_path = config_get_string("ui", "assets/ui/editor.yaml"),
+
+
+
+        .log_level = log_level,
+
+
+
+        .on_init = app_on_init, .on_update = app_on_update
+
+
+
+    };
+
+
+
+    
+
+
+
+    // Log Interval / Screenshot
+
+
+
+    float interval = config_get_float("log_interval", 0.0f);
+
+
+
+    if (interval > 0.0f) {
+
+
+
+         logger_set_trace_interval(interval);
+
+
+
+         config.screenshot_interval = (double)interval;
+
+
 
     }
+
+
+
+
+
+
+
+    logger_init("logs/graphics.log");
+
+
+
+
 
 
 
     Engine* engine = engine_create(&config);
 
+
+
     if (engine) {
+
+
 
         engine_run(engine);
 
+
+
         app_on_shutdown(engine); // Clean up user data
+
+
 
         engine_destroy(engine);
 
+
+
     }
+
+
+
+    
+
+
+
+    config_system_shutdown();
+
+
 
     logger_shutdown();
 
+
+
     return 0;
 
+
+
 }
+
+
+
+
