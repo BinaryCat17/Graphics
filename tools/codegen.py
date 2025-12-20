@@ -26,6 +26,7 @@ BASE_TYPES = {
     'f64': 'META_TYPE_FLOAT',
     'b8': 'META_TYPE_BOOL',
     'b32': 'META_TYPE_BOOL',
+    'StringId': 'META_TYPE_STRING_ID',
 }
 
 def parse_enum_body(body_text):

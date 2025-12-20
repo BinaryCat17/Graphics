@@ -112,7 +112,7 @@ void ui_element_clear_children(UiElement* parent, UiInstance* instance);
 void ui_element_update(UiElement* element, float dt); // Syncs data
 
 // --- Accessors ---
-const char* ui_element_get_id(const UiElement* element);
+StringId ui_element_get_id(const UiElement* element);
 UiElement* ui_element_find_by_id(UiElement* root, const char* id);
 void* ui_element_get_data(const UiElement* element);
 const MetaStruct* ui_element_get_meta(const UiElement* element);

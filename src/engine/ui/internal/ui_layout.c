@@ -144,8 +144,8 @@ static void layout_recursive(UiElement* el, Rect available, uint64_t frame_numbe
     el->rect.h = calculate_height(el, available.h);
 
     if (log_debug) {
-        LOG_DEBUG("[Frame %llu] Layout Node id='%s': Rect(%.1f, %.1f, %.1f, %.1f)", 
-            (unsigned long long)frame_number, spec->id ? spec->id : "(anon)",
+        LOG_DEBUG("[Frame %llu] Layout Node id='%u': Rect(%.1f, %.1f, %.1f, %.1f)", 
+            (unsigned long long)frame_number, spec->id,
             el->rect.x, el->rect.y, el->rect.w, el->rect.h);
     }
 

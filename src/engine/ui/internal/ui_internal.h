@@ -12,7 +12,7 @@
 
 struct UiNodeSpec {
     // 1. Identity & Behavior
-    char* id;               // REFLECT
+    StringId id;            // REFLECT
     UiKind kind;            // REFLECT
     UiLayoutStrategy layout;// REFLECT
     UiLayer layer;          // REFLECT
@@ -54,8 +54,8 @@ struct UiNodeSpec {
     size_t child_count;               // REFLECT
     
     // 7. Commands
-    char* on_click_cmd;     // REFLECT
-    char* on_change_cmd;    // REFLECT
+    StringId on_click_cmd;  // REFLECT
+    StringId on_change_cmd; // REFLECT
 };
 
 // --- UI ASSET (The Resource) ---

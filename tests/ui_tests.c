@@ -13,7 +13,7 @@ static UiNodeSpec* create_node(UiAsset* asset, UiLayoutStrategy layout, float w,
     spec->layout = layout;
     spec->width = w;
     spec->height = h;
-    spec->id = arena_push_string(&asset->arena, id ? id : "node");
+    spec->id = str_id(id ? id : "node");
     return spec;
 }
 

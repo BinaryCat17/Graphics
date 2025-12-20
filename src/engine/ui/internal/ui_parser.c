@@ -129,8 +129,8 @@ static UiNodeSpec* load_recursive(UiAsset* asset, const ConfigNode* node) {
         if (!key || !val) continue;
 
         if (strcmp(key, "import") == 0) {
-            LOG_ERROR("UiParser: 'import' is not supported inside children (Node: %s). Use a Template and 'type: instance' instead.", 
-                      spec->id ? spec->id : "anonymous");
+            LOG_ERROR("UiParser: 'import' is not supported inside children (Node ID:%u). Use a Template and 'type: instance' instead.", 
+                      spec->id);
             continue;
         }
 
@@ -241,6 +241,12 @@ static UiNodeSpec* load_recursive(UiAsset* asset, const ConfigNode* node) {
                      char** field_ptr = (char**)meta_get_field_ptr(spec, field);
                      if (field_ptr) *field_ptr = str_copy;
                  }
+            } else if (field->type == META_TYPE_STRING_ID) {
+                 const char* s = val->scalar ? val->scalar : "";
+                 StringId id = str_id(s);
+                 // We reuse meta_set_int because StringId is compatible with int (32-bit)
+                 // and we don't have meta_set_uint or meta_set_string_id
+                 meta_set_int(spec, field, (int)id);
             }
         }
     }
@@ -272,17 +278,15 @@ static ConfigNode* resolve_import(MemoryArena* scratch, const ConfigNode* node) 
 static void validate_node(UiNodeSpec* spec, const char* path) {
     if (!spec) return;
     
-    const char* id = spec->id ? spec->id : "(anon)";
-    
     if (spec->layout == UI_LAYOUT_FLEX_COLUMN || spec->layout == UI_LAYOUT_FLEX_ROW) {
         if (spec->x_source || spec->y_source) {
-            LOG_WARN("UiParser: Node '%s' uses x/y bindings inside a Flex container. These will be ignored.", id);
+            LOG_WARN("UiParser: Node ID:%u uses x/y bindings inside a Flex container. These will be ignored.", spec->id);
         }
     }
     
     if (spec->layout == UI_LAYOUT_SPLIT_H || spec->layout == UI_LAYOUT_SPLIT_V) {
         if (spec->child_count != 2) {
-            LOG_ERROR("UiParser: Split container '%s' MUST have exactly 2 children (has %zu).", id, spec->child_count);
+            LOG_ERROR("UiParser: Split container ID:%u MUST have exactly 2 children (has %zu).", spec->id, spec->child_count);
         }
     }
     
