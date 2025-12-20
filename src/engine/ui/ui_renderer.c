@@ -4,8 +4,9 @@
 #include "foundation/logger/logger.h"
 #include "engine/graphics/text/text_renderer.h" 
 #include "engine/graphics/text/font.h" 
+#include "foundation/memory/arena.h"
 #include <string.h> 
-#include <stdlib.h>
+// #include <stdlib.h> // Malloc removed
 
 // Helper: Intersection
 static Rect rect_intersect(Rect a, Rect b) {
@@ -132,25 +133,33 @@ typedef struct UiRenderContext {
     Scene* scene;
 } UiRenderContext;
 
-// Persistent overlay buffer to avoid per-frame allocation
-static const UiElement** g_overlay_buffer = NULL;
-static size_t g_overlay_count = 0;
-static size_t g_overlay_capacity = 0;
+// Persistent scratch arena for frame-local data (Overlay List)
+static MemoryArena g_ui_renderer_arena = {0};
+static bool g_ui_renderer_arena_init = false;
+
+typedef struct OverlayNode {
+    const UiElement* el;
+    struct OverlayNode* next;
+} OverlayNode;
+
+static OverlayNode* g_overlay_head = NULL;
+static OverlayNode* g_overlay_tail = NULL;
 
 static void push_overlay(UiRenderContext* ctx, const UiElement* el) {
-    (void)ctx; // Unused in this implementation
-    if (g_overlay_count >= g_overlay_capacity) {
-        size_t new_cap = g_overlay_capacity == 0 ? 64 : g_overlay_capacity * 2;
-        const UiElement** new_arr = (const UiElement**)realloc((void*)g_overlay_buffer, new_cap * sizeof(UiElement*));
-        if (new_arr) {
-            g_overlay_buffer = new_arr;
-            g_overlay_capacity = new_cap;
-        } else {
-            LOG_ERROR("UiRenderer: Failed to realloc overlay buffer");
-            return;
-        }
+    (void)ctx;
+    OverlayNode* node = arena_alloc_zero(&g_ui_renderer_arena, sizeof(OverlayNode));
+    if (!node) return;
+    
+    node->el = el;
+    node->next = NULL;
+    
+    if (!g_overlay_head) {
+        g_overlay_head = node;
+        g_overlay_tail = node;
+    } else {
+        g_overlay_tail->next = node;
+        g_overlay_tail = node;
     }
-    g_overlay_buffer[g_overlay_count++] = el;
 }
 
 static void process_node(const UiElement* el, UiRenderContext* ctx, Rect current_clip, float base_z, bool is_overlay_pass) {
@@ -200,26 +209,35 @@ static void process_node(const UiElement* el, UiRenderContext* ctx, Rect current
 void ui_renderer_build_scene(const UiElement* root, Scene* scene, const Assets* assets) {
     (void)assets;
     if (!root) return;
+
+    // Lazy Init Arena
+    if (!g_ui_renderer_arena_init) {
+        // 1MB scratch for overlay pointers is plenty
+        if (arena_init(&g_ui_renderer_arena, 1024 * 1024)) {
+            g_ui_renderer_arena_init = true;
+        } else {
+            LOG_ERROR("UiRenderer: Failed to init scratch arena");
+            return;
+        }
+    }
+    
+    // Reset per frame
+    arena_reset(&g_ui_renderer_arena);
+    g_overlay_head = NULL;
+    g_overlay_tail = NULL;
     
     Rect infinite_clip = {-10000.0f, -10000.0f, 20000.0f, 20000.0f};
     
     UiRenderContext ctx = {0};
     ctx.scene = scene;
     
-    // Reset global overlay count for this frame
-    g_overlay_count = 0;
-    
     // Pass 1: Draw Normal, Defer Overlays
     process_node(root, &ctx, infinite_clip, 0.0f, false);
     
     // Pass 2: Draw Overlays
-    // We iterate the deferred list. Note that overlays might contain OTHER overlays (nested),
-    // but our logic above defers them during traversal. 
-    // However, usually overlays are top-level. 
-    // The current implementation flattens the first level of overlays.
-    for (size_t i = 0; i < g_overlay_count; ++i) {
-        process_node(g_overlay_buffer[i], &ctx, infinite_clip, 0.8f, true);
+    OverlayNode* curr = g_overlay_head;
+    while (curr) {
+        process_node(curr->el, &ctx, infinite_clip, 0.8f, true);
+        curr = curr->next;
     }
-    
-    // Do NOT free g_overlay_buffer here. It persists.
 }

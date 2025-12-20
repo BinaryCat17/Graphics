@@ -3,8 +3,11 @@
 
 #include <stdbool.h>
 #include "engine/graphics/scene/scene.h"
+#include "foundation/memory/arena.h"
 
 typedef struct Assets {
+    MemoryArena arena; // For storing paths and metadata
+
     // Paths (Legacy/Config)
     const char* root_dir;
     const char* ui_default_vert_spv;
