@@ -37,12 +37,19 @@ static void render_background(const UiElement* el, Scene* scene, Vec4 clip_vec, 
 
     // Hover/Active tints
     if (el->is_active) {
-        quad.color.x *= 0.5f; quad.color.y *= 0.5f; quad.color.z *= 0.5f;
+        if (el->spec->active_color.w > 0.0f) {
+            quad.color = el->spec->active_color;
+        } else {
+            float tint = el->spec->active_tint > 0.0f ? el->spec->active_tint : 0.5f;
+            quad.color.x *= tint; quad.color.y *= tint; quad.color.z *= tint;
+        }
     } else if (el->is_hovered && (el->spec->hover_color.x == 0 && el->spec->hover_color.y == 0 && el->spec->hover_color.z == 0 && el->spec->hover_color.w == 0)) {
         // Only apply legacy tint if no declarative hover color is set
-        quad.color.x *= 1.2f; quad.color.y *= 1.2f; quad.color.z *= 1.2f;
+        float tint = el->spec->hover_tint > 0.0f ? el->spec->hover_tint : 1.2f;
+        quad.color.x *= tint; quad.color.y *= tint; quad.color.z *= tint;
     } else if (el->spec->kind == UI_KIND_TEXT_INPUT) {
-         // Make inputs slightly lighter by default
+         // Make inputs slightly lighter by default (Legacy/Default behavior)
+         // Could be parameterized later if needed
          quad.color.x *= 1.1f; quad.color.y *= 1.1f; quad.color.z *= 1.1f;
     }
 
@@ -96,7 +103,10 @@ static void render_content(const UiElement* el, Scene* scene, Vec4 clip_vec, flo
     if (text) {
         Vec3 pos = {el->screen_rect.x + el->spec->padding, el->screen_rect.y + el->spec->padding, z + 0.001f};
         
-        scene_add_text_clipped(scene, text, pos, 0.5f, (Vec4){1.0f, 1.0f, 1.0f, 1.0f}, clip_vec);
+        float txt_scale = el->spec->text_scale > 0.0f ? el->spec->text_scale : 0.5f;
+        Vec4 txt_color = el->spec->text_color.w > 0.0f ? el->spec->text_color : (Vec4){1.0f, 1.0f, 1.0f, 1.0f};
+        
+        scene_add_text_clipped(scene, text, pos, txt_scale, txt_color, clip_vec);
 
         // Draw Caret
         if (el->spec->kind == UI_KIND_TEXT_INPUT && el->is_focused) {
@@ -110,14 +120,20 @@ static void render_content(const UiElement* el, Scene* scene, Vec4 clip_vec, flo
             memcpy(temp, text, copy_len);
             temp[copy_len] = '\0';
             
-            float text_width = font_measure_text(temp) * 0.5f; 
+            float text_width = font_measure_text(temp) * txt_scale; 
             
             SceneObject caret = {0};
             caret.prim_type = SCENE_PRIM_QUAD;
             caret.position = (Vec3){pos.x + text_width, pos.y, z + 0.002f}; 
-            caret.scale = (Vec3){2.0f, 20.0f, 1.0f}; 
+            
+            float cw = el->spec->caret_width > 0.0f ? el->spec->caret_width : 2.0f;
+            float ch = el->spec->caret_height > 0.0f ? el->spec->caret_height : 20.0f;
+            caret.scale = (Vec3){cw, ch, 1.0f}; 
+            
             caret.clip_rect = clip_vec;
-            caret.color = (Vec4){1.0f, 1.0f, 1.0f, 1.0f}; 
+            
+            Vec4 cc = el->spec->caret_color.w > 0.0f ? el->spec->caret_color : (Vec4){1.0f, 1.0f, 1.0f, 1.0f};
+            caret.color = cc; 
             
             caret.shader_params_0.x = (float)SCENE_MODE_SOLID;
             float u, v;

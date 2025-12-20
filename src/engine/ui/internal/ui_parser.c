@@ -118,6 +118,14 @@ static UiNodeSpec* load_recursive(UiAsset* asset, const ConfigNode* node) {
         spec->width = -1.0f;
         spec->height = -1.0f;
         spec->color = (Vec4){1,1,1,1};
+        // Style defaults (Legacy behavior)
+        spec->active_tint = 0.5f;
+        spec->hover_tint = 1.2f;
+        spec->text_scale = 0.5f;
+        spec->caret_width = 2.0f;
+        spec->caret_height = 20.0f;
+        spec->text_color = (Vec4){1,1,1,1};
+        spec->caret_color = (Vec4){1,1,1,1};
     }
 
     const MetaStruct* meta = meta_get_struct("UiNodeSpec");
@@ -164,8 +172,16 @@ static UiNodeSpec* load_recursive(UiAsset* asset, const ConfigNode* node) {
             }
             continue;
         }
-        if (strcmp(key, "color") == 0 || strcmp(key, "hover_color") == 0) {
-            Vec4* target_color = strcmp(key, "color") == 0 ? &spec->color : &spec->hover_color;
+
+        // --- Colors ---
+        Vec4* target_color = NULL;
+        if (strcmp(key, "color") == 0) target_color = &spec->color;
+        else if (strcmp(key, "hover_color") == 0) target_color = &spec->hover_color;
+        else if (strcmp(key, "active_color") == 0) target_color = &spec->active_color;
+        else if (strcmp(key, "text_color") == 0) target_color = &spec->text_color;
+        else if (strcmp(key, "caret_color") == 0) target_color = &spec->caret_color;
+
+        if (target_color) {
             if (val->type == CONFIG_NODE_SEQUENCE && val->item_count >= 3) {
                  float r = val->items[0]->scalar ? (float)atof(val->items[0]->scalar) : 1.0f;
                  float g = val->items[1]->scalar ? (float)atof(val->items[1]->scalar) : 1.0f;
@@ -178,8 +194,18 @@ static UiNodeSpec* load_recursive(UiAsset* asset, const ConfigNode* node) {
             }
             continue;
         }
-        if (strcmp(key, "animation_speed") == 0) {
-            spec->animation_speed = val->scalar ? (float)atof(val->scalar) : 0.0f;
+
+        // --- Floats ---
+        float* target_float = NULL;
+        if (strcmp(key, "animation_speed") == 0) target_float = &spec->animation_speed;
+        else if (strcmp(key, "active_tint") == 0) target_float = &spec->active_tint;
+        else if (strcmp(key, "hover_tint") == 0) target_float = &spec->hover_tint;
+        else if (strcmp(key, "text_scale") == 0) target_float = &spec->text_scale;
+        else if (strcmp(key, "caret_width") == 0) target_float = &spec->caret_width;
+        else if (strcmp(key, "caret_height") == 0) target_float = &spec->caret_height;
+
+        if (target_float) {
+            *target_float = val->scalar ? (float)atof(val->scalar) : 0.0f;
             continue;
         }
         // Flags manual overrides (mixes with kind)

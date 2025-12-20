@@ -21,6 +21,14 @@ struct UiNodeSpec {
     // 3. Styling (Reference to style sheet, not implemented yet)
     Vec4 color;             // REFLECT
     Vec4 hover_color;       // REFLECT
+    Vec4 active_color;      // REFLECT
+    float active_tint;      // REFLECT
+    float hover_tint;       // REFLECT
+    Vec4 text_color;        // REFLECT
+    float text_scale;       // REFLECT
+    Vec4 caret_color;       // REFLECT
+    float caret_width;      // REFLECT
+    float caret_height;     // REFLECT
     float animation_speed;  // REFLECT
     
     // 9-Slice Sizing (if kind == UI_KIND_CONTAINER and texture is used)
