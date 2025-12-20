@@ -16,6 +16,8 @@ The project is undergoing a structural standardization to enforce strict public/
 
 - [ ] **Scene Memory Optimization:** Replace `realloc` in `Scene` with `MemoryArena` (Frame Allocator) to eliminate heap fragmentation and allocation spikes during rendering.
 - [x] **Asset Decoupling:** Refactor `Assets` module to load file content into memory buffers. Update `RenderSystem` to accept data pointers (bytes) instead of file paths, decoupling rendering from the OS file system.
+- [ ] **Font System Decoupling:** Update `font_init` to accept a memory buffer instead of a file path, ensuring all I/O is centralized in the `Assets` module.
+- [ ] **Geometry Deduplication:** Centralize primitive generation (e.g., Unit Quad) in a shared helper to eliminate duplicate vertex data definitions in `Assets` and `VulkanBackend`.
 - [ ] **UI Styling Data-Drive:** Remove hardcoded visual logic (e.g., `color *= 1.1f` for inputs) from `ui_renderer.c`. Move state-based visual changes into `UiStyle` or config data.
 
 ### Phase 7: 3D Visualization & Compute
@@ -34,5 +36,4 @@ The project is undergoing a structural standardization to enforce strict public/
 
 ## 🛠 Technical Debt & Backlog
 
-*   **Geometry Utils:** Move generic mesh generation (quads, cubes) from `vk_utils.c` to a backend-agnostic `foundation/geometry` module.
 *   **Input Mapping:** Replace hardcoded keys (e.g., `KEY_Z`) with an Action Mapping system.
