@@ -4,6 +4,7 @@
 #include "foundation/platform/platform.h"
 #include "foundation/platform/fs.h"
 #include "foundation/logger/logger.h"
+#include "foundation/memory/arena.h"
 
 #include <string.h>
 #include <stdlib.h>

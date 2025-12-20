@@ -180,9 +180,10 @@ static int ui_resolve_count(void* data, const MetaStruct* meta, const char* fiel
     
     if (strstr(field_name, "_ptrs")) {
         strncpy(count_name, field_name, sizeof(count_name));
+        count_name[sizeof(count_name) - 1] = '\0';
         char* p = strstr(count_name, "_ptrs");
         if (p) {
-            strcpy(p, "_count");
+            strncpy(p, "_count", sizeof(count_name) - (p - count_name));
             f = meta_find_field(meta, count_name);
             if (f && f->type == META_TYPE_INT) return meta_get_int(data, f);
         }

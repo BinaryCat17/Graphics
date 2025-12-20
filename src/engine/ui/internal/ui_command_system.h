@@ -6,13 +6,11 @@
 
 typedef void (*UiCommandCallback)(void* user_data, UiElement* target);
 
-void ui_command_init(void);
-void ui_command_shutdown(void);
+// Redundant declarations removed to avoid warnings (declared in ui_core.h)
+// void ui_command_init(void);
+// void ui_command_shutdown(void);
+// void ui_command_register(const char* name, UiCommandCallback callback, void* user_data);
+// void ui_command_execute_id(StringId id, UiElement* target);
 
-// Register a command by name
-void ui_command_register(const char* name, UiCommandCallback callback, void* user_data);
-
-// Execute a command by ID (Faster)
-void ui_command_execute_id(StringId id, UiElement* target);
 
 #endif // UI_COMMAND_SYSTEM_H

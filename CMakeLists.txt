@@ -59,9 +59,15 @@ add_custom_command(
 
 # --- FOUNDATION LAYER ---
 
+# Thread
+add_library(foundation_thread STATIC "src/foundation/thread/thread.c")
+target_include_directories(foundation_thread PUBLIC "src/")
+target_link_libraries(foundation_thread PUBLIC Threads::Threads)
+
 # Logger
 add_library(foundation_logger STATIC "src/foundation/logger/logger.c")
 target_include_directories(foundation_logger PUBLIC "src/")
+target_link_libraries(foundation_logger PUBLIC foundation_thread)
 
 # String
 add_library(foundation_string STATIC "src/foundation/string/string_id.c")

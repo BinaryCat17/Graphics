@@ -14,11 +14,11 @@
 #include "foundation/platform/fs.h"
 #include "foundation/math/coordinate_systems.h"
 #include "foundation/image/image.h"
+#include "foundation/thread/thread.h"
 
 #include <stdlib.h>
 #include <string.h>
 #include <math.h>
-#include <threads.h>
 
 typedef struct ScreenshotContext {
     char path[256];
@@ -423,10 +423,8 @@ static void vulkan_renderer_render_scene(RendererBackend* backend, const Scene* 
     VkResult result = vkAcquireNextImageKHR(state->device, state->swapchain, UINT64_MAX, 
                                             state->sem_img_avail, VK_NULL_HANDLE, &image_index);
 
-    if (result == VK_ERROR_OUT_OF_DATE_KHR) {
-        // resize
-        return;
-    } else if (result != VK_SUCCESS && result != VK_SUBOPTIMAL_KHR) {
+    if (result == VK_ERROR_OUT_OF_DATE_KHR || (result != VK_SUCCESS && result != VK_SUBOPTIMAL_KHR)) {
+        // resize or error
         return;
     }
     
@@ -459,7 +457,7 @@ static void vulkan_renderer_render_scene(RendererBackend* backend, const Scene* 
     for (size_t i = 0; i < actual_count; ++i) {
         const SceneObject* obj = &scene_objects[i];
         
-        Mat4 m = mat4_identity();
+        Mat4 m;
         Mat4 s = mat4_scale(obj->scale);
         Mat4 t = mat4_translation(obj->position);
         m = mat4_multiply(&t, &s);
@@ -621,9 +619,9 @@ static void vulkan_renderer_render_scene(RendererBackend* backend, const Scene* 
                     ctx->data = host_copy;
                     ctx->needs_swizzle = (state->swapchain_format == VK_FORMAT_B8G8R8A8_UNORM || state->swapchain_format == VK_FORMAT_B8G8R8A8_SRGB);
 
-                    thrd_t t;
-                    if (thrd_create(&t, save_screenshot_task, ctx) == thrd_success) {
-                        thrd_detach(t);
+                    Thread* t = thread_create(save_screenshot_task, ctx);
+                    if (t) {
+                        thread_detach(t);
                         LOG_TRACE("Screenshot: Offloaded to thread.");
                     } else {
                         LOG_ERROR("Screenshot: Failed to create thread!");

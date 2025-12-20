@@ -1,5 +1,6 @@
 #include "simple_yaml.h"
 #include "foundation/platform/platform.h"
+#include "foundation/memory/arena.h"
 
 #include <ctype.h>
 #include <stdio.h>
@@ -68,7 +69,7 @@ static int yaml_sequence_append(MemoryArena* arena, ConfigNode *seq, ConfigNode 
         if (!new_items) return 0;
         
         if (seq->items) {
-            memcpy(new_items, seq->items, seq->item_count * sizeof(ConfigNode *));
+            memcpy((void*)new_items, (const void*)seq->items, seq->item_count * sizeof(ConfigNode *));
         }
         
         seq->items = new_items;
@@ -309,21 +310,21 @@ static int emit_json_internal(const ConfigNode *node, char **out)
         char **children = (char **)calloc(node->item_count, sizeof(char *));
         if (!children) return 0;
         for (size_t i = 0; i < node->item_count; ++i) {
-            if (!emit_json_internal(node->items[i], &children[i])) { free(children); return 0; }
+            if (!emit_json_internal(node->items[i], &children[i])) { free((void*)children); return 0; }
             total += strlen(children[i]) + 1;
         }
         char *buf = (char *)malloc(total + 1);
-        if (!buf) { for (size_t i = 0; i < node->item_count; ++i) free(children[i]); free(children); return 0; }
+        if (!buf) { for (size_t i = 0; i < node->item_count; ++i) free((void*)children[i]); free((void*)children); return 0; }
         buf[0] = '['; size_t pos = 1;
         for (size_t i = 0; i < node->item_count; ++i) {
             size_t len = strlen(children[i]);
             memcpy(buf + pos, children[i], len);
             pos += len;
             if (i + 1 < node->item_count) buf[pos++] = ',';
-            free(children[i]);
+            free((void*)children[i]);
         }
         buf[pos++] = ']'; buf[pos] = 0;
-        free(children);
+        free((void*)children);
         *out = buf;
         return 1;
     }
@@ -334,8 +335,8 @@ static int emit_json_internal(const ConfigNode *node, char **out)
         for (size_t i = 0; i < node->pair_count; ++i) {
             char *val_json = NULL;
             if (!emit_json_internal(node->pairs[i].value, &val_json)) {
-                for (size_t j = 0; j < i; ++j) free(pairs[j]);
-                free(pairs);
+                for (size_t j = 0; j < i; ++j) free((void*)pairs[j]);
+                free((void*)pairs);
                 return 0;
             }
             size_t key_len = strlen(node->pairs[i].key);
@@ -347,17 +348,17 @@ static int emit_json_internal(const ConfigNode *node, char **out)
             total += strlen(pairs[i]) + 1;
         }
         char *buf = (char *)malloc(total + 1);
-        if (!buf) { for (size_t i = 0; i < node->pair_count; ++i) free(pairs[i]); free(pairs); return 0; }
+        if (!buf) { for (size_t i = 0; i < node->pair_count; ++i) free((void*)pairs[i]); free((void*)pairs); return 0; }
         buf[0] = '{'; size_t pos = 1;
         for (size_t i = 0; i < node->pair_count; ++i) {
             size_t len = strlen(pairs[i]);
             memcpy(buf + pos, pairs[i], len);
             pos += len;
             if (i + 1 < node->pair_count) buf[pos++] = ',';
-            free(pairs[i]);
+            free((void*)pairs[i]);
         }
         buf[pos++] = '}'; buf[pos] = 0;
-        free(pairs);
+        free((void*)pairs);
         *out = buf;
         return 1;
     }

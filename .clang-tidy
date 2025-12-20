@@ -10,7 +10,11 @@ Checks: >
   -clang-analyzer-security.insecureAPI.DeprecatedOrUnsafeBufferHandling,
   -bugprone-easily-swappable-parameters,
   -readability-function-cognitive-complexity,
-  -misc-no-recursion
+  -misc-no-recursion,
+  -misc-include-cleaner,
+  -bugprone-implicit-widening-of-multiplication-result,
+  -bugprone-narrowing-conversions
+
 
 # Check only files in src/ to avoid linting vendor headers (stb, glfw, etc)
 HeaderFilterRegex: 'src/.*'

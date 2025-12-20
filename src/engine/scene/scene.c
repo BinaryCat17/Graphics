@@ -1,7 +1,9 @@
 #include "scene.h"
 #include "internal/scene_internal.h"
+#include "foundation/memory/arena.h"
 #include <stdlib.h>
 #include <string.h>
+#include <stdint.h>
 
 #define SCENE_ARENA_SIZE (4 * 1024 * 1024) // 4 MB Capacity (~25k objects)
 

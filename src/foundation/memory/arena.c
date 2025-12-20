@@ -1,5 +1,6 @@
 #include "foundation/memory/arena.h"
 #include <stdlib.h>
+#include <stdint.h>
 #include <string.h>
 #include <stdio.h>
 #include <stdarg.h>

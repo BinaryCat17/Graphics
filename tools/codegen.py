@@ -154,7 +154,7 @@ def generate_code(enums, structs, headers, output_path):
         for name, values in enums.items():
             f.write(f'static const MetaEnumValue values_{name}[] = {{\n')
             for v in values:
-                f.write(f'    {{ "{v}", (int){v} }},\n')
+                f.write(f'    {{ "{v}", {v} }},\n')
             f.write('};\n\n')
 
         f.write('// --- STRUCTS ---\n\n')

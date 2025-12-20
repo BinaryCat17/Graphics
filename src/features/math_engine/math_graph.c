@@ -35,7 +35,7 @@ void math_graph_clear(MathGraph* graph) {
     if (!graph) return;
     
     if (graph->node_ptrs) {
-        free(graph->node_ptrs);
+        free((void*)graph->node_ptrs);
         graph->node_ptrs = NULL;
     }
     
@@ -58,14 +58,14 @@ MathNodeId math_graph_add_node(MathGraph* graph, MathNodeType type) {
         uint32_t new_cap = graph->node_capacity * 2;
         if (new_cap == 0) new_cap = 32;
         
-        MathNode** new_ptrs = (MathNode**)realloc(graph->node_ptrs, sizeof(MathNode*) * new_cap);
+        MathNode** new_ptrs = (MathNode**)realloc((void*)graph->node_ptrs, sizeof(MathNode*) * new_cap);
         if (!new_ptrs) {
             LOG_ERROR("MathGraph: Out of memory for ID table!");
             return MATH_NODE_INVALID_ID;
         }
         
         // Zero out new slots
-        memset(new_ptrs + graph->node_capacity, 0, (new_cap - graph->node_capacity) * sizeof(MathNode*));
+        memset((void*)(new_ptrs + graph->node_capacity), 0, (new_cap - graph->node_capacity) * sizeof(MathNode*));
         
         graph->node_ptrs = new_ptrs;
         graph->node_capacity = new_cap;

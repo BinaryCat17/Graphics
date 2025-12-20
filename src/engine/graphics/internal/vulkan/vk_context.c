@@ -51,9 +51,9 @@ void vk_create_instance(VulkanRendererState* state) {
 void vk_pick_physical_and_create_device(VulkanRendererState* state) {
     uint32_t pc = 0; 
     vkEnumeratePhysicalDevices(state->instance, &pc, NULL); 
-    if (pc == 0) LOG_FATAL("No physical dev");
+    if (pc == 0) { LOG_FATAL("No physical dev"); return; }
     
-    VkPhysicalDevice* list = malloc(sizeof(VkPhysicalDevice) * pc); 
+    VkPhysicalDevice* list = (VkPhysicalDevice*)malloc(sizeof(VkPhysicalDevice) * pc); 
     vkEnumeratePhysicalDevices(state->instance, &pc, list);
     
     VkPhysicalDevice best_device = VK_NULL_HANDLE;
@@ -77,7 +77,7 @@ void vk_pick_physical_and_create_device(VulkanRendererState* state) {
         }
     }
     state->physical_device = best_device;
-    free(list);
+    free((void*)list);
 
     log_gpu_info(state->physical_device);
 

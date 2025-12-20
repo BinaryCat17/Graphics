@@ -1,5 +1,6 @@
 #include "foundation/platform/fs.h"
 #include "foundation/platform/platform.h"
+#include "foundation/memory/arena.h"
 
 #include <stdio.h>
 #include <stdlib.h>

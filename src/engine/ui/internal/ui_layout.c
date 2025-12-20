@@ -116,7 +116,9 @@ static void layout_canvas(UiElement* el, float* out_max_x, float* out_max_y) {
 static void layout_split_h(UiElement* el, float start_x, float start_y) {
     if (el->child_count < 2) return;
     UiElement* c1 = el->first_child;
+    if (!c1) return;
     UiElement* c2 = c1->next_sibling;
+    if (!c2) return;
     
     c1->rect.x = start_x;
     c1->rect.y = start_y;
@@ -127,7 +129,9 @@ static void layout_split_h(UiElement* el, float start_x, float start_y) {
 static void layout_split_v(UiElement* el, float start_x, float start_y) {
     if (el->child_count < 2) return;
     UiElement* c1 = el->first_child;
+    if (!c1) return;
     UiElement* c2 = c1->next_sibling;
+    if (!c2) return;
     
     c1->rect.x = start_x;
     c1->rect.y = start_y;

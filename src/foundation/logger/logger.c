@@ -3,6 +3,7 @@
 #endif
 
 #include "logger.h"
+#include "foundation/thread/thread.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <time.h>
@@ -15,11 +16,6 @@
     #include <windows.h>
     #include <direct.h>
     
-    // Windows SRWLock is lighter and supports static init
-    static SRWLOCK g_log_lock = SRWLOCK_INIT;
-    static void lock_mutex(void) { AcquireSRWLockExclusive(&g_log_lock); }
-    static void unlock_mutex(void) { ReleaseSRWLockExclusive(&g_log_lock); }
-
     static void safe_localtime(const time_t* timep, struct tm* result) {
         localtime_s(result, timep);
     }
@@ -28,13 +24,8 @@
         _mkdir(path);
     }
 #else
-    #include <pthread.h>
     #include <sys/stat.h>
     #include <sys/types.h> // NOLINT
-
-    static pthread_mutex_t g_log_lock = PTHREAD_MUTEX_INITIALIZER; // NOLINT
-    static void lock_mutex(void) { pthread_mutex_lock(&g_log_lock); }
-    static void unlock_mutex(void) { pthread_mutex_unlock(&g_log_lock); }
 
     static void safe_localtime(const time_t* timep, struct tm* result) {
         localtime_r(timep, result);
@@ -44,6 +35,16 @@
         mkdir(path, 0755);
     }
 #endif
+
+static Mutex* g_log_lock = NULL;
+
+static void lock_mutex(void) { 
+    if (g_log_lock) mutex_lock(g_log_lock); 
+}
+
+static void unlock_mutex(void) { 
+    if (g_log_lock) mutex_unlock(g_log_lock); 
+}
 
 static LogLevel g_console_level = LOG_LEVEL_INFO;
 static LogLevel g_file_level = LOG_LEVEL_TRACE;
@@ -94,11 +95,16 @@ static void create_dir_if_needed(const char* path) {
 }
 
 void logger_init(const char* log_file_path) {
-    lock_mutex();
+    // Note: We assume logger_init is called from the main thread at startup.
+    // If we wanted to be strictly thread-safe here, we'd need a spinlock or atomic check,
+    // but Mutex creation itself needs to happen once.
     if (g_initialized) {
-        unlock_mutex();
         return;
     }
+    
+    g_log_lock = mutex_create();
+
+    lock_mutex();
 
     if (log_file_path) {
         create_dir_if_needed(log_file_path);
@@ -120,6 +126,9 @@ void logger_shutdown(void) {
     }
     g_initialized = false;
     unlock_mutex();
+    
+    mutex_destroy(g_log_lock);
+    g_log_lock = NULL;
 }
 
 void logger_set_console_level(LogLevel level) {

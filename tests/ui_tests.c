@@ -21,7 +21,7 @@ static void add_child_spec(UiAsset* asset, UiNodeSpec* parent, UiNodeSpec* child
     parent->child_count++;
     UiNodeSpec** new_children = (UiNodeSpec**)arena_alloc(&asset->arena, parent->child_count * sizeof(UiNodeSpec*));
     if (parent->children) {
-        memcpy(new_children, parent->children, (parent->child_count - 1) * sizeof(UiNodeSpec*));
+        memcpy((void*)new_children, (const void*)parent->children, (parent->child_count - 1) * sizeof(UiNodeSpec*));
     }
     new_children[parent->child_count - 1] = child;
     parent->children = new_children;
@@ -29,7 +29,7 @@ static void add_child_spec(UiAsset* asset, UiNodeSpec* parent, UiNodeSpec* child
 
 // --- TESTS ---
 
-int test_column_layout() {
+int test_column_layout(void) {
     UiAsset* asset = ui_asset_create(4096);
 
     UiNodeSpec* root = create_node(asset, UI_LAYOUT_FLEX_COLUMN, 100.0f, 200.0f, "root");
@@ -65,7 +65,7 @@ int test_column_layout() {
     return 1;
 }
 
-int main() {
+int main(void) {
     printf("--- Running UI Tests ---\n");
     RUN_TEST(test_column_layout);
     

@@ -54,11 +54,12 @@ static void config_node_add_scalar(ConfigNode* map, const char* key, const char*
     // Copy key and value to arena
     size_t key_len = strlen(key);
     char* key_copy = arena_alloc(&g_config.arena, key_len + 1);
-    strcpy(key_copy, key);
+    memcpy(key_copy, key, key_len + 1);
 
     size_t val_len = strlen(value);
     char* val_copy = arena_alloc(&g_config.arena, val_len + 1);
-    strcpy(val_copy, value);
+    memcpy(val_copy, value, val_len + 1);
+
 
     ConfigNode* val_node = arena_alloc_zero(&g_config.arena, sizeof(ConfigNode));
     val_node->type = CONFIG_NODE_SCALAR;

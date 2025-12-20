@@ -59,7 +59,10 @@ void meta_set_string(void* instance, const MetaField* field, const char* value) 
     } else if (field->type == META_TYPE_STRING_ARRAY) {
         char* ptr = (char*)instance + field->offset;
         if (value) {
-            strcpy(ptr, value); 
+            // Using a safe default limit since MetaField doesn't store array size yet.
+            // Assuming 256 is enough for most names/paths in this engine.
+            strncpy(ptr, value, 255);
+            ptr[255] = '\0';
         } else {
             ptr[0] = '\0';
         }

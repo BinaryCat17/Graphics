@@ -5,7 +5,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <threads.h>
+#include "foundation/thread/thread.h"
 
 #include "foundation/platform/platform.h"
 #include "engine/graphics/internal/renderer_backend.h"
@@ -24,7 +24,7 @@ struct RenderSystem {
     int front_packet_index;
     int back_packet_index;
     bool packet_ready;
-    mtx_t packet_mutex;
+    Mutex* packet_mutex;
     
     // Thread control
     bool running;
@@ -46,14 +46,14 @@ static void render_packet_free_resources(RenderFramePacket* packet) {
 const RenderFramePacket* render_system_acquire_packet(RenderSystem* sys) {
     if (!sys) return NULL;
 
-    mtx_lock(&sys->packet_mutex);
+    mutex_lock(sys->packet_mutex);
     if (sys->packet_ready) {
         int temp = sys->front_packet_index;
         sys->front_packet_index = sys->back_packet_index;
         sys->back_packet_index = temp;
         sys->packet_ready = false;
     }
-    mtx_unlock(&sys->packet_mutex);
+    mutex_unlock(sys->packet_mutex);
 
     return &sys->packets[sys->front_packet_index];
 }
@@ -108,7 +108,7 @@ RenderSystem* render_system_create(const RenderSystemConfig* config) {
 
     sys->window = config->window;
     
-    mtx_init(&sys->packet_mutex, mtx_plain);
+    sys->packet_mutex = mutex_create();
     sys->back_packet_index = 1;
     sys->frame_count = 0;
 
@@ -124,6 +124,7 @@ RenderSystem* render_system_create(const RenderSystemConfig* config) {
         LOG_ERROR("RenderSystem: Failed to load backend '%s'", backend_id);
         scene_destroy(sys->packets[0].scene);
         scene_destroy(sys->packets[1].scene);
+        mutex_destroy(sys->packet_mutex);
         free(sys);
         return NULL;
     }
@@ -144,7 +145,7 @@ void render_system_destroy(RenderSystem* sys) {
     render_packet_free_resources(&sys->packets[1]);
     scene_destroy(sys->packets[1].scene);
     
-    mtx_destroy(&sys->packet_mutex);
+    mutex_destroy(sys->packet_mutex);
     free(sys);
 }
 
@@ -217,9 +218,9 @@ void render_system_update(RenderSystem* sys) {
     }
 
     // Mark Packet Ready
-    mtx_lock(&sys->packet_mutex);
+    mutex_lock(sys->packet_mutex);
     sys->packet_ready = true;
-    mtx_unlock(&sys->packet_mutex);
+    mutex_unlock(sys->packet_mutex);
 }
 
 void render_system_draw(RenderSystem* sys) {

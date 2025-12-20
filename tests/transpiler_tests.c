@@ -6,7 +6,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-int test_transpiler_simple_add() {
+int test_transpiler_simple_add(void) {
     MathGraph graph;
     // Arena no longer needed for MathGraph initialization
     // MemoryArena arena;
@@ -52,7 +52,7 @@ int test_transpiler_simple_add() {
     return 1;
 }
 
-int main() {
+int main(void) {
     printf("Running Transpiler Tests...\n");
     RUN_TEST(test_transpiler_simple_add);
     

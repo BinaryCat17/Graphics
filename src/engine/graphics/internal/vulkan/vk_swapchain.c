@@ -42,9 +42,9 @@ void vk_create_swapchain_and_views(VulkanRendererState* state, VkSwapchainKHR ol
     /* choose format */
     uint32_t fc = 0; 
     vkGetPhysicalDeviceSurfaceFormatsKHR(state->physical_device, state->surface, &fc, NULL); 
-    if (fc == 0) LOG_FATAL("no surface formats");
+    if (fc == 0) { LOG_FATAL("no surface formats"); return; }
     
-    VkSurfaceFormatKHR* fmts = malloc(sizeof(VkSurfaceFormatKHR) * fc); 
+    VkSurfaceFormatKHR* fmts = (VkSurfaceFormatKHR*)malloc(sizeof(VkSurfaceFormatKHR) * fc); 
     vkGetPhysicalDeviceSurfaceFormatsKHR(state->physical_device, state->surface, &fc, fmts);
     
     VkSurfaceFormatKHR chosen_fmt = { 0 };
@@ -85,11 +85,7 @@ void vk_create_swapchain_and_views(VulkanRendererState* state, VkSwapchainKHR ol
         }
     }
 
-    if (have_srgb_blend) {
-        chosen_fmt = srgb_choice;
-        chosen_support = srgb_support;
-    }
-    else if (!chosen_support.color_attachment && have_srgb) {
+    if (have_srgb_blend || (!chosen_support.color_attachment && have_srgb)) {
         chosen_fmt = srgb_choice;
         chosen_support = srgb_support;
     }
@@ -183,10 +179,10 @@ void vk_create_swapchain_and_views(VulkanRendererState* state, VkSwapchainKHR ol
     if (state->res != VK_SUCCESS) fatal_vk("vkCreateSwapchainKHR", state->res);
     
     vkGetSwapchainImagesKHR(state->device, state->swapchain, &state->swapchain_img_count, NULL);
-    state->swapchain_imgs = malloc(sizeof(VkImage) * state->swapchain_img_count);
+    state->swapchain_imgs = (VkImage*)malloc(sizeof(VkImage) * state->swapchain_img_count);
     vkGetSwapchainImagesKHR(state->device, state->swapchain, &state->swapchain_img_count, state->swapchain_imgs);
     
-    state->swapchain_imgviews = malloc(sizeof(VkImageView) * state->swapchain_img_count);
+    state->swapchain_imgviews = (VkImageView*)malloc(sizeof(VkImageView) * state->swapchain_img_count);
     for (uint32_t i = 0; i < state->swapchain_img_count; i++) {
         VkImageViewCreateInfo ivci = { 
             .sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO, 
@@ -293,12 +289,12 @@ void vk_create_cmds_and_sync(VulkanRendererState* state) {
     state->res = vkCreateCommandPool(state->device, &cpci, NULL, &state->cmdpool);
     if (state->res != VK_SUCCESS) fatal_vk("vkCreateCommandPool", state->res);
     
-    state->cmdbuffers = malloc(sizeof(VkCommandBuffer) * state->swapchain_img_count);
+    state->cmdbuffers = (VkCommandBuffer*)malloc(sizeof(VkCommandBuffer) * state->swapchain_img_count);
     VkCommandBufferAllocateInfo cbai = { .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO, .commandPool = state->cmdpool, .level = VK_COMMAND_BUFFER_LEVEL_PRIMARY, .commandBufferCount = state->swapchain_img_count };
     state->res = vkAllocateCommandBuffers(state->device, &cbai, state->cmdbuffers);
     if (state->res != VK_SUCCESS) fatal_vk("vkAllocateCommandBuffers", state->res);
 
-    state->framebuffers = malloc(sizeof(VkFramebuffer) * state->swapchain_img_count);
+    state->framebuffers = (VkFramebuffer*)malloc(sizeof(VkFramebuffer) * state->swapchain_img_count);
     for (uint32_t i = 0; i < state->swapchain_img_count; i++) {
         VkImageView attachments[2] = { state->swapchain_imgviews[i], state->depth_image_view };
         VkFramebufferCreateInfo fci = { .sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO, .renderPass = state->render_pass, .attachmentCount = 2, .pAttachments = attachments, .width = state->swapchain_extent.width, .height = state->swapchain_extent.height, .layers = 1 };
@@ -309,7 +305,7 @@ void vk_create_cmds_and_sync(VulkanRendererState* state) {
     vkCreateSemaphore(state->device, &sci, NULL, &state->sem_img_avail); 
     vkCreateSemaphore(state->device, &sci, NULL, &state->sem_render_done);
     
-    state->fences = malloc(sizeof(VkFence) * state->swapchain_img_count);
+    state->fences = (VkFence*)malloc(sizeof(VkFence) * state->swapchain_img_count);
     for (uint32_t i = 0; i < state->swapchain_img_count; i++) {
         VkFenceCreateInfo fci = { .sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO, .flags = VK_FENCE_CREATE_SIGNALED_BIT };
         vkCreateFence(state->device, &fci, NULL, &state->fences[i]);
@@ -328,7 +324,7 @@ void vk_create_cmds_and_sync(VulkanRendererState* state) {
 void vk_cleanup_swapchain(VulkanRendererState* state, bool keep_swapchain_handle) {
     if (state->cmdbuffers) {
         vkFreeCommandBuffers(state->device, state->cmdpool, state->swapchain_img_count, state->cmdbuffers);
-        free(state->cmdbuffers);
+        free((void*)state->cmdbuffers);
         state->cmdbuffers = NULL;
     }
     if (state->cmdpool) {
@@ -337,27 +333,27 @@ void vk_cleanup_swapchain(VulkanRendererState* state, bool keep_swapchain_handle
     }
     if (state->framebuffers) {
         for (uint32_t i = 0; i < state->swapchain_img_count; i++) vkDestroyFramebuffer(state->device, state->framebuffers[i], NULL);
-        free(state->framebuffers);
+        free((void*)state->framebuffers);
         state->framebuffers = NULL;
     }
     if (state->fences) {
         for (uint32_t i = 0; i < state->swapchain_img_count; i++) vkDestroyFence(state->device, state->fences[i], NULL);
-        free(state->fences);
+        free((void*)state->fences);
         state->fences = NULL;
     }
     for (size_t i = 0; i < 2; ++i) {
         state->frame_resources[i].stage = FRAME_AVAILABLE;
         state->frame_resources[i].inflight_fence = VK_NULL_HANDLE;
     }
-    free(state->image_frame_owner);
+    free((void*)state->image_frame_owner);
     state->image_frame_owner = NULL;
     if (state->swapchain_imgviews) {
         for (uint32_t i = 0; i < state->swapchain_img_count; i++) vkDestroyImageView(state->device, state->swapchain_imgviews[i], NULL);
-        free(state->swapchain_imgviews);
+        free((void*)state->swapchain_imgviews);
         state->swapchain_imgviews = NULL;
     }
     if (state->swapchain_imgs) {
-        free(state->swapchain_imgs);
+        free((void*)state->swapchain_imgs);
         state->swapchain_imgs = NULL;
     }
     vk_destroy_depth_resources(state);

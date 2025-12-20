@@ -27,7 +27,8 @@ The project is undergoing a structural standardization to enforce strict public/
 - [ ] **Header Dependency Cleanup:** Refactor headers to reduce inclusion pollution, ensuring each header includes what it uses (IWYU) and uses forward declarations where possible.
 - [x] **Unified Frame Memory:** Implement a central `FrameArena` in `Engine` that is reset daily. Refactor `UiRenderer` and other systems to use this arena instead of managing their own scratch memory.
 - [ ] **Input Action Mapping:** Implement an abstraction layer to map physical keys (e.g., `KEY_Z`) to logical actions (e.g., `ACTION_UNDO`), removing hardcoded key checks from game logic.
-- [ ] **Cross-Platform Threading:** Remove dependency on C11 `<threads.h>` (unreliable on older Windows compilers). Replace with a custom platform abstraction (WinAPI/Pthreads) similar to `logger.c`.
+- [ ] **Foundation Threading Module:** Extract the internal mutex/threading logic from `logger.c` into a reusable `src/foundation/threads` library to serve as the project's standard synchronization primitive.
+- [ ] **Cross-Platform Threading:** Remove dependency on C11 `<threads.h>` (unreliable on older Windows compilers). Replace with the new `foundation/threads` abstraction.
 - [ ] **C Standard Downgrade Analysis:** Investigate feasibility of strict C99 compliance to maximize compiler portability (evaluating cost of losing C11 features like anonymous structs/unions).
 
 ### Phase 7: 3D Visualization & Compute

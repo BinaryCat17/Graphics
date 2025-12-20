@@ -3,6 +3,7 @@
 #include "internal/font_internal.h"
 #include "foundation/logger/logger.h"
 #include <string.h>
+#include <stdint.h>
 
 void scene_add_text_clipped(Scene* scene, const char* text, Vec3 pos, float scale, Vec4 color, Vec4 clip_rect) {
     if (!scene || !text) return;
@@ -11,7 +12,6 @@ void scene_add_text_clipped(Scene* scene, const char* text, Vec3 pos, float scal
     float cursor_y = pos.y;
     
     const char* ptr = text;
-    int count = 0;
     while (*ptr) {
         uint32_t c = (uint32_t)(*ptr);
         Glyph g;
@@ -55,7 +55,6 @@ void scene_add_text_clipped(Scene* scene, const char* text, Vec3 pos, float scal
             obj.clip_rect = clip_rect;
             
             scene_add_object(scene, obj);
-            count++;
             
             cursor_x += scaled_advance;
         }

@@ -5,6 +5,7 @@
 #include "foundation/logger/logger.h"
 #include "foundation/memory/arena.h"
 #include <stdlib.h>
+#include <stdint.h>
 #include <stdio.h>
 #include <math.h>
 #include <string.h>
@@ -93,7 +94,7 @@ bool font_init(const void* ttf_data, size_t ttf_size) {
             // Border (2px)
             float inner = radius - 2.0f;
             
-            unsigned char val = (unsigned char)(alpha * 255);
+            unsigned char val;
             // We want it to be a bit thicker at borders for visibility
             if (d > inner) val = (unsigned char)(alpha * 255); 
             else val = (unsigned char)(alpha * 180); // Lighter center

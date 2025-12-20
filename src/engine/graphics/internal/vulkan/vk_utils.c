@@ -3,6 +3,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <stdint.h>
+#include <vulkan/vulkan.h>
 
 void fatal_vk(const char* msg, VkResult res) {
     LOG_FATAL("%s: VkResult %d", msg, res);
@@ -39,7 +41,7 @@ uint32_t* read_file_bin_u32(const char* filename, size_t* out_size) {
 
     fseek(file, 0, SEEK_END);
     long file_size = ftell(file);
-    rewind(file);
+    fseek(file, 0, SEEK_SET);
 
     if (file_size % 4 != 0) {
         LOG_WARN("File size is not a multiple of 4 (SPIR-V requirement?): %s", filename);
