@@ -238,4 +238,25 @@ void ui_instance_layout(UiInstance* instance, float window_w, float window_h, ui
 // Should be called after layout.
 void ui_instance_render(UiInstance* instance, Scene* scene, const Assets* assets);
 
+// --- Public Subsystem API ---
+
+// Parser
+UiAsset* ui_parser_load_from_file(const char* path);
+
+// Command System
+typedef void (*UiCommandCallback)(void* user_data, UiElement* target);
+
+void ui_command_init(void);
+void ui_command_shutdown(void);
+void ui_command_register(const char* name, UiCommandCallback callback, void* user_data);
+void ui_command_execute_id(StringId id, UiElement* target);
+
+// Input System
+typedef struct UiInputContext UiInputContext;
+
+UiInputContext* ui_input_create(void);
+void ui_input_destroy(UiInputContext* ctx);
+void ui_input_update(UiInputContext* ctx, UiElement* root, const InputState* input, const InputEventQueue* events);
+bool ui_input_pop_event(UiInputContext* ctx, UiEvent* out_event);
+
 #endif // UI_CORE_H

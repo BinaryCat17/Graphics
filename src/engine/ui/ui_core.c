@@ -1,6 +1,6 @@
 #include "ui_core.h"
-#include "ui_layout.h"   // Internal
-#include "ui_renderer.h" // Internal
+#include "internal/ui_layout.h"   // Internal
+#include "internal/ui_renderer.h" // Internal
 
 #include <stdlib.h>
 #include <string.h>

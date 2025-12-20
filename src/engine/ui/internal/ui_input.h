@@ -1,7 +1,7 @@
 #ifndef UI_INPUT_H
 #define UI_INPUT_H
 
-#include "ui_core.h"
+#include "../ui_core.h"
 
 // --- UI Input Context ---
 // Stores the persistent state of interaction across frames.

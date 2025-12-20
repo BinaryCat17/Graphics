@@ -4,7 +4,7 @@
 // --- INTERNAL HEADER: Do not include in public API ---
 // Use ui_core.h (ui_instance_layout) instead.
 
-#include "ui_core.h"
+#include "../ui_core.h"
 
 #include <stdint.h>
 #include <stdbool.h>

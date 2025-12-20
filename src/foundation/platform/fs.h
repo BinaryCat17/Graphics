@@ -20,4 +20,9 @@ void platform_dir_close(PlatformDir* dir);
 bool platform_mkdir(const char* path);
 bool platform_remove_file(const char* path);
 
+// Reads a binary file into a raw buffer allocated from the arena (or heap if arena is NULL).
+// If arena is NULL, the caller must free() the result.
+// Returns NULL on failure.
+void* fs_read_bin(MemoryArena* arena, const char* path, size_t* out_size);
+
 #endif // PLATFORM_FS_H

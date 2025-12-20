@@ -132,11 +132,11 @@ target_link_libraries(engine_assets PUBLIC foundation_platform foundation_config
 # UI
 set(ENGINE_UI_SOURCES
     src/engine/ui/ui_core.c
-    src/engine/ui/ui_input.c
-    src/engine/ui/ui_layout.c
-    src/engine/ui/ui_parser.c
-    src/engine/ui/ui_renderer.c
-    src/engine/ui/ui_command_system.c)
+    src/engine/ui/internal/ui_input.c
+    src/engine/ui/internal/ui_layout.c
+    src/engine/ui/internal/ui_parser.c
+    src/engine/ui/internal/ui_renderer.c
+    src/engine/ui/internal/ui_command_system.c)
 add_library(engine_ui STATIC ${ENGINE_UI_SOURCES})
 target_include_directories(engine_ui PUBLIC "src/" ${Stb_INCLUDE_DIR})
 target_link_libraries(engine_ui PUBLIC foundation_config engine_assets foundation_meta foundation_math engine_graphics)

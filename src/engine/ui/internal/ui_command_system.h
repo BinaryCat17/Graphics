@@ -1,7 +1,7 @@
 #ifndef UI_COMMAND_SYSTEM_H
 #define UI_COMMAND_SYSTEM_H
 
-#include "ui_core.h"
+#include "../ui_core.h"
 #include "foundation/string/string_id.h"
 
 typedef void (*UiCommandCallback)(void* user_data, UiElement* target);

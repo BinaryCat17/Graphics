@@ -32,6 +32,16 @@ static void set_field_from_string(void* data, const MetaField* field, const char
 
 // --- Public API ---
 
+UiInputContext* ui_input_create(void) {
+    UiInputContext* ctx = (UiInputContext*)calloc(1, sizeof(UiInputContext));
+    if (ctx) ui_input_init(ctx);
+    return ctx;
+}
+
+void ui_input_destroy(UiInputContext* ctx) {
+    free(ctx);
+}
+
 void ui_input_init(UiInputContext* ctx) {
     memset(ctx, 0, sizeof(UiInputContext));
 }

@@ -219,3 +219,41 @@ bool platform_remove_file(const char* path) {
     return unlink(path) == 0;
 #endif
 }
+
+void* fs_read_bin(MemoryArena* arena, const char* path, size_t* out_size) {
+    if (!path) return NULL;
+    FILE* f = platform_fopen(path, "rb");
+    if (!f) return NULL;
+
+    fseek(f, 0, SEEK_END);
+    long len = ftell(f);
+    fseek(f, 0, SEEK_SET);
+
+    if (len < 0) {
+        fclose(f);
+        return NULL;
+    }
+
+    void* data = NULL;
+    if (arena) {
+        data = arena_alloc(arena, (size_t)len);
+    } else {
+        data = malloc((size_t)len);
+    }
+
+    if (!data) {
+        fclose(f);
+        return NULL;
+    }
+
+    size_t read = fread(data, 1, (size_t)len, f);
+    fclose(f);
+
+    if (read != (size_t)len) {
+        if (!arena) free(data);
+        return NULL;
+    }
+
+    if (out_size) *out_size = (size_t)len;
+    return data;
+}

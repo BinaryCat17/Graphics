@@ -1,5 +1,5 @@
 #include "ui_renderer.h"
-#include "ui_core.h"
+#include "../ui_core.h"
 #include "engine/graphics/scene/scene.h"
 #include "foundation/logger/logger.h"
 #include "engine/graphics/text/text_renderer.h" 

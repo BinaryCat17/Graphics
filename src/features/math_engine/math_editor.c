@@ -6,8 +6,6 @@
 #include "foundation/meta/reflection.h"
 #include "features/math_engine/transpiler.h"
 #include "engine/graphics/backend/renderer_backend.h"
-#include "engine/ui/ui_parser.h"
-#include "engine/ui/ui_command_system.h"
 #include "engine/graphics/text/font.h"
 
 #include <stdlib.h>
@@ -262,7 +260,7 @@ void math_editor_init(MathEditorState* state, Engine* engine) {
     ui_command_register("Graph.Clear", cmd_clear_graph, state);
     ui_command_register("Graph.Recompile", cmd_recompile, state);
 
-    ui_input_init(&state->input_ctx);
+    state->input_ctx = ui_input_create();
     ui_instance_init(&state->ui_instance, 1024 * 1024); // 1MB for UI Elements
 
     // 4. Load UI Asset
@@ -325,11 +323,11 @@ void math_editor_update(MathEditorState* state, Engine* engine) {
         ui_element_update(state->ui_instance.root, engine->dt);
         
         // Input Handling
-        ui_input_update(&state->input_ctx, state->ui_instance.root, &engine->input, &engine->input_events);
+        ui_input_update(state->input_ctx, state->ui_instance.root, &engine->input, &engine->input_events);
         
         // Process Events
         UiEvent evt;
-        while (ui_input_pop_event(&state->input_ctx, &evt)) {
+        while (ui_input_pop_event(state->input_ctx, &evt)) {
             switch (evt.type) {
                 case UI_EVENT_VALUE_CHANGE:
                 case UI_EVENT_DRAG_END:
@@ -387,6 +385,7 @@ void math_editor_shutdown(MathEditorState* state, Engine* engine) {
     (void)engine;
     if (!state) return;
     
+    ui_input_destroy(state->input_ctx);
     ui_instance_destroy(&state->ui_instance);
     arena_destroy(&state->graph_arena);
     
