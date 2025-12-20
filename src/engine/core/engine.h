@@ -2,7 +2,7 @@
 
 #include <stdbool.h>
 
-// Forward Declarations
+// Forward Declarations (C11 allows redefinition of typedefs)
 typedef struct RenderSystem RenderSystem;
 typedef struct Assets Assets;
 typedef struct PlatformWindow PlatformWindow;

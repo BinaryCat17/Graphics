@@ -5,6 +5,7 @@
 #include "foundation/platform/fs.h"
 #include "foundation/meta/reflection.h"
 #include "features/math_engine/internal/transpiler.h"
+#include "features/math_engine/internal/math_graph_internal.h" // Access to internal Graph/Node structs
 #include "engine/graphics/internal/renderer_backend.h"
 #include "engine/text/font.h"
 #include "engine/graphics/render_system.h"
@@ -49,7 +50,8 @@ static MathNodeView* math_editor_add_view(MathEditorState* state, MathNodeId id,
 static void math_editor_sync_view_data(MathEditorState* state) {
     for(uint32_t i=0; i<state->node_view_count; ++i) {
         MathNodeView* view = &state->node_views[i];
-        MathNode* node = math_graph_get_node(&state->graph, view->node_id);
+        // Use internal accessor (visible via math_graph_internal.h)
+        MathNode* node = math_graph_get_node(state->graph, view->node_id);
         if(node) {
             // One-way binding: Logic -> View
             strncpy(view->name, node->name, 31);
@@ -66,7 +68,7 @@ static void math_editor_recompile_graph(MathEditorState* state, RenderSystem* rs
     LOG_INFO("Editor: Recompiling Math Graph...");
 
     // 1. Transpile to GLSL
-    char* glsl = math_graph_transpile(&state->graph, TRANSPILE_MODE_IMAGE_2D, SHADER_TARGET_GLSL_VULKAN);
+    char* glsl = math_graph_transpile(state->graph, TRANSPILE_MODE_IMAGE_2D, SHADER_TARGET_GLSL_VULKAN);
     if (!glsl) {
         LOG_ERROR("Transpilation failed.");
         return;
@@ -120,7 +122,7 @@ static void math_editor_refresh_inspector(MathEditorState* state) {
         return;
     }
     
-    MathNode* node = math_graph_get_node(&state->graph, state->selected_node_id);
+    MathNode* node = math_graph_get_node(state->graph, state->selected_node_id);
     if (!node) {
         return;
     }
@@ -151,7 +153,7 @@ static void cmd_add_node(void* user_data, UiElement* target) {
     MathEditorState* state = (MathEditorState*)user_data;
     LOG_INFO("Command: Graph.AddNode");
     
-    MathNodeId id = math_graph_add_node(&state->graph, MATH_NODE_VALUE);
+    MathNodeId id = math_graph_add_node(state->graph, MATH_NODE_VALUE);
     math_editor_add_view(state, id, 100, 100);
     
     math_editor_refresh_graph_view(state);
@@ -175,29 +177,29 @@ static void cmd_recompile(void* user_data, UiElement* target) {
 static void math_editor_setup_default_graph(MathEditorState* state) {
     LOG_INFO("Editor: Setting up default Math Graph...");
     
-    MathNodeId uv_id = math_graph_add_node(&state->graph, MATH_NODE_UV);
-    MathNode* uv = math_graph_get_node(&state->graph, uv_id);
-    if(uv) { math_graph_set_name(&state->graph, uv_id, "UV.x"); }
+    MathNodeId uv_id = math_graph_add_node(state->graph, MATH_NODE_UV);
+    MathNode* uv = math_graph_get_node(state->graph, uv_id);
+    if(uv) { math_graph_set_name(state->graph, uv_id, "UV.x"); }
     math_editor_add_view(state, uv_id, 50, 100);
     
-    MathNodeId freq_id = math_graph_add_node(&state->graph, MATH_NODE_VALUE);
-    MathNode* freq = math_graph_get_node(&state->graph, freq_id);
-    if(freq) { math_graph_set_name(&state->graph, freq_id, "Frequency"); freq->value = 20.0f; }
+    MathNodeId freq_id = math_graph_add_node(state->graph, MATH_NODE_VALUE);
+    MathNode* freq = math_graph_get_node(state->graph, freq_id);
+    if(freq) { math_graph_set_name(state->graph, freq_id, "Frequency"); freq->value = 20.0f; }
     math_editor_add_view(state, freq_id, 50, 250);
     
-    MathNodeId mul_id = math_graph_add_node(&state->graph, MATH_NODE_MUL);
-    MathNode* mul = math_graph_get_node(&state->graph, mul_id);
-    if(mul) { math_graph_set_name(&state->graph, mul_id, "Multiply"); }
+    MathNodeId mul_id = math_graph_add_node(state->graph, MATH_NODE_MUL);
+    MathNode* mul = math_graph_get_node(state->graph, mul_id);
+    if(mul) { math_graph_set_name(state->graph, mul_id, "Multiply"); }
     math_editor_add_view(state, mul_id, 250, 175);
     
-    MathNodeId sin_id = math_graph_add_node(&state->graph, MATH_NODE_SIN);
-    MathNode* s = math_graph_get_node(&state->graph, sin_id);
-    if(s) { math_graph_set_name(&state->graph, sin_id, "Sin"); }
+    MathNodeId sin_id = math_graph_add_node(state->graph, MATH_NODE_SIN);
+    MathNode* s = math_graph_get_node(state->graph, sin_id);
+    if(s) { math_graph_set_name(state->graph, sin_id, "Sin"); }
     math_editor_add_view(state, sin_id, 450, 175);
     
-    math_graph_connect(&state->graph, mul_id, 0, uv_id); 
-    math_graph_connect(&state->graph, mul_id, 1, freq_id); 
-    math_graph_connect(&state->graph, sin_id, 0, mul_id);
+    math_graph_connect(state->graph, mul_id, 0, uv_id); 
+    math_graph_connect(state->graph, mul_id, 1, freq_id); 
+    math_graph_connect(state->graph, sin_id, 0, mul_id);
     
     math_editor_sync_view_data(state);
 }
@@ -205,7 +207,9 @@ static void math_editor_setup_default_graph(MathEditorState* state) {
 void math_editor_init(MathEditorState* state, Engine* engine) {
     // 1. Init Memory
     arena_init(&state->graph_arena, 1024 * 1024); // 1MB for Graph Data
-    math_graph_init(&state->graph, &state->graph_arena);
+    // Use factory function (Heap alloc via Arena)
+    state->graph = math_graph_create(&state->graph_arena);
+    
     state->node_views = NULL;
     state->node_view_count = 0;
     state->node_view_cap = 0;
@@ -260,7 +264,7 @@ void math_editor_init(MathEditorState* state, Engine* engine) {
     }
 }
 
-void math_editor_render(MathEditorState* state, Scene* scene, const Assets* assets, MemoryArena* arena) {
+void math_editor_render(MathEditorState* state, Scene* scene, const struct Assets* assets, MemoryArena* arena) {
     UiElement* root = ui_instance_get_root(state->ui_instance);
     if (!state || !scene || !root) return;
     
@@ -339,10 +343,12 @@ void math_editor_update(MathEditorState* state, Engine* engine) {
     }
 
     // Graph Evaluation (Naive interpretation on CPU for debugging/node values)
-    for (uint32_t i = 0; i < state->graph.node_count; ++i) {
-        const MathNode* n = math_graph_get_node(&state->graph, i);
-        if (n && n->type != MATH_NODE_NONE) {
-            math_graph_evaluate(&state->graph, i);
+    if (state->graph) { // Check pointer
+        for (uint32_t i = 0; i < state->graph->node_count; ++i) { // Use ->
+            const MathNode* n = math_graph_get_node(state->graph, i);
+            if (n && n->type != MATH_NODE_NONE) {
+                math_graph_evaluate(state->graph, i);
+            }
         }
     }
 
@@ -359,6 +365,10 @@ void math_editor_shutdown(MathEditorState* state, Engine* engine) {
     
     ui_input_destroy(state->input_ctx);
     ui_instance_free(state->ui_instance);
+    
+    // Explicitly destroy graph resources (pool, ptrs)
+    math_graph_destroy(state->graph);
+    
     arena_destroy(&state->graph_arena);
     
     if (state->ui_asset) ui_asset_free(state->ui_asset);

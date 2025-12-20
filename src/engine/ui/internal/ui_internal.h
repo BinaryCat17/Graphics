@@ -98,15 +98,15 @@ struct UiElement {
     
     // Data Context
     void* data_ptr;         // Pointer to C struct
-    const MetaStruct* meta; // Type info
+    const struct MetaStruct* meta; // Type info
 
     // Cached Bindings (Resolved at creation)
-    const MetaField* bind_text;
-    const MetaField* bind_visible;
-    const MetaField* bind_x;
-    const MetaField* bind_y;
-    const MetaField* bind_w;
-    const MetaField* bind_h;
+    const struct MetaField* bind_text;
+    const struct MetaField* bind_visible;
+    const struct MetaField* bind_x;
+    const struct MetaField* bind_y;
+    const struct MetaField* bind_w;
+    const struct MetaField* bind_h;
     
     // Commands (Resolved at creation)
     StringId on_click_cmd_id;

@@ -29,7 +29,7 @@ typedef struct ActionMapping {
 #define MAX_ACTIONS 128
 
 // Full System Definition
-typedef struct InputSystem {
+struct InputSystem {
     InputState state;
     InputEventQueue queue;
     
@@ -40,6 +40,6 @@ typedef struct InputSystem {
     // Action Mappings
     ActionMapping actions[MAX_ACTIONS];
     int action_count;
-} InputSystem;
+};
 
 #endif // ENGINE_INPUT_INTERNAL_H

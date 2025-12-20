@@ -14,10 +14,10 @@ The project is undergoing a structural standardization to enforce strict public/
 ### Phase 6: Architectural Hardening & Cleanup (IMMEDIATE PRIORITY)
 **Objective:** Enforce the "Public/Internal" separation pattern, optimize memory usage, and remove hardcoded logic.
 
-- [ ] **Input Action Mapping:** Implement an abstraction layer to map physical keys (e.g., `KEY_Z`) to logical actions (e.g., `ACTION_UNDO`), removing hardcoded key checks from game logic.
+- [x] **Input Action Mapping:** Implement an abstraction layer to map physical keys (e.g., `KEY_Z`) to logical actions (e.g., `ACTION_UNDO`), removing hardcoded key checks from game logic.
 - [ ] **Test Suite Expansion:** Expand unit tests to cover critical foundation modules (Memory, Strings, Containers) and ensuring automated execution in the build pipeline.
 - [ ] **Math Engine Encapsulation:** Refactor `MathNode` to hide internal struct details behind an opaque handle API, ensuring changes to node logic do not break dependent features.
-- [ ] **C Standard Downgrade Analysis:** Investigate feasibility of strict C99 compliance to maximize compiler portability (evaluating cost of losing C11 features like anonymous structs/unions).
+- [x] **C Standard Decision:** Adopted **C11** to utilize `typedef` redefinitions for cleaner, decoupled APIs (Rejected C99 downgrade).
 
 ### Phase 7: 3D Visualization & Compute
 **Objective:** Visualize mathematical functions and data in 3D space.

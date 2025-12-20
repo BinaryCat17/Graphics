@@ -2,8 +2,6 @@
 #define MATH_GRAPH_H
 
 #include "foundation/memory/arena.h"
-#include "foundation/math/coordinate_systems.h" // For Vec2/Rect
-
 #include <stdint.h>
 #include <stdbool.h>
 
@@ -31,42 +29,19 @@ typedef enum MathNodeType {
 #define MATH_NODE_MAX_INPUTS 4
 #define MATH_NODE_NAME_MAX 32
 
-typedef struct MathNode {
-    MathNodeId id;          // REFLECT
-    MathNodeType type;      // REFLECT
-    
-    // Logic Data
-    float value;            // REFLECT
-    float x, y;             // REFLECT
-    bool dirty;             // REFLECT
-    float cached_output;    // Last calculated result
-    
-    // Connections (Dependencies)
-    // Stores the IDs of the nodes connected to input slots.
-    MathNodeId inputs[MATH_NODE_MAX_INPUTS]; 
-    
-    // UI / Editor Data (Moved to MathNodeView in Editor)
-    char name[32];          // REFLECT
-} MathNode;
-
-typedef struct MathGraph {
-    struct MemoryPool* node_pool; // From foundation/memory/pool.h
-    
-    // Indirection table: ID -> MathNode*
-    // This array grows, but the nodes themselves stay stable in the pool.
-    MathNode** node_ptrs;    // REFLECT
-    uint32_t node_count;     // REFLECT
-    uint32_t node_capacity;  // Capacity
-} MathGraph;
+// Opaque Handles
+typedef struct MathNode MathNode;
+typedef struct MathGraph MathGraph;
 
 // --- API ---
 
-// Initialize graph using the provided arena for all internal allocations.
-void math_graph_init(MathGraph* graph, MemoryArena* arena);
+// Create a new graph instance.
+// Allocates the MathGraph struct from the provided arena.
+MathGraph* math_graph_create(MemoryArena* arena);
 
-// No explicit dispose needed if the arena is managed externally (e.g., per level/app).
-// But we can clear the graph struct.
-void math_graph_clear(MathGraph* graph);
+// Destroy the graph and free internal resources (pool, lookup tables).
+// Does NOT free the MathGraph struct itself if it was allocated in an arena.
+void math_graph_destroy(MathGraph* graph);
 
 // Create a new node. Returns the ID of the created node.
 MathNodeId math_graph_add_node(MathGraph* graph, MathNodeType type);
@@ -85,9 +60,5 @@ void math_graph_set_name(MathGraph* graph, MathNodeId id, const char* name);
 
 // Evaluate a specific node.
 float math_graph_evaluate(MathGraph* graph, MathNodeId id);
-
-// Get a pointer to the node data (Unsafe: pointer may be invalidated on array resize).
-// Use with care, prefer using IDs.
-MathNode* math_graph_get_node(MathGraph* graph, MathNodeId id);
 
 #endif // MATH_GRAPH_H

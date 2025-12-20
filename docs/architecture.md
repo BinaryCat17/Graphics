@@ -57,6 +57,14 @@ src/engine/ui/
 
 ### 📏 The Golden Rules
 
+#### 0. Language Standard (C11)
+The project strictly enforces **C11 (ISO/IEC 9899:2011)**.
+*   **Why?** Allows `typedef` redefinition, enabling cleaner opaque pointer APIs without "God Headers".
+*   **Pattern:**
+    *   **Public API:** Use `typedef struct Name Name;` in headers.
+    *   **Function Signatures:** Use `Name*` (not `struct Name*`).
+    *   **Forward Declarations:** Repeat `typedef struct Name Name;` in consuming headers (allowed in C11) to avoid `#include` dependencies.
+
 #### 1. The Public Header (`module.h`)
 *   **Purpose:** Defines *what* the module does, not *how*.
 *   **Content:**

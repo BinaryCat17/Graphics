@@ -66,4 +66,24 @@ static int g_tests_failed = 0;
         } \
     } while(0)
 
+/* Aliases and Test Runner Helpers */
+#define ASSERT_TRUE(cond) TEST_ASSERT(cond)
+#define ASSERT_EQ_INT(e, a) TEST_ASSERT_INT_EQ(e, a)
+#define ASSERT_EQ_FLOAT(e, a, eps) TEST_ASSERT_FLOAT_EQ(e, a, eps)
+#define ASSERT_STR_EQ(e, a) TEST_ASSERT_STR_EQ(e, a)
+
+#define TEST_INIT(name) printf("Running Test Suite: " name "\n")
+#define TEST_RUN(func) RUN_TEST(func)
+#define TEST_REPORT() do { \
+    printf("--------------------------------------------------\n"); \
+    printf("Tests Run: %d, Failed: %d\n", g_tests_run, g_tests_failed); \
+    if (g_tests_failed > 0) { \
+        printf(TERM_RED "SOME TESTS FAILED\n" TERM_RESET); \
+        return 1; \
+    } else { \
+        printf(TERM_GREEN "ALL TESTS PASSED\n" TERM_RESET); \
+        return 0; \
+    } \
+} while(0)
+
 #endif // TEST_FRAMEWORK_H

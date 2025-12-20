@@ -1,4 +1,5 @@
 #include "transpiler.h"
+#include "math_graph_internal.h"
 #include "shader_ir.h"
 #include "emitters/glsl_emitter.h"
 #include "foundation/memory/arena.h"

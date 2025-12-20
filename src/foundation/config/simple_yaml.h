@@ -17,7 +17,7 @@ typedef struct ConfigPair {
     ConfigNode *value;
 } ConfigPair;
 
-typedef struct ConfigNode {
+struct ConfigNode {
     ConfigNodeType type;
     int line;
     char *scalar;
@@ -27,7 +27,10 @@ typedef struct ConfigNode {
     ConfigNode **items;
     size_t item_count;
     size_t item_capacity;
-} ConfigNode;
+};
+// Wait, earlier on line 13 it says 'typedef struct ConfigNode ConfigNode;'.
+// So I should change this block to 'struct ConfigNode { ... };'
+
 
 typedef struct ConfigError {
     int line;

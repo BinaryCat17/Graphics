@@ -1,4 +1,5 @@
 #include "math_graph.h"
+#include "internal/math_graph_internal.h"
 #include "foundation/memory/pool.h"
 #include "foundation/logger/logger.h"
 #include <string.h>
@@ -15,12 +16,16 @@ MathNode* math_graph_get_node(MathGraph* graph, MathNodeId id) {
     return node;
 }
 
-// --- Init / Clear ---
+// --- Create / Destroy ---
 
-void math_graph_init(MathGraph* graph, MemoryArena* arena) {
-    (void)arena; // Arena is no longer used for the graph itself
-    if (!graph) return;
-    memset(graph, 0, sizeof(MathGraph));
+MathGraph* math_graph_create(MemoryArena* arena) {
+    if (!arena) {
+        LOG_ERROR("MathGraph: Arena required for creation.");
+        return NULL;
+    }
+    
+    MathGraph* graph = (MathGraph*)arena_alloc_zero(arena, sizeof(MathGraph));
+    // memset(graph, 0, sizeof(MathGraph)); // arena_alloc_zero already clears it
     
     // Create Pool: Elements are MathNode size, 256 per block
     graph->node_pool = pool_create(sizeof(MathNode), 256);
@@ -29,9 +34,11 @@ void math_graph_init(MathGraph* graph, MemoryArena* arena) {
     graph->node_capacity = 32; 
     graph->node_ptrs = (MathNode**)calloc(graph->node_capacity, sizeof(MathNode*));
     graph->node_count = 0;
+
+    return graph;
 }
 
-void math_graph_clear(MathGraph* graph) {
+void math_graph_destroy(MathGraph* graph) {
     if (!graph) return;
     
     if (graph->node_ptrs) {
@@ -46,6 +53,7 @@ void math_graph_clear(MathGraph* graph) {
     
     graph->node_count = 0;
     graph->node_capacity = 0;
+    // Struct itself is in arena, so we don't free it.
 }
 
 // --- Node Management ---

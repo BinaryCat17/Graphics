@@ -18,7 +18,7 @@ typedef struct MathNodeView {
 
 // The State of the Graph Editor Feature
 typedef struct MathEditorState {
-    MathGraph graph;
+    MathGraph* graph;
     MemoryArena graph_arena;
     
     // UI State
@@ -45,7 +45,7 @@ void math_editor_init(MathEditorState* state, Engine* engine);
 void math_editor_update(MathEditorState* state, Engine* engine);
 
 // Renders the editor UI to the provided scene
-void math_editor_render(MathEditorState* state, Scene* scene, const Assets* assets, MemoryArena* arena);
+void math_editor_render(MathEditorState* state, struct Scene* scene, const struct Assets* assets, struct MemoryArena* arena);
 
 // Shuts down the editor and frees resources
 void math_editor_shutdown(MathEditorState* state, Engine* engine);

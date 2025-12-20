@@ -11,6 +11,8 @@ typedef struct MetaStruct MetaStruct;
 typedef struct MetaField MetaField;
 typedef struct MemoryArena MemoryArena;
 typedef struct InputSystem InputSystem;
+typedef struct Scene Scene;
+typedef struct Assets Assets;
 
 // --- CONSTANTS & FLAGS ---
 
@@ -85,14 +87,7 @@ UiNodeSpec* ui_asset_get_root(const UiAsset* asset);
 // Created from a UiAsset + Data Context.
 // Managed by a UiInstance container.
 
-typedef struct UiElement UiElement;
-
-
 typedef struct UiInstance UiInstance;
-
-// Forward Declarations for Render Pipeline
-typedef struct Scene Scene;
-typedef struct Assets Assets;
 
 // API for Instance
 UiInstance* ui_instance_create(size_t size);

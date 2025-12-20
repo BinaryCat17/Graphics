@@ -7,27 +7,26 @@
 #include <string.h>
 
 int test_transpiler_simple_add(void) {
-    MathGraph graph;
-    // Arena no longer needed for MathGraph initialization
-    // MemoryArena arena;
-    // arena_init(&arena, 1024 * 1024);
+    MemoryArena arena;
+    arena_init(&arena, 1024 * 1024);
     
-    math_graph_init(&graph, NULL); // Pass NULL as arena is unused
+    MathGraph* graph = math_graph_create(&arena);
+    TEST_ASSERT(graph != NULL);
     
     // Create nodes: 3.0 + 5.0
-    MathNodeId id1 = math_graph_add_node(&graph, MATH_NODE_VALUE);
-    math_graph_set_value(&graph, id1, 3.0f);
+    MathNodeId id1 = math_graph_add_node(graph, MATH_NODE_VALUE);
+    math_graph_set_value(graph, id1, 3.0f);
     
-    MathNodeId id2 = math_graph_add_node(&graph, MATH_NODE_VALUE);
-    math_graph_set_value(&graph, id2, 5.0f);
+    MathNodeId id2 = math_graph_add_node(graph, MATH_NODE_VALUE);
+    math_graph_set_value(graph, id2, 5.0f);
     
-    MathNodeId id_add = math_graph_add_node(&graph, MATH_NODE_ADD);
+    MathNodeId id_add = math_graph_add_node(graph, MATH_NODE_ADD);
     
-    math_graph_connect(&graph, id_add, 0, id1);
-    math_graph_connect(&graph, id_add, 1, id2);
+    math_graph_connect(graph, id_add, 0, id1);
+    math_graph_connect(graph, id_add, 1, id2);
     
     // Transpile
-    char* glsl = math_graph_transpile(&graph, TRANSPILE_MODE_BUFFER_1D, SHADER_TARGET_GLSL_VULKAN);
+    char* glsl = math_graph_transpile(graph, TRANSPILE_MODE_BUFFER_1D, SHADER_TARGET_GLSL_VULKAN);
     TEST_ASSERT(glsl != NULL);
     
     printf("\n--- Generated GLSL ---\n%s\n----------------------\n", glsl);
@@ -47,8 +46,9 @@ int test_transpiler_simple_add(void) {
     TEST_ASSERT(strstr(glsl, buf) != NULL);
     
     free(glsl);
-    math_graph_clear(&graph); // Clean up pool
-    // arena_destroy(&arena);
+    
+    math_graph_destroy(graph);
+    arena_destroy(&arena);
     return 1;
 }
 

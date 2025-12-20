@@ -193,7 +193,7 @@ typedef enum InputMod {
 
 // --- Lifecycle ---
 
-InputSystem* input_system_create(PlatformWindow* window);
+InputSystem* input_system_create(struct PlatformWindow* window);
 void input_system_destroy(InputSystem* sys);
 void input_system_update(InputSystem* sys);
 

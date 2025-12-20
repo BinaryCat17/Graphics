@@ -6,7 +6,7 @@
 // --- UI Input Context ---
 // Stores the persistent state of interaction across frames.
 
-typedef struct UiInputContext {
+struct UiInputContext {
     // Current Frame State
     UiElement* hovered;      // Element currently under mouse
     UiElement* active;       // Element being pressed (mouse down)
@@ -25,6 +25,6 @@ typedef struct UiInputContext {
     // Event Queue
     UiEvent events[64];
     int event_count;
-} UiInputContext;
+};
 
 #endif // UI_INPUT_H
