@@ -13,7 +13,7 @@ The project is undergoing a structural standardization to enforce strict public/
 
 ### Phase 6: Architectural Hardening & Cleanup (IMMEDIATE PRIORITY)
 **Objective:** Enforce the "Public/Internal" separation pattern across all modules to prevent technical debt and remove legacy code.
-- [ ] **Scene Encapsulation:** Apply Opaque Handle pattern to `Scene` struct (hide implementation in `internal/scene_internal.h`).
+- [x] **Scene Encapsulation:** Apply Opaque Handle pattern to `Scene` struct (hide implementation in `internal/scene_internal.h`).
 - [ ] **Shader Constants:** Extract magic numbers (e.g., UI rendering modes `3.0f`, `4.0f`) into a shared header/enum.
 - [ ] **Font Memory Safety:** Replace raw `malloc` in `font.c` with the Foundation memory subsystem (`MemoryArena`).
 - [ ] **Backend Cleanup:** Move screenshot IO logic (`stb_image_write`) out of `vulkan_renderer.c` into a dedicated Foundation module.

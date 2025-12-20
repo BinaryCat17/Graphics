@@ -40,7 +40,7 @@ struct RenderSystem {
 
 static void render_packet_free_resources(RenderFramePacket* packet) {
     if (!packet) return;
-    scene_clear(&packet->scene);
+    scene_clear(packet->scene);
 }
 
 const RenderFramePacket* render_system_acquire_packet(RenderSystem* sys) {
@@ -60,7 +60,7 @@ const RenderFramePacket* render_system_acquire_packet(RenderSystem* sys) {
 
 Scene* render_system_get_scene(RenderSystem* sys) {
     if (!sys) return NULL;
-    return &sys->packets[sys->back_packet_index].scene;
+    return sys->packets[sys->back_packet_index].scene;
 }
 
 // --- Init & Bootstrap ---
@@ -98,12 +98,18 @@ RenderSystem* render_system_create(const RenderSystemConfig* config) {
     sys->back_packet_index = 1;
     sys->frame_count = 0;
 
+    // Create Scenes
+    sys->packets[0].scene = scene_create();
+    sys->packets[1].scene = scene_create();
+
     // Register Backend
     renderer_backend_register(vulkan_renderer_backend());
     const char* backend_id = config->backend_type ? config->backend_type : "vulkan";
     sys->backend = renderer_backend_get(backend_id);
     if (!sys->backend) {
         LOG_ERROR("RenderSystem: Failed to load backend '%s'", backend_id);
+        scene_destroy(sys->packets[0].scene);
+        scene_destroy(sys->packets[1].scene);
         free(sys);
         return NULL;
     }
@@ -119,7 +125,11 @@ void render_system_destroy(RenderSystem* sys) {
     }
     
     render_packet_free_resources(&sys->packets[0]);
+    scene_destroy(sys->packets[0].scene);
+    
     render_packet_free_resources(&sys->packets[1]);
+    scene_destroy(sys->packets[1].scene);
+    
     mtx_destroy(&sys->packet_mutex);
     free(sys);
 }
@@ -140,7 +150,7 @@ void render_system_begin_frame(RenderSystem* sys, double time) {
     // Clear old scene
     render_packet_free_resources(dest);
     
-    dest->scene.frame_number = sys->frame_count;
+    scene_set_frame_number(dest->scene, sys->frame_count);
 
     // Setup Camera (Ortho)
     PlatformWindowSize size = platform_get_framebuffer_size(sys->window);
@@ -150,10 +160,13 @@ void render_system_begin_frame(RenderSystem* sys, double time) {
     if (h < 1.0f) h = 1.0f;
 
     // View: Identity (Camera at 0,0)
-    dest->scene.camera.view_matrix = mat4_identity();
+    SceneCamera camera = {0};
+    camera.view_matrix = mat4_identity();
     
     Mat4 proj = mat4_orthographic(0.0f, w, 0.0f, h, -100.0f, 100.0f);
-    dest->scene.camera.view_matrix = proj; 
+    camera.view_matrix = proj; // Matches original behavior (overwriting view with proj)
+    
+    scene_set_camera(dest->scene, camera);
 }
 
 void render_system_update(RenderSystem* sys) {
@@ -186,7 +199,7 @@ void render_system_update(RenderSystem* sys) {
         quad.uv_rect = (Vec4){0.0f, 0.0f, 1.0f, 1.0f};
         
         RenderFramePacket* dest = &sys->packets[sys->back_packet_index];
-        scene_add_object(&dest->scene, quad);
+        scene_add_object(dest->scene, quad);
     }
 
     // Mark Packet Ready
@@ -200,7 +213,7 @@ void render_system_draw(RenderSystem* sys) {
     
     const RenderFramePacket* packet = render_system_acquire_packet(sys);
     if (packet && sys->backend->render_scene) {
-        sys->backend->render_scene(sys->backend, &packet->scene);
+        sys->backend->render_scene(sys->backend, packet->scene);
     }
 }
 

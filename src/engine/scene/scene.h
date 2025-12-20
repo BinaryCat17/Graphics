@@ -68,20 +68,25 @@ typedef struct SceneObject {
 
 // --- The Scene Container ---
 
-typedef struct Scene {
-    SceneObject* objects; // Linear array
-    size_t object_count;
-    size_t object_capacity;
-    
-    SceneCamera camera;
-    
-    uint64_t frame_number;
-} Scene;
+typedef struct Scene Scene;
 
 // --- API ---
 
-void scene_init(Scene* scene);
-void scene_add_object(Scene* scene, SceneObject obj); // Pass by value (copy)
+// Lifecycle
+Scene* scene_create(void);
+void scene_destroy(Scene* scene);
+
 void scene_clear(Scene* scene);
+void scene_add_object(Scene* scene, SceneObject obj); // Pass by value (copy)
+
+// Accessors
+void scene_set_camera(Scene* scene, SceneCamera camera);
+SceneCamera scene_get_camera(const Scene* scene);
+
+void scene_set_frame_number(Scene* scene, uint64_t frame_number);
+uint64_t scene_get_frame_number(const Scene* scene);
+
+// Returns pointer to internal array and sets out_count. Do not free.
+const SceneObject* scene_get_all_objects(const Scene* scene, size_t* out_count);
 
 #endif // SCENE_H

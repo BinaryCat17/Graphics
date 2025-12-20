@@ -433,14 +433,28 @@ static void vulkan_renderer_render_scene(RendererBackend* backend, const Scene* 
     FrameResources* frame = &state->frame_resources[state->current_frame_cursor];
     
     // 1. Check Capacity and Resize if needed
-    size_t count = scene->object_count;
+    size_t count = 0;
+    const SceneObject* scene_objects = scene_get_all_objects(scene, &count);
+    
     if (count == 0) count = 1; // Avoid 0 size
     ensure_instance_capacity(state, frame, count);
     
     // 2. Upload Data
     GpuInstanceData* instances = (GpuInstanceData*)frame->instance_mapped;
-    for (size_t i = 0; i < scene->object_count; ++i) {
-        SceneObject* obj = &scene->objects[i];
+    if (scene_objects) {
+        for (size_t i = 0; i < (count == 1 && !scene_objects ? 0 : count); ++i) { // Handle dummy count=1 if objects are null
+             // Re-check count usage. If scene_objects is NULL, count is 0 from accessor, but we forced it to 1 above for buffer alloc.
+             // So we must use original count for loop, or check scene_objects.
+             // Better:
+        }
+    }
+    
+    // Refined loop:
+    size_t actual_count = 0;
+    scene_objects = scene_get_all_objects(scene, &actual_count);
+    
+    for (size_t i = 0; i < actual_count; ++i) {
+        const SceneObject* obj = &scene_objects[i];
         
         Mat4 m = mat4_identity();
         Mat4 s = mat4_scale(obj->scale);
@@ -498,11 +512,12 @@ static void vulkan_renderer_render_scene(RendererBackend* backend, const Scene* 
     vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, state->pipeline_layout, 1, 1, &frame->instance_set, 0, NULL);
     
     // Push Constants (ViewProj)
-    vkCmdPushConstants(cmd, state->pipeline_layout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(Mat4), &scene->camera.view_matrix); 
+    SceneCamera cam = scene_get_camera(scene);
+    vkCmdPushConstants(cmd, state->pipeline_layout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(Mat4), &cam.view_matrix); 
 
     // Draw
-    if (scene->object_count > 0) {
-        vkCmdDraw(cmd, 6, scene->object_count, 0, 0);
+    if (actual_count > 0) {
+        vkCmdDraw(cmd, 6, actual_count, 0, 0);
     }
     
     vkCmdEndRenderPass(cmd);

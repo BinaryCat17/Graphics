@@ -5,7 +5,7 @@
 
 typedef struct RenderFramePacket {
     // The unified scene state for this frame
-    Scene scene;
+    Scene* scene;
 } RenderFramePacket;
 
 #endif // RENDER_PACKET_H
