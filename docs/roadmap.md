@@ -15,7 +15,7 @@ The project is undergoing a structural standardization to enforce strict public/
 **Objective:** Enforce the "Public/Internal" separation pattern across all modules to prevent technical debt and remove legacy code.
 - [x] **Input System:** Enforce Opaque Handle pattern (hide `InputSystem` struct).
 - [x] **Refactor:** Replace public `InputState` struct with accessors and hide implementation.
-- [ ] **UI System:** Enforce Opaque Handle pattern (hide `UiElement`, `UiNodeSpec` structs).
+- [x] **UI System:** Enforce Opaque Handle pattern (hide `UiElement`, `UiNodeSpec` structs).
 - [x] **Cleanup:** Remove legacy redundant fields from `InputState` (mouse_clicked, scroll_dx/dy, last_char/key/action) and update consumers.
 - [ ] **Cleanup:** Remove legacy monolithic code patterns from `src/engine/core`.
 - [ ] **Cleanup:** Verify and remove any remaining direct Vulkan dependencies in Feature layer.
