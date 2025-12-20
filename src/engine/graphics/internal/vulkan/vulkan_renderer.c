@@ -12,14 +12,12 @@
 #include "foundation/platform/platform.h"
 #include "foundation/platform/fs.h"
 #include "foundation/math/coordinate_systems.h"
+#include "foundation/image/image.h"
 
 #include <stdlib.h>
 #include <string.h>
 #include <math.h>
 #include <threads.h>
-
-#define STB_IMAGE_WRITE_IMPLEMENTATION
-#include "stb_image_write.h"
 
 typedef struct ScreenshotContext {
     char path[256];
@@ -33,20 +31,13 @@ static int save_screenshot_task(void* arg) {
     ScreenshotContext* ctx = (ScreenshotContext*)arg;
     if (ctx) {
         if (ctx->needs_swizzle) {
-            for (int i = 0; i < ctx->width * ctx->height; i++) {
-                uint8_t b = ctx->data[i * 4 + 0];
-                uint8_t r = ctx->data[i * 4 + 2];
-                ctx->data[i * 4 + 0] = r;
-                ctx->data[i * 4 + 2] = b;
-            }
+            image_swizzle_bgra_to_rgba(ctx->data, ctx->width * ctx->height);
         }
         
         LOG_TRACE("Screenshot Thread: Writing to disk (%s)...", ctx->path);
         // Using default compression (which is slow but standard). Threading hides the latency.
-        if (stbi_write_png(ctx->path, ctx->width, ctx->height, 4, ctx->data, ctx->width * 4)) {
+        if (image_write_png(ctx->path, ctx->width, ctx->height, 4, ctx->data, ctx->width * 4)) {
             LOG_TRACE("Screenshot saved to %s", ctx->path);
-        } else {
-            LOG_ERROR("Failed to write screenshot to %s", ctx->path);
         }
         free(ctx->data);
         free(ctx);

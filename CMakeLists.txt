@@ -94,6 +94,11 @@ add_library(foundation_memory STATIC ${FOUNDATION_MEMORY_SOURCES})
 target_include_directories(foundation_memory PUBLIC "src/")
 target_link_libraries(foundation_memory PUBLIC foundation_logger)
 
+# Image
+add_library(foundation_image STATIC "src/foundation/image/image.c")
+target_include_directories(foundation_image PUBLIC "src/" ${Stb_INCLUDE_DIR})
+target_link_libraries(foundation_image PUBLIC foundation_logger)
+
 # Config
 set(FOUNDATION_CONFIG_SOURCES
     "src/foundation/config/simple_yaml.c"
@@ -144,7 +149,7 @@ set(ENGINE_GRAPHICS_SOURCES
 add_library(engine_graphics STATIC ${ENGINE_GRAPHICS_SOURCES})
 target_include_directories(engine_graphics PUBLIC "src/" ${Stb_INCLUDE_DIR})
 target_link_libraries(engine_graphics PUBLIC 
-    foundation_platform foundation_math foundation_memory 
+    foundation_platform foundation_math foundation_memory foundation_image
     Vulkan::Vulkan glfw Threads::Threads 
     foundation_config engine_assets engine_scene
 )
