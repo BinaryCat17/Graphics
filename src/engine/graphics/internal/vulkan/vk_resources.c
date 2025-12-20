@@ -2,7 +2,7 @@
 #include "vk_swapchain.h"
 #include "vk_utils.h"
 #include "foundation/logger/logger.h"
-#include "engine/graphics/text/font.h" // Include Font Module
+#include "engine/text/font.h" // Include Font Module
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>

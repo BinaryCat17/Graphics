@@ -231,7 +231,7 @@ typedef float (*UiTextMeasureFunc)(const char* text, void* user_data);
 // Should be called before rendering.
 void ui_instance_layout(UiInstance* instance, float window_w, float window_h, uint64_t frame_number, UiTextMeasureFunc measure_func, void* measure_data);
 
-#include "engine/graphics/scene/scene.h"
+#include "engine/scene/scene.h"
 #include "engine/assets/assets.h"
 
 // Builds the render packets for the scene.

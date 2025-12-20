@@ -6,7 +6,7 @@
 #include "engine/graphics/internal/vulkan/vk_pipeline.h"
 #include "engine/graphics/internal/vulkan/vk_resources.h"
 #include "engine/graphics/internal/vulkan/vk_utils.h"
-#include "engine/graphics/text/font.h"
+#include "engine/text/font.h"
 
 #include "foundation/logger/logger.h"
 #include "foundation/platform/platform.h"

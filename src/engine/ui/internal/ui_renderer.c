@@ -1,9 +1,9 @@
 #include "ui_renderer.h"
 #include "../ui_core.h"
-#include "engine/graphics/scene/scene.h"
+#include "engine/scene/scene.h"
 #include "foundation/logger/logger.h"
-#include "engine/graphics/text/text_renderer.h" 
-#include "engine/graphics/text/font.h" 
+#include "engine/text/text_renderer.h" 
+#include "engine/text/font.h" 
 #include "foundation/memory/arena.h"
 #include <string.h> 
 // #include <stdlib.h> // Malloc removed

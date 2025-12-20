@@ -2,7 +2,7 @@
 #define ASSETS_SYSTEM_H
 
 #include <stdbool.h>
-#include "engine/graphics/scene/scene.h"
+#include "engine/scene/scene.h"
 #include "foundation/memory/arena.h"
 
 typedef struct Assets {

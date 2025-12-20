@@ -5,7 +5,7 @@
 // Use ui_core.h (ui_instance_render) instead.
 
 #include "engine/ui/ui_core.h"
-#include "engine/graphics/scene/scene.h"
+#include "engine/scene/scene.h"
 #include "engine/assets/assets.h"
 
 // Traverses the UiElement tree and populates the Scene with renderable objects.

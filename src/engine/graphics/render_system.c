@@ -10,8 +10,6 @@
 #include "foundation/platform/platform.h"
 #include "engine/graphics/internal/renderer_backend.h"
 #include "engine/graphics/internal/vulkan/vulkan_renderer.h"
-#include "engine/graphics/text/font.h"
-#include "engine/graphics/text/text_renderer.h"
 
 struct RenderSystem {
     // Dependencies (Injectable)

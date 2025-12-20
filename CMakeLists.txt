@@ -103,7 +103,28 @@ target_link_libraries(foundation_config PUBLIC foundation_platform foundation_lo
 
 # --- ENGINE LAYER ---
 
-# Graphics (Renderer + Scene + Text + Vulkan)
+# Scene
+add_library(engine_scene STATIC "src/engine/scene/scene.c")
+target_include_directories(engine_scene PUBLIC "src/")
+target_link_libraries(engine_scene PUBLIC foundation_math foundation_memory)
+
+# Text
+set(ENGINE_TEXT_SOURCES
+    "src/engine/text/text_renderer.c"
+    "src/engine/text/font.c"
+    "src/engine/text/internal/stb_impl.c"
+)
+add_library(engine_text STATIC ${ENGINE_TEXT_SOURCES})
+target_include_directories(engine_text PUBLIC "src/" ${Stb_INCLUDE_DIR})
+target_link_libraries(engine_text PUBLIC foundation_platform foundation_logger engine_scene)
+
+# Assets
+set(ENGINE_ASSETS_SOURCES "src/engine/assets/assets.c")
+add_library(engine_assets STATIC ${ENGINE_ASSETS_SOURCES})
+target_include_directories(engine_assets PUBLIC "src/")
+target_link_libraries(engine_assets PUBLIC foundation_platform foundation_config engine_scene)
+
+# Graphics (Renderer + Vulkan)
 set(ENGINE_GRAPHICS_SOURCES
     "src/engine/graphics/internal/renderer_backend.c"
     "src/engine/graphics/internal/vulkan/vulkan_renderer.c"
@@ -113,21 +134,14 @@ set(ENGINE_GRAPHICS_SOURCES
     "src/engine/graphics/internal/vulkan/vk_pipeline.c"
     "src/engine/graphics/internal/vulkan/vk_resources.c"
     "src/engine/graphics/render_system.c"
-    "src/engine/graphics/scene/scene.c"
-    "src/engine/graphics/text/text_renderer.c"
-    "src/engine/graphics/text/font.c"
-    "src/engine/graphics/text/internal/stb_impl.c"
 )
 add_library(engine_graphics STATIC ${ENGINE_GRAPHICS_SOURCES})
 target_include_directories(engine_graphics PUBLIC "src/" ${Stb_INCLUDE_DIR})
-target_link_libraries(engine_graphics PUBLIC foundation_platform foundation_math foundation_memory Vulkan::Vulkan glfw Threads::Threads foundation_config engine_ui engine_assets)
-# Removed dependency on domain_math/features!
-
-# Assets
-set(ENGINE_ASSETS_SOURCES "src/engine/assets/assets.c")
-add_library(engine_assets STATIC ${ENGINE_ASSETS_SOURCES})
-target_include_directories(engine_assets PUBLIC "src/")
-target_link_libraries(engine_assets PUBLIC foundation_platform foundation_config)
+target_link_libraries(engine_graphics PUBLIC 
+    foundation_platform foundation_math foundation_memory 
+    Vulkan::Vulkan glfw Threads::Threads 
+    foundation_config engine_assets engine_scene
+)
 
 # UI
 set(ENGINE_UI_SOURCES
@@ -139,7 +153,10 @@ set(ENGINE_UI_SOURCES
     src/engine/ui/internal/ui_command_system.c)
 add_library(engine_ui STATIC ${ENGINE_UI_SOURCES})
 target_include_directories(engine_ui PUBLIC "src/" ${Stb_INCLUDE_DIR})
-target_link_libraries(engine_ui PUBLIC foundation_config engine_assets foundation_meta foundation_math engine_graphics)
+target_link_libraries(engine_ui PUBLIC 
+    foundation_config engine_assets foundation_meta foundation_math 
+    engine_scene engine_text
+)
 
 # --- FEATURES LAYER ---
 
@@ -152,7 +169,10 @@ set(FEATURE_MATH_ENGINE_SOURCES
 add_library(feature_math_engine STATIC ${FEATURE_MATH_ENGINE_SOURCES})
 target_include_directories(feature_math_engine PUBLIC "src/")
 target_link_libraries(feature_math_engine PUBLIC foundation_math foundation_memory)
-target_link_libraries(feature_math_engine PRIVATE engine_graphics engine_ui foundation_platform foundation_config foundation_logger foundation_meta Vulkan::Vulkan)
+target_link_libraries(feature_math_engine PRIVATE 
+    engine_graphics engine_ui engine_scene engine_text
+    foundation_platform foundation_config foundation_logger foundation_meta Vulkan::Vulkan
+)
 if(UNIX)
     target_link_libraries(feature_math_engine PUBLIC m)
 endif()
@@ -163,7 +183,10 @@ set(ENGINE_CORE_SOURCES
 )
 add_library(engine_core STATIC ${ENGINE_CORE_SOURCES})
 target_include_directories(engine_core PUBLIC "src/")
-target_link_libraries(engine_core PUBLIC engine_graphics engine_ui engine_assets feature_math_engine foundation_meta foundation_logger)
+target_link_libraries(engine_core PUBLIC 
+    engine_graphics engine_ui engine_assets engine_text feature_math_engine 
+    foundation_meta foundation_logger
+)
 
 # --- APP ---
 
@@ -175,6 +198,8 @@ target_link_libraries(Graphics PRIVATE
     engine_graphics
     engine_ui
     engine_assets
+    engine_scene
+    engine_text
     foundation_config
     foundation_platform
     foundation_meta
@@ -196,6 +221,6 @@ function(add_graphics_test TEST_NAME SOURCE_FILE)
 endfunction()
 
 # Update test paths and libs
-add_graphics_test(transform_tests tests/transform_tests.c foundation_math engine_graphics)
+add_graphics_test(transform_tests tests/transform_tests.c foundation_math engine_scene)
 add_graphics_test(transpiler_tests tests/transpiler_tests.c feature_math_engine)
 add_graphics_test(ui_tests tests/ui_tests.c engine_ui foundation_logger feature_math_engine)

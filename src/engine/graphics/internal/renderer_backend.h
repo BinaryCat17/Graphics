@@ -5,7 +5,7 @@
 #include <stddef.h>
 
 #include "foundation/platform/platform.h"
-#include "engine/graphics/scene/scene.h"
+#include "engine/scene/scene.h"
 
 // Backend Initialization Parameters
 typedef struct RenderBackendInit {

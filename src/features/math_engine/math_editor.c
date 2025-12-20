@@ -6,7 +6,7 @@
 #include "foundation/meta/reflection.h"
 #include "features/math_engine/internal/transpiler.h"
 #include "engine/graphics/internal/renderer_backend.h"
-#include "engine/graphics/text/font.h"
+#include "engine/text/font.h"
 
 #include <stdlib.h>
 #include <stdio.h>

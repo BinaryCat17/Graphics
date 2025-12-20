@@ -3,7 +3,7 @@
 #include "foundation/platform/platform.h"
 #include "foundation/platform/fs.h"
 #include "foundation/meta/reflection.h"
-#include "engine/graphics/text/font.h"
+#include "engine/text/font.h"
 
 #include <stdio.h>
 #include <string.h>
