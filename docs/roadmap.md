@@ -14,17 +14,18 @@ The project has transitioned to a stable architecture with strict encapsulation.
 
 ## 🚀 Active Phases
 
-### Phase 6: 3D & Scene Expansion (IN PROGRESS)
-**Objective:** Move beyond 2D quads and prepare the engine for 3D content.
-- [ ] **Mesh Rendering:** Implement 3D mesh loading (OBJ/GLTF) and rendering in `vulkan_renderer.c`.
-- [ ] **Camera System:** Implement a proper 3D camera controller (Perspective/Orthographic).
-- [ ] **Transform Hierarchy:** Upgrade `SceneObject` to support parent-child transforms.
+### Phase 6: 3D Visualization & Compute (IN PROGRESS)
+**Objective:** Visualize mathematical functions and data in 3D space.
+- [ ] **Procedural Geometry:** Generate meshes from math functions (e.g., $z=f(x,y)$) using Compute Shaders.
+- [ ] **Arcball Camera:** Implement an orbit camera for inspecting 3D surfaces.
+- [ ] **Compute Particles:** Visualizing vector fields using particle systems.
 
-### Phase 7: Advanced Rendering
-**Objective:** Visual fidelity improvements.
-- [ ] **Lighting:** Basic Phong/PBR implementation.
-- [ ] **Shadow Mapping:** Directional light shadows.
-- [ ] **Post-Processing:** Bloom, Tone Mapping.
+### Phase 7: Editor & Tooling Maturity
+**Objective:** Improve the user experience of the Visual Programming Environment.
+- [ ] **Undo/Redo System:** Implement command history for graph operations.
+- [ ] **Node Library Expansion:** Add Noise (Perlin/Simplex), Trigonometry, and Logic nodes.
+- [ ] **Export System:** Export generated shaders (GLSL/SPIR-V) for external use.
+- [ ] **Graph Optimization:** Dead code elimination in the Transpiler.
 
 ---
 
