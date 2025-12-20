@@ -62,19 +62,22 @@ The entry point (`main.c`). It orchestrates the layers.
 *   **Definition:** Behavior is defined in data, not code.
 *   **Example:** The UI is built from `manifest.yaml`. The Engine purely interprets this data.
 
-### ⚡ Reactivity (MVVM)
-*   **Definition:** The View updates automatically when the Model changes.
-*   **Mechanism:** The Reflection system binds UI fields (strings in YAML) to C struct offsets.
+### ⚡ Reactivity (MVVM / ViewModel)
+*   **Definition:** The View updates automatically when the Model changes, but the Model never knows about the View.
+*   **Implementation:** 
+    *   **Model:** Pure logic data (e.g., `MathNode` with IDs and values).
+    *   **ViewModel:** Editor-specific data (e.g., `MathNodeView` with `x, y` coordinates and cached labels).
+    *   **Mechanism:** The Engine's Reflection system binds UI fields to the ViewModel. The Editor synchronizes Logic -> ViewModel once per frame.
 
 ### 🛡 Memory Safety
 *   **Rule:** No `malloc`/`free` in the hot loop.
 *   **Mechanism:**
-    *   **Arenas:** Linear allocators for frame-scope or permanent data.
-    *   **Pools:** O(1) alloc/free for dynamic objects with stable IDs.
+    *   **Arenas:** Linear allocators for frame-scope or permanent data (e.g., `MathGraph` nodes).
+    *   **Pools:** O(1) alloc/free for dynamic objects with stable IDs (e.g., `UiElement`).
 
 ### 🔗 Strict Decoupling
 *   **Rule:** Systems communicate via opaque IDs or Commands, not pointers.
-*   **Mechanism:** The UI doesn't know about the Graph. It sends a "Graph.AddNode" command (String ID), which the App handles.
+*   **Architecture Hardening (v0.5):** The `Engine` header is now isolated from UI implementation details. `InputState` is moved to a dedicated core header to prevent dependency leaks.
 
 ---
 

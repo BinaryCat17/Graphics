@@ -10,7 +10,7 @@
 #define UI_SCROLL_SPEED 20.0f
 #define UI_DRAG_THRESHOLD_SQ 9.0f
 
-// --- Helper Functions ---
+// ... Helper Functions ...
 
 static void push_event(UiInputContext* ctx, UiEventType type, UiElement* target) {
     if (ctx->event_count < UI_MAX_EVENTS) {
@@ -90,14 +90,16 @@ static void update_hover_state(UiInputContext* ctx, UiElement* root, const Input
     }
 }
 
-static void handle_scroll(UiInputContext* ctx, const InputState* input) {
-    if (input->scroll_dy == 0.0f && input->scroll_dx == 0.0f) return;
+static void handle_scroll_event(UiInputContext* ctx, const InputEvent* event) {
+    if (event->type != INPUT_EVENT_SCROLL) return;
+    float dx = event->data.scroll.dx;
+    float dy = event->data.scroll.dy;
 
     UiElement* target = ctx->hovered;
     while (target) {
         if (target->flags & UI_FLAG_SCROLLABLE) {
-            target->scroll_y -= input->scroll_dy * UI_SCROLL_SPEED; 
-            target->scroll_x += input->scroll_dx * UI_SCROLL_SPEED;
+            target->scroll_y -= dy * UI_SCROLL_SPEED; 
+            target->scroll_x += dx * UI_SCROLL_SPEED;
 
             // Clamp Y
             float max_scroll_y = target->content_h - (target->rect.h - target->spec->padding * 2);
@@ -117,14 +119,18 @@ static void handle_scroll(UiInputContext* ctx, const InputState* input) {
     }
 }
 
-static void handle_mouse_press(UiInputContext* ctx, const InputState* input) {
-    if (!input->mouse_clicked) return;
+static void handle_mouse_press_event(UiInputContext* ctx, const InputEvent* event) {
+    if (event->type != INPUT_EVENT_MOUSE_PRESSED) return;
+    if (event->data.mouse_button.button != 0) return; // Left click only for now
+
+    float mx = event->data.mouse_button.x;
+    float my = event->data.mouse_button.y;
 
     if (ctx->hovered) {
         ctx->active = ctx->hovered;
         ctx->possible_drag = true;
-        ctx->drag_start_mouse_x = input->mouse_x;
-        ctx->drag_start_mouse_y = input->mouse_y;
+        ctx->drag_start_mouse_x = mx;
+        ctx->drag_start_mouse_y = my;
         
         // Cache start values for potential drag
         if (ctx->active->flags & UI_FLAG_SCROLLABLE) {
@@ -150,9 +156,6 @@ static void handle_mouse_press(UiInputContext* ctx, const InputState* input) {
             ctx->focused = ctx->hovered;
             ctx->focused->is_focused = true;
         } else {
-            // Clicked something non-focusable (like a button), lose focus on text field?
-            // Usually buttons don't steal focus from text inputs in desktop apps, 
-            // but for now let's clear focus to be safe or strict.
             if (ctx->focused) {
                 ctx->focused->is_focused = false;
             }
@@ -171,50 +174,54 @@ static void handle_mouse_press(UiInputContext* ctx, const InputState* input) {
     }
 }
 
-static void handle_keyboard_input(UiInputContext* ctx, const InputState* input) {
+static void handle_char_event(UiInputContext* ctx, const InputEvent* event) {
     if (!ctx->focused) return;
-    
     UiElement* el = ctx->focused;
     if (!((el->flags & UI_FLAG_EDITABLE) && el->spec->kind == UI_KIND_TEXT_INPUT)) return;
 
-    bool changed = false;
-    
-    // Ensure we have binding
-    if (!el->data_ptr || !el->bind_text) return;
-    const MetaField* field = el->bind_text;
+    if (event->type == INPUT_EVENT_CHAR) {
+         char buf[256] = {0};
+         if (el->data_ptr && el->bind_text) {
+             ui_bind_read_string(el->data_ptr, el->bind_text, buf, sizeof(buf));
+             
+             size_t len = strlen(buf);
+             if (len < 255) {
+                 buf[len] = (char)event->data.character.codepoint;
+                 buf[len+1] = '\0';
+                 set_field_from_string(el->data_ptr, el->bind_text, buf);
+                 el->cursor_idx++;
+                 
+                 push_event(ctx, UI_EVENT_VALUE_CHANGE, el);
+                 if (el->on_change_cmd_id) {
+                     ui_command_execute_id(el->on_change_cmd_id, el);
+                 }
+             }
+         }
+    }
+}
 
-    // 1. Typing
-    if (input->last_char >= 32 && input->last_char <= 126) {
-         char buf[256] = {0};
-         ui_bind_read_string(el->data_ptr, field, buf, sizeof(buf));
-         
-         size_t len = strlen(buf);
-         if (len < 255) {
-             // Simple insertion at end (TODO: Use cursor_idx for insertion)
-             buf[len] = (char)input->last_char;
-             buf[len+1] = '\0';
-             set_field_from_string(el->data_ptr, field, buf);
-             el->cursor_idx++;
-             changed = true;
-         }
-    }
-    // 2. Backspace
-    if (input->last_key == UI_KEY_BACKSPACE && input->last_action != 0) { // UI_KEY_BACKSPACE
-         char buf[256] = {0};
-         ui_bind_read_string(el->data_ptr, field, buf, sizeof(buf));
-         size_t len = strlen(buf);
-         if (len > 0) {
-             buf[len-1] = '\0';
-             set_field_from_string(el->data_ptr, field, buf);
-             if (el->cursor_idx > 0) el->cursor_idx--;
-             changed = true;
-         }
-    }
-    
-    if (changed) {
-        push_event(ctx, UI_EVENT_VALUE_CHANGE, el);
-        if (el->on_change_cmd_id) {
-            ui_command_execute_id(el->on_change_cmd_id, el);
+static void handle_key_event(UiInputContext* ctx, const InputEvent* event) {
+    if (!ctx->focused) return;
+    UiElement* el = ctx->focused;
+    if (!((el->flags & UI_FLAG_EDITABLE) && el->spec->kind == UI_KIND_TEXT_INPUT)) return;
+
+    if (event->type == INPUT_EVENT_KEY_PRESSED || event->type == INPUT_EVENT_KEY_REPEAT) {
+        if (event->data.key.key == UI_KEY_BACKSPACE) {
+             char buf[256] = {0};
+             if (el->data_ptr && el->bind_text) {
+                 ui_bind_read_string(el->data_ptr, el->bind_text, buf, sizeof(buf));
+                 size_t len = strlen(buf);
+                 if (len > 0) {
+                     buf[len-1] = '\0';
+                     set_field_from_string(el->data_ptr, el->bind_text, buf);
+                     if (el->cursor_idx > 0) el->cursor_idx--;
+                     
+                     push_event(ctx, UI_EVENT_VALUE_CHANGE, el);
+                     if (el->on_change_cmd_id) {
+                         ui_command_execute_id(el->on_change_cmd_id, el);
+                     }
+                 }
+             }
         }
     }
 }
@@ -276,8 +283,8 @@ static void handle_drag_logic(UiInputContext* ctx, const InputState* input) {
     }
 }
 
-static void handle_mouse_release(UiInputContext* ctx, const InputState* input) {
-    if (input->mouse_down) return; // Only on release
+static void handle_mouse_release_event(UiInputContext* ctx, const InputEvent* event) {
+    if (event->type != INPUT_EVENT_MOUSE_RELEASED) return;
 
     if (ctx->active) {
         // Click?
@@ -301,13 +308,29 @@ static void handle_mouse_release(UiInputContext* ctx, const InputState* input) {
 
 // --- Main Update Loop ---
 
-void ui_input_update(UiInputContext* ctx, UiElement* root, const InputState* input) {
+void ui_input_update(UiInputContext* ctx, UiElement* root, const InputState* input, const InputEventQueue* events) {
     if (!ctx || !root || !input) return;
 
     update_hover_state(ctx, root, input);
-    handle_scroll(ctx, input);
-    handle_mouse_press(ctx, input);
-    handle_keyboard_input(ctx, input);
+    
+    // Process Events
+    if (events) {
+        for (int i = 0; i < events->count; ++i) {
+            const InputEvent* e = &events->events[i];
+            switch (e->type) {
+                case INPUT_EVENT_SCROLL: handle_scroll_event(ctx, e); break;
+                case INPUT_EVENT_MOUSE_PRESSED: handle_mouse_press_event(ctx, e); break;
+                case INPUT_EVENT_MOUSE_RELEASED: handle_mouse_release_event(ctx, e); break;
+                case INPUT_EVENT_CHAR: handle_char_event(ctx, e); break;
+                case INPUT_EVENT_KEY_PRESSED: 
+                case INPUT_EVENT_KEY_REPEAT: 
+                    handle_key_event(ctx, e); 
+                    break;
+                default: break;
+            }
+        }
+    }
+    
+    // Continuous Drag Logic
     handle_drag_logic(ctx, input);
-    handle_mouse_release(ctx, input);
 }

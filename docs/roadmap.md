@@ -19,12 +19,12 @@ The project has completed a major architectural cleanup.
 - [x] **Decouple Logic/View:** Remove UI data from `MathNode`. Implemented ViewModel pattern in Editor.
 - [x] **Engine Encapsulation:** Hide `PlatformWindow` and split `InputState` from heavy UI headers.
 - [x] **Header Hygiene:** Reduced include bloat in `engine.h`.
-- [ ] **Interface Abstraction:** (Next) Define opaque handles for Engine systems to further hide implementation.
+- [x] **Interface Abstraction:** Define opaque handles for Engine systems to further hide implementation (RenderSystem is now opaque).
 - [x] **Memory Audit:** 
     - [x] Refactor `simple_yaml.c` and `fs.c` to use scratch arenas instead of `malloc`.
     - [x] Cleanup `assets.c` path concatenation.
     - [x] Optimize `ui_renderer.c` overlay buffer (replace `realloc` with Arena).
-- [ ] **Input System Upgrade:** Replace polling-based `InputState` with an Event Queue (essential for Editor shortcuts).
+- [x] **Input System Upgrade:** Replace polling-based `InputState` with an Event Queue (essential for Editor shortcuts).
 - [x] **Zero Warnings Policy:** Fix unused functions in `math_editor.c` and other pending warnings.
 
 ### Phase 6: 3D & Scene Expansion

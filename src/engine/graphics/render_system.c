@@ -4,6 +4,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <threads.h>
 
 #include "foundation/platform/platform.h"
 #include "engine/graphics/backend/renderer_backend.h"
@@ -13,6 +14,32 @@
 #include "engine/ui/ui_layout.h"
 #include "engine/graphics/text/font.h"
 #include "engine/graphics/text/text_renderer.h"
+
+struct RenderSystem {
+    // Dependencies (Injectable)
+    Assets* assets;
+    UiElement* ui_root_view;
+
+    // Internal State
+    PlatformWindow* window;
+    struct RendererBackend* backend;
+    
+    // Packet buffering
+    RenderFramePacket packets[2];
+    int front_packet_index;
+    int back_packet_index;
+    bool packet_ready;
+    mtx_t packet_mutex;
+    
+    // Thread control
+    bool running;
+    bool renderer_ready;
+    bool show_compute_result;
+    uint32_t active_compute_pipeline;
+    double current_time;
+    
+    uint64_t frame_count;
+};
 
 // --- Helper: Packet Management ---
 
@@ -44,17 +71,7 @@ static void try_sync_packet(RenderSystem* sys) {
     // View: Identity (Camera at 0,0)
     dest->scene.camera.view_matrix = mat4_identity();
     
-    // Proj: Ortho 0..w, 0..h. 
-    // Vulkan Clip: Y is down (-1 Top, +1 Bottom).
-    // We want y=0 (Top) -> -1.
-    // We want y=h (Bottom) -> +1.
-    // mat4_orthographic(left, right, bottom, top, ...)
-    // m[5] = 2/(top-bottom). m[13] = -(top+bottom)/(top-bottom).
-    // If bottom=0, top=h: m[5]=2/h, m[13]=-1.
-    // y=0 -> -1. y=h -> 1. Correct.
-    
     Mat4 proj = mat4_orthographic(0.0f, w, 0.0f, h, -100.0f, 100.0f);
-    
     dest->scene.camera.view_matrix = proj; 
 
     // 2. Generate UI Scene (if bound)
@@ -95,8 +112,6 @@ const RenderFramePacket* render_system_acquire_packet(RenderSystem* sys) {
 
 // --- Init & Bootstrap ---
 
-
-
 static void try_bootstrap_renderer(RenderSystem* sys) {
     if (!sys) return;
     if (sys->renderer_ready) return;
@@ -119,10 +134,11 @@ static void try_bootstrap_renderer(RenderSystem* sys) {
     sys->renderer_ready = sys->backend->init(sys->backend, &init);
 }
 
-bool render_system_init(RenderSystem* sys, const RenderSystemConfig* config) {
-    if (!sys || !config) return false;
-    
-    memset(sys, 0, sizeof(RenderSystem));
+RenderSystem* render_system_create(const RenderSystemConfig* config) {
+    if (!config) return NULL;
+    RenderSystem* sys = calloc(1, sizeof(RenderSystem));
+    if (!sys) return NULL;
+
     sys->window = config->window;
     
     mtx_init(&sys->packet_mutex, mtx_plain);
@@ -135,15 +151,14 @@ bool render_system_init(RenderSystem* sys, const RenderSystemConfig* config) {
     sys->backend = renderer_backend_get(backend_id);
     if (!sys->backend) {
         LOG_ERROR("RenderSystem: Failed to load backend '%s'", backend_id);
-        return false;
+        free(sys);
+        return NULL;
     }
     
-    // Note: We delay bootstrap until assets are bound
-    
-    return true;
+    return sys;
 }
 
-void render_system_shutdown(RenderSystem* sys) {
+void render_system_destroy(RenderSystem* sys) {
     if (!sys) return;
     
     if (sys->backend && sys->backend->cleanup) {
@@ -153,6 +168,7 @@ void render_system_shutdown(RenderSystem* sys) {
     render_packet_free_resources(&sys->packets[0]);
     render_packet_free_resources(&sys->packets[1]);
     mtx_destroy(&sys->packet_mutex);
+    free(sys);
 }
 
 void render_system_bind_assets(RenderSystem* sys, Assets* assets) {
@@ -163,6 +179,12 @@ void render_system_bind_assets(RenderSystem* sys, Assets* assets) {
 void render_system_bind_ui(RenderSystem* sys, UiElement* root_view) {
     sys->ui_root_view = root_view;
     try_bootstrap_renderer(sys);
+}
+
+void render_system_begin_frame(RenderSystem* sys, double time) {
+    if (!sys) return;
+    sys->frame_count++;
+    sys->current_time = time;
 }
 
 void render_system_update(RenderSystem* sys) {
@@ -187,17 +209,43 @@ void render_system_update(RenderSystem* sys) {
     try_sync_packet(sys);
 }
 
+void render_system_draw(RenderSystem* sys) {
+    if (!sys || !sys->renderer_ready || !sys->backend) return;
+    
+    const RenderFramePacket* packet = render_system_acquire_packet(sys);
+    if (packet && sys->backend->render_scene) {
+        sys->backend->render_scene(sys->backend, &packet->scene);
+    }
+}
+
+void render_system_resize(RenderSystem* sys, int width, int height) {
+    if (sys && sys->backend && sys->backend->update_viewport) {
+        sys->backend->update_viewport(sys->backend, width, height);
+    }
+}
+
 void render_system_set_compute_pipeline(RenderSystem* sys, uint32_t pipeline_id) {
     if (!sys) return;
-    
-    // Cleanup old pipeline if it was dynamic? 
-    // Actually, RenderSystem doesn't know if it's dynamic.
-    // Let's just swap it.
     sys->active_compute_pipeline = pipeline_id;
     LOG_INFO("RenderSystem: Active compute pipeline set to %u", pipeline_id);
+}
+
+uint32_t render_system_create_compute_pipeline(RenderSystem* sys, uint32_t* spv_code, size_t spv_size) {
+    if (!sys || !sys->backend || !sys->backend->compute_pipeline_create) return 0;
+    return sys->backend->compute_pipeline_create(sys->backend, spv_code, spv_size, 0);
+}
+
+void render_system_destroy_compute_pipeline(RenderSystem* sys, uint32_t pipeline_id) {
+    if (!sys || !sys->backend || !sys->backend->compute_pipeline_destroy) return;
+    sys->backend->compute_pipeline_destroy(sys->backend, pipeline_id);
 }
 
 void render_system_request_screenshot(RenderSystem* sys, const char* filepath) {
     if (!sys || !sys->backend || !sys->backend->request_screenshot) return;
     sys->backend->request_screenshot(sys->backend, filepath);
 }
+
+double render_system_get_time(RenderSystem* sys) { return sys ? sys->current_time : 0.0; }
+uint64_t render_system_get_frame_count(RenderSystem* sys) { return sys ? sys->frame_count : 0; }
+bool render_system_is_ready(RenderSystem* sys) { return sys ? sys->renderer_ready : false; }
+void render_system_set_show_compute(RenderSystem* sys, bool show) { if(sys) sys->show_compute_result = show; }

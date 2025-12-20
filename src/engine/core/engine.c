@@ -12,11 +12,18 @@
 
 // --- Input Callbacks ---
 
+static void engine_push_event(Engine* engine, InputEvent event) {
+    if (engine->input_events.count < MAX_INPUT_EVENTS) {
+        engine->input_events.events[engine->input_events.count++] = event;
+    }
+}
+
 static void on_mouse_button(PlatformWindow* window, PlatformMouseButton button, PlatformInputAction action, int mods, void* user_data) {
-    (void)window; (void)mods;
+    (void)window; 
     Engine* engine = (Engine*)user_data;
     if (!engine) return;
     
+    // Legacy State
     if (button == PLATFORM_MOUSE_BUTTON_LEFT) {
         if (action == PLATFORM_PRESS) {
             engine->input.mouse_down = true;
@@ -25,6 +32,19 @@ static void on_mouse_button(PlatformWindow* window, PlatformMouseButton button, 
             engine->input.mouse_down = false;
         }
     }
+
+    // Event
+    InputEvent event = {0};
+    if (action == PLATFORM_PRESS) event.type = INPUT_EVENT_MOUSE_PRESSED;
+    else if (action == PLATFORM_RELEASE) event.type = INPUT_EVENT_MOUSE_RELEASED;
+    
+    if (event.type != INPUT_EVENT_NONE) {
+        event.data.mouse_button.button = (int)button;
+        event.data.mouse_button.mods = mods;
+        event.data.mouse_button.x = engine->input.mouse_x;
+        event.data.mouse_button.y = engine->input.mouse_y;
+        engine_push_event(engine, event);
+    }
 }
 
 static void on_scroll(PlatformWindow* window, double xoff, double yoff, void* user_data) {
@@ -32,17 +52,39 @@ static void on_scroll(PlatformWindow* window, double xoff, double yoff, void* us
     Engine* engine = (Engine*)user_data;
     if (!engine) return;
 
+    // Legacy State
     engine->input.scroll_dx += (float)xoff;
     engine->input.scroll_dy += (float)yoff;
+
+    // Event
+    InputEvent event = {0};
+    event.type = INPUT_EVENT_SCROLL;
+    event.data.scroll.dx = (float)xoff;
+    event.data.scroll.dy = (float)yoff;
+    engine_push_event(engine, event);
 }
 
 static void on_key(PlatformWindow* window, int key, int scancode, PlatformInputAction action, int mods, void* user_data) {
-    (void)window; (void)scancode; (void)mods;
+    (void)window; 
     Engine* engine = (Engine*)user_data;
     if (!engine) return;
     
+    // Legacy State
     engine->input.last_key = key;
     engine->input.last_action = (int)action;
+
+    // Event
+    InputEvent event = {0};
+    if (action == PLATFORM_PRESS) event.type = INPUT_EVENT_KEY_PRESSED;
+    else if (action == PLATFORM_RELEASE) event.type = INPUT_EVENT_KEY_RELEASED;
+    else if (action == PLATFORM_REPEAT) event.type = INPUT_EVENT_KEY_REPEAT;
+
+    if (event.type != INPUT_EVENT_NONE) {
+        event.data.key.key = key;
+        event.data.key.scancode = scancode;
+        event.data.key.mods = mods;
+        engine_push_event(engine, event);
+    }
 }
 
 static void on_char(PlatformWindow* window, unsigned int codepoint, void* user_data) {
@@ -50,7 +92,14 @@ static void on_char(PlatformWindow* window, unsigned int codepoint, void* user_d
     Engine* engine = (Engine*)user_data;
     if (!engine) return;
     
+    // Legacy State
     engine->input.last_char = codepoint;
+
+    // Event
+    InputEvent event = {0};
+    event.type = INPUT_EVENT_CHAR;
+    event.data.character.codepoint = codepoint;
+    engine_push_event(engine, event);
 }
 
 static void on_cursor_pos(PlatformWindow* window, double x, double y, void* user_data) {
@@ -58,8 +107,16 @@ static void on_cursor_pos(PlatformWindow* window, double x, double y, void* user
     Engine* engine = (Engine*)user_data;
     if (!engine) return;
 
+    // Legacy State
     engine->input.mouse_x = (float)x;
     engine->input.mouse_y = (float)y;
+
+    // Event
+    InputEvent event = {0};
+    event.type = INPUT_EVENT_MOUSE_MOVED;
+    event.data.mouse.x = (float)x;
+    event.data.mouse.y = (float)y;
+    engine_push_event(engine, event);
 }
 
 static void on_framebuffer_size(PlatformWindow* window, int width, int height, void* user_data) {
@@ -67,8 +124,8 @@ static void on_framebuffer_size(PlatformWindow* window, int width, int height, v
     Engine* engine = (Engine*)user_data;
     if (!engine) return;
     
-    if (engine->render_system.backend && engine->render_system.backend->update_viewport) {
-        engine->render_system.backend->update_viewport(engine->render_system.backend, width, height);
+    if (engine->render_system) {
+        render_system_resize(engine->render_system, width, height);
     }
 }
 
@@ -121,13 +178,14 @@ bool engine_init(Engine* engine, const EngineConfig* config) {
         .window = engine->window,
         .backend_type = "vulkan"
     };
-    if (!render_system_init(&engine->render_system, &rs_config)) {
+    engine->render_system = render_system_create(&rs_config);
+    if (!engine->render_system) {
         LOG_FATAL("Failed to initialize RenderSystem.");
         return false;
     }
 
     // Bindings
-    render_system_bind_assets(&engine->render_system, &engine->assets);
+    render_system_bind_assets(engine->render_system, &engine->assets);
     
     // 5. Application Init Hook (App sets up Graph, UI, binds them to Renderer)
     if (config->on_init) {
@@ -168,7 +226,7 @@ void engine_run(Engine* engine) {
 
     LOG_INFO("Engine Loop Starting...");
     
-    RenderSystem* rs = &engine->render_system;
+    RenderSystem* rs = engine->render_system;
     engine->last_time = platform_get_time_ms() / 1000.0;
     
     while (engine->running && !platform_window_should_close(engine->window)) {
@@ -185,8 +243,7 @@ void engine_run(Engine* engine) {
             engine->last_screenshot_time = now;
         }
 
-        rs->frame_count++;
-        rs->current_time = now;
+        render_system_begin_frame(rs, now);
         
         // Reset per-frame input deltas
         engine->input.scroll_dx = 0;
@@ -194,6 +251,7 @@ void engine_run(Engine* engine) {
         engine->input.last_char = 0;
         engine->input.last_key = 0;
         engine->input.last_action = -1;
+        engine->input_events.count = 0;
         
         // Input Poll (Triggers callbacks)
         platform_poll_events();
@@ -212,19 +270,14 @@ void engine_run(Engine* engine) {
         render_system_update(rs);
 
         // Draw
-        if (rs->renderer_ready && rs->backend) {
-            const RenderFramePacket* packet = render_system_acquire_packet(rs);
-            if (packet && rs->backend->render_scene) {
-                rs->backend->render_scene(rs->backend, &packet->scene);
-            }
-        }
+        render_system_draw(rs);
     }
 }
 
 void engine_shutdown(Engine* engine) {
     if (!engine) return;
     
-    render_system_shutdown(&engine->render_system);
+    render_system_destroy(engine->render_system);
     assets_shutdown(&engine->assets);
     
     if (engine->window) {

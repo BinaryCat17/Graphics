@@ -25,9 +25,10 @@ struct Engine {
     // Platform
     PlatformWindow* window;
     InputState input;
+    InputEventQueue input_events;
 
     // Systems
-    RenderSystem render_system;
+    RenderSystem* render_system;
     Assets assets;
     
     // Application Data

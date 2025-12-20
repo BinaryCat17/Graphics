@@ -73,7 +73,7 @@ static void math_editor_sync_view_data(MathEditorState* state) {
 // --- Recompilation Logic ---
 
 static void math_editor_recompile_graph(MathEditorState* state, RenderSystem* rs) {
-    if (!state || !rs || !rs->backend) return;
+    if (!state || !rs) return;
 
     LOG_INFO("Editor: Recompiling Math Graph...");
 
@@ -117,7 +117,7 @@ static void math_editor_recompile_graph(MathEditorState* state, RenderSystem* rs
     }
 
     // 5. Create Pipeline
-    uint32_t new_pipe = rs->backend->compute_pipeline_create(rs->backend, spv_code, spv_size, 0);
+    uint32_t new_pipe = render_system_create_compute_pipeline(rs, spv_code, spv_size);
     free(spv_code);
 
     if (new_pipe == 0) {
@@ -127,7 +127,7 @@ static void math_editor_recompile_graph(MathEditorState* state, RenderSystem* rs
 
     // 6. Swap
     if (state->current_pipeline > 0) {
-        rs->backend->compute_pipeline_destroy(rs->backend, state->current_pipeline);
+        render_system_destroy_compute_pipeline(rs, state->current_pipeline);
     }
     state->current_pipeline = new_pipe;
     render_system_set_compute_pipeline(rs, new_pipe);
@@ -288,7 +288,7 @@ void math_editor_init(MathEditorState* state, Engine* engine) {
             state->ui_instance.root = ui_element_create(&state->ui_instance, state->ui_asset->root, state, editor_meta);
 
             // Bind to Renderer
-            render_system_bind_ui(&engine->render_system, state->ui_instance.root);
+            render_system_bind_ui(engine->render_system, state->ui_instance.root);
             
             // Initial Select
             if (state->node_view_count > 0) {
@@ -301,8 +301,8 @@ void math_editor_init(MathEditorState* state, Engine* engine) {
 
     // 5. Initial Compute Compile
     engine->show_compute_visualizer = true;
-    engine->render_system.show_compute_result = true;
-    math_editor_recompile_graph(state, &engine->render_system);
+    render_system_set_show_compute(engine->render_system, true);
+    math_editor_recompile_graph(state, engine->render_system);
 }
 
 void math_editor_update(MathEditorState* state, Engine* engine) {
@@ -311,18 +311,17 @@ void math_editor_update(MathEditorState* state, Engine* engine) {
     // Sync Logic -> View (one way binding for visual updates)
     math_editor_sync_view_data(state);
 
-    // Toggle Visualizer (Hotkey C)
-    static bool key_c_prev = false;
-    bool key_c_curr = platform_get_key(engine->window, 67); // KEY_C
-    
-    if (key_c_curr && !key_c_prev) {
-        engine->show_compute_visualizer = !engine->show_compute_visualizer;
-        engine->render_system.show_compute_result = engine->show_compute_visualizer;
-        if (engine->show_compute_visualizer) {
-            state->graph_dirty = true; 
+    // Toggle Visualizer (Hotkey C) - Event Based
+    for (int i = 0; i < engine->input_events.count; ++i) {
+        const InputEvent* e = &engine->input_events.events[i];
+        if (e->type == INPUT_EVENT_KEY_PRESSED && e->data.key.key == 67) { // KEY_C
+             engine->show_compute_visualizer = !engine->show_compute_visualizer;
+             render_system_set_show_compute(engine->render_system, engine->show_compute_visualizer);
+             if (engine->show_compute_visualizer) {
+                 state->graph_dirty = true; 
+             }
         }
     }
-    key_c_prev = key_c_curr;
 
     // UI Update Loop
     if (state->ui_instance.root) {
@@ -330,7 +329,7 @@ void math_editor_update(MathEditorState* state, Engine* engine) {
         ui_element_update(state->ui_instance.root, engine->dt);
         
         // Input Handling
-        ui_input_update(&state->input_ctx, state->ui_instance.root, &engine->input);
+        ui_input_update(&state->input_ctx, state->ui_instance.root, &engine->input, &engine->input_events);
         
         // Process Events
         UiEvent evt;
@@ -370,7 +369,7 @@ void math_editor_update(MathEditorState* state, Engine* engine) {
         
         // Layout
         PlatformWindowSize size = platform_get_framebuffer_size(engine->window);
-        ui_layout_root(state->ui_instance.root, (float)size.width, (float)size.height, engine->render_system.frame_count, false, text_measure_wrapper, NULL);
+        ui_layout_root(state->ui_instance.root, (float)size.width, (float)size.height, render_system_get_frame_count(engine->render_system), false, text_measure_wrapper, NULL);
     }
 
     // Graph Evaluation (Naive interpretation on CPU for debugging/node values)
@@ -383,7 +382,7 @@ void math_editor_update(MathEditorState* state, Engine* engine) {
 
     // Recompile Compute Shader if dirty
     if (state->graph_dirty && engine->show_compute_visualizer) {
-        math_editor_recompile_graph(state, &engine->render_system);
+        math_editor_recompile_graph(state, engine->render_system);
         state->graph_dirty = false;
     }
 }
