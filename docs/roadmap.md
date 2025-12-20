@@ -1,25 +1,17 @@
 # Project Roadmap
 
-**Current Focus:** Phase 6 - Architectural Hardening & 3D
+**Current Focus:** Phase 7 - 3D Visualization & Compute
 **Date:** December 20, 2025
 
-## 🏁 Current State (v0.7.1 Refactoring)
+## 🏁 Current State (v0.8.0 - 3D Ready)
 
-The project is undergoing a structural standardization to enforce strict public/private API boundaries before expanding into complex 3D features.
+Structural standardization (Phase 6) is complete. The codebase enforces strict Public/Internal API boundaries across all modules. The Math Engine is fully encapsulated, and the foundation is covered by unit tests. The system is now ready for 3D procedural geometry and compute shader integration.
 
 ---
 
 ## 🚀 Active Phases
 
-### Phase 6: Architectural Hardening & Cleanup (IMMEDIATE PRIORITY)
-**Objective:** Enforce the "Public/Internal" separation pattern, optimize memory usage, and remove hardcoded logic.
-
-- [x] **Input Action Mapping:** Implement an abstraction layer to map physical keys (e.g., `KEY_Z`) to logical actions (e.g., `ACTION_UNDO`), removing hardcoded key checks from game logic.
-- [x] **Test Suite Expansion:** Expand unit tests to cover critical foundation modules (Memory, Strings, Containers) and ensuring automated execution in the build pipeline.
-- [x] **Math Engine Encapsulation:** Refactor `MathNode` to hide internal struct details behind an opaque handle API, ensuring changes to node logic do not break dependent features.
-- [x] **C Standard Decision:** Adopted **C11** to utilize `typedef` redefinitions for cleaner, decoupled APIs (Rejected C99 downgrade).
-
-### Phase 7: 3D Visualization & Compute
+### Phase 7: 3D Visualization & Compute (IMMEDIATE PRIORITY)
 **Objective:** Visualize mathematical functions and data in 3D space.
 - [ ] **Procedural Geometry:** Generate meshes from math functions (e.g., $z=f(x,y)$) using Compute Shaders.
 - [ ] **Arcball Camera:** Implement an orbit camera for inspecting 3D surfaces.
@@ -30,6 +22,16 @@ The project is undergoing a structural standardization to enforce strict public/
 - [ ] **Undo/Redo System:** Implement command history for graph operations.
 - [ ] **Node Library Expansion:** Add Noise (Perlin/Simplex), Trigonometry, and Logic nodes.
 - [ ] **Export System:** Export generated shaders (GLSL/SPIR-V) for external use.
+
+---
+
+## ✅ Completed Milestones
+
+### Phase 6: Architectural Hardening
+- [x] **API Encapsulation:** Enforced "Public/Internal" separation (Opaque Handles) across all Engine and Feature modules.
+- [x] **C11 Adoption:** Standardized on C11 for cleaner API design via typedef redefinitions.
+- [x] **Input Action Mapping:** Removed hardcoded keys; implemented logical action system.
+- [x] **Test Suite Foundation:** Established unit tests for Memory (Arenas) and Strings (StringId).
 
 ---
 
