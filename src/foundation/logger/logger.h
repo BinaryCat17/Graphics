@@ -1,8 +1,6 @@
 #ifndef LOGGER_H
 #define LOGGER_H
 
-#include <stdarg.h>
-
 typedef enum LogLevel {
     LOG_LEVEL_TRACE, // Ultra-verbose, per-frame, variable tracing
     LOG_LEVEL_DEBUG, // Diagnostic information for developers

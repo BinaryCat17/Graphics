@@ -53,10 +53,10 @@ const MetaEnum* meta_get_enum(const char* name);
 
 // Хелперы
 void* meta_get_field_ptr(void* instance, const MetaField* field);
-int meta_get_int(void* instance, const MetaField* field);
-float meta_get_float(void* instance, const MetaField* field);
-const char* meta_get_string(void* instance, const MetaField* field);
-bool meta_get_bool(void* instance, const MetaField* field);
+int meta_get_int(const void* instance, const MetaField* field);
+float meta_get_float(const void* instance, const MetaField* field);
+const char* meta_get_string(const void* instance, const MetaField* field);
+bool meta_get_bool(const void* instance, const MetaField* field);
 void meta_set_int(void* instance, const MetaField* field, int value);
 void meta_set_float(void* instance, const MetaField* field, float value);
 void meta_set_string(void* instance, const MetaField* field, const char* value);

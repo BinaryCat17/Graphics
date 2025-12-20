@@ -2,6 +2,8 @@
 #include "ui_command_system.h"
 #include "ui_internal.h"
 #include "foundation/logger/logger.h"
+#include "foundation/meta/reflection.h"
+#include "engine/input/input.h"
 #include <string.h>
 #include <stdio.h>
 #include <stdlib.h>

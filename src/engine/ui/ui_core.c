@@ -2,6 +2,7 @@
 #include "internal/ui_internal.h"
 #include "internal/ui_layout.h"   // Internal
 #include "internal/ui_renderer.h" // Internal
+#include "foundation/meta/reflection.h"
 
 #include <stdlib.h>
 #include <string.h>

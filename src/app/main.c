@@ -2,6 +2,9 @@
 #include "foundation/logger/logger.h"
 #include "features/math_engine/math_editor.h"
 #include "foundation/config/config_system.h"
+#include "engine/graphics/render_system.h"
+#include "engine/assets/assets.h"
+#include "foundation/memory/arena.h"
 
 #include <string.h>
 #include <stdlib.h>

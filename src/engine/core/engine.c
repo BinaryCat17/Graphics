@@ -5,6 +5,9 @@
 #include "foundation/meta/reflection.h"
 #include "engine/text/font.h"
 #include "foundation/memory/arena.h"
+#include "engine/graphics/render_system.h"
+#include "engine/assets/assets.h"
+#include "engine/input/input.h"
 
 #include <stdio.h>
 #include <string.h>
@@ -262,11 +265,11 @@ MemoryArena* engine_get_frame_arena(Engine* engine) {
     return engine ? &engine->frame_arena : NULL;
 }
 
-const EngineConfig* engine_get_config(Engine* engine) {
+const EngineConfig* engine_get_config(const Engine* engine) {
     return engine ? &engine->config : NULL;
 }
 
-void* engine_get_user_data(Engine* engine) {
+void* engine_get_user_data(const Engine* engine) {
     return engine ? engine->user_data : NULL;
 }
 
@@ -274,11 +277,11 @@ void engine_set_user_data(Engine* engine, void* user_data) {
     if (engine) engine->user_data = user_data;
 }
 
-float engine_get_dt(Engine* engine) {
+float engine_get_dt(const Engine* engine) {
     return engine ? engine->dt : 0.0f;
 }
 
-bool engine_is_running(Engine* engine) {
+bool engine_is_running(const Engine* engine) {
     return engine ? engine->running : false;
 }
 
@@ -286,6 +289,6 @@ void engine_set_show_compute(Engine* engine, bool show) {
     if (engine) engine->show_compute_visualizer = show;
 }
 
-bool engine_get_show_compute(Engine* engine) {
+bool engine_get_show_compute(const Engine* engine) {
     return engine ? engine->show_compute_visualizer : false;
 }

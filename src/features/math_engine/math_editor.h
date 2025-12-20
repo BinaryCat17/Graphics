@@ -3,6 +3,7 @@
 #include "engine/core/engine.h"
 #include "features/math_engine/math_graph.h"
 #include "engine/ui/ui_core.h"
+#include "foundation/memory/arena.h"
 
 // ViewModel for a Node in the Editor
 typedef struct MathNodeView {

@@ -21,6 +21,6 @@ void assets_free_file(AssetData* data);
 
 // Accessors
 const char* assets_get_root_dir(const Assets* assets);
-Mesh* assets_get_unit_quad(Assets* assets);
+const Mesh* assets_get_unit_quad(const Assets* assets);
 
 #endif // ASSETS_SYSTEM_H

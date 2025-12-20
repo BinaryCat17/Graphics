@@ -3,12 +3,14 @@
 
 #include <stdbool.h>
 #include <stdint.h>
-#include "foundation/meta/reflection.h"
-#include "foundation/memory/arena.h"
-#include "foundation/math/coordinate_systems.h"
-
-#include "foundation/memory/pool.h"
+#include <stddef.h>
 #include "foundation/string/string_id.h"
+
+// Forward Declarations
+typedef struct MetaStruct MetaStruct;
+typedef struct MetaField MetaField;
+typedef struct MemoryArena MemoryArena;
+typedef struct InputSystem InputSystem;
 
 // --- CONSTANTS & FLAGS ---
 
@@ -58,8 +60,6 @@ typedef struct UiEvent {
     UiEventType type;
     UiElement* target;
 } UiEvent;
-
-#include "engine/input/input.h"
 
 // --- UI SPECIFICATION (The DNA) ---
 // Pure data. Allocated inside a UiAsset arena. Read-only at runtime.

@@ -7,6 +7,8 @@
 #include "features/math_engine/internal/transpiler.h"
 #include "engine/graphics/internal/renderer_backend.h"
 #include "engine/text/font.h"
+#include "engine/graphics/render_system.h"
+#include "engine/input/input.h"
 
 #include <stdlib.h>
 #include <stdio.h>

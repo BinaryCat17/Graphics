@@ -8,17 +8,17 @@ void* meta_get_field_ptr(void* instance, const MetaField* field) {
     return (char*)instance + field->offset;
 }
 
-int meta_get_int(void* instance, const MetaField* field) {
+int meta_get_int(const void* instance, const MetaField* field) {
     if (!instance || !field || field->type != META_TYPE_INT) return 0;
     return *(int*)((char*)instance + field->offset);
 }
 
-float meta_get_float(void* instance, const MetaField* field) {
+float meta_get_float(const void* instance, const MetaField* field) {
     if (!instance || !field || field->type != META_TYPE_FLOAT) return 0.0f;
     return *(float*)((char*)instance + field->offset);
 }
 
-const char* meta_get_string(void* instance, const MetaField* field) {
+const char* meta_get_string(const void* instance, const MetaField* field) {
     if (!instance || !field) return NULL;
     if (field->type == META_TYPE_STRING) {
         return *(char**)((char*)instance + field->offset);
@@ -28,7 +28,7 @@ const char* meta_get_string(void* instance, const MetaField* field) {
     return NULL;
 }
 
-bool meta_get_bool(void* instance, const MetaField* field) {
+bool meta_get_bool(const void* instance, const MetaField* field) {
     if (!instance || !field || field->type != META_TYPE_BOOL) return false;
     return *(bool*)((char*)instance + field->offset);
 }

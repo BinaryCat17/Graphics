@@ -1,4 +1,5 @@
 #include "engine/graphics/render_system.h"
+#include "engine/assets/assets.h"
 #include "engine/graphics/internal/render_packet.h"
 #include "foundation/logger/logger.h"
 

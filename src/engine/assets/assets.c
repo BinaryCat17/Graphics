@@ -101,6 +101,6 @@ const char* assets_get_root_dir(const Assets* assets) {
     return assets->root_dir;
 }
 
-Mesh* assets_get_unit_quad(Assets* assets) {
+const Mesh* assets_get_unit_quad(const Assets* assets) {
     return &assets->unit_quad;
 }
