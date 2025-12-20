@@ -4,8 +4,9 @@
 #include <stdint.h>
 #include <stdbool.h>
 
-// Forward declaration
+// Forward declarations
 typedef struct PlatformWindow PlatformWindow;
+typedef struct InputSystem InputSystem; // Opaque handle
 
 // Event-based Input System
 typedef enum InputEventType {
@@ -47,33 +48,25 @@ typedef struct InputEvent {
 
 #define MAX_INPUT_EVENTS 256
 
-typedef struct InputEventQueue {
-    InputEvent events[MAX_INPUT_EVENTS];
-    int count;
-} InputEventQueue;
+// --- Lifecycle ---
 
-// Legacy / Continuous State (Polling)
-typedef struct InputState {
-    float mouse_x, mouse_y;
-    bool mouse_down;
-    bool mouse_clicked;
-    float scroll_dx, scroll_dy;
-    
-    // Keyboard
-    uint32_t last_char; // Unicode codepoint
-    int last_key;       // Platform key code
-    int last_action;    // Press/Release/Repeat
-} InputState;
-
-typedef struct InputSystem {
-    InputState state;
-    InputEventQueue queue;
-    
-    // Internal
-    bool _prev_mouse_down;
-} InputSystem;
-
-void input_system_init(InputSystem* sys, PlatformWindow* window);
+InputSystem* input_system_create(PlatformWindow* window);
+void input_system_destroy(InputSystem* sys);
 void input_system_update(InputSystem* sys);
+
+// --- Accessors (State) ---
+
+float input_get_mouse_x(const InputSystem* sys);
+float input_get_mouse_y(const InputSystem* sys);
+bool input_is_mouse_down(const InputSystem* sys);
+
+// --- Accessors (Events) ---
+
+// Returns the number of events recorded this frame
+int input_get_event_count(const InputSystem* sys);
+
+// Returns a pointer to the event at index 'index', or NULL if out of bounds.
+// The pointer is valid only until the next update.
+const InputEvent* input_get_event(const InputSystem* sys, int index);
 
 #endif // ENGINE_INPUT_H

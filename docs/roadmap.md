@@ -14,7 +14,9 @@ The project is undergoing a structural standardization to enforce strict public/
 ### Phase 6: Architectural Hardening & Cleanup (IMMEDIATE PRIORITY)
 **Objective:** Enforce the "Public/Internal" separation pattern across all modules to prevent technical debt and remove legacy code.
 - [ ] **Input System:** Enforce Opaque Handle pattern (hide `InputSystem` struct).
+- [ ] **Refactor:** Replace public `InputState` struct with accessors and hide implementation.
 - [ ] **UI System:** Enforce Opaque Handle pattern (hide `UiElement`, `UiNodeSpec` structs).
+- [ ] **Cleanup:** Remove legacy redundant fields from `InputState` (mouse_clicked, scroll_dx/dy, last_char/key/action) and update consumers.
 - [ ] **Cleanup:** Remove legacy monolithic code patterns from `src/engine/core`.
 - [ ] **Cleanup:** Verify and remove any remaining direct Vulkan dependencies in Feature layer.
 

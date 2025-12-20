@@ -28,8 +28,7 @@ typedef struct UiInputContext {
 } UiInputContext;
 
 void ui_input_init(UiInputContext* ctx);
-void ui_input_reset(UiInputContext* ctx); // Clears internal pointers (safe for rebuild)
-void ui_input_update(UiInputContext* ctx, UiElement* root, const InputState* input, const InputEventQueue* events);
+void ui_input_update(UiInputContext* ctx, UiElement* root, const InputSystem* input);
 bool ui_input_pop_event(UiInputContext* ctx, UiEvent* out_event);
 
 #endif // UI_INPUT_H

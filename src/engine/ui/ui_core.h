@@ -251,12 +251,13 @@ void ui_command_shutdown(void);
 void ui_command_register(const char* name, UiCommandCallback callback, void* user_data);
 void ui_command_execute_id(StringId id, UiElement* target);
 
-// Input System
+// Input
 typedef struct UiInputContext UiInputContext;
 
 UiInputContext* ui_input_create(void);
 void ui_input_destroy(UiInputContext* ctx);
-void ui_input_update(UiInputContext* ctx, UiElement* root, const InputState* input, const InputEventQueue* events);
+void ui_input_init(UiInputContext* ctx);
+void ui_input_update(UiInputContext* ctx, UiElement* root, const InputSystem* input);
 bool ui_input_pop_event(UiInputContext* ctx, UiEvent* out_event);
 
 #endif // UI_CORE_H

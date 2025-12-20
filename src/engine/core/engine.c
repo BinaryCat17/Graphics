@@ -51,7 +51,11 @@ bool engine_init(Engine* engine, const EngineConfig* config) {
     platform_set_framebuffer_size_callback(engine->window, on_framebuffer_size, engine);
 
     // 3. Input System
-    input_system_init(&engine->input_system, engine->window);
+    engine->input_system = input_system_create(engine->window);
+    if (!engine->input_system) {
+        LOG_FATAL("Failed to initialize InputSystem.");
+        return false;
+    }
 
     // 4. Assets
     if (!assets_init(&engine->assets, config->assets_path, NULL)) {
@@ -137,7 +141,7 @@ void engine_run(Engine* engine) {
         render_system_begin_frame(rs, now);
         
         // Input Update
-        input_system_update(&engine->input_system);
+        input_system_update(engine->input_system);
         
         // Input Poll (Triggers callbacks)
         platform_poll_events();
@@ -159,6 +163,7 @@ void engine_shutdown(Engine* engine) {
     if (!engine) return;
     
     render_system_destroy(engine->render_system);
+    input_system_destroy(engine->input_system);
     assets_shutdown(&engine->assets);
     
     if (engine->window) {

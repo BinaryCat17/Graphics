@@ -274,8 +274,9 @@ void math_editor_update(MathEditorState* state, Engine* engine) {
     math_editor_sync_view_data(state);
 
     // Toggle Visualizer (Hotkey C) - Event Based
-    for (int i = 0; i < engine->input_system.queue.count; ++i) {
-        const InputEvent* e = &engine->input_system.queue.events[i];
+    int event_count = input_get_event_count(engine->input_system);
+    for (int i = 0; i < event_count; ++i) {
+        const InputEvent* e = input_get_event(engine->input_system, i);
         if (e->type == INPUT_EVENT_KEY_PRESSED && e->data.key.key == 67) { // KEY_C
              engine->show_compute_visualizer = !engine->show_compute_visualizer;
              render_system_set_show_compute(engine->render_system, engine->show_compute_visualizer);
@@ -291,7 +292,7 @@ void math_editor_update(MathEditorState* state, Engine* engine) {
         ui_element_update(state->ui_instance.root, engine->dt);
         
         // Input Handling
-        ui_input_update(state->input_ctx, state->ui_instance.root, &engine->input_system.state, &engine->input_system.queue);
+        ui_input_update(state->input_ctx, state->ui_instance.root, engine->input_system);
         
         // Process Events
         UiEvent evt;

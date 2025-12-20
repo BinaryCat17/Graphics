@@ -24,7 +24,7 @@ typedef struct EngineConfig {
 struct Engine {
     // Platform
     PlatformWindow* window;
-    InputSystem input_system;
+    InputSystem* input_system;
 
     // Systems
     RenderSystem* render_system;

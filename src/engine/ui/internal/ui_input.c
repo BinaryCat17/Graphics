@@ -88,9 +88,12 @@ static UiElement* hit_test_recursive(UiElement* el, float x, float y) {
     return NULL;
 }
 
-static void update_hover_state(UiInputContext* ctx, UiElement* root, const InputState* input) {
+static void update_hover_state(UiInputContext* ctx, UiElement* root, const InputSystem* input) {
     UiElement* prev_hovered = ctx->hovered;
-    ctx->hovered = hit_test_recursive(root, input->mouse_x, input->mouse_y);
+    float mx = input_get_mouse_x(input);
+    float my = input_get_mouse_y(input);
+    
+    ctx->hovered = hit_test_recursive(root, mx, my);
 
     if (prev_hovered && prev_hovered != ctx->hovered) {
         prev_hovered->is_hovered = false;
@@ -236,13 +239,16 @@ static void handle_key_event(UiInputContext* ctx, const InputEvent* event) {
     }
 }
 
-static void handle_drag_logic(UiInputContext* ctx, const InputState* input) {
-    if (!ctx->active || !input->mouse_down) return;
+static void handle_drag_logic(UiInputContext* ctx, const InputSystem* input) {
+    if (!ctx->active || !input_is_mouse_down(input)) return;
+
+    float mx = input_get_mouse_x(input);
+    float my = input_get_mouse_y(input);
 
     // Check start threshold
     if (ctx->possible_drag && !ctx->is_dragging) {
-        float dx = input->mouse_x - ctx->drag_start_mouse_x;
-        float dy = input->mouse_y - ctx->drag_start_mouse_y;
+        float dx = mx - ctx->drag_start_mouse_x;
+        float dy = my - ctx->drag_start_mouse_y;
         if (dx*dx + dy*dy > UI_DRAG_THRESHOLD_SQ) { 
             ctx->is_dragging = true;
             push_event(ctx, UI_EVENT_DRAG_START, ctx->active);
@@ -250,8 +256,8 @@ static void handle_drag_logic(UiInputContext* ctx, const InputState* input) {
     }
 
     if (ctx->is_dragging) {
-        float dx = input->mouse_x - ctx->drag_start_mouse_x;
-        float dy = input->mouse_y - ctx->drag_start_mouse_y;
+        float dx = mx - ctx->drag_start_mouse_x;
+        float dy = my - ctx->drag_start_mouse_y;
         bool changed = false;
 
         // Case A: Draggable Object (updates data model)
@@ -318,26 +324,27 @@ static void handle_mouse_release_event(UiInputContext* ctx, const InputEvent* ev
 
 // --- Main Update Loop ---
 
-void ui_input_update(UiInputContext* ctx, UiElement* root, const InputState* input, const InputEventQueue* events) {
+void ui_input_update(UiInputContext* ctx, UiElement* root, const InputSystem* input) {
     if (!ctx || !root || !input) return;
 
     update_hover_state(ctx, root, input);
     
     // Process Events
-    if (events) {
-        for (int i = 0; i < events->count; ++i) {
-            const InputEvent* e = &events->events[i];
-            switch (e->type) {
-                case INPUT_EVENT_SCROLL: handle_scroll_event(ctx, e); break;
-                case INPUT_EVENT_MOUSE_PRESSED: handle_mouse_press_event(ctx, e); break;
-                case INPUT_EVENT_MOUSE_RELEASED: handle_mouse_release_event(ctx, e); break;
-                case INPUT_EVENT_CHAR: handle_char_event(ctx, e); break;
-                case INPUT_EVENT_KEY_PRESSED: 
-                case INPUT_EVENT_KEY_REPEAT: 
-                    handle_key_event(ctx, e); 
-                    break;
-                default: break;
-            }
+    int count = input_get_event_count(input);
+    for (int i = 0; i < count; ++i) {
+        const InputEvent* e = input_get_event(input, i);
+        if (!e) continue;
+
+        switch (e->type) {
+            case INPUT_EVENT_SCROLL: handle_scroll_event(ctx, e); break;
+            case INPUT_EVENT_MOUSE_PRESSED: handle_mouse_press_event(ctx, e); break;
+            case INPUT_EVENT_MOUSE_RELEASED: handle_mouse_release_event(ctx, e); break;
+            case INPUT_EVENT_CHAR: handle_char_event(ctx, e); break;
+            case INPUT_EVENT_KEY_PRESSED: 
+            case INPUT_EVENT_KEY_REPEAT: 
+                handle_key_event(ctx, e); 
+                break;
+            default: break;
         }
     }
     
