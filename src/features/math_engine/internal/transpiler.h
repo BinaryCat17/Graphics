@@ -1,7 +1,7 @@
 #ifndef TRANSPILER_H
 #define TRANSPILER_H
 
-#include "math_graph.h"
+#include "features/math_engine/math_graph.h"
 #include <stdbool.h>
 
 typedef enum TranspilerMode {

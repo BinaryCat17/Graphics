@@ -1,11 +1,11 @@
-#include "engine/graphics/backend/vulkan/vulkan_renderer.h"
+#include "engine/graphics/internal/vulkan/vulkan_renderer.h"
 
-#include "engine/graphics/backend/vulkan/vk_types.h"
-#include "engine/graphics/backend/vulkan/vk_context.h"
-#include "engine/graphics/backend/vulkan/vk_swapchain.h"
-#include "engine/graphics/backend/vulkan/vk_pipeline.h"
-#include "engine/graphics/backend/vulkan/vk_resources.h"
-#include "engine/graphics/backend/vulkan/vk_utils.h"
+#include "engine/graphics/internal/vulkan/vk_types.h"
+#include "engine/graphics/internal/vulkan/vk_context.h"
+#include "engine/graphics/internal/vulkan/vk_swapchain.h"
+#include "engine/graphics/internal/vulkan/vk_pipeline.h"
+#include "engine/graphics/internal/vulkan/vk_resources.h"
+#include "engine/graphics/internal/vulkan/vk_utils.h"
 #include "engine/graphics/text/font.h"
 
 #include "foundation/logger/logger.h"

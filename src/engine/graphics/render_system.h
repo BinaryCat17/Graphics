@@ -4,10 +4,10 @@
 #include <stdbool.h>
 
 #include "engine/assets/assets.h"
-#include "engine/graphics/scene/render_packet.h"
 #include "foundation/platform/platform.h"
 
 typedef struct RenderSystem RenderSystem;
+typedef struct RenderFramePacket RenderFramePacket;
 
 typedef struct RenderSystemConfig {
     PlatformWindow* window;

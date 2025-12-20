@@ -1,7 +1,7 @@
 #ifndef VK_UTILS_H
 #define VK_UTILS_H
 
-#include "engine/graphics/backend/vulkan/vk_types.h"
+#include "engine/graphics/internal/vulkan/vk_types.h"
 
 // Helper to log fatal error and exit (or abort)
 void fatal_vk(const char* msg, VkResult res);

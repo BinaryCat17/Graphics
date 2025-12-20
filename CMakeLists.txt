@@ -105,13 +105,13 @@ target_link_libraries(foundation_config PUBLIC foundation_platform foundation_lo
 
 # Graphics (Renderer + Scene + Text + Vulkan)
 set(ENGINE_GRAPHICS_SOURCES
-    "src/engine/graphics/backend/renderer_backend.c"
-    "src/engine/graphics/backend/vulkan/vulkan_renderer.c"
-    "src/engine/graphics/backend/vulkan/vk_utils.c"
-    "src/engine/graphics/backend/vulkan/vk_context.c"
-    "src/engine/graphics/backend/vulkan/vk_swapchain.c"
-    "src/engine/graphics/backend/vulkan/vk_pipeline.c"
-    "src/engine/graphics/backend/vulkan/vk_resources.c"
+    "src/engine/graphics/internal/renderer_backend.c"
+    "src/engine/graphics/internal/vulkan/vulkan_renderer.c"
+    "src/engine/graphics/internal/vulkan/vk_utils.c"
+    "src/engine/graphics/internal/vulkan/vk_context.c"
+    "src/engine/graphics/internal/vulkan/vk_swapchain.c"
+    "src/engine/graphics/internal/vulkan/vk_pipeline.c"
+    "src/engine/graphics/internal/vulkan/vk_resources.c"
     "src/engine/graphics/render_system.c"
     "src/engine/graphics/scene/scene.c"
     "src/engine/graphics/text/text_renderer.c"
@@ -147,8 +147,8 @@ target_link_libraries(engine_ui PUBLIC foundation_config engine_assets foundatio
 set(FEATURE_MATH_ENGINE_SOURCES
     "src/features/math_engine/math_graph.c"
     "src/features/math_engine/math_editor.c"
-    "src/features/math_engine/transpiler.c"
-    "src/features/math_engine/emitters/glsl_emitter.c")
+    "src/features/math_engine/internal/transpiler.c"
+    "src/features/math_engine/internal/emitters/glsl_emitter.c")
 add_library(feature_math_engine STATIC ${FEATURE_MATH_ENGINE_SOURCES})
 target_include_directories(feature_math_engine PUBLIC "src/")
 target_link_libraries(feature_math_engine PUBLIC foundation_math foundation_memory)

@@ -16,9 +16,9 @@ The project is undergoing a structural standardization to enforce strict public/
 - [x] **UI System:** Refactor to `src/engine/ui/internal/`.
     - Move `ui_layout.*`, `ui_renderer.*`, `ui_parser.*`, `ui_command_system.*`.
     - Update includes.
-- [ ] **Math Engine:** Refactor to `src/features/math_engine/internal/`.
+- [x] **Math Engine:** Refactor to `src/features/math_engine/internal/`.
     - Move `transpiler.*`, `emitters/`, `shader_ir.h`.
-- [ ] **Graphics Engine:** Refactor to `src/engine/graphics/internal/`.
+- [x] **Graphics Engine:** Refactor to `src/engine/graphics/internal/`.
     - Move backend implementations and internal headers.
 
 ### Phase 7: 3D Visualization & Compute

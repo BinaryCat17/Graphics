@@ -90,7 +90,7 @@ def scan_files(src_dir):
     
     for root, _, files in os.walk(src_dir):
         root = root.replace('\\', '/')
-        if 'backend' in root or 'generated' in root:
+        if 'backend' in root or 'generated' in root or 'internal' in root:
             continue
 
         for file in files:

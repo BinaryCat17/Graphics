@@ -4,8 +4,8 @@
 #include "foundation/platform/platform.h"
 #include "foundation/platform/fs.h"
 #include "foundation/meta/reflection.h"
-#include "features/math_engine/transpiler.h"
-#include "engine/graphics/backend/renderer_backend.h"
+#include "features/math_engine/internal/transpiler.h"
+#include "engine/graphics/internal/renderer_backend.h"
 #include "engine/graphics/text/font.h"
 
 #include <stdlib.h>

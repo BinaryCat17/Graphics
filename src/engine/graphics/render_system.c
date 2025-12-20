@@ -1,4 +1,5 @@
 #include "engine/graphics/render_system.h"
+#include "engine/graphics/internal/render_packet.h"
 #include "foundation/logger/logger.h"
 
 #include <stdio.h>
@@ -7,8 +8,8 @@
 #include <threads.h>
 
 #include "foundation/platform/platform.h"
-#include "engine/graphics/backend/renderer_backend.h"
-#include "engine/graphics/backend/vulkan/vulkan_renderer.h"
+#include "engine/graphics/internal/renderer_backend.h"
+#include "engine/graphics/internal/vulkan/vulkan_renderer.h"
 #include "engine/graphics/text/font.h"
 #include "engine/graphics/text/text_renderer.h"
 

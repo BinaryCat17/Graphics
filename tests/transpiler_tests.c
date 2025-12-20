@@ -1,6 +1,6 @@
 #include "test_framework.h"
 #include "features/math_engine/math_graph.h"
-#include "features/math_engine/transpiler.h"
+#include "features/math_engine/internal/transpiler.h"
 #include "foundation/memory/arena.h"
 #include <stdio.h>
 #include <stdlib.h>
