@@ -19,9 +19,9 @@ The project is undergoing a structural standardization to enforce strict public/
 - [x] **Font System Decoupling:** Update `font_init` to accept a memory buffer instead of a file path, ensuring all I/O is centralized in the `Assets` module.
 - [x] **Geometry Deduplication:** Centralize primitive generation (e.g., Unit Quad) in a shared helper to eliminate duplicate vertex data definitions in `Assets` and `VulkanBackend`.
 - [x] **UI Styling Data-Drive:** Remove hardcoded visual logic (e.g., `color *= 1.1f` for inputs) from `ui_renderer.c`. Move state-based visual changes into `UiStyle` or config data.
-- [ ] **Uniform Error Handling:** Refactor `engine_create` and subsystem initializers to use a standardized `goto cleanup` pattern or shared destructor helper to prevent resource leaks and reduce code duplication on failure.
+- [x] **Uniform Error Handling:** Refactor `engine_create` and subsystem initializers to use a standardized `goto cleanup` pattern or shared destructor helper to prevent resource leaks and reduce code duplication on failure.
 - [ ] **Strict Compiler Compliance:** Enable `-Werror` (treat warnings as errors) in CMake and resolve all existing warnings to ensure code hygiene.
-- [ ] **Unified Frame Memory:** Implement a central `FrameArena` in `Engine` that is reset daily. Refactor `UiRenderer` and other systems to use this arena instead of managing their own scratch memory.
+- [x] **Unified Frame Memory:** Implement a central `FrameArena` in `Engine` that is reset daily. Refactor `UiRenderer` and other systems to use this arena instead of managing their own scratch memory.
 - [ ] **Input Action Mapping:** Implement an abstraction layer to map physical keys (e.g., `KEY_Z`) to logical actions (e.g., `ACTION_UNDO`), removing hardcoded key checks from game logic.
 
 ### Phase 7: 3D Visualization & Compute
