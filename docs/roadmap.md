@@ -29,19 +29,8 @@ The project has transitioned to a stable architecture with strict encapsulation.
 
 ---
 
-## 📜 Completed Phases
-
-### Phase 5: Architecture Hardening (Completed Dec 2025)
-*   **Decoupled Logic/View:** Implemented ViewModel pattern.
-*   **Encapsulation:** Hidden Engine headers and platform details.
-*   **Interface Abstraction:** Opaque handles for `RenderSystem`.
-*   **Input Upgrade:** Implemented Event Queue.
-*   **Memory Audit:** Removed mallocs from hot paths.
-
----
-
 ## 🛠 Technical Debt & Backlog
 
-### Text Rendering
-- **Issue:** Current implementation creates 1 draw call per character.
-- **Plan:** Implement Glyph Batching.
+*None currently prioritized.*
+
+

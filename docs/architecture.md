@@ -70,10 +70,11 @@ The entry point (`main.c`). It orchestrates the layers.
     *   **Mechanism:** The Engine's Reflection system binds UI fields to the ViewModel. The Editor synchronizes Logic -> ViewModel once per frame.
 
 ### 🛡 Memory Safety
-*   **Rule:** No `malloc`/`free` in the hot loop.
+*   **Rule:** **Zero** `malloc`/`free` in the hot loop.
 *   **Mechanism:**
     *   **Arenas:** Linear allocators for frame-scope or permanent data (e.g., `MathGraph` nodes).
     *   **Pools:** O(1) alloc/free for dynamic objects with stable IDs (e.g., `UiElement`).
+    *   **Linked Lists:** Used for hierarchies (UI) to avoid dynamic array reallocations.
 
 ### 🔗 Strict Decoupling
 *   **Rule:** Systems communicate via opaque IDs or Commands, not pointers.
@@ -104,8 +105,9 @@ A complete transpiler pipeline embedded in the application.
 
 ### The UI System
 1.  **Parser:** Reads YAML and creates a simplified internal tree.
-2.  **Layout:** Calculates absolute positions (AABB) for all widgets.
-3.  **Renderer:** Converts widgets into `SceneObject`s for the `RenderSystem`.
+2.  **Structure:** `UiElement`s form a **Doubly Linked List** (`first_child`, `next_sibling`), allocated from a fixed-size `MemoryPool`. This eliminates `malloc`/`free` and dynamic arrays.
+3.  **Layout:** Calculates absolute positions (AABB) for all widgets.
+4.  **Renderer:** Converts widgets into `SceneObject`s for the `RenderSystem`.
 
 ---
 
