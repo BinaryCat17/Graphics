@@ -13,7 +13,8 @@ Checks: >
   -misc-no-recursion,
   -misc-include-cleaner,
   -bugprone-implicit-widening-of-multiplication-result,
-  -bugprone-narrowing-conversions
+  -bugprone-narrowing-conversions,
+  -misc-confusable-identifiers
 
 
 # Check only files in src/ to avoid linting vendor headers (stb, glfw, etc)

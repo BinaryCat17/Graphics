@@ -9,7 +9,6 @@
 #include <stdlib.h>
 
 #define UI_MAX_EVENTS 64
-#define UI_KEY_BACKSPACE 259
 #define UI_SCROLL_SPEED 20.0f
 #define UI_DRAG_THRESHOLD_SQ 9.0f
 
@@ -222,7 +221,7 @@ static void handle_key_event(UiInputContext* ctx, const InputEvent* event) {
     if (!((el->flags & UI_FLAG_EDITABLE) && el->spec->kind == UI_KIND_TEXT_INPUT)) return;
 
     if (event->type == INPUT_EVENT_KEY_PRESSED || event->type == INPUT_EVENT_KEY_REPEAT) {
-        if (event->data.key.key == UI_KEY_BACKSPACE) {
+        if (event->data.key.key == INPUT_KEY_BACKSPACE) {
              char buf[256] = {0};
              if (el->data_ptr && el->bind_text) {
                  ui_bind_read_string(el->data_ptr, el->bind_text, buf, sizeof(buf));

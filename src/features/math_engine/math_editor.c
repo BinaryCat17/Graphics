@@ -252,6 +252,12 @@ void math_editor_init(MathEditorState* state, Engine* engine) {
     engine_set_show_compute(engine, true);
     render_system_set_show_compute(engine_get_render_system(engine), true);
     math_editor_recompile_graph(state, engine_get_render_system(engine));
+
+    // 6. Input Mappings
+    InputSystem* input = engine_get_input_system(engine);
+    if (input) {
+        input_map_action(input, "ToggleCompute", INPUT_KEY_C, INPUT_MOD_NONE);
+    }
 }
 
 void math_editor_render(MathEditorState* state, Scene* scene, const Assets* assets, MemoryArena* arena) {
@@ -268,18 +274,14 @@ void math_editor_update(MathEditorState* state, Engine* engine) {
     // Sync Logic -> View (one way binding for visual updates)
     math_editor_sync_view_data(state);
 
-    // Toggle Visualizer (Hotkey C) - Event Based
-    int event_count = input_get_event_count(engine_get_input_system(engine));
-    for (int i = 0; i < event_count; ++i) {
-        const InputEvent* e = input_get_event(engine_get_input_system(engine), i);
-        if (e->type == INPUT_EVENT_KEY_PRESSED && e->data.key.key == 67) { // KEY_C
-             bool show = !engine_get_show_compute(engine);
-             engine_set_show_compute(engine, show);
-             render_system_set_show_compute(engine_get_render_system(engine), show);
-             if (show) {
-                 state->graph_dirty = true; 
-             }
-        }
+    // Toggle Visualizer (Hotkey C) - Action Based
+    if (input_is_action_just_pressed(engine_get_input_system(engine), "ToggleCompute")) {
+         bool show = !engine_get_show_compute(engine);
+         engine_set_show_compute(engine, show);
+         render_system_set_show_compute(engine_get_render_system(engine), show);
+         if (show) {
+             state->graph_dirty = true; 
+         }
     }
 
     UiElement* root = ui_instance_get_root(state->ui_instance);

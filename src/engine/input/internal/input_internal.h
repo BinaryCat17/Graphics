@@ -2,6 +2,7 @@
 #define ENGINE_INPUT_INTERNAL_H
 
 #include "engine/input/input.h"
+#include "foundation/string/string_id.h"
 
 // Internal Event Queue
 typedef struct InputEventQueue {
@@ -14,7 +15,18 @@ typedef struct InputState {
     float mouse_x, mouse_y;
     double last_scroll_y;
     bool mouse_down;
+    
+    // Key state for the current frame
+    bool keys[INPUT_KEY_LAST + 1];
 } InputState;
+
+typedef struct ActionMapping {
+    StringId name_hash;
+    InputKey key;
+    int mods;
+} ActionMapping;
+
+#define MAX_ACTIONS 128
 
 // Full System Definition
 typedef struct InputSystem {
@@ -23,6 +35,11 @@ typedef struct InputSystem {
     
     // Internal logic
     bool _prev_mouse_down;
+    bool _prev_keys[INPUT_KEY_LAST + 1];
+
+    // Action Mappings
+    ActionMapping actions[MAX_ACTIONS];
+    int action_count;
 } InputSystem;
 
 #endif // ENGINE_INPUT_INTERNAL_H

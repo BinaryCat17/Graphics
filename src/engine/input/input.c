@@ -1,8 +1,32 @@
 #include "engine/input/input.h"
 #include "engine/input/internal/input_internal.h"
 #include "foundation/platform/platform.h"
+#include "foundation/logger/logger.h"
 #include <string.h>
 #include <stdlib.h>
+
+// --- Helpers ---
+
+static bool check_modifiers(const InputSystem* sys, int mods) {
+    bool shift = sys->state.keys[INPUT_KEY_LEFT_SHIFT] || sys->state.keys[INPUT_KEY_RIGHT_SHIFT];
+    bool ctrl = sys->state.keys[INPUT_KEY_LEFT_CONTROL] || sys->state.keys[INPUT_KEY_RIGHT_CONTROL];
+    bool alt = sys->state.keys[INPUT_KEY_LEFT_ALT] || sys->state.keys[INPUT_KEY_RIGHT_ALT];
+    bool super = sys->state.keys[INPUT_KEY_LEFT_SUPER] || sys->state.keys[INPUT_KEY_RIGHT_SUPER];
+    // TODO: Caps/Num lock if needed
+
+    if ((mods & INPUT_MOD_SHIFT) && !shift) return false;
+    if ((mods & INPUT_MOD_CONTROL) && !ctrl) return false;
+    if ((mods & INPUT_MOD_ALT) && !alt) return false;
+    if ((mods & INPUT_MOD_SUPER) && !super) return false;
+    
+    // Strict modifier check? 
+    // Usually if I ask for Ctrl+Z, Ctrl+Shift+Z should NOT trigger it?
+    // For now, let's implement strict checking: if mod is NOT requested but IS pressed, fail?
+    // Common behavior: simple inclusion. Ctrl+Z usually triggers on Ctrl+Shift+Z unless Shift+Z is also bound.
+    // Let's stick to "required modifiers are present".
+    
+    return true;
+}
 
 // --- Input Callbacks ---
 
@@ -58,6 +82,16 @@ static void on_key(PlatformWindow* window, int key, int scancode, PlatformInputA
     InputSystem* sys = (InputSystem*)user_data;
     if (!sys) return;
     
+    // State Update
+    if (key >= 0 && key <= INPUT_KEY_LAST) {
+        if (action == PLATFORM_PRESS) {
+            sys->state.keys[key] = true;
+        } else if (action == PLATFORM_RELEASE) {
+            sys->state.keys[key] = false;
+        }
+        // Repeat does not change boolean state
+    }
+
     // Event
     InputEvent event = {0};
     if (action == PLATFORM_PRESS) event.type = INPUT_EVENT_KEY_PRESSED;
@@ -132,6 +166,90 @@ void input_system_update(InputSystem* sys) {
     sys->queue.count = 0;
     
     sys->_prev_mouse_down = sys->state.mouse_down;
+    memcpy(sys->_prev_keys, sys->state.keys, sizeof(sys->state.keys));
+}
+
+// --- Action Mapping ---
+
+void input_map_action(InputSystem* sys, const char* action_name, InputKey default_key, int modifiers) {
+    if (!sys || !action_name) return;
+
+    StringId id = str_id(action_name);
+
+    // Update existing or add new
+    for (int i = 0; i < sys->action_count; ++i) {
+        if (sys->actions[i].name_hash == id) {
+            sys->actions[i].key = default_key;
+            sys->actions[i].mods = modifiers;
+            return;
+        }
+    }
+
+    if (sys->action_count < MAX_ACTIONS) {
+        sys->actions[sys->action_count].name_hash = id;
+        sys->actions[sys->action_count].key = default_key;
+        sys->actions[sys->action_count].mods = modifiers;
+        sys->action_count++;
+        // LOG_DEBUG("Mapped Action '%s' to Key %d (Mods: %d)", action_name, default_key, modifiers);
+    } else {
+        LOG_ERROR("Input Action limit reached! Cannot map '%s'", action_name);
+    }
+}
+
+bool input_is_action_pressed(const InputSystem* sys, const char* action_name) {
+    if (!sys || !action_name) return false;
+    StringId id = str_id(action_name);
+
+    for (int i = 0; i < sys->action_count; ++i) {
+        if (sys->actions[i].name_hash == id) {
+            InputKey k = sys->actions[i].key;
+            if (k == INPUT_KEY_UNKNOWN) return false; // Unbound
+            
+            bool key_down = sys->state.keys[k];
+            bool mods_ok = check_modifiers(sys, sys->actions[i].mods);
+            return key_down && mods_ok;
+        }
+    }
+    return false;
+}
+
+bool input_is_action_just_pressed(const InputSystem* sys, const char* action_name) {
+    if (!sys || !action_name) return false;
+    StringId id = str_id(action_name);
+
+    for (int i = 0; i < sys->action_count; ++i) {
+        if (sys->actions[i].name_hash == id) {
+            InputKey k = sys->actions[i].key;
+            if (k == INPUT_KEY_UNKNOWN) return false;
+
+            bool key_down = sys->state.keys[k];
+            bool prev_down = sys->_prev_keys[k];
+            bool mods_ok = check_modifiers(sys, sys->actions[i].mods);
+
+            // Note: We don't check if modifiers were "just pressed", usually just the trigger key.
+            return key_down && !prev_down && mods_ok;
+        }
+    }
+    return false;
+}
+
+bool input_is_action_released(const InputSystem* sys, const char* action_name) {
+    if (!sys || !action_name) return false;
+    StringId id = str_id(action_name);
+
+    for (int i = 0; i < sys->action_count; ++i) {
+        if (sys->actions[i].name_hash == id) {
+            InputKey k = sys->actions[i].key;
+            if (k == INPUT_KEY_UNKNOWN) return false;
+
+            bool key_down = sys->state.keys[k];
+            bool prev_down = sys->_prev_keys[k];
+            // Modifiers state at release moment? 
+            // Usually we want to know if it WAS pressed and NOW isn't.
+            return !key_down && prev_down;
+        }
+    }
+    return false;
 }
 
 // --- Accessors ---
@@ -146,6 +264,11 @@ float input_get_mouse_y(const InputSystem* sys) {
 
 bool input_is_mouse_down(const InputSystem* sys) {
     return sys ? sys->state.mouse_down : false;
+}
+
+bool input_is_key_down(const InputSystem* sys, InputKey key) {
+    if (!sys || key < 0 || key > INPUT_KEY_LAST) return false;
+    return sys->state.keys[key];
 }
 
 int input_get_event_count(const InputSystem* sys) {
