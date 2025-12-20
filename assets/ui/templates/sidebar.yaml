@@ -1,6 +1,6 @@
 type: panel
 id: left_panel
-layout: column
+layout: flex_column
 width: 250
 height: -1
 color: "#333338"
@@ -23,7 +23,7 @@ children:
     color: "#FFFFFF"
 
   - type: panel
-    layout: row
+    layout: flex_row
     height: 40
     spacing: 5
     children:
@@ -52,9 +52,11 @@ children:
     
   - type: panel
     id: inspector_area
-    layout: column
+    layout: flex_column
     height: -1 # Fill rest
     corner_radius: 4
-    border_t: 1 
     color: "#26262B"
     padding: 5
+    bind_collection: "selected_nodes"
+    template_selector: "type"
+    item_template: "DefaultNodeInspector"

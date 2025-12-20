@@ -105,39 +105,27 @@ static void math_editor_refresh_graph_view(MathEditor* editor) {
     }
 }
 
-static void math_editor_refresh_inspector(MathEditor* editor) {
+static void math_editor_update_selection(MathEditor* editor) {
+    if (!editor) return;
+
+    // 1. Update ViewModel (Selection Array)
+    editor->selected_nodes_count = 0;
+    if (editor->selected_node_id != MATH_NODE_INVALID_ID) {
+        MathNode* node = math_graph_get_node(editor->graph, editor->selected_node_id);
+        if (node) {
+            editor->selected_nodes[0] = node;
+            editor->selected_nodes_count = 1;
+        }
+    }
+
+    // 2. Trigger UI Rebuild for Inspector
+    // The UI system will read 'selected_nodes_count' and 'selected_nodes' 
+    // and instantiate the correct template based on 'type'.
     UiElement* root = ui_instance_get_root(editor->ui_instance);
-    if (!root) return;
-    UiElement* inspector = ui_element_find_by_id(root, "inspector_area");
-    if (!inspector) return;
-    
-    // Clear previous
-    ui_element_clear_children(inspector, editor->ui_instance);
-    
-    if (editor->selected_node_id == MATH_NODE_INVALID_ID) {
-        return;
-    }
-    
-    MathNode* node = math_graph_get_node(editor->graph, editor->selected_node_id);
-    if (!node) {
-        return;
-    }
-    
-    const MetaStruct* node_meta = meta_get_struct("MathNode");
-    
-    // Title
-    UiNodeSpec* title_spec = ui_asset_get_template(editor->ui_asset, "InspectorTitle");
-    if (title_spec) {
-        UiElement* title = ui_element_create(editor->ui_instance, title_spec, node, node_meta);
-        ui_element_add_child(inspector, title);
-    }
-    
-    // Value Editor
-    if (node->type == MATH_NODE_VALUE) {
-        UiNodeSpec* field_spec = ui_asset_get_template(editor->ui_asset, "InspectorField");
-        if (field_spec) {
-            UiElement* field = ui_element_create(editor->ui_instance, field_spec, node, node_meta);
-            ui_element_add_child(inspector, field);
+    if (root) {
+        UiElement* inspector = ui_element_find_by_id(root, "inspector_area");
+        if (inspector) {
+             ui_element_rebuild_children(inspector, editor->ui_instance);
         }
     }
 }
@@ -253,6 +241,7 @@ MathEditor* math_editor_create(Engine* engine) {
             // Initial Select
             if (editor->node_view_count > 0) {
                 editor->selected_node_id = editor->node_views[0].node_id;
+                math_editor_update_selection(editor);
             }
     }
 
@@ -339,7 +328,7 @@ void math_editor_update(MathEditor* editor, Engine* engine) {
         
         // Lazy Inspector Rebuild
         if (editor->selection_dirty) {
-            math_editor_refresh_inspector(editor);
+            math_editor_update_selection(editor);
             editor->selection_dirty = false;
         }
         

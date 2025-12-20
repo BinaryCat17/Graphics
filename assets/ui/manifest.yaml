@@ -10,4 +10,80 @@ templates:
   EditorSidebar:
     import: "assets/ui/templates/sidebar.yaml"
 
+  # Node Inspectors (Conditional Templates)
+  MATH_NODE_VALUE:
+    type: panel
+    layout: flex_column
+    spacing: 5
+    children:
+      - type: instance
+        instance: InspectorTitle
+      - type: instance
+        instance: InspectorField
+
+  MATH_NODE_ADD:
+    type: panel
+    layout: flex_column
+    spacing: 5
+    children:
+      - type: instance
+        instance: InspectorTitle
+      - type: label
+        text: "Add (A + B)"
+        color: "#888888"
+
+  MATH_NODE_SUB:
+    type: panel
+    layout: flex_column
+    spacing: 5
+    children:
+      - type: instance
+        instance: InspectorTitle
+      - type: label
+        text: "Subtract (A - B)"
+        color: "#888888"
+
+  MATH_NODE_MUL:
+    type: panel
+    layout: flex_column
+    spacing: 5
+    children:
+      - type: instance
+        instance: InspectorTitle
+      - type: label
+        text: "Multiply (A * B)"
+        color: "#888888"
+
+  MATH_NODE_SIN:
+    type: panel
+    layout: flex_column
+    spacing: 5
+    children:
+      - type: instance
+        instance: InspectorTitle
+      - type: label
+        text: "Sine (sin A)"
+        color: "#888888"
+
+  MATH_NODE_UV:
+    type: panel
+    layout: flex_column
+    spacing: 5
+    children:
+      - type: instance
+        instance: InspectorTitle
+      - type: label
+        text: "UV Coordinates"
+        color: "#888888"
+
+  DefaultNodeInspector:
+    type: panel
+    layout: flex_column
+    children:
+      - type: instance
+        instance: InspectorTitle
+      - type: label
+        text: "Select a node"
+        color: "#666666"
+
 import: "assets/ui/layouts/editor_layout.yaml"
