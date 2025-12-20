@@ -321,7 +321,7 @@ static void validate_node(UiNodeSpec* spec, const char* path) {
     }
 }
 
-UiAsset* ui_parser_load_from_file(const char* path) {
+UiAsset* ui_parser_load_internal(const char* path) {
     if (!path) return NULL;
 
     LOG_TRACE("UiParser: Loading UI definition from file: %s", path);

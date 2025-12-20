@@ -3,7 +3,10 @@
 
 #include "../ui_core.h"
 
-// Loads a UI Asset (Memory + Spec Tree) from a YAML file.
-// UiAsset* ui_parser_load_from_file(const char* path);
+// INTERNAL API
+// Loads a UI Asset from a YAML file. 
+// This function is implemented in ui_parser.c and wrapped by ui_core.c
+UiAsset* ui_parser_load_internal(const char* path);
 
 #endif // UI_PARSER_H
+

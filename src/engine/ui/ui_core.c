@@ -2,6 +2,7 @@
 #include "internal/ui_internal.h"
 #include "internal/ui_layout.h"   // Internal
 #include "internal/ui_renderer.h" // Internal
+#include "internal/ui_parser.h"   // Internal
 #include "foundation/meta/reflection.h"
 
 #include <stdlib.h>
@@ -413,3 +414,10 @@ void ui_instance_render(UiInstance* instance, Scene* scene, const Assets* assets
     if (!instance || !instance->root || !scene || !assets || !arena) return;
     ui_renderer_build_scene(instance->root, scene, assets, arena);
 }
+
+// --- Public Subsystem API ---
+
+UiAsset* ui_parser_load_from_file(const char* path) {
+    return ui_parser_load_internal(path);
+}
+
