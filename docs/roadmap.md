@@ -13,7 +13,7 @@ The project is undergoing a structural standardization to enforce strict public/
 
 ### Phase 6: Architectural Hardening (IMMEDIATE PRIORITY)
 **Objective:** Enforce the "Public/Internal" separation pattern across all modules to prevent technical debt.
-- [ ] **UI System:** Refactor to `src/engine/ui/internal/`.
+- [x] **UI System:** Refactor to `src/engine/ui/internal/`.
     - Move `ui_layout.*`, `ui_renderer.*`, `ui_parser.*`, `ui_command_system.*`.
     - Update includes.
 - [ ] **Math Engine:** Refactor to `src/features/math_engine/internal/`.
