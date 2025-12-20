@@ -3,7 +3,7 @@ import re
 import sys
 
 # Regex Patterns
-ENUM_PATTERN = re.compile(r'typedef\s+enum\s*\w*\s*\{([^}]*)\}\s*(\w+);', re.MULTILINE | re.DOTALL)
+ENUM_PATTERN = re.compile(r'typedef\s+enum\s*\w*\s*\{([^}]*)\}\s*(\w+);\s*//\s*REFLECT', re.MULTILINE | re.DOTALL)
 STRUCT_PATTERN = re.compile(r'typedef\s+struct\s*\w*\s*\{([^}]*)\}\s*(\w+);', re.MULTILINE | re.DOTALL)
 REFLECT_PATTERN = re.compile(r'^\s*(.+?);\s*//\s*REFLECT(.*)', re.MULTILINE)
 
@@ -91,10 +91,6 @@ def scan_files(src_dir):
     for root, _, files in os.walk(src_dir):
         root = root.replace('\\', '/')
         if 'backend' in root or 'generated' in root:
-            continue
-            
-        # Generally skip internal, but allow UI internal for UiNodeSpec reflection
-        if 'internal' in root and '/engine/ui/internal' not in root:
             continue
 
         for file in files:

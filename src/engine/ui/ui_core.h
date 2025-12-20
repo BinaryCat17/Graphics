@@ -18,7 +18,7 @@ typedef enum UiLayoutStrategy {
     UI_LAYOUT_CANVAS,      // Absolute positioning (Floating nodes)
     UI_LAYOUT_SPLIT_H,     // 2-child horizontal split
     UI_LAYOUT_SPLIT_V      // 2-child vertical split
-} UiLayoutStrategy;
+} UiLayoutStrategy; // REFLECT
 
 typedef enum UiFlags {
     UI_FLAG_NONE        = 0,
@@ -37,12 +37,12 @@ typedef enum UiKind {
     UI_KIND_CONTAINER, // Generic Rect
     UI_KIND_TEXT,      // Renders text
     UI_KIND_TEXT_INPUT // Text Field
-} UiKind;
+} UiKind; // REFLECT
 
 typedef enum UiLayer {
     UI_LAYER_NORMAL = 0,
     UI_LAYER_OVERLAY  // Renders last, ignores parent clipping (popups)
-} UiLayer;
+} UiLayer; // REFLECT
 
 typedef struct UiElement UiElement;
 

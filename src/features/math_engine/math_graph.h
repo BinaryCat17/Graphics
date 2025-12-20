@@ -26,7 +26,7 @@ typedef enum MathNodeType {
     MATH_NODE_OUTPUT, 
     MATH_NODE_SURFACE_GRID,
     MATH_NODE_COUNT
-} MathNodeType;
+} MathNodeType; // REFLECT
 
 #define MATH_NODE_MAX_INPUTS 4
 #define MATH_NODE_NAME_MAX 32
