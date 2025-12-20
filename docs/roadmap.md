@@ -13,16 +13,10 @@ The project is undergoing a structural standardization to enforce strict public/
 
 ### Phase 6: Architectural Hardening & Cleanup (IMMEDIATE PRIORITY)
 **Objective:** Enforce the "Public/Internal" separation pattern across all modules to prevent technical debt and remove legacy code.
-- [x] **Input System:** Enforce Opaque Handle pattern (hide `InputSystem` struct).
-- [x] **Refactor:** Replace public `InputState` struct with accessors and hide implementation.
-- [x] **UI System:** Enforce Opaque Handle pattern (hide `UiElement`, `UiNodeSpec` structs).
-- [x] **Cleanup:** Remove legacy redundant fields from `InputState` (mouse_clicked, scroll_dx/dy, last_char/key/action) and update consumers.
-- [x] **Engine Encapsulation:** Restrict direct access to `Engine` struct fields by introducing accessors (`engine_get_render_system`, etc.) to decouple App from Core.
-- [x] **Unified Config:** Move CLI argument parsing and config loading logic from `main.c` to a dedicated `ConfigSystem` in Foundation.
-- [x] **Optimization:** Replace raw `char*` usage in `UiNodeSpec` with `StringId` for faster comparisons and memory safety.
-- [x] **Refactor:** Standardize Asset Paths to use `StringId` where appropriate for performance (Implemented `texture_id` in `UiNodeSpec`).
-- [x] **Cleanup:** Remove legacy monolithic code patterns from `src/engine/core` (Decoupled Engine from Assets internals).
-- [x] **Cleanup:** Verify and remove any remaining direct Vulkan dependencies in Feature layer (Verified none exist).
+- [ ] **Scene Encapsulation:** Apply Opaque Handle pattern to `Scene` struct (hide implementation in `internal/scene_internal.h`).
+- [ ] **Shader Constants:** Extract magic numbers (e.g., UI rendering modes `3.0f`, `4.0f`) into a shared header/enum.
+- [ ] **Font Memory Safety:** Replace raw `malloc` in `font.c` with the Foundation memory subsystem (`MemoryArena`).
+- [ ] **Backend Cleanup:** Move screenshot IO logic (`stb_image_write`) out of `vulkan_renderer.c` into a dedicated Foundation module.
 
 ### Phase 7: 3D Visualization & Compute
 **Objective:** Visualize mathematical functions and data in 3D space.
