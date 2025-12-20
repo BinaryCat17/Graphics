@@ -87,7 +87,14 @@ The entry point (`main.c`). It orchestrates the layers.
 Split into Data, Manager, and Worker.
 1.  **Unified Scene (`scene.h`):** A flat array of `SceneObject`s. Everything (Text, UI, 3D) is an object.
 2.  **RenderSystem (`render_system.h`):** Sorts objects (Z-index), culls, and builds render packets.
+    *   **Opaque Handle:** The `RenderSystem` struct is hidden. The App interacts only via the API (`render_system_draw`, `render_system_create`), ensuring strict encapsulation of the backend.
 3.  **RendererBackend (`renderer_backend.h`):** Executes Vulkan commands.
+
+### The Input System
+A hybrid Polling/Event-Driven architecture.
+1.  **InputState (`input_types.h`):** Continuous state (Mouse coordinates, keys currently held down). Best for smooth movement (e.g., camera control, drag-and-drop).
+2.  **InputEventQueue (`input_types.h`):** Discrete events (Key Pressed, Char Typed, Scroll, Click). Best for "trigger" actions (e.g., toggle visualizer, text entry) to ensure no inputs are lost between frames.
+3.  **Flow:** Platform Callbacks -> Engine Queue -> UI System / App Logic.
 
 ### The Math Engine (Feature)
 A complete transpiler pipeline embedded in the application.
