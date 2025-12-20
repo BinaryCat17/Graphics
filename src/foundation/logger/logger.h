@@ -17,7 +17,6 @@ void logger_init(const char* log_file_path);
 void logger_shutdown(void);
 
 // Configuration
-void logger_set_level(LogLevel level); // Sets Console Level (Backwards Compatibility)
 void logger_set_console_level(LogLevel level);
 void logger_set_file_level(LogLevel level);
 void logger_set_trace_interval(double seconds);

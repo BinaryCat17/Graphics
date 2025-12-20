@@ -12,8 +12,8 @@ typedef struct InputEventQueue {
 // Internal State (Polling)
 typedef struct InputState {
     float mouse_x, mouse_y;
+    double last_scroll_y;
     bool mouse_down;
-    // Legacy fields removed: mouse_clicked, scroll_dx, scroll_dy, last_char, last_key, last_action
 } InputState;
 
 // Full System Definition

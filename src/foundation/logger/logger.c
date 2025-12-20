@@ -95,11 +95,6 @@ void logger_shutdown(void) {
     pthread_mutex_unlock(&g_log_mutex);
 }
 
-void logger_set_level(LogLevel level) {
-    // Legacy behavior: Sets Console Level
-    g_console_level = level;
-}
-
 void logger_set_console_level(LogLevel level) {
     g_console_level = level;
 }

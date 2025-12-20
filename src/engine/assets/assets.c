@@ -4,9 +4,8 @@
 
 #include <string.h>
 
-bool assets_init(Assets* out_assets, const char* assets_dir, const char* ui_config_path) {
+bool assets_init(Assets* out_assets, const char* assets_dir) {
     if (!out_assets) return false;
-    (void)ui_config_path; // Unused in modern system
 
     memset(out_assets, 0, sizeof(*out_assets));
 

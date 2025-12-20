@@ -58,7 +58,7 @@ Engine* engine_create(const EngineConfig* config) {
     engine->on_update = config->on_update;
 
     // 1. Logger
-    logger_set_level(config->log_level);
+    logger_set_console_level(config->log_level);
     LOG_INFO("Engine Initializing...");
     
     // 2. Platform & Window
@@ -91,7 +91,7 @@ Engine* engine_create(const EngineConfig* config) {
     }
 
     // 4. Assets
-    if (!assets_init(&engine->assets, config->assets_path, NULL)) {
+    if (!assets_init(&engine->assets, config->assets_path)) {
         LOG_FATAL("Failed to initialize assets from '%s'", config->assets_path);
         // Cleanup
         input_system_destroy(engine->input_system);

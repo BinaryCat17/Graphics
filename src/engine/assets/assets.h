@@ -8,7 +8,7 @@
 typedef struct Assets {
     MemoryArena arena; // For storing paths and metadata
 
-    // Paths (Legacy/Config)
+    // Resource Paths
     const char* root_dir;
     const char* ui_default_vert_spv;
     const char* ui_default_frag_spv;
@@ -19,7 +19,7 @@ typedef struct Assets {
 } Assets;
 
 // Public API
-bool assets_init(Assets* assets, const char* assets_dir, const char* ui_config_path);
+bool assets_init(Assets* assets, const char* assets_dir);
 void assets_shutdown(Assets* assets);
 
 #endif // ASSETS_SYSTEM_H
