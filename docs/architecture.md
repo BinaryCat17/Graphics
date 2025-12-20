@@ -128,6 +128,7 @@ Systems communicate via **IDs** (integers) or **Commands**, never raw pointers. 
 ### Scene
 *   **Public:** `Scene`, `SceneObject`, `SceneCamera`.
 *   **Goal:** Logic representation of the world. Decoupled from rendering implementation.
+*   **Data Layout:** `SceneObject` uses **Anonymous Unions** to multiplex memory between domains (e.g., UI vs. PBR 3D). This keeps the struct POD (Plain Old Data) and cache-friendly while avoiding "bloat" from unused fields.
 
 ### Input
 *   **Public:** `InputSystem` (Opaque handle).

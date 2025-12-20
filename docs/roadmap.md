@@ -25,16 +25,6 @@ Structural standardization (Phase 6) is complete. The codebase enforces strict P
 
 ---
 
-## ✅ Completed Milestones
-
-### Phase 6: Architectural Hardening
-- [x] **API Encapsulation:** Enforced "Public/Internal" separation (Opaque Handles) across all Engine and Feature modules.
-- [x] **C11 Adoption:** Standardized on C11 for cleaner API design via typedef redefinitions.
-- [x] **Input Action Mapping:** Removed hardcoded keys; implemented logical action system.
-- [x] **Test Suite Foundation:** Established unit tests for Memory (Arenas) and Strings (StringId).
-
----
-
 ## 🛠 Technical Debt & Backlog
 
 *   **Shader Hot-Reloading:** Allow editing shaders at runtime without restarting.
