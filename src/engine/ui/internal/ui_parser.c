@@ -197,7 +197,7 @@ static UiNodeSpec* load_recursive(UiAsset* asset, const ConfigNode* node) {
         if (!field) {
             // Check alias mappings (YAML key -> Struct field)
             if (strcmp(key, "text") == 0) field = meta_find_field(meta, "static_text");
-            else if (strcmp(key, "texture") == 0) field = meta_find_field(meta, "texture_path");
+            else if (strcmp(key, "texture") == 0) field = meta_find_field(meta, "texture_id");
             else if (strcmp(key, "bind") == 0) field = meta_find_field(meta, "value_source");
             else if (strcmp(key, "bind_visible") == 0 || strcmp(key, "bind_if") == 0) field = meta_find_field(meta, "visible_source");
             else if (strcmp(key, "bind_x") == 0) field = meta_find_field(meta, "x_source");

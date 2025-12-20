@@ -27,7 +27,7 @@ struct UiNodeSpec {
     float border_l, border_t, border_r, border_b; // REFLECT
     float corner_radius;    // REFLECT
     float tex_w, tex_h;     // REFLECT
-    char* texture_path;     // REFLECT
+    StringId texture_id;    // REFLECT
     
     // 4. Data Bindings (Sources)
     char* text_source;      // REFLECT

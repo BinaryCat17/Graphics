@@ -16,7 +16,7 @@ struct Engine {
 
     // Systems
     RenderSystem* render_system;
-    Assets assets;
+    Assets* assets;
     
     // Application Data
     void* user_data;
@@ -91,7 +91,8 @@ Engine* engine_create(const EngineConfig* config) {
     }
 
     // 4. Assets
-    if (!assets_init(&engine->assets, config->assets_path)) {
+    engine->assets = assets_create(config->assets_path);
+    if (!engine->assets) {
         LOG_FATAL("Failed to initialize assets from '%s'", config->assets_path);
         // Cleanup
         input_system_destroy(engine->input_system);
@@ -100,10 +101,10 @@ Engine* engine_create(const EngineConfig* config) {
         return NULL;
     }
 
-    if (!font_init(engine->assets.font_path)) {
-        LOG_FATAL("Failed to initialize font from '%s'", engine->assets.font_path);
+    if (!font_init(assets_get_font_path(engine->assets))) {
+        LOG_FATAL("Failed to initialize font from '%s'", assets_get_font_path(engine->assets));
         // Cleanup
-        assets_shutdown(&engine->assets);
+        assets_destroy(engine->assets);
         input_system_destroy(engine->input_system);
         platform_destroy_window(engine->window);
         free(engine);
@@ -120,7 +121,7 @@ Engine* engine_create(const EngineConfig* config) {
         LOG_FATAL("Failed to initialize RenderSystem.");
         // Cleanup
         font_shutdown();
-        assets_shutdown(&engine->assets);
+        assets_destroy(engine->assets);
         input_system_destroy(engine->input_system);
         platform_destroy_window(engine->window);
         free(engine);
@@ -128,7 +129,7 @@ Engine* engine_create(const EngineConfig* config) {
     }
 
     // Bindings
-    render_system_bind_assets(engine->render_system, &engine->assets);
+    render_system_bind_assets(engine->render_system, engine->assets);
     
     // 6. Application Init Hook (App sets up Graph, UI, binds them to Renderer)
     if (config->on_init) {
@@ -213,7 +214,7 @@ void engine_destroy(Engine* engine) {
     render_system_destroy(engine->render_system);
     font_shutdown();
     input_system_destroy(engine->input_system);
-    assets_shutdown(&engine->assets);
+    assets_destroy(engine->assets);
     
     if (engine->window) {
         platform_destroy_window(engine->window);
@@ -233,7 +234,7 @@ InputSystem* engine_get_input_system(Engine* engine) {
 }
 
 Assets* engine_get_assets(Engine* engine) {
-    return engine ? &engine->assets : NULL;
+    return engine ? engine->assets : NULL;
 }
 
 PlatformWindow* engine_get_window(Engine* engine) {

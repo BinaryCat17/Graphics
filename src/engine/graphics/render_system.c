@@ -71,7 +71,7 @@ static void try_bootstrap_renderer(RenderSystem* sys) {
     
     // Dependencies Check
     if (!sys->window) return;
-    if (!sys->assets || !sys->assets->ui_default_vert_spv) return;
+    if (!sys->assets || !assets_get_ui_default_vert_shader_path(sys->assets)) return;
     if (!sys->backend) return;
 
     PlatformSurface surface = {0};
@@ -79,9 +79,9 @@ static void try_bootstrap_renderer(RenderSystem* sys) {
     RenderBackendInit init = {
         .window = sys->window,
         .surface = &surface, // Pass pointer to empty surface struct, backend/platform fills it
-        .vert_spv = sys->assets->ui_default_vert_spv,
-        .frag_spv = sys->assets->ui_default_frag_spv,
-        .font_path = sys->assets->font_path,
+        .vert_spv = assets_get_ui_default_vert_shader_path(sys->assets),
+        .frag_spv = assets_get_ui_default_frag_shader_path(sys->assets),
+        .font_path = assets_get_font_path(sys->assets),
     };
 
     sys->renderer_ready = sys->backend->init(sys->backend, &init);

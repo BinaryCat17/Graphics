@@ -46,7 +46,7 @@ static void render_background(const UiElement* el, Scene* scene, Vec4 clip_vec, 
          quad.color.x *= 1.1f; quad.color.y *= 1.1f; quad.color.z *= 1.1f;
     }
 
-    if ((el->spec->texture_path)) {
+    if ((el->spec->texture_id != 0)) {
         // Use 9-Slice or Textured Quad
         quad.shader_params_0.x = 3.0f; // 9-Slice (UI Shader Mode)
         

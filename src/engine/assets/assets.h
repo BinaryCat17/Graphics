@@ -3,23 +3,18 @@
 
 #include <stdbool.h>
 #include "engine/scene/scene.h"
-#include "foundation/memory/arena.h"
 
-typedef struct Assets {
-    MemoryArena arena; // For storing paths and metadata
-
-    // Resource Paths
-    const char* root_dir;
-    const char* ui_default_vert_spv;
-    const char* ui_default_frag_spv;
-    const char* font_path;
-    
-    // Built-in Resources
-    Mesh unit_quad;
-} Assets;
+typedef struct Assets Assets;
 
 // Public API
-bool assets_init(Assets* assets, const char* assets_dir);
-void assets_shutdown(Assets* assets);
+Assets* assets_create(const char* assets_dir);
+void assets_destroy(Assets* assets);
+
+// Accessors
+const char* assets_get_root_dir(const Assets* assets);
+const char* assets_get_ui_default_vert_shader_path(const Assets* assets);
+const char* assets_get_ui_default_frag_shader_path(const Assets* assets);
+const char* assets_get_font_path(const Assets* assets);
+Mesh* assets_get_unit_quad(Assets* assets);
 
 #endif // ASSETS_SYSTEM_H
