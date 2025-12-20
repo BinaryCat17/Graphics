@@ -44,7 +44,6 @@ bool assets_init_internal(Assets* out_assets, const char* assets_dir) {
     }
 
     out_assets->root_dir = arena_push_string(&out_assets->arena, assets_dir);
-    out_assets->font_path = arena_sprintf(&out_assets->arena, "%s/fonts/font.ttf", assets_dir);
 
     // Create Unit Quad (0,0 to 1,1)
     static float quad_verts[] = {
@@ -85,10 +84,6 @@ void assets_destroy(Assets* assets) {
 
 const char* assets_get_root_dir(const Assets* assets) {
     return assets->root_dir;
-}
-
-const char* assets_get_font_path(const Assets* assets) {
-    return assets->font_path;
 }
 
 Mesh* assets_get_unit_quad(Assets* assets) {

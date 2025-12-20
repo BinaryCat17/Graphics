@@ -14,7 +14,7 @@ The project is undergoing a structural standardization to enforce strict public/
 ### Phase 6: Architectural Hardening & Cleanup (IMMEDIATE PRIORITY)
 **Objective:** Enforce the "Public/Internal" separation pattern, optimize memory usage, and remove hardcoded logic.
 
-- [ ] **Scene Memory Optimization:** Replace `realloc` in `Scene` with `MemoryArena` (Frame Allocator) to eliminate heap fragmentation and allocation spikes during rendering.
+- [x] **Scene Memory Optimization:** Replace `realloc` in `Scene` with `MemoryArena` (Frame Allocator) to eliminate heap fragmentation and allocation spikes during rendering.
 - [x] **Asset Decoupling:** Refactor `Assets` module to load file content into memory buffers. Update `RenderSystem` to accept data pointers (bytes) instead of file paths, decoupling rendering from the OS file system.
 - [ ] **Font System Decoupling:** Update `font_init` to accept a memory buffer instead of a file path, ensuring all I/O is centralized in the `Assets` module.
 - [ ] **Geometry Deduplication:** Centralize primitive generation (e.g., Unit Quad) in a shared helper to eliminate duplicate vertex data definitions in `Assets` and `VulkanBackend`.

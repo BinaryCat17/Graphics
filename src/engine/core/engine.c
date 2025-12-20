@@ -101,8 +101,21 @@ Engine* engine_create(const EngineConfig* config) {
         return NULL;
     }
 
-    if (!font_init(assets_get_font_path(engine->assets))) {
-        LOG_FATAL("Failed to initialize font from '%s'", assets_get_font_path(engine->assets));
+    // Load font from assets
+    AssetData font_data = assets_load_file(engine->assets, "fonts/font.ttf");
+    if (!font_data.data) {
+        LOG_FATAL("Failed to load default font from assets/fonts/font.ttf");
+         // Cleanup
+        assets_destroy(engine->assets);
+        input_system_destroy(engine->input_system);
+        platform_destroy_window(engine->window);
+        free(engine);
+        return NULL;
+    }
+
+    if (!font_init(font_data.data, font_data.size)) {
+        LOG_FATAL("Failed to initialize font system");
+        assets_free_file(&font_data);
         // Cleanup
         assets_destroy(engine->assets);
         input_system_destroy(engine->input_system);
@@ -110,6 +123,7 @@ Engine* engine_create(const EngineConfig* config) {
         free(engine);
         return NULL;
     }
+    assets_free_file(&font_data);
 
     // 5. Render System
     RenderSystemConfig rs_config = {

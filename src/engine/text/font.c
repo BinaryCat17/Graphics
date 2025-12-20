@@ -32,10 +32,10 @@ static float smoothstep(float edge0, float edge1, float x) {
     return t * t * (3.0f - 2.0f * t);
 }
 
-bool font_init(const char* font_path) {
+bool font_init(const void* ttf_data, size_t ttf_size) {
     if (g_font_state.initialized) return true;
-    if (!font_path) {
-        LOG_ERROR("Font path is null");
+    if (!ttf_data || ttf_size == 0) {
+        LOG_ERROR("Font data is null or empty");
         return false;
     }
 
@@ -44,26 +44,14 @@ bool font_init(const char* font_path) {
         return false;
     }
 
-    FILE* f = platform_fopen(font_path, "rb");
-    if (!f) {
-        LOG_ERROR("Font not found at %s", font_path);
-        arena_destroy(&g_font_state.arena);
-        return false;
-    }
-
-    fseek(f, 0, SEEK_END);
-    long sz = ftell(f);
-    fseek(f, 0, SEEK_SET);
-
-    g_font_state.ttf_buffer = arena_alloc(&g_font_state.arena, sz);
+    // Copy TTF data to our arena to ensure persistence
+    g_font_state.ttf_buffer = arena_alloc(&g_font_state.arena, ttf_size);
     if (!g_font_state.ttf_buffer) {
-        fclose(f);
+        LOG_FATAL("Failed to allocate font buffer in arena");
         arena_destroy(&g_font_state.arena);
         return false;
     }
-    
-    fread(g_font_state.ttf_buffer, 1, sz, f);
-    fclose(f);
+    memcpy(g_font_state.ttf_buffer, ttf_data, ttf_size);
 
     if (!stbtt_InitFont(&g_font_state.fontinfo, g_font_state.ttf_buffer, 0)) {
         LOG_ERROR("Failed to init stb_truetype");

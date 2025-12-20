@@ -9,7 +9,6 @@ struct Assets {
 
     // Resource Paths
     const char* root_dir;
-    const char* font_path;
     
     // Built-in Resources
     Mesh unit_quad;

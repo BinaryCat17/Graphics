@@ -3,10 +3,11 @@
 
 #include <stdbool.h>
 #include <stdint.h>
+#include <stddef.h>
 
-// Initialize the font module, loading a font from disk and building the atlas.
+// Initialize the font module using TTF data from memory.
 // Returns true on success.
-bool font_init(const char* font_path);
+bool font_init(const void* ttf_data, size_t ttf_size);
 
 // Clean up resources (pixels, etc.)
 void font_shutdown(void);
