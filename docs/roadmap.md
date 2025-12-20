@@ -13,6 +13,8 @@ Structural standardization (Phase 6) is largely complete, but critical limitatio
 - [x] **UI Conditional Templates:** Support logic-based template selection (e.g., `template_selector: "type"`) to handle polymorphic collections (like heterogeneous node lists).
 - [ ] **UI Event Safety:** Implement typesafe wrappers for event callbacks to replace brittle `void*` casting and string-based logic.
 - [ ] **UI Layout:** Implement Flexbox-style properties (`flex-grow`, `justify-content`) for robust responsive layouts.
+- [ ] **Graph Serialization:** Move hardcoded default graph setup to a data file (YAML/JSON) to support saving/loading.
+- [ ] **Declarative Node Palette:** Replace hardcoded "Add Node" logic with a data-driven palette system.
 
 The codebase enforces strict Public/Internal API boundaries across all modules. The Math Engine is fully encapsulated, and the foundation is covered by unit tests. The system is now ready for 3D procedural geometry and compute shader integration.
 

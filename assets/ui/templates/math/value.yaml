@@ -1,0 +1,8 @@
+type: panel
+layout: flex_column
+spacing: 5
+children:
+  - type: instance
+    instance: InspectorTitle
+  - type: instance
+    instance: InspectorField

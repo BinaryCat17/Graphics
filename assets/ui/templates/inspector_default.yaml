@@ -1,0 +1,8 @@
+type: panel
+layout: flex_column
+children:
+  - type: instance
+    instance: InspectorTitle
+  - type: label
+    text: "Select a node"
+    color: "#666666"

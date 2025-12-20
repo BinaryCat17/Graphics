@@ -1,0 +1,9 @@
+type: panel
+layout: flex_column
+spacing: 5
+children:
+  - type: instance
+    instance: InspectorTitle
+  - type: label
+    text: "Sine (sin A)"
+    color: "#888888"
