@@ -20,10 +20,10 @@ The project has completed a major architectural cleanup.
 - [x] **Engine Encapsulation:** Hide `PlatformWindow` and split `InputState` from heavy UI headers.
 - [x] **Header Hygiene:** Reduced include bloat in `engine.h`.
 - [ ] **Interface Abstraction:** (Next) Define opaque handles for Engine systems to further hide implementation.
-- [ ] **Memory Audit:** 
+- [x] **Memory Audit:** 
     - [x] Refactor `simple_yaml.c` and `fs.c` to use scratch arenas instead of `malloc`.
-    - [ ] Cleanup `assets.c` path concatenation.
-    - [ ] Optimize `ui_renderer.c` overlay buffer (replace `realloc` with Arena).
+    - [x] Cleanup `assets.c` path concatenation.
+    - [x] Optimize `ui_renderer.c` overlay buffer (replace `realloc` with Arena).
 - [ ] **Input System Upgrade:** Replace polling-based `InputState` with an Event Queue (essential for Editor shortcuts).
 - [x] **Zero Warnings Policy:** Fix unused functions in `math_editor.c` and other pending warnings.
 
