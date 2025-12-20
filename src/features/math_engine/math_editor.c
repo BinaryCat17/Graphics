@@ -225,13 +225,21 @@ MathEditor* math_editor_create(Engine* engine) {
     ui_command_register("Graph.Recompile", cmd_recompile, editor);
 
     editor->input_ctx = ui_input_create();
-    editor->ui_instance = ui_instance_create(1024 * 1024); // 1MB for UI Elements
 
     // 4. Load UI Asset
     const char* ui_path = engine_get_config(engine)->ui_path; // Use config path
     if (ui_path) {
         editor->ui_asset = ui_parser_load_from_file(ui_path);
-        if (editor->ui_asset) {
+        if (!editor->ui_asset) {
+             LOG_ERROR("Failed to load UI asset: %s", ui_path);
+        }
+    } else {
+        editor->ui_asset = NULL;
+    }
+
+    editor->ui_instance = ui_instance_create(editor->ui_asset, 1024 * 1024); // 1MB for UI Elements
+
+    if (editor->ui_asset) {
             // NOTE: We now bind MathEditor, not MathGraph!
             const MetaStruct* editor_meta = meta_get_struct("MathEditor");
             if (!editor_meta) {
@@ -246,9 +254,6 @@ MathEditor* math_editor_create(Engine* engine) {
             if (editor->node_view_count > 0) {
                 editor->selected_node_id = editor->node_views[0].node_id;
             }
-        } else {
-            LOG_ERROR("Failed to load UI asset: %s", ui_path);
-        }
     }
 
     // 5. Initial Compute Compile

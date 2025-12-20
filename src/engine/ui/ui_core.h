@@ -50,11 +50,15 @@ typedef struct UiElement UiElement;
 // --- UI INSTANCE (The Living Tree) ---
 // Created from a UiAsset + Data Context.
 // Managed by a UiInstance container.
+#include "foundation/math/coordinate_systems.h"
 
+typedef struct UiAsset UiAsset;
 typedef struct UiInstance UiInstance;
 
 // API for Instance
-UiInstance* ui_instance_create(size_t size);
+// Create an instance to hold runtime state for a UI tree
+// Requires an Asset (templates) and a memory size for the frame arena
+UiInstance* ui_instance_create(UiAsset* assets, size_t size);
 void ui_instance_free(UiInstance* instance);
 UiElement* ui_instance_get_root(const UiInstance* instance);
 void ui_instance_set_root(UiInstance* instance, UiElement* root);

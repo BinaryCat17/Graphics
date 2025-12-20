@@ -45,6 +45,7 @@ struct UiNodeSpec {
     char* value_source;     // REFLECT
     char* visible_source;   // REFLECT
     char* bind_collection;  // REFLECT
+    char* template_selector;// REFLECT
     
     // 4. Geometry Bindings (For CANVAS layout or manual overrides)
     char* x_source;         // REFLECT
@@ -149,6 +150,7 @@ struct UiInstance {
     MemoryArena arena;
     MemoryPool* element_pool;
     UiElement* root;
+    UiAsset* assets;
 };
 
 #endif // UI_INTERNAL_H

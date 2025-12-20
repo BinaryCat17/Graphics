@@ -69,7 +69,7 @@ static void destroy_recursive(UiInstance* instance, UiElement* el) {
     pool_free(instance->element_pool, el);
 }
 
-UiInstance* ui_instance_create(size_t size) {
+UiInstance* ui_instance_create(UiAsset* assets, size_t size) {
     UiInstance* instance = (UiInstance*)calloc(1, sizeof(UiInstance));
     if (!instance) return NULL;
     
@@ -78,6 +78,7 @@ UiInstance* ui_instance_create(size_t size) {
         return NULL;
     }
     
+    instance->assets = assets;
     instance->element_pool = pool_create(sizeof(UiElement), 256);
     instance->root = NULL;
     return instance;
@@ -254,7 +255,23 @@ void ui_element_rebuild_children(UiElement* el, UiInstance* instance) {
                  }
 
                  if (item_ptr) {
-                     UiElement* child = ui_element_create(instance, el->spec->item_template, item_ptr, item_meta);
+                     const UiNodeSpec* child_spec = el->spec->item_template;
+
+                     // Conditional Template Selector
+                     if (el->spec->template_selector && instance->assets) {
+                         const MetaField* sel_field = meta_find_field(item_meta, el->spec->template_selector);
+                         if (sel_field && sel_field->type == META_TYPE_ENUM) {
+                             int val = meta_get_int(item_ptr, sel_field);
+                             const MetaEnum* e = meta_get_enum(sel_field->type_name);
+                             const char* t_name = meta_enum_get_name(e, val);
+                             if (t_name) {
+                                 UiNodeSpec* t = ui_asset_get_template(instance->assets, t_name);
+                                 if (t) child_spec = t;
+                             }
+                         }
+                     }
+
+                     UiElement* child = ui_element_create(instance, child_spec, item_ptr, item_meta);
                      if (child) {
                         ui_element_add_child(el, child);
                      }

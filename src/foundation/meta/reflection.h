@@ -67,4 +67,7 @@ const MetaField* meta_find_field(const MetaStruct* meta, const char* field_name)
 // Helper to find enum value by string name (returns true if found)
 bool meta_enum_get_value(const MetaEnum* meta_enum, const char* name_str, int* out_value);
 
+// Helper to find enum name by value
+const char* meta_enum_get_name(const MetaEnum* meta_enum, int value);
+
 #endif // FOUNDATION_META_REFLECTION_H

@@ -41,7 +41,7 @@ int test_column_layout(void) {
     add_child_spec(asset, root, c1);
     add_child_spec(asset, root, c2);
     
-    UiInstance* instance = ui_instance_create(4096);
+    UiInstance* instance = ui_instance_create(asset, 4096);
 
     UiElement* el = ui_element_create(instance, root, NULL, NULL);
     instance->root = el;

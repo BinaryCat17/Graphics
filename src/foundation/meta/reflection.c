@@ -83,3 +83,13 @@ const MetaField* meta_find_field(const MetaStruct* meta, const char* field_name)
     }
     return NULL;
 }
+
+const char* meta_enum_get_name(const MetaEnum* meta_enum, int value) {
+    if (!meta_enum) return NULL;
+    for (size_t i = 0; i < meta_enum->count; ++i) {
+        if (meta_enum->values[i].value == value) {
+            return meta_enum->values[i].name;
+        }
+    }
+    return NULL;
+}
