@@ -465,9 +465,9 @@ static void vulkan_renderer_render_scene(RendererBackend* backend, const Scene* 
         instances[i].model = m;
         instances[i].color = obj->color;
         instances[i].uv_rect = obj->uv_rect;
-        instances[i].params_1 = obj->shader_params_0;
-        instances[i].params_2 = obj->shader_params_1; // Pass through extra data (9-slice or curves)
-        instances[i].clip_rect = obj->clip_rect;
+        instances[i].params_1 = obj->raw.params_0;
+        instances[i].params_2 = obj->raw.params_1; // Pass through extra data (9-slice or curves)
+        instances[i].clip_rect = obj->ui.clip_rect;
     }
     
     // --- COMMAND RECORDING ---

@@ -29,7 +29,7 @@ static void render_background(const UiElement* el, Scene* scene, Vec4 clip_vec, 
     quad.prim_type = SCENE_PRIM_QUAD; 
     quad.position = (Vec3){el->screen_rect.x, el->screen_rect.y, z}; 
     quad.scale = (Vec3){el->screen_rect.w, el->screen_rect.h, 1.0f};
-    quad.clip_rect = clip_vec; 
+    quad.ui.clip_rect = clip_vec; 
     
     // Use animated color
     quad.color = el->render_color;
@@ -55,30 +55,30 @@ static void render_background(const UiElement* el, Scene* scene, Vec4 clip_vec, 
 
     if ((el->spec->texture_id != 0)) {
         // Use 9-Slice or Textured Quad
-        quad.shader_params_0.x = (float)SCENE_MODE_9_SLICE; // 9-Slice (UI Shader Mode)
+        quad.ui.style_params.x = (float)SCENE_MODE_9_SLICE; // 9-Slice (UI Shader Mode)
         
         float u0, v0, u1, v1;
         font_get_ui_rect_uv(&u0, &v0, &u1, &v1);
         quad.uv_rect = (Vec4){u0, v0, u1 - u0, v1 - v0};
         
         // Pass 9-slice data
-        // shader_params_0: x=type, y=unused, z=width, w=height
-        quad.shader_params_0.z = el->spec->tex_w > 0 ? el->spec->tex_w : 32.0f;
-        quad.shader_params_0.w = el->spec->tex_h > 0 ? el->spec->tex_h : 32.0f;
+        // style_params: x=type, y=unused, z=width, w=height
+        quad.ui.style_params.z = el->spec->tex_w > 0 ? el->spec->tex_w : 32.0f;
+        quad.ui.style_params.w = el->spec->tex_h > 0 ? el->spec->tex_h : 32.0f;
         
-        // shader_params_1: borders (top, right, bottom, left)
-        quad.shader_params_1.x = el->spec->border_t;
-        quad.shader_params_1.y = el->spec->border_r;
-        quad.shader_params_1.z = el->spec->border_b;
-        quad.shader_params_1.w = el->spec->border_l;
+        // extra_params: borders (top, right, bottom, left)
+        quad.ui.extra_params.x = el->spec->border_t;
+        quad.ui.extra_params.y = el->spec->border_r;
+        quad.ui.extra_params.z = el->spec->border_b;
+        quad.ui.extra_params.w = el->spec->border_l;
         
     } else {
         // SDF Rounded Box (Mode 4)
-        quad.shader_params_0.x = (float)SCENE_MODE_SDF_BOX; // Mode 4: SDF Rect
-        quad.shader_params_0.y = el->spec->corner_radius; // Radius
+        quad.ui.style_params.x = (float)SCENE_MODE_SDF_BOX; // Mode 4: SDF Rect
+        quad.ui.style_params.y = el->spec->corner_radius; // Radius
         
         // Pass borders for SDF stroke
-        quad.shader_params_0.z = el->spec->border_t; 
+        quad.ui.style_params.z = el->spec->border_t; 
 
         float u, v;
         font_get_white_pixel_uv(&u, &v);
@@ -130,12 +130,12 @@ static void render_content(const UiElement* el, Scene* scene, Vec4 clip_vec, flo
             float ch = el->spec->caret_height > 0.0f ? el->spec->caret_height : 20.0f;
             caret.scale = (Vec3){cw, ch, 1.0f}; 
             
-            caret.clip_rect = clip_vec;
+            caret.ui.clip_rect = clip_vec;
             
             Vec4 cc = el->spec->caret_color.w > 0.0f ? el->spec->caret_color : (Vec4){1.0f, 1.0f, 1.0f, 1.0f};
             caret.color = cc; 
             
-            caret.shader_params_0.x = (float)SCENE_MODE_SOLID;
+            caret.ui.style_params.x = (float)SCENE_MODE_SOLID;
             float u, v;
             font_get_white_pixel_uv(&u, &v);
             caret.uv_rect = (Vec4){u, v, 0.001f, 0.001f};

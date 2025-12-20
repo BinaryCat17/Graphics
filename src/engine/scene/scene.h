@@ -62,16 +62,35 @@ typedef struct SceneObject {
     
     // --- Rendering ---
     const Mesh* mesh; 
-    Vec4 clip_rect; // Clipping bounds (x,y,w,h). 0,0,0,0 means no clipping.
 
     // --- Material & Styling ---
     Vec4 color; 
     Vec4 uv_rect; // Texture Subset (xy=off, zw=scale)
 
     // --- Advanced / Generic Shader Data ---
-    // Usage defined by SceneShaderMode (e.g., UI corners, Graph thicknesses)
-    Vec4 shader_params_0; 
-    Vec4 shader_params_1; 
+    // Domain-specific data accessed via union to save memory and improve semantics
+    union {
+        // UI Context
+        struct {
+            Vec4 style_params; // x=type, y=radius, z=width, w=height
+            Vec4 extra_params; // Borders etc.
+            Vec4 clip_rect;    // Scissor bounds (x,y,w,h)
+        } ui;
+
+        // PBR / 3D Context (Reserved)
+        struct {
+            Vec4 pbr_data;     // x=roughness, y=metal, z=ao
+            Vec4 user_data;
+            Vec4 emission;
+        } pbr;
+
+        // Raw Access
+        struct {
+            Vec4 params_0; // Maps to style_params
+            Vec4 params_1; // Maps to extra_params
+            Vec4 params_2; // Maps to clip_rect
+        } raw;
+    };
 
     // --- Instancing (Data-Driven Visualization) ---
     void* instance_buffer; // Pointer to GpuBuffer (if massive instancing)

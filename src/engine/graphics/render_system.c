@@ -211,7 +211,7 @@ void render_system_update(RenderSystem* sys) {
         quad.position = (Vec3){600.0f, 100.0f, 0.0f};
         quad.scale = (Vec3){512.0f, 512.0f, 1.0f};
         quad.color = (Vec4){1.0f, 1.0f, 1.0f, 1.0f};
-        quad.shader_params_0.x = (float)SCENE_MODE_USER_TEXTURE; // User Texture
+        quad.raw.params_0.x = (float)SCENE_MODE_USER_TEXTURE; // User Texture
         quad.uv_rect = (Vec4){0.0f, 0.0f, 1.0f, 1.0f};
         
         RenderFramePacket* dest = &sys->packets[sys->back_packet_index];

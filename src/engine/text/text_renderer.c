@@ -43,7 +43,7 @@ void scene_add_text_clipped(Scene* scene, const char* text, Vec3 pos, float scal
             obj.color = color;
             
             // Texture Params (1.0 = use texture)
-            obj.shader_params_0.x = (float)SCENE_MODE_TEXTURED;
+            obj.raw.params_0.x = (float)SCENE_MODE_TEXTURED;
             
             // UVs
             obj.uv_rect.x = g.u0;
@@ -52,7 +52,7 @@ void scene_add_text_clipped(Scene* scene, const char* text, Vec3 pos, float scal
             obj.uv_rect.w = g.v1 - g.v0; // Height
             
             // Clipping
-            obj.clip_rect = clip_rect;
+            obj.ui.clip_rect = clip_rect;
             
             scene_add_object(scene, obj);
             
