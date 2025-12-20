@@ -2,12 +2,19 @@
 #define SCENE_INTERNAL_H
 
 #include "../scene.h"
+#include "foundation/memory/arena.h"
 
 // The Scene Container implementation
 struct Scene {
-    SceneObject* objects; // Linear array
+    // Memory Arena for frame-local scene objects
+    // This replaces the malloc/realloc dynamic array pattern
+    MemoryArena arena;
+
+    // Pointer to the start of the object array in the arena
+    SceneObject* objects;
+    
+    // Number of objects currently in the arena
     size_t object_count;
-    size_t object_capacity;
     
     SceneCamera camera;
     

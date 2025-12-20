@@ -48,29 +48,30 @@ typedef struct SceneCamera {
 } SceneCamera;
 
 typedef struct SceneObject {
+    // --- Identification & Classification ---
     int id;
     RenderLayer layer;
     ScenePrimitiveType prim_type;
     
-    // Transform
+    // --- Transform ---
     Vec3 position;
     Vec3 rotation; 
     Vec3 scale;
     
-    // Visuals
+    // --- Rendering ---
     const Mesh* mesh; 
-    Vec4 color; 
-    Vec4 uv_rect; // Texture Subset (xy=off, zw=scale)
     Vec4 clip_rect; // Clipping bounds (x,y,w,h). 0,0,0,0 means no clipping.
 
-    // Unified Parameters (Maps to shader 'params' and 'extra')
-    // Generic storage for per-instance shader data.
-    // Usage is defined by the specific renderer/shader (e.g., UI, Graph, etc.)
+    // --- Material & Styling ---
+    Vec4 color; 
+    Vec4 uv_rect; // Texture Subset (xy=off, zw=scale)
+
+    // --- Advanced / Generic Shader Data ---
+    // Usage defined by SceneShaderMode (e.g., UI corners, Graph thicknesses)
     Vec4 shader_params_0; 
     Vec4 shader_params_1; 
 
-    
-    // Instancing (Data-Driven Visualization)
+    // --- Instancing (Data-Driven Visualization) ---
     void* instance_buffer; // Pointer to GpuBuffer (if massive instancing)
     size_t instance_count;
 } SceneObject;
@@ -86,7 +87,10 @@ Scene* scene_create(void);
 void scene_destroy(Scene* scene);
 
 void scene_clear(Scene* scene);
-void scene_add_object(Scene* scene, SceneObject obj); // Pass by value (copy)
+
+// Adds an object to the scene. 
+// Uses a fast linear allocator (MemoryArena), so this is very cheap.
+void scene_add_object(Scene* scene, SceneObject obj); 
 
 // Accessors
 void scene_set_camera(Scene* scene, SceneCamera camera);
@@ -95,7 +99,8 @@ SceneCamera scene_get_camera(const Scene* scene);
 void scene_set_frame_number(Scene* scene, uint64_t frame_number);
 uint64_t scene_get_frame_number(const Scene* scene);
 
-// Returns pointer to internal array and sets out_count. Do not free.
+// Returns pointer to internal linear array and sets out_count. 
+// Do not free or persist this pointer across frames.
 const SceneObject* scene_get_all_objects(const Scene* scene, size_t* out_count);
 
 #endif // SCENE_H

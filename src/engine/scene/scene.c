@@ -3,40 +3,49 @@
 #include <stdlib.h>
 #include <string.h>
 
+#define SCENE_ARENA_SIZE (4 * 1024 * 1024) // 4 MB Capacity (~25k objects)
+
 Scene* scene_create(void) {
     Scene* scene = (Scene*)malloc(sizeof(Scene));
     if (scene) {
         memset(scene, 0, sizeof(Scene));
+        if (!arena_init(&scene->arena, SCENE_ARENA_SIZE)) {
+            free(scene);
+            return NULL;
+        }
+        // Objects array starts at the base of the arena
+        scene->objects = (SceneObject*)scene->arena.base;
     }
     return scene;
 }
 
 void scene_destroy(Scene* scene) {
     if (!scene) return;
-    if (scene->objects) {
-        free(scene->objects);
-    }
+    arena_destroy(&scene->arena);
     free(scene);
 }
 
 void scene_add_object(Scene* scene, SceneObject obj) {
     if (!scene) return;
     
-    if (scene->object_count == scene->object_capacity) {
-        size_t new_cap = scene->object_capacity == 0 ? 64 : scene->object_capacity * 2;
-        SceneObject* new_list = realloc(scene->objects, new_cap * sizeof(SceneObject));
-        if (!new_list) return; // Allocation failed
-        
-        scene->objects = new_list;
-        scene->object_capacity = new_cap;
-    }
+    // Allocate directly from the arena
+    SceneObject* new_slot = (SceneObject*)arena_alloc(&scene->arena, sizeof(SceneObject));
     
-    scene->objects[scene->object_count++] = obj;
+    if (new_slot) {
+        *new_slot = obj;
+        scene->object_count++;
+    } else {
+        // Out of memory in the arena - silently fail or log error
+        // For a production engine, we might want a logging macro here
+    }
 }
 
 void scene_clear(Scene* scene) {
     if (!scene) return;
+    arena_reset(&scene->arena);
     scene->object_count = 0;
+    // Reset objects pointer to base (though it shouldn't have changed)
+    scene->objects = (SceneObject*)scene->arena.base;
 }
 
 void scene_set_camera(Scene* scene, SceneCamera camera) {
