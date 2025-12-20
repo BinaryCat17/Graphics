@@ -108,6 +108,11 @@ add_library(engine_scene STATIC "src/engine/scene/scene.c")
 target_include_directories(engine_scene PUBLIC "src/")
 target_link_libraries(engine_scene PUBLIC foundation_math foundation_memory)
 
+# Input
+add_library(engine_input STATIC "src/engine/input/input.c")
+target_include_directories(engine_input PUBLIC "src/")
+target_link_libraries(engine_input PUBLIC foundation_platform foundation_logger)
+
 # Text
 set(ENGINE_TEXT_SOURCES
     "src/engine/text/text_renderer.c"
@@ -155,7 +160,7 @@ add_library(engine_ui STATIC ${ENGINE_UI_SOURCES})
 target_include_directories(engine_ui PUBLIC "src/" ${Stb_INCLUDE_DIR})
 target_link_libraries(engine_ui PUBLIC 
     foundation_config engine_assets foundation_meta foundation_math 
-    engine_scene engine_text
+    engine_scene engine_text engine_input
 )
 
 # --- FEATURES LAYER ---
@@ -171,7 +176,7 @@ target_include_directories(feature_math_engine PUBLIC "src/")
 target_link_libraries(feature_math_engine PUBLIC foundation_math foundation_memory)
 target_link_libraries(feature_math_engine PRIVATE 
     engine_graphics engine_ui engine_scene engine_text
-    foundation_platform foundation_config foundation_logger foundation_meta Vulkan::Vulkan
+    foundation_platform foundation_config foundation_logger foundation_meta
 )
 if(UNIX)
     target_link_libraries(feature_math_engine PUBLIC m)
@@ -185,7 +190,7 @@ add_library(engine_core STATIC ${ENGINE_CORE_SOURCES})
 target_include_directories(engine_core PUBLIC "src/")
 target_link_libraries(engine_core PUBLIC 
     engine_graphics engine_ui engine_assets engine_text feature_math_engine 
-    foundation_meta foundation_logger
+    foundation_meta foundation_logger engine_input
 )
 
 # --- APP ---

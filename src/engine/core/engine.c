@@ -11,113 +11,6 @@
 
 // --- Input Callbacks ---
 
-static void engine_push_event(Engine* engine, InputEvent event) {
-    if (engine->input_events.count < MAX_INPUT_EVENTS) {
-        engine->input_events.events[engine->input_events.count++] = event;
-    }
-}
-
-static void on_mouse_button(PlatformWindow* window, PlatformMouseButton button, PlatformInputAction action, int mods, void* user_data) {
-    (void)window; 
-    Engine* engine = (Engine*)user_data;
-    if (!engine) return;
-    
-    // Legacy State
-    if (button == PLATFORM_MOUSE_BUTTON_LEFT) {
-        if (action == PLATFORM_PRESS) {
-            engine->input.mouse_down = true;
-            engine->input.mouse_clicked = true;
-        } else if (action == PLATFORM_RELEASE) {
-            engine->input.mouse_down = false;
-        }
-    }
-
-    // Event
-    InputEvent event = {0};
-    if (action == PLATFORM_PRESS) event.type = INPUT_EVENT_MOUSE_PRESSED;
-    else if (action == PLATFORM_RELEASE) event.type = INPUT_EVENT_MOUSE_RELEASED;
-    
-    if (event.type != INPUT_EVENT_NONE) {
-        event.data.mouse_button.button = (int)button;
-        event.data.mouse_button.mods = mods;
-        event.data.mouse_button.x = engine->input.mouse_x;
-        event.data.mouse_button.y = engine->input.mouse_y;
-        engine_push_event(engine, event);
-    }
-}
-
-static void on_scroll(PlatformWindow* window, double xoff, double yoff, void* user_data) {
-    (void)window; 
-    Engine* engine = (Engine*)user_data;
-    if (!engine) return;
-
-    // Legacy State
-    engine->input.scroll_dx += (float)xoff;
-    engine->input.scroll_dy += (float)yoff;
-
-    // Event
-    InputEvent event = {0};
-    event.type = INPUT_EVENT_SCROLL;
-    event.data.scroll.dx = (float)xoff;
-    event.data.scroll.dy = (float)yoff;
-    engine_push_event(engine, event);
-}
-
-static void on_key(PlatformWindow* window, int key, int scancode, PlatformInputAction action, int mods, void* user_data) {
-    (void)window; 
-    Engine* engine = (Engine*)user_data;
-    if (!engine) return;
-    
-    // Legacy State
-    engine->input.last_key = key;
-    engine->input.last_action = (int)action;
-
-    // Event
-    InputEvent event = {0};
-    if (action == PLATFORM_PRESS) event.type = INPUT_EVENT_KEY_PRESSED;
-    else if (action == PLATFORM_RELEASE) event.type = INPUT_EVENT_KEY_RELEASED;
-    else if (action == PLATFORM_REPEAT) event.type = INPUT_EVENT_KEY_REPEAT;
-
-    if (event.type != INPUT_EVENT_NONE) {
-        event.data.key.key = key;
-        event.data.key.scancode = scancode;
-        event.data.key.mods = mods;
-        engine_push_event(engine, event);
-    }
-}
-
-static void on_char(PlatformWindow* window, unsigned int codepoint, void* user_data) {
-    (void)window;
-    Engine* engine = (Engine*)user_data;
-    if (!engine) return;
-    
-    // Legacy State
-    engine->input.last_char = codepoint;
-
-    // Event
-    InputEvent event = {0};
-    event.type = INPUT_EVENT_CHAR;
-    event.data.character.codepoint = codepoint;
-    engine_push_event(engine, event);
-}
-
-static void on_cursor_pos(PlatformWindow* window, double x, double y, void* user_data) {
-    (void)window;
-    Engine* engine = (Engine*)user_data;
-    if (!engine) return;
-
-    // Legacy State
-    engine->input.mouse_x = (float)x;
-    engine->input.mouse_y = (float)y;
-
-    // Event
-    InputEvent event = {0};
-    event.type = INPUT_EVENT_MOUSE_MOVED;
-    event.data.mouse.x = (float)x;
-    event.data.mouse.y = (float)y;
-    engine_push_event(engine, event);
-}
-
 static void on_framebuffer_size(PlatformWindow* window, int width, int height, void* user_data) {
     (void)window;
     Engine* engine = (Engine*)user_data;
@@ -154,14 +47,13 @@ bool engine_init(Engine* engine, const EngineConfig* config) {
     
     // Callbacks
     platform_set_window_user_pointer(engine->window, engine);
-    platform_set_mouse_button_callback(engine->window, on_mouse_button, engine);
-    platform_set_scroll_callback(engine->window, on_scroll, engine);
-    platform_set_key_callback(engine->window, on_key, engine);
-    platform_set_char_callback(engine->window, on_char, engine);
-    platform_set_cursor_pos_callback(engine->window, on_cursor_pos, engine);
+    // Note: Input callbacks are registered by input_system_init
     platform_set_framebuffer_size_callback(engine->window, on_framebuffer_size, engine);
 
-    // 3. Assets
+    // 3. Input System
+    input_system_init(&engine->input_system, engine->window);
+
+    // 4. Assets
     if (!assets_init(&engine->assets, config->assets_path, NULL)) {
         LOG_FATAL("Failed to initialize assets from '%s'", config->assets_path);
         return false;
@@ -172,7 +64,7 @@ bool engine_init(Engine* engine, const EngineConfig* config) {
         return false;
     }
 
-    // 4. Render System
+    // 5. Render System
     RenderSystemConfig rs_config = {
         .window = engine->window,
         .backend_type = "vulkan"
@@ -186,7 +78,7 @@ bool engine_init(Engine* engine, const EngineConfig* config) {
     // Bindings
     render_system_bind_assets(engine->render_system, &engine->assets);
     
-    // 5. Application Init Hook (App sets up Graph, UI, binds them to Renderer)
+    // 6. Application Init Hook (App sets up Graph, UI, binds them to Renderer)
     if (config->on_init) {
         config->on_init(engine);
     }
@@ -244,21 +136,11 @@ void engine_run(Engine* engine) {
 
         render_system_begin_frame(rs, now);
         
-        // Reset per-frame input deltas
-        engine->input.scroll_dx = 0;
-        engine->input.scroll_dy = 0;
-        engine->input.last_char = 0;
-        engine->input.last_key = 0;
-        engine->input.last_action = -1;
-        engine->input_events.count = 0;
+        // Input Update
+        input_system_update(&engine->input_system);
         
         // Input Poll (Triggers callbacks)
         platform_poll_events();
-        
-        // Toggle Logic for Click
-        static bool last_down = false;
-        engine->input.mouse_clicked = engine->input.mouse_down && !last_down;
-        last_down = engine->input.mouse_down;
 
         // Application Update Hook (App updates Graph, UI Layout, etc.)
         if (engine->on_update) {

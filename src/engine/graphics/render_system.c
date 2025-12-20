@@ -221,6 +221,35 @@ uint32_t render_system_create_compute_pipeline(RenderSystem* sys, uint32_t* spv_
     return sys->backend->compute_pipeline_create(sys->backend, spv_code, spv_size, 0);
 }
 
+uint32_t render_system_create_compute_pipeline_from_source(RenderSystem* sys, const char* source) {
+    if (!sys || !sys->backend) return 0;
+    
+    // 1. Compile
+    void* spv_code = NULL;
+    size_t spv_size = 0;
+    
+    if (!sys->backend->compile_shader) {
+        LOG_ERROR("Backend does not support runtime shader compilation.");
+        return 0;
+    }
+    
+    if (!sys->backend->compile_shader(sys->backend, source, strlen(source), "compute", &spv_code, &spv_size)) {
+        LOG_ERROR("Shader compilation failed.");
+        return 0;
+    }
+    
+    // 2. Create Pipeline
+    uint32_t id = 0;
+    if (sys->backend->compute_pipeline_create) {
+        id = sys->backend->compute_pipeline_create(sys->backend, spv_code, spv_size, 0);
+    }
+    
+    // 3. Free SPIR-V
+    free(spv_code);
+    
+    return id;
+}
+
 void render_system_destroy_compute_pipeline(RenderSystem* sys, uint32_t pipeline_id) {
     if (!sys || !sys->backend || !sys->backend->compute_pipeline_destroy) return;
     sys->backend->compute_pipeline_destroy(sys->backend, pipeline_id);

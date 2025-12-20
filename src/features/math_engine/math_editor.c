@@ -81,48 +81,16 @@ static void math_editor_recompile_graph(MathEditorState* state, RenderSystem* rs
         return;
     }
 
-    // 2. Save to temp file
-    const char* tmp_glsl = "logs/tmp_graph.comp";
-    FILE* f = fopen(tmp_glsl, "w");
-    if (!f) {
-        LOG_ERROR("Failed to create temp GLSL file");
-        free(glsl);
-        return;
-    }
-    fprintf(f, "%s", glsl);
-    fclose(f);
+    // 2. Create Pipeline (Compiles internally)
+    uint32_t new_pipe = render_system_create_compute_pipeline_from_source(rs, glsl);
     free(glsl);
-
-    // 3. Call glslc
-    const char* tmp_spv = "logs/tmp_graph.spv";
-    char cmd[512];
-    sprintf(cmd, "glslc %s -o %s", tmp_glsl, tmp_spv);
-    
-    // LOG_DEBUG("Running: %s", cmd);
-    int res = system(cmd);
-    if (res != 0) {
-        LOG_ERROR("glslc failed with code %d", res);
-        return;
-    }
-
-    // 4. Load SPIR-V
-    size_t spv_size = 0;
-    uint32_t* spv_code = (uint32_t*)fs_read_bin(NULL, tmp_spv, &spv_size);
-    if (!spv_code) {
-        LOG_ERROR("Failed to read generated SPIR-V");
-        return;
-    }
-
-    // 5. Create Pipeline
-    uint32_t new_pipe = render_system_create_compute_pipeline(rs, spv_code, spv_size);
-    free(spv_code);
 
     if (new_pipe == 0) {
         LOG_ERROR("Failed to create compute pipeline");
         return;
     }
 
-    // 6. Swap
+    // 3. Swap
     if (state->current_pipeline > 0) {
         render_system_destroy_compute_pipeline(rs, state->current_pipeline);
     }
@@ -306,8 +274,8 @@ void math_editor_update(MathEditorState* state, Engine* engine) {
     math_editor_sync_view_data(state);
 
     // Toggle Visualizer (Hotkey C) - Event Based
-    for (int i = 0; i < engine->input_events.count; ++i) {
-        const InputEvent* e = &engine->input_events.events[i];
+    for (int i = 0; i < engine->input_system.queue.count; ++i) {
+        const InputEvent* e = &engine->input_system.queue.events[i];
         if (e->type == INPUT_EVENT_KEY_PRESSED && e->data.key.key == 67) { // KEY_C
              engine->show_compute_visualizer = !engine->show_compute_visualizer;
              render_system_set_show_compute(engine->render_system, engine->show_compute_visualizer);
@@ -323,7 +291,7 @@ void math_editor_update(MathEditorState* state, Engine* engine) {
         ui_element_update(state->ui_instance.root, engine->dt);
         
         // Input Handling
-        ui_input_update(state->input_ctx, state->ui_instance.root, &engine->input, &engine->input_events);
+        ui_input_update(state->input_ctx, state->ui_instance.root, &engine->input_system.state, &engine->input_system.queue);
         
         // Process Events
         UiEvent evt;

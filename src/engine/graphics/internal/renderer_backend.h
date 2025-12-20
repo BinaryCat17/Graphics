@@ -54,6 +54,11 @@ typedef struct RendererBackend {
     // Sync: Wait for compute to finish (memory barrier).
     void (*compute_wait)(struct RendererBackend* backend);
 
+    // Optional: Compile high-level shader source to bytecode
+    // Returns true on success. Allocates out_spv (caller must free).
+    // stage: "compute", "vertex", "fragment"
+    bool (*compile_shader)(struct RendererBackend* backend, const char* source, size_t size, const char* stage, void** out_spv, size_t* out_spv_size);
+
 } RendererBackend;
 
 // Registry / Factory

@@ -1,8 +1,11 @@
-#ifndef ENGINE_INPUT_TYPES_H
-#define ENGINE_INPUT_TYPES_H
+#ifndef ENGINE_INPUT_H
+#define ENGINE_INPUT_H
 
 #include <stdint.h>
 #include <stdbool.h>
+
+// Forward declaration
+typedef struct PlatformWindow PlatformWindow;
 
 // Event-based Input System
 typedef enum InputEventType {
@@ -62,4 +65,15 @@ typedef struct InputState {
     int last_action;    // Press/Release/Repeat
 } InputState;
 
-#endif // ENGINE_INPUT_TYPES_H
+typedef struct InputSystem {
+    InputState state;
+    InputEventQueue queue;
+    
+    // Internal
+    bool _prev_mouse_down;
+} InputSystem;
+
+void input_system_init(InputSystem* sys, PlatformWindow* window);
+void input_system_update(InputSystem* sys);
+
+#endif // ENGINE_INPUT_H

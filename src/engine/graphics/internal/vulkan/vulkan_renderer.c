@@ -10,6 +10,7 @@
 
 #include "foundation/logger/logger.h"
 #include "foundation/platform/platform.h"
+#include "foundation/platform/fs.h"
 #include "foundation/math/coordinate_systems.h"
 
 #include <stdlib.h>
@@ -243,6 +244,42 @@ static void vulkan_compute_dispatch(RendererBackend* backend, uint32_t pipeline_
 static void vulkan_compute_wait(RendererBackend* backend) {
     VulkanRendererState* state = (VulkanRendererState*)backend->state;
     vkWaitForFences(state->device, 1, &state->compute_fence, VK_TRUE, UINT64_MAX);
+}
+
+static bool vulkan_compile_shader(RendererBackend* backend, const char* source, size_t size, const char* stage, void** out_spv, size_t* out_spv_size) {
+    (void)backend;
+    
+    // 1. Ensure logs dir exists
+    platform_mkdir("logs");
+    
+    // 2. Write source to temp file
+    const char* tmp_src = "logs/tmp_compile.glsl";
+    const char* tmp_spv = "logs/tmp_compile.spv";
+    
+    FILE* f = fopen(tmp_src, "w");
+    if (!f) return false;
+    fwrite(source, 1, size, f);
+    fclose(f);
+    
+    // 3. Construct Command
+    char cmd[512];
+    snprintf(cmd, sizeof(cmd), "glslc -fshader-stage=%s %s -o %s", stage, tmp_src, tmp_spv);
+    
+    // 4. Run
+    int res = system(cmd);
+    if (res != 0) {
+        LOG_ERROR("Vulkan: Shader compilation failed. Command: %s", cmd);
+        return false;
+    }
+    
+    // 5. Read Result
+    size_t sz = 0;
+    void* code = fs_read_bin(NULL, tmp_spv, &sz);
+    if (!code) return false;
+    
+    *out_spv = code;
+    *out_spv_size = sz;
+    return true;
 }
 
 static bool vulkan_renderer_init(RendererBackend* backend, const RenderBackendInit* init) {
@@ -657,6 +694,7 @@ RendererBackend* vulkan_renderer_backend(void) {
     backend->compute_pipeline_destroy = vulkan_compute_pipeline_destroy;
     backend->compute_dispatch = vulkan_compute_dispatch;
     backend->compute_wait = vulkan_compute_wait;
+    backend->compile_shader = vulkan_compile_shader;
     
     return backend;
 }

@@ -20,6 +20,9 @@ The project is undergoing a structural standardization to enforce strict public/
     - Move `transpiler.*`, `emitters/`, `shader_ir.h`.
 - [x] **Graphics Engine:** Refactor to `src/engine/graphics/internal/`.
     - Move backend implementations and internal headers.
+- [x] **Scene & Text:** Extract from Graphics to `src/engine/scene` and `src/engine/text`.
+- [x] **Input System:** Extract from `engine.c` to `src/engine/input`.
+- [x] **Feature Decoupling:** Remove Vulkan dependency from `feature_math_engine`.
 
 ### Phase 7: 3D Visualization & Compute
 **Objective:** Visualize mathematical functions and data in 3D space.

@@ -1,6 +1,6 @@
 # The Architecture Guide
 
-**Version:** 0.7 (Standardized)
+**Version:** 0.7.1 (Standardized)
 **Date:** December 20, 2025
 
 This document explains **how** the system is built and **why** it is built that way.
@@ -24,7 +24,7 @@ Zero-dependency utilities: Memory, Platform, Math, Logger, Config, Reflection.
 
 ### ⚙️ Engine (`src/engine/`)
 **"The Machine"**
-Systems for interactive applications: Core, Graphics, UI, Assets.
+Systems for interactive applications: Core, Graphics, Scene, Text, UI, Assets.
 
 ### 🧩 Features (`src/features/`)
 **"The Logic"**
@@ -109,8 +109,17 @@ Systems communicate via **IDs** (integers) or **Commands**, never raw pointers. 
 
 ### Graphics
 *   **Public:** `RenderSystem` (Opaque handle).
-*   **Internal:** `RendererBackend`, `VulkanContext`, `RenderPacket`.
-*   **Goal:** The App should never know Vulkan exists.
+*   **Internal:** `RendererBackend`, `VulkanContext`.
+*   **Goal:** The App should never know Vulkan exists. Only renders what is in the Scene.
+
+### Scene
+*   **Public:** `Scene`, `SceneObject`, `SceneCamera`.
+*   **Goal:** Logic representation of the world. Decoupled from rendering implementation.
+
+### Text
+*   **Public:** `Font`, `TextRenderer`.
+*   **Internal:** `stb_truetype` implementation.
+*   **Goal:** Font loading, atlas generation, and text measurement.
 
 ### UI
 *   **Public:** `UiInstance`, `UiCore`.

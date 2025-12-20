@@ -59,7 +59,7 @@ typedef struct UiEvent {
     UiElement* target;
 } UiEvent;
 
-#include "engine/core/input_types.h"
+#include "engine/input/input.h"
 
 // --- UI SPECIFICATION (The DNA) ---
 // Pure data. Allocated inside a UiAsset arena. Read-only at runtime.

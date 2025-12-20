@@ -3,7 +3,7 @@
 #include "engine/graphics/render_system.h"
 #include "engine/assets/assets.h"
 #include "foundation/platform/platform.h"
-#include "engine/core/input_types.h"
+#include "engine/input/input.h"
 
 typedef struct Engine Engine;
 
@@ -24,8 +24,7 @@ typedef struct EngineConfig {
 struct Engine {
     // Platform
     PlatformWindow* window;
-    InputState input;
-    InputEventQueue input_events;
+    InputSystem input_system;
 
     // Systems
     RenderSystem* render_system;

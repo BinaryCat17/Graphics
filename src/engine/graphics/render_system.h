@@ -38,6 +38,8 @@ void render_system_resize(RenderSystem* sys, int width, int height);
 // Sets the active compute pipeline for the next frames
 void render_system_set_compute_pipeline(RenderSystem* sys, uint32_t pipeline_id);
 uint32_t render_system_create_compute_pipeline(RenderSystem* sys, uint32_t* spv_code, size_t spv_size);
+// Compiles GLSL (if supported by backend) and creates pipeline
+uint32_t render_system_create_compute_pipeline_from_source(RenderSystem* sys, const char* source);
 void render_system_destroy_compute_pipeline(RenderSystem* sys, uint32_t pipeline_id);
 
 // Request a screenshot to be saved to the specified path
