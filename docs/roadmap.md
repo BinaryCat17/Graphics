@@ -14,21 +14,9 @@ The project is undergoing a structural standardization to enforce strict public/
 ### Phase 6: Architectural Hardening & Cleanup (IMMEDIATE PRIORITY)
 **Objective:** Enforce the "Public/Internal" separation pattern, optimize memory usage, and remove hardcoded logic.
 
-- [x] **Scene Memory Optimization:** Replace `realloc` in `Scene` with `MemoryArena` (Frame Allocator) to eliminate heap fragmentation and allocation spikes during rendering.
-- [x] **Asset Decoupling:** Refactor `Assets` module to load file content into memory buffers. Update `RenderSystem` to accept data pointers (bytes) instead of file paths, decoupling rendering from the OS file system.
-- [x] **Font System Decoupling:** Update `font_init` to accept a memory buffer instead of a file path, ensuring all I/O is centralized in the `Assets` module.
-- [x] **Geometry Deduplication:** Centralize primitive generation (e.g., Unit Quad) in a shared helper to eliminate duplicate vertex data definitions in `Assets` and `VulkanBackend`.
-- [x] **UI Styling Data-Drive:** Remove hardcoded visual logic (e.g., `color *= 1.1f` for inputs) from `ui_renderer.c`. Move state-based visual changes into `UiStyle` or config data.
-- [x] **Uniform Error Handling:** Refactor `engine_create` and subsystem initializers to use a standardized `goto cleanup` pattern or shared destructor helper to prevent resource leaks and reduce code duplication on failure.
-- [x] **Strict Compiler Compliance:** Enable `-Werror` (treat warnings as errors) in CMake and resolve all existing warnings to ensure code hygiene.
-- [x] **Static Analysis Integration:** Integrate `cppcheck` or `clang-tidy` into the CMake pipeline to automatically detect bugs and memory issues.
-- [x] **Debug String Database:** Implement a debug-only global hash map in `string_id` to store original strings, allowing reverse lookup (Hash -> String) for easier debugging.
-- [x] **Const Correctness Audit:** Review public APIs to enforce `const` correctness for input pointers, improving safety and compiler optimization potential.
-- [x] **Header Dependency Cleanup:** Refactor headers to reduce inclusion pollution, ensuring each header includes what it uses (IWYU) and uses forward declarations where possible.
-- [x] **Unified Frame Memory:** Implement a central `FrameArena` in `Engine` that is reset daily. Refactor `UiRenderer` and other systems to use this arena instead of managing their own scratch memory.
 - [ ] **Input Action Mapping:** Implement an abstraction layer to map physical keys (e.g., `KEY_Z`) to logical actions (e.g., `ACTION_UNDO`), removing hardcoded key checks from game logic.
-- [x] **Foundation Threading Module:** Extract the internal mutex/threading logic from `logger.c` into a reusable `src/foundation/threads` library to serve as the project's standard synchronization primitive.
-- [x] **Cross-Platform Threading:** Remove dependency on C11 `<threads.h>` (unreliable on older Windows compilers). Replace with the new `foundation/threads` abstraction.
+- [ ] **Test Suite Expansion:** Expand unit tests to cover critical foundation modules (Memory, Strings, Containers) and ensuring automated execution in the build pipeline.
+- [ ] **Math Engine Encapsulation:** Refactor `MathNode` to hide internal struct details behind an opaque handle API, ensuring changes to node logic do not break dependent features.
 - [ ] **C Standard Downgrade Analysis:** Investigate feasibility of strict C99 compliance to maximize compiler portability (evaluating cost of losing C11 features like anonymous structs/unions).
 
 ### Phase 7: 3D Visualization & Compute
@@ -48,3 +36,4 @@ The project is undergoing a structural standardization to enforce strict public/
 ## 🛠 Technical Debt & Backlog
 
 *   **Shader Hot-Reloading:** Allow editing shaders at runtime without restarting.
+*   **API Documentation:** Setup Doxygen or a similar tool to generate up-to-date API documentation from public headers.
