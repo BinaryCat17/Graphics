@@ -103,20 +103,6 @@ Engine* engine_create(const EngineConfig* config) {
         goto cleanup_input;
     }
 
-    // Load font from assets
-    AssetData font_data = assets_load_file(engine->assets, "fonts/font.ttf");
-    if (!font_data.data) {
-        LOG_FATAL("Failed to load default font from assets/fonts/font.ttf");
-        goto cleanup_assets;
-    }
-
-    if (!font_init(font_data.data, font_data.size)) {
-        LOG_FATAL("Failed to initialize font system");
-        assets_free_file(&font_data);
-        goto cleanup_assets;
-    }
-    assets_free_file(&font_data);
-
     // 5. Render System
     RenderSystemConfig rs_config = {
         .window = engine->window,
@@ -125,7 +111,7 @@ Engine* engine_create(const EngineConfig* config) {
     engine->render_system = render_system_create(&rs_config);
     if (!engine->render_system) {
         LOG_FATAL("Failed to initialize RenderSystem.");
-        goto cleanup_font;
+        goto cleanup_assets;
     }
 
     // Bindings
@@ -164,8 +150,6 @@ Engine* engine_create(const EngineConfig* config) {
     engine->running = true;
     return engine;
 
-cleanup_font:
-    font_shutdown();
 cleanup_assets:
     assets_destroy(engine->assets);
 cleanup_input:
@@ -231,7 +215,6 @@ void engine_destroy(Engine* engine) {
     if (!engine) return;
     
     render_system_destroy(engine->render_system);
-    font_shutdown();
     input_system_destroy(engine->input_system);
     assets_destroy(engine->assets);
     

@@ -1,6 +1,7 @@
 #include "engine/assets/assets.h"
 #include "engine/assets/internal/assets_internal.h"
 #include "engine/graphics/primitives.h"
+#include "engine/text/font.h"
 #include "foundation/platform/platform.h"
 #include "foundation/platform/fs.h"
 #include "foundation/logger/logger.h"
@@ -76,6 +77,19 @@ bool assets_init_internal(Assets* out_assets, const char* assets_dir) {
         LOG_ERROR("Assets: Failed to allocate memory for unit quad.");
     }
 
+    // Load Default Font
+    // Note: We use the public API to load the file, but internal field to store it
+    AssetData font_data = assets_load_file(out_assets, "fonts/font.ttf");
+    if (font_data.data) {
+        out_assets->font = font_create(font_data.data, font_data.size);
+        if (!out_assets->font) {
+            LOG_ERROR("Assets: Failed to create font from 'fonts/font.ttf'");
+        }
+        assets_free_file(&font_data);
+    } else {
+        LOG_WARN("Assets: Could not load default font 'fonts/font.ttf'. Text rendering will fail.");
+    }
+
     LOG_INFO("Assets: Initialized with root '%s'", assets_dir);
     return true;
 }
@@ -93,6 +107,11 @@ Assets* assets_create(const char* assets_dir) {
 
 void assets_destroy(Assets* assets) {
     if (!assets) return;
+    
+    if (assets->font) {
+        font_destroy(assets->font);
+    }
+    
     arena_destroy(&assets->arena);
     free(assets);
 }
@@ -103,4 +122,8 @@ const char* assets_get_root_dir(const Assets* assets) {
 
 const Mesh* assets_get_unit_quad(const Assets* assets) {
     return &assets->unit_quad;
+}
+
+const Font* assets_get_font(const Assets* assets) {
+    return assets ? assets->font : NULL;
 }

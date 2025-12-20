@@ -110,7 +110,7 @@ bool vk_create_vertex_buffer(VulkanRendererState* state, FrameResources *frame, 
 void vk_create_font_texture(VulkanRendererState* state) {
     int width, height;
     unsigned char* pixels;
-    font_get_atlas_data(&width, &height, &pixels);
+    font_get_atlas_data(state->font, &width, &height, &pixels);
 
     if (!pixels) {
         LOG_FATAL("Font atlas not available from Font Module");

@@ -91,6 +91,7 @@ static void try_bootstrap_renderer(RenderSystem* sys) {
     RenderBackendInit init = {
         .window = sys->window,
         .surface = &surface, // Pass pointer to empty surface struct, backend/platform fills it
+        .font = assets_get_font(sys->assets),
         .vert_shader = { .data = vert_shader.data, .size = vert_shader.size },
         .frag_shader = { .data = frag_shader.data, .size = frag_shader.size },
     };

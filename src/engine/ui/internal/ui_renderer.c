@@ -5,9 +5,24 @@
 #include "foundation/logger/logger.h"
 #include "engine/text/text_renderer.h" 
 #include "engine/text/font.h" 
+#include "engine/assets/assets.h"
 #include "foundation/memory/arena.h"
 #include <string.h> 
 // #include <stdlib.h> // Malloc removed
+
+typedef struct OverlayNode {
+    const UiElement* el;
+    struct OverlayNode* next;
+} OverlayNode;
+
+// Internal Render Context to avoid passing too many args
+typedef struct UiRenderContext {
+    Scene* scene;
+    const Font* font;
+    MemoryArena* arena;
+    OverlayNode* overlay_head;
+    OverlayNode* overlay_tail;
+} UiRenderContext;
 
 // Helper: Intersection
 static Rect rect_intersect(Rect a, Rect b) {
@@ -22,7 +37,7 @@ static Rect rect_intersect(Rect a, Rect b) {
     return (Rect){x1, y1, x2 - x1, y2 - y1};
 }
 
-static void render_background(const UiElement* el, Scene* scene, Vec4 clip_vec, float z) {
+static void render_background(const UiElement* el, UiRenderContext* ctx, Vec4 clip_vec, float z) {
     if (el->spec->kind != UI_KIND_CONTAINER && el->spec->kind != UI_KIND_TEXT_INPUT) return;
 
     SceneObject quad = {0};
@@ -58,7 +73,7 @@ static void render_background(const UiElement* el, Scene* scene, Vec4 clip_vec, 
         quad.ui.style_params.x = (float)SCENE_MODE_9_SLICE; // 9-Slice (UI Shader Mode)
         
         float u0, v0, u1, v1;
-        font_get_ui_rect_uv(&u0, &v0, &u1, &v1);
+        font_get_ui_rect_uv(ctx->font, &u0, &v0, &u1, &v1);
         quad.uv_rect = (Vec4){u0, v0, u1 - u0, v1 - v0};
         
         // Pass 9-slice data
@@ -81,14 +96,14 @@ static void render_background(const UiElement* el, Scene* scene, Vec4 clip_vec, 
         quad.ui.style_params.z = el->spec->border_t; 
 
         float u, v;
-        font_get_white_pixel_uv(&u, &v);
+        font_get_white_pixel_uv(ctx->font, &u, &v);
         quad.uv_rect = (Vec4){u, v, 0.001f, 0.001f}; 
     }
     
-    scene_add_object(scene, quad);
+    scene_add_object(ctx->scene, quad);
 }
 
-static void render_content(const UiElement* el, Scene* scene, Vec4 clip_vec, float z) {
+static void render_content(const UiElement* el, UiRenderContext* ctx, Vec4 clip_vec, float z) {
     // Resolve Text (Use Cache)
     const char* text = el->cached_text;
     if (!text || text[0] == '\0') {
@@ -106,7 +121,7 @@ static void render_content(const UiElement* el, Scene* scene, Vec4 clip_vec, flo
         float txt_scale = el->spec->text_scale > 0.0f ? el->spec->text_scale : 0.5f;
         Vec4 txt_color = el->spec->text_color.w > 0.0f ? el->spec->text_color : (Vec4){1.0f, 1.0f, 1.0f, 1.0f};
         
-        scene_add_text_clipped(scene, text, pos, txt_scale, txt_color, clip_vec);
+        scene_add_text_clipped(ctx->scene, ctx->font, text, pos, txt_scale, txt_color, clip_vec);
 
         // Draw Caret
         if (el->spec->kind == UI_KIND_TEXT_INPUT && el->is_focused) {
@@ -120,7 +135,7 @@ static void render_content(const UiElement* el, Scene* scene, Vec4 clip_vec, flo
             memcpy(temp, text, copy_len);
             temp[copy_len] = '\0';
             
-            float text_width = font_measure_text(temp) * txt_scale; 
+            float text_width = font_measure_text(ctx->font, temp) * txt_scale; 
             
             SceneObject caret = {0};
             caret.prim_type = SCENE_PRIM_QUAD;
@@ -137,26 +152,13 @@ static void render_content(const UiElement* el, Scene* scene, Vec4 clip_vec, flo
             
             caret.ui.style_params.x = (float)SCENE_MODE_SOLID;
             float u, v;
-            font_get_white_pixel_uv(&u, &v);
+            font_get_white_pixel_uv(ctx->font, &u, &v);
             caret.uv_rect = (Vec4){u, v, 0.001f, 0.001f};
 
-            scene_add_object(scene, caret);
+            scene_add_object(ctx->scene, caret);
         }
     }
 }
-
-typedef struct OverlayNode {
-    const UiElement* el;
-    struct OverlayNode* next;
-} OverlayNode;
-
-// Internal Render Context to avoid passing too many args
-typedef struct UiRenderContext {
-    Scene* scene;
-    MemoryArena* arena;
-    OverlayNode* overlay_head;
-    OverlayNode* overlay_tail;
-} UiRenderContext;
 
 static void push_overlay(UiRenderContext* ctx, const UiElement* el) {
     if (!ctx || !ctx->arena) return;
@@ -208,10 +210,10 @@ static void process_node(const UiElement* el, UiRenderContext* ctx, Rect current
     Vec4 clip_vec = {effective_clip.x, effective_clip.y, effective_clip.w, effective_clip.h};
 
     // 1. Draw Background
-    render_background(el, ctx->scene, clip_vec, base_z);
+    render_background(el, ctx, clip_vec, base_z);
 
     // 2. Draw Content
-    render_content(el, ctx->scene, clip_vec, base_z);
+    render_content(el, ctx, clip_vec, base_z);
 
     // 3. Recurse
     for (UiElement* child = el->first_child; child; child = child->next_sibling) {
@@ -220,13 +222,13 @@ static void process_node(const UiElement* el, UiRenderContext* ctx, Rect current
 }
 
 void ui_renderer_build_scene(const UiElement* root, Scene* scene, const Assets* assets, MemoryArena* arena) {
-    (void)assets;
     if (!root || !arena) return;
 
     Rect infinite_clip = {-10000.0f, -10000.0f, 20000.0f, 20000.0f};
     
     UiRenderContext ctx = {0};
     ctx.scene = scene;
+    ctx.font = assets_get_font(assets);
     ctx.arena = arena;
     
     // Pass 1: Draw Normal, Defer Overlays

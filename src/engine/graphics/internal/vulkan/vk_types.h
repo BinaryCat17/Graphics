@@ -9,6 +9,8 @@
 #include "foundation/platform/platform.h"
 #include "engine/graphics/internal/vulkan/vulkan_renderer.h"
 
+typedef struct Font Font;
+
 typedef struct { float viewport[2]; } ViewConstants;
 
 typedef enum {
@@ -92,6 +94,7 @@ typedef struct VulkanRendererState {
     VkDescriptorPool descriptor_pool;
     VkDescriptorSet descriptor_set; // Set 0: Global Textures
     CoordinateSystem2D transformer;
+    const Font* font;
     
     // Screenshot State
     bool screenshot_pending;

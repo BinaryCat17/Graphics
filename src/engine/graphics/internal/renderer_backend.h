@@ -7,10 +7,13 @@
 #include "foundation/platform/platform.h"
 #include "engine/scene/scene.h"
 
+typedef struct Font Font;
+
 // Backend Initialization Parameters
 typedef struct RenderBackendInit {
     PlatformWindow* window;
     PlatformSurface* surface;
+    const Font* font;
     
     // Resources (Data Blobs)
     struct {

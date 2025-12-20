@@ -5,8 +5,8 @@
 #include <string.h>
 #include <stdint.h>
 
-void scene_add_text_clipped(Scene* scene, const char* text, Vec3 pos, float scale, Vec4 color, Vec4 clip_rect) {
-    if (!scene || !text) return;
+void scene_add_text_clipped(Scene* scene, const Font* font, const char* text, Vec3 pos, float scale, Vec4 color, Vec4 clip_rect) {
+    if (!scene || !text || !font) return;
 
     float cursor_x = pos.x;
     float cursor_y = pos.y;
@@ -16,7 +16,7 @@ void scene_add_text_clipped(Scene* scene, const char* text, Vec3 pos, float scal
         uint32_t c = (uint32_t)(*ptr);
         Glyph g;
         // Check if font is initialized and has glyph
-        if (font_get_glyph(c, &g)) {
+        if (font_get_glyph(font, c, &g)) {
             // Calculate dimensions
             float scaled_w = g.w * scale;
             float scaled_h = g.h * scale;
@@ -62,10 +62,10 @@ void scene_add_text_clipped(Scene* scene, const char* text, Vec3 pos, float scal
     }
 }
 
-void scene_add_text(Scene* scene, const char* text, Vec3 pos, float scale, Vec4 color) {
+void scene_add_text(Scene* scene, const Font* font, const char* text, Vec3 pos, float scale, Vec4 color) {
     // Default to infinite clip
     Vec4 infinite_clip = {-10000.0f, -10000.0f, 20000.0f, 20000.0f};
-    scene_add_text_clipped(scene, text, pos, scale, color, infinite_clip);
+    scene_add_text_clipped(scene, font, text, pos, scale, color, infinite_clip);
     
     static bool logged = false;
     if (!logged) {

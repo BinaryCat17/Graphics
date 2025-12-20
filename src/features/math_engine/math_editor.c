@@ -9,6 +9,7 @@
 #include "features/math_engine/internal/math_graph_internal.h" // Access to internal Graph/Node structs
 #include "engine/graphics/internal/renderer_backend.h"
 #include "engine/text/font.h"
+#include "engine/assets/assets.h"
 #include "engine/graphics/render_system.h"
 #include "engine/input/input.h"
 
@@ -18,8 +19,8 @@
 
 // --- Helper: Text Measurement for UI Layout ---
 static float text_measure_wrapper(const char* text, void* user_data) {
-    (void)user_data;
-    return font_measure_text(text);
+    const Font* font = (const Font*)user_data;
+    return font_measure_text(font, text);
 }
 
 // --- View Model Management ---
@@ -338,7 +339,7 @@ void math_editor_update(MathEditor* editor, Engine* engine) {
         
         // Layout
         PlatformWindowSize size = platform_get_framebuffer_size(engine_get_window(engine));
-        ui_instance_layout(editor->ui_instance, (float)size.width, (float)size.height, render_system_get_frame_count(engine_get_render_system(engine)), text_measure_wrapper, NULL);
+        ui_instance_layout(editor->ui_instance, (float)size.width, (float)size.height, render_system_get_frame_count(engine_get_render_system(engine)), text_measure_wrapper, (void*)assets_get_font(engine_get_assets(engine)));
     }
 
     // Graph Evaluation (Naive interpretation on CPU for debugging/node values)

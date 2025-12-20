@@ -280,6 +280,7 @@ static bool vulkan_renderer_init(RendererBackend* backend, const RenderBackendIn
     // Config
     state->window = init->window;
     state->platform_surface = init->surface;
+    state->font = init->font;
     
     // Copy Shader Data
     if (init->vert_shader.data && init->vert_shader.size > 0) {

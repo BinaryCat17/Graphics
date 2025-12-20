@@ -3,6 +3,7 @@
 
 #include "../assets.h"
 #include "foundation/memory/arena.h"
+#include "engine/scene/scene.h"
 
 struct Assets {
     MemoryArena arena; // For storing paths and metadata
@@ -12,6 +13,7 @@ struct Assets {
     
     // Built-in Resources
     Mesh unit_quad;
+    Font* font;
 };
 
 #endif // ASSETS_INTERNAL_H

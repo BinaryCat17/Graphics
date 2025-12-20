@@ -2,9 +2,11 @@
 #define ASSETS_SYSTEM_H
 
 #include <stdbool.h>
-#include "engine/scene/scene.h"
+#include <stddef.h>
 
 typedef struct Assets Assets;
+typedef struct Mesh Mesh;
+typedef struct Font Font;
 
 typedef struct AssetData {
     void* data;
@@ -22,5 +24,6 @@ void assets_free_file(AssetData* data);
 // Accessors
 const char* assets_get_root_dir(const Assets* assets);
 const Mesh* assets_get_unit_quad(const Assets* assets);
+const Font* assets_get_font(const Assets* assets);
 
 #endif // ASSETS_SYSTEM_H
