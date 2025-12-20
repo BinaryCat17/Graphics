@@ -9,7 +9,7 @@
 bool font_init(const char* font_path);
 
 // Clean up resources (pixels, etc.)
-void font_cleanup(void);
+void font_shutdown(void);
 
 // Get the current atlas texture data (R8 format).
 // Used by the renderer backend to upload the texture.

@@ -9,6 +9,31 @@
 #include <string.h>
 #include <stdlib.h>
 
+struct Engine {
+    // Platform
+    PlatformWindow* window;
+    InputSystem* input_system;
+
+    // Systems
+    RenderSystem* render_system;
+    Assets assets;
+    
+    // Application Data
+    void* user_data;
+    
+    // State
+    bool running;
+    bool show_compute_visualizer;
+    EngineConfig config;
+    double screenshot_interval;
+    double last_screenshot_time;
+    double last_time;
+    float dt;
+    
+    // Callbacks
+    void (*on_update)(Engine* engine);
+};
+
 // --- Input Callbacks ---
 
 static void on_framebuffer_size(PlatformWindow* window, int width, int height, void* user_data) {
@@ -21,9 +46,12 @@ static void on_framebuffer_size(PlatformWindow* window, int width, int height, v
     }
 }
 
-bool engine_init(Engine* engine, const EngineConfig* config) {
-    if (!engine || !config) return false;
-    memset(engine, 0, sizeof(Engine));
+Engine* engine_create(const EngineConfig* config) {
+    if (!config) return NULL;
+
+    Engine* engine = (Engine*)calloc(1, sizeof(Engine));
+    if (!engine) return NULL;
+
     engine->config = *config;
 
     // Store Callbacks
@@ -36,13 +64,15 @@ bool engine_init(Engine* engine, const EngineConfig* config) {
     // 2. Platform & Window
     if (!platform_layer_init()) {
         LOG_FATAL("Failed to initialize platform layer.");
-        return false;
+        free(engine);
+        return NULL;
     }
     
     engine->window = platform_create_window(config->width, config->height, config->title);
     if (!engine->window) {
         LOG_FATAL("Failed to create window.");
-        return false;
+        free(engine);
+        return NULL;
     }
     
     // Callbacks
@@ -54,18 +84,30 @@ bool engine_init(Engine* engine, const EngineConfig* config) {
     engine->input_system = input_system_create(engine->window);
     if (!engine->input_system) {
         LOG_FATAL("Failed to initialize InputSystem.");
-        return false;
+        // Cleanup partial init
+        platform_destroy_window(engine->window);
+        free(engine);
+        return NULL;
     }
 
     // 4. Assets
     if (!assets_init(&engine->assets, config->assets_path, NULL)) {
         LOG_FATAL("Failed to initialize assets from '%s'", config->assets_path);
-        return false;
+        // Cleanup
+        input_system_destroy(engine->input_system);
+        platform_destroy_window(engine->window);
+        free(engine);
+        return NULL;
     }
 
     if (!font_init(engine->assets.font_path)) {
         LOG_FATAL("Failed to initialize font from '%s'", engine->assets.font_path);
-        return false;
+        // Cleanup
+        assets_shutdown(&engine->assets);
+        input_system_destroy(engine->input_system);
+        platform_destroy_window(engine->window);
+        free(engine);
+        return NULL;
     }
 
     // 5. Render System
@@ -76,7 +118,13 @@ bool engine_init(Engine* engine, const EngineConfig* config) {
     engine->render_system = render_system_create(&rs_config);
     if (!engine->render_system) {
         LOG_FATAL("Failed to initialize RenderSystem.");
-        return false;
+        // Cleanup
+        font_shutdown();
+        assets_shutdown(&engine->assets);
+        input_system_destroy(engine->input_system);
+        platform_destroy_window(engine->window);
+        free(engine);
+        return NULL;
     }
 
     // Bindings
@@ -113,7 +161,7 @@ bool engine_init(Engine* engine, const EngineConfig* config) {
     }
 
     engine->running = true;
-    return true;
+    return engine;
 }
 
 void engine_run(Engine* engine) {
@@ -159,10 +207,11 @@ void engine_run(Engine* engine) {
     }
 }
 
-void engine_shutdown(Engine* engine) {
+void engine_destroy(Engine* engine) {
     if (!engine) return;
     
     render_system_destroy(engine->render_system);
+    font_shutdown();
     input_system_destroy(engine->input_system);
     assets_shutdown(&engine->assets);
     
@@ -170,4 +219,51 @@ void engine_shutdown(Engine* engine) {
         platform_destroy_window(engine->window);
     }
     platform_layer_shutdown();
+    free(engine);
+}
+
+// --- Accessors ---
+
+RenderSystem* engine_get_render_system(Engine* engine) {
+    return engine ? engine->render_system : NULL;
+}
+
+InputSystem* engine_get_input_system(Engine* engine) {
+    return engine ? engine->input_system : NULL;
+}
+
+Assets* engine_get_assets(Engine* engine) {
+    return engine ? &engine->assets : NULL;
+}
+
+PlatformWindow* engine_get_window(Engine* engine) {
+    return engine ? engine->window : NULL;
+}
+
+const EngineConfig* engine_get_config(Engine* engine) {
+    return engine ? &engine->config : NULL;
+}
+
+void* engine_get_user_data(Engine* engine) {
+    return engine ? engine->user_data : NULL;
+}
+
+void engine_set_user_data(Engine* engine, void* user_data) {
+    if (engine) engine->user_data = user_data;
+}
+
+float engine_get_dt(Engine* engine) {
+    return engine ? engine->dt : 0.0f;
+}
+
+bool engine_is_running(Engine* engine) {
+    return engine ? engine->running : false;
+}
+
+void engine_set_show_compute(Engine* engine, bool show) {
+    if (engine) engine->show_compute_visualizer = show;
+}
+
+bool engine_get_show_compute(Engine* engine) {
+    return engine ? engine->show_compute_visualizer : false;
 }

@@ -170,7 +170,7 @@ bool font_init(const char* font_path) {
     return true;
 }
 
-void font_cleanup(void) {
+void font_shutdown(void) {
     if (g_font_state.atlas.pixels) {
         free(g_font_state.atlas.pixels);
         g_font_state.atlas.pixels = NULL;

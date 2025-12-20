@@ -21,31 +21,23 @@ typedef struct EngineConfig {
     void (*on_update)(Engine* engine);
 } EngineConfig;
 
-struct Engine {
-    // Platform
-    PlatformWindow* window;
-    InputSystem* input_system;
-
-    // Systems
-    RenderSystem* render_system;
-    Assets assets;
-    
-    // Application Data
-    void* user_data;
-    
-    // State
-    bool running;
-    bool show_compute_visualizer;
-    EngineConfig config;
-    double screenshot_interval;
-    double last_screenshot_time;
-    double last_time;
-    float dt;
-    
-    // Callbacks
-    void (*on_update)(Engine* engine);
-};
-
-bool engine_init(Engine* engine, const EngineConfig* config);
+// Lifecycle
+Engine* engine_create(const EngineConfig* config);
 void engine_run(Engine* engine);
-void engine_shutdown(Engine* engine);
+void engine_destroy(Engine* engine);
+
+// Accessors
+RenderSystem* engine_get_render_system(Engine* engine);
+InputSystem* engine_get_input_system(Engine* engine);
+Assets* engine_get_assets(Engine* engine);
+PlatformWindow* engine_get_window(Engine* engine);
+const EngineConfig* engine_get_config(Engine* engine);
+
+void* engine_get_user_data(Engine* engine);
+void engine_set_user_data(Engine* engine, void* user_data);
+
+float engine_get_dt(Engine* engine);
+bool engine_is_running(Engine* engine);
+
+void engine_set_show_compute(Engine* engine, bool show);
+bool engine_get_show_compute(Engine* engine);

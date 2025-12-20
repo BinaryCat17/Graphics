@@ -17,7 +17,7 @@ The project is undergoing a structural standardization to enforce strict public/
 - [x] **Refactor:** Replace public `InputState` struct with accessors and hide implementation.
 - [x] **UI System:** Enforce Opaque Handle pattern (hide `UiElement`, `UiNodeSpec` structs).
 - [x] **Cleanup:** Remove legacy redundant fields from `InputState` (mouse_clicked, scroll_dx/dy, last_char/key/action) and update consumers.
-- [ ] **Engine Encapsulation:** Restrict direct access to `Engine` struct fields by introducing accessors (`engine_get_render_system`, etc.) to decouple App from Core.
+- [x] **Engine Encapsulation:** Restrict direct access to `Engine` struct fields by introducing accessors (`engine_get_render_system`, etc.) to decouple App from Core.
 - [ ] **Unified Config:** Move CLI argument parsing and config loading logic from `main.c` to a dedicated `ConfigSystem` in Foundation.
 - [ ] **Optimization:** Replace raw `char*` usage in `UiNodeSpec` with `StringId` for faster comparisons and memory safety.
 - [ ] **Refactor:** Standardize Asset Paths to use `StringId` where appropriate for performance.

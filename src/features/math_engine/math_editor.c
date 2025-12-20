@@ -223,7 +223,7 @@ void math_editor_init(MathEditorState* state, Engine* engine) {
     state->ui_instance = ui_instance_create(1024 * 1024); // 1MB for UI Elements
 
     // 4. Load UI Asset
-    const char* ui_path = engine->config.ui_path; // Use config path
+    const char* ui_path = engine_get_config(engine)->ui_path; // Use config path
     if (ui_path) {
         state->ui_asset = ui_parser_load_from_file(ui_path);
         if (state->ui_asset) {
@@ -247,9 +247,9 @@ void math_editor_init(MathEditorState* state, Engine* engine) {
     }
 
     // 5. Initial Compute Compile
-    engine->show_compute_visualizer = true;
-    render_system_set_show_compute(engine->render_system, true);
-    math_editor_recompile_graph(state, engine->render_system);
+    engine_set_show_compute(engine, true);
+    render_system_set_show_compute(engine_get_render_system(engine), true);
+    math_editor_recompile_graph(state, engine_get_render_system(engine));
 }
 
 void math_editor_render(MathEditorState* state, Scene* scene, const Assets* assets) {
@@ -267,13 +267,14 @@ void math_editor_update(MathEditorState* state, Engine* engine) {
     math_editor_sync_view_data(state);
 
     // Toggle Visualizer (Hotkey C) - Event Based
-    int event_count = input_get_event_count(engine->input_system);
+    int event_count = input_get_event_count(engine_get_input_system(engine));
     for (int i = 0; i < event_count; ++i) {
-        const InputEvent* e = input_get_event(engine->input_system, i);
+        const InputEvent* e = input_get_event(engine_get_input_system(engine), i);
         if (e->type == INPUT_EVENT_KEY_PRESSED && e->data.key.key == 67) { // KEY_C
-             engine->show_compute_visualizer = !engine->show_compute_visualizer;
-             render_system_set_show_compute(engine->render_system, engine->show_compute_visualizer);
-             if (engine->show_compute_visualizer) {
+             bool show = !engine_get_show_compute(engine);
+             engine_set_show_compute(engine, show);
+             render_system_set_show_compute(engine_get_render_system(engine), show);
+             if (show) {
                  state->graph_dirty = true; 
              }
         }
@@ -284,10 +285,10 @@ void math_editor_update(MathEditorState* state, Engine* engine) {
     // UI Update Loop
     if (root) {
         // Animation / Logic Update
-        ui_element_update(root, engine->dt);
+        ui_element_update(root, engine_get_dt(engine));
         
         // Input Handling
-        ui_input_update(state->input_ctx, root, engine->input_system);
+        ui_input_update(state->input_ctx, root, engine_get_input_system(engine));
         
         // Process Events
         UiEvent evt;
@@ -329,8 +330,8 @@ void math_editor_update(MathEditorState* state, Engine* engine) {
         }
         
         // Layout
-        PlatformWindowSize size = platform_get_framebuffer_size(engine->window);
-        ui_instance_layout(state->ui_instance, (float)size.width, (float)size.height, render_system_get_frame_count(engine->render_system), text_measure_wrapper, NULL);
+        PlatformWindowSize size = platform_get_framebuffer_size(engine_get_window(engine));
+        ui_instance_layout(state->ui_instance, (float)size.width, (float)size.height, render_system_get_frame_count(engine_get_render_system(engine)), text_measure_wrapper, NULL);
     }
 
     // Graph Evaluation (Naive interpretation on CPU for debugging/node values)
@@ -342,8 +343,8 @@ void math_editor_update(MathEditorState* state, Engine* engine) {
     }
 
     // Recompile Compute Shader if dirty
-    if (state->graph_dirty && engine->show_compute_visualizer) {
-        math_editor_recompile_graph(state, engine->render_system);
+    if (state->graph_dirty && engine_get_show_compute(engine)) {
+        math_editor_recompile_graph(state, engine_get_render_system(engine));
         state->graph_dirty = false;
     }
 }
