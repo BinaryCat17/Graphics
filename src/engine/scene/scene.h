@@ -11,6 +11,8 @@
 typedef struct Mesh {
     float *positions; // xyz triplets
     size_t position_count;
+    float *uvs; // uv pairs
+    size_t uv_count;
     unsigned int *indices;
     size_t index_count;
     float aabb_min[3];

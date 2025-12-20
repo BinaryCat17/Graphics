@@ -287,6 +287,12 @@ void vk_destroy_device_resources(VulkanRendererState* state) {
     if (state->font_image) { vkDestroyImage(state->device, state->font_image, NULL); state->font_image = VK_NULL_HANDLE; }
     if (state->font_image_mem) { vkFreeMemory(state->device, state->font_image_mem, NULL); state->font_image_mem = VK_NULL_HANDLE; }
     
+    // Unified Resources (Quad)
+    if (state->unit_quad_buffer) { vkDestroyBuffer(state->device, state->unit_quad_buffer, NULL); state->unit_quad_buffer = VK_NULL_HANDLE; }
+    if (state->unit_quad_memory) { vkFreeMemory(state->device, state->unit_quad_memory, NULL); state->unit_quad_memory = VK_NULL_HANDLE; }
+    if (state->unit_quad_index_buffer) { vkDestroyBuffer(state->device, state->unit_quad_index_buffer, NULL); state->unit_quad_index_buffer = VK_NULL_HANDLE; }
+    if (state->unit_quad_index_memory) { vkFreeMemory(state->device, state->unit_quad_index_memory, NULL); state->unit_quad_index_memory = VK_NULL_HANDLE; }
+
     // Cleanup Compute
     if (state->compute_target_view) { vkDestroyImageView(state->device, state->compute_target_view, NULL); state->compute_target_view = VK_NULL_HANDLE; }
     if (state->compute_target_image) { vkDestroyImage(state->device, state->compute_target_image, NULL); state->compute_target_image = VK_NULL_HANDLE; }

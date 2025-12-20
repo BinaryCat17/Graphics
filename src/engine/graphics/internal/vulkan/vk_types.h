@@ -100,6 +100,8 @@ typedef struct VulkanRendererState {
     // Unified Resources
     VkBuffer unit_quad_buffer;
     VkDeviceMemory unit_quad_memory;
+    VkBuffer unit_quad_index_buffer;
+    VkDeviceMemory unit_quad_index_memory;
     
     // Instancing (Global Layout, Per-Frame Sets)
     VkDescriptorSetLayout instance_layout;

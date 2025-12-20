@@ -1,5 +1,6 @@
 #include "engine/assets/assets.h"
 #include "engine/assets/internal/assets_internal.h"
+#include "engine/graphics/primitives.h"
 #include "foundation/platform/platform.h"
 #include "foundation/platform/fs.h"
 #include "foundation/logger/logger.h"
@@ -46,20 +47,33 @@ bool assets_init_internal(Assets* out_assets, const char* assets_dir) {
     out_assets->root_dir = arena_push_string(&out_assets->arena, assets_dir);
 
     // Create Unit Quad (0,0 to 1,1)
-    static float quad_verts[] = {
-        0.0f, 0.0f, 0.0f,
-        1.0f, 0.0f, 0.0f,
-        1.0f, 1.0f, 0.0f,
-        0.0f, 1.0f, 0.0f
-    };
-    static unsigned int quad_indices[] = {
-        0, 1, 2, 0, 2, 3
-    };
-    
-    out_assets->unit_quad.positions = quad_verts;
-    out_assets->unit_quad.position_count = 12; 
-    out_assets->unit_quad.indices = quad_indices;
-    out_assets->unit_quad.index_count = 6;
+    // De-interleave standardized primitive data
+    size_t pos_size = PRIM_QUAD_VERTEX_COUNT * 3 * sizeof(float);
+    size_t uv_size = PRIM_QUAD_VERTEX_COUNT * 2 * sizeof(float);
+    size_t idx_size = PRIM_QUAD_INDEX_COUNT * sizeof(unsigned int);
+
+    out_assets->unit_quad.positions = (float*)arena_alloc(&out_assets->arena, pos_size);
+    out_assets->unit_quad.uvs = (float*)arena_alloc(&out_assets->arena, uv_size);
+    out_assets->unit_quad.indices = (unsigned int*)arena_alloc(&out_assets->arena, idx_size);
+
+    if (out_assets->unit_quad.positions && out_assets->unit_quad.uvs && out_assets->unit_quad.indices) {
+        for (int i = 0; i < PRIM_QUAD_VERTEX_COUNT; ++i) {
+            int src_idx = i * PRIM_VERTEX_STRIDE;
+            out_assets->unit_quad.positions[i*3 + 0] = PRIM_QUAD_VERTS[src_idx + 0];
+            out_assets->unit_quad.positions[i*3 + 1] = PRIM_QUAD_VERTS[src_idx + 1];
+            out_assets->unit_quad.positions[i*3 + 2] = PRIM_QUAD_VERTS[src_idx + 2];
+            
+            out_assets->unit_quad.uvs[i*2 + 0] = PRIM_QUAD_VERTS[src_idx + 3];
+            out_assets->unit_quad.uvs[i*2 + 1] = PRIM_QUAD_VERTS[src_idx + 4];
+        }
+        memcpy(out_assets->unit_quad.indices, PRIM_QUAD_INDICES, idx_size);
+        
+        out_assets->unit_quad.position_count = PRIM_QUAD_VERTEX_COUNT * 3;
+        out_assets->unit_quad.uv_count = PRIM_QUAD_VERTEX_COUNT * 2;
+        out_assets->unit_quad.index_count = PRIM_QUAD_INDEX_COUNT;
+    } else {
+        LOG_ERROR("Assets: Failed to allocate memory for unit quad.");
+    }
 
     LOG_INFO("Assets: Initialized with root '%s'", assets_dir);
     return true;

@@ -6,6 +6,7 @@
 #include "engine/graphics/internal/vulkan/vk_pipeline.h"
 #include "engine/graphics/internal/vulkan/vk_resources.h"
 #include "engine/graphics/internal/vulkan/vk_utils.h"
+#include "engine/graphics/primitives.h"
 #include "engine/text/font.h"
 
 #include "foundation/logger/logger.h"
@@ -323,26 +324,28 @@ static bool vulkan_renderer_init(RendererBackend* backend, const RenderBackendIn
     vk_create_font_texture(state);
     vk_create_descriptor_pool_and_set(state);
 
-    // 9. Static Buffers (Quad - 2 Triangles, 0..1 range)
-    float quad_verts[] = {
-        // Pos (x,y,z)      // UV (u,v)
-        0.0f, 0.0f, 0.0f,   0.0f, 0.0f,
-        1.0f, 0.0f, 0.0f,   1.0f, 0.0f,
-        1.0f, 1.0f, 0.0f,   1.0f, 1.0f,
-        
-        0.0f, 0.0f, 0.0f,   0.0f, 0.0f,
-        1.0f, 1.0f, 0.0f,   1.0f, 1.0f,
-        0.0f, 1.0f, 0.0f,   0.0f, 1.0f
-    };
-    VkDeviceSize v_size = sizeof(quad_verts);
+    // 9. Static Buffers (Quad)
+    // Vertex Buffer
+    VkDeviceSize v_size = sizeof(PRIM_QUAD_VERTS);
     vk_create_buffer(state, v_size, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, 
                      VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, 
                      &state->unit_quad_buffer, &state->unit_quad_memory);
     
     void* v_map;
     vkMapMemory(state->device, state->unit_quad_memory, 0, VK_WHOLE_SIZE, 0, &v_map);
-    memcpy(v_map, quad_verts, v_size);
+    memcpy(v_map, PRIM_QUAD_VERTS, v_size);
     vkUnmapMemory(state->device, state->unit_quad_memory);
+
+    // Index Buffer
+    VkDeviceSize i_size = sizeof(PRIM_QUAD_INDICES);
+    vk_create_buffer(state, i_size, VK_BUFFER_USAGE_INDEX_BUFFER_BIT, 
+                     VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, 
+                     &state->unit_quad_index_buffer, &state->unit_quad_index_memory);
+                     
+    void* i_map;
+    vkMapMemory(state->device, state->unit_quad_index_memory, 0, VK_WHOLE_SIZE, 0, &i_map);
+    memcpy(i_map, PRIM_QUAD_INDICES, i_size);
+    vkUnmapMemory(state->device, state->unit_quad_index_memory);
     
     // 10. Per-Frame Instance Resources
     for (int i = 0; i < 2; ++i) {
@@ -503,6 +506,7 @@ static void vulkan_renderer_render_scene(RendererBackend* backend, const Scene* 
     // Bind Quad Vertex Buffer
     VkDeviceSize offsets[] = {0};
     vkCmdBindVertexBuffers(cmd, 0, 1, &state->unit_quad_buffer, offsets);
+    vkCmdBindIndexBuffer(cmd, state->unit_quad_index_buffer, 0, VK_INDEX_TYPE_UINT32);
 
     // Bind Descriptors
     // Set 0: Global Textures (Font)
@@ -517,7 +521,7 @@ static void vulkan_renderer_render_scene(RendererBackend* backend, const Scene* 
 
     // Draw
     if (actual_count > 0) {
-        vkCmdDraw(cmd, 6, actual_count, 0, 0);
+        vkCmdDrawIndexed(cmd, PRIM_QUAD_INDEX_COUNT, (uint32_t)actual_count, 0, 0, 0);
     }
     
     vkCmdEndRenderPass(cmd);
