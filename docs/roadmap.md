@@ -19,6 +19,9 @@ The project is undergoing a structural standardization to enforce strict public/
 - [x] **Cleanup:** Remove legacy redundant fields from `InputState` (mouse_clicked, scroll_dx/dy, last_char/key/action) and update consumers.
 - [ ] **Cleanup:** Remove legacy monolithic code patterns from `src/engine/core`.
 - [ ] **Cleanup:** Verify and remove any remaining direct Vulkan dependencies in Feature layer.
+- [ ] **Engine Encapsulation:** Restrict direct access to `Engine` struct fields by introducing accessors (`engine_get_render_system`, etc.) to decouple App from Core.
+- [ ] **Unified Config:** Move CLI argument parsing and config loading logic from `main.c` to a dedicated `ConfigSystem` in Foundation.
+- [ ] **Optimization:** Replace raw `char*` usage in `UiNodeSpec` and Assets with `StringId` for faster comparisons and memory safety.
 
 ### Phase 7: 3D Visualization & Compute
 **Objective:** Visualize mathematical functions and data in 3D space.
