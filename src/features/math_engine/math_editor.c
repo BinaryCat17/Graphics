@@ -32,6 +32,44 @@ static UiElement* ui_find_element_by_id(UiElement* root, const char* id) {
     return NULL;
 }
 
+// --- View Model Management ---
+
+static MathNodeView* math_editor_find_view(MathEditorState* state, MathNodeId id) {
+    for(uint32_t i=0; i<state->node_view_count; ++i) {
+        if(state->node_views[i].node_id == id) return &state->node_views[i];
+    }
+    return NULL;
+}
+
+static MathNodeView* math_editor_add_view(MathEditorState* state, MathNodeId id, float x, float y) {
+    if (state->node_view_count >= state->node_view_cap) {
+        uint32_t new_cap = state->node_view_cap ? state->node_view_cap * 2 : 16;
+        MathNodeView* new_arr = arena_alloc_zero(&state->graph_arena, new_cap * sizeof(MathNodeView));
+        if (state->node_views) {
+            memcpy(new_arr, state->node_views, state->node_view_count * sizeof(MathNodeView));
+        }
+        state->node_views = new_arr;
+        state->node_view_cap = new_cap;
+    }
+    MathNodeView* view = &state->node_views[state->node_view_count++];
+    view->node_id = id;
+    view->x = x;
+    view->y = y;
+    return view;
+}
+
+static void math_editor_sync_view_data(MathEditorState* state) {
+    for(uint32_t i=0; i<state->node_view_count; ++i) {
+        MathNodeView* view = &state->node_views[i];
+        MathNode* node = math_graph_get_node(&state->graph, view->node_id);
+        if(node) {
+            // One-way binding: Logic -> View
+            strncpy(view->name, node->name, 31);
+            view->value = node->value;
+        }
+    }
+}
+
 // --- Recompilation Logic ---
 
 static void math_editor_recompile_graph(MathEditorState* state, RenderSystem* rs) {
@@ -63,7 +101,7 @@ static void math_editor_recompile_graph(MathEditorState* state, RenderSystem* rs
     char cmd[512];
     sprintf(cmd, "glslc %s -o %s", tmp_glsl, tmp_spv);
     
-    LOG_DEBUG("Running: %s", cmd);
+    // LOG_DEBUG("Running: %s", cmd);
     int res = system(cmd);
     if (res != 0) {
         LOG_ERROR("glslc failed with code %d", res);
@@ -101,6 +139,10 @@ static void math_editor_recompile_graph(MathEditorState* state, RenderSystem* rs
 
 static void math_editor_refresh_graph_view(MathEditorState* state) {
     if (!state->ui_instance.root) return;
+    
+    // Sync data before rebuild
+    math_editor_sync_view_data(state);
+
     UiElement* canvas = ui_find_element_by_id(state->ui_instance.root, "canvas_area");
     if (canvas) {
         // Declarative Refresh
@@ -112,10 +154,6 @@ static void math_editor_refresh_inspector(MathEditorState* state) {
     if (!state->ui_instance.root) return;
     UiElement* inspector = ui_find_element_by_id(state->ui_instance.root, "inspector_area");
     if (!inspector) return;
-    
-    // Note: Inspector is still imperative for now as it depends on selection which is not a collection
-    // We could potentially make it declarative by binding "selected_node" but that requires Single-Item Binding logic
-    // which we haven't built yet. So we keep this imperative.
     
     if (state->selected_node_id == MATH_NODE_INVALID_ID) {
         inspector->child_count = 0;
@@ -161,7 +199,10 @@ static void cmd_add_node(void* user_data, UiElement* target) {
     (void)target;
     MathEditorState* state = (MathEditorState*)user_data;
     LOG_INFO("Command: Graph.AddNode");
-    math_graph_add_node(&state->graph, MATH_NODE_VALUE);
+    
+    MathNodeId id = math_graph_add_node(&state->graph, MATH_NODE_VALUE);
+    math_editor_add_view(state, id, 100, 100);
+    
     math_editor_refresh_graph_view(state);
 }
 
@@ -185,29 +226,38 @@ static void math_editor_setup_default_graph(MathEditorState* state) {
     
     MathNodeId uv_id = math_graph_add_node(&state->graph, MATH_NODE_UV);
     MathNode* uv = math_graph_get_node(&state->graph, uv_id);
-    if(uv) { math_graph_set_name(&state->graph, uv_id, "UV.x"); uv->ui_x = 50; uv->ui_y = 100; }
+    if(uv) { math_graph_set_name(&state->graph, uv_id, "UV.x"); }
+    math_editor_add_view(state, uv_id, 50, 100);
     
     MathNodeId freq_id = math_graph_add_node(&state->graph, MATH_NODE_VALUE);
     MathNode* freq = math_graph_get_node(&state->graph, freq_id);
-    if(freq) { math_graph_set_name(&state->graph, freq_id, "Frequency"); freq->value = 20.0f; freq->ui_x = 50; freq->ui_y = 250; }
+    if(freq) { math_graph_set_name(&state->graph, freq_id, "Frequency"); freq->value = 20.0f; }
+    math_editor_add_view(state, freq_id, 50, 250);
     
     MathNodeId mul_id = math_graph_add_node(&state->graph, MATH_NODE_MUL);
     MathNode* mul = math_graph_get_node(&state->graph, mul_id);
-    if(mul) { math_graph_set_name(&state->graph, mul_id, "Multiply"); mul->ui_x = 250; mul->ui_y = 175; }
+    if(mul) { math_graph_set_name(&state->graph, mul_id, "Multiply"); }
+    math_editor_add_view(state, mul_id, 250, 175);
     
     MathNodeId sin_id = math_graph_add_node(&state->graph, MATH_NODE_SIN);
     MathNode* s = math_graph_get_node(&state->graph, sin_id);
-    if(s) { math_graph_set_name(&state->graph, sin_id, "Sin"); s->ui_x = 450; s->ui_y = 175; }
+    if(s) { math_graph_set_name(&state->graph, sin_id, "Sin"); }
+    math_editor_add_view(state, sin_id, 450, 175);
     
     math_graph_connect(&state->graph, mul_id, 0, uv_id); 
     math_graph_connect(&state->graph, mul_id, 1, freq_id); 
     math_graph_connect(&state->graph, sin_id, 0, mul_id);
+    
+    math_editor_sync_view_data(state);
 }
 
 void math_editor_init(MathEditorState* state, Engine* engine) {
     // 1. Init Memory
     arena_init(&state->graph_arena, 1024 * 1024); // 1MB for Graph Data
     math_graph_init(&state->graph, &state->graph_arena);
+    state->node_views = NULL;
+    state->node_view_count = 0;
+    state->node_view_cap = 0;
     
     state->selected_node_id = MATH_NODE_INVALID_ID;
     
@@ -228,21 +278,21 @@ void math_editor_init(MathEditorState* state, Engine* engine) {
     if (ui_path) {
         state->ui_asset = ui_parser_load_from_file(ui_path);
         if (state->ui_asset) {
-            const MetaStruct* graph_meta = meta_get_struct("MathGraph");
+            // NOTE: We now bind MathEditorState, not MathGraph!
+            const MetaStruct* editor_meta = meta_get_struct("MathEditorState");
+            if (!editor_meta) {
+                 LOG_ERROR("MathEditorState meta not found! Did you run codegen?");
+            }
             
             // Build Static UI from Asset into Instance
-            state->ui_instance.root = ui_element_create(&state->ui_instance, state->ui_asset->root, &state->graph, graph_meta);
+            state->ui_instance.root = ui_element_create(&state->ui_instance, state->ui_asset->root, state, editor_meta);
 
             // Bind to Renderer
             render_system_bind_ui(&engine->render_system, state->ui_instance.root);
             
-            // Select first node (optional convenience)
-            for(uint32_t i=0; i<state->graph.node_count; ++i) {
-                const MathNode* n = math_graph_get_node(&state->graph, i);
-                if(n && n->type != MATH_NODE_NONE) {
-                    state->selected_node_id = n->id;
-                    break;
-                }
+            // Initial Select
+            if (state->node_view_count > 0) {
+                state->selected_node_id = state->node_views[0].node_id;
             }
         } else {
             LOG_ERROR("Failed to load UI asset: %s", ui_path);
@@ -250,7 +300,6 @@ void math_editor_init(MathEditorState* state, Engine* engine) {
     }
 
     // 5. Initial Compute Compile
-    // Force visualizer on for now
     engine->show_compute_visualizer = true;
     engine->render_system.show_compute_result = true;
     math_editor_recompile_graph(state, &engine->render_system);
@@ -258,6 +307,9 @@ void math_editor_init(MathEditorState* state, Engine* engine) {
 
 void math_editor_update(MathEditorState* state, Engine* engine) {
     if (!state) return;
+    
+    // Sync Logic -> View (one way binding for visual updates)
+    math_editor_sync_view_data(state);
 
     // Toggle Visualizer (Hotkey C)
     static bool key_c_prev = false;
@@ -287,16 +339,20 @@ void math_editor_update(MathEditorState* state, Engine* engine) {
                 case UI_EVENT_VALUE_CHANGE:
                 case UI_EVENT_DRAG_END:
                     state->graph_dirty = true;
+                    // If drag end was on a view node, update its x/y is automatic via UI binding,
+                    // but we don't need to sync back to logic because logic doesn't have x/y anymore!
+                    // This is the beauty of separation.
                     break;
                 case UI_EVENT_CLICK: {
                     // Selection Logic
                     UiElement* hit = evt.target;
                     while (hit) {
-                        if (hit->data_ptr && hit->meta && strcmp(hit->meta->name, "MathNode") == 0) {
-                            MathNode* n = (MathNode*)hit->data_ptr;
-                            state->selected_node_id = n->id;
+                        // Check for MathNodeView
+                        if (hit->data_ptr && hit->meta && strcmp(hit->meta->name, "MathNodeView") == 0) {
+                            MathNodeView* v = (MathNodeView*)hit->data_ptr;
+                            state->selected_node_id = v->node_id;
                             state->selection_dirty = true;
-                            LOG_INFO("Selected Node: %d", n->id);
+                            LOG_INFO("Selected Node: %d", v->node_id);
                             break;
                         }
                         hit = hit->parent;
@@ -340,7 +396,4 @@ void math_editor_shutdown(MathEditorState* state, Engine* engine) {
     arena_destroy(&state->graph_arena);
     
     if (state->ui_asset) ui_asset_free(state->ui_asset);
-    
-    // Note: RenderSystem pipeline cleanup should theoretically happen here or in Engine
-    // but RenderSystem cleans up its own resources on shutdown.
 }

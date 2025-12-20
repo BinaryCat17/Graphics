@@ -4,8 +4,8 @@ width: 150
 height: 100
 clickable: true
 draggable: true
-bind_x: "ui_x"
-bind_y: "ui_y"
+bind_x: "x"
+bind_y: "y"
 color: "#333333"
 padding: 5
 children:

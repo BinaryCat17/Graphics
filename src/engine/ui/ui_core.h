@@ -59,17 +59,7 @@ typedef struct UiEvent {
     UiElement* target;
 } UiEvent;
 
-typedef struct InputState {
-    float mouse_x, mouse_y;
-    bool mouse_down;
-    bool mouse_clicked;
-    float scroll_dx, scroll_dy;
-    
-    // Keyboard
-    uint32_t last_char; // Unicode codepoint
-    int last_key;       // Platform key code
-    int last_action;    // Press/Release/Repeat
-} InputState;
+#include "engine/core/input_types.h"
 
 // --- UI SPECIFICATION (The DNA) ---
 // Pure data. Allocated inside a UiAsset arena. Read-only at runtime.

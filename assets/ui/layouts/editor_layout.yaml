@@ -20,7 +20,7 @@ children:
     width: -1 # Fill rest
     height: -1
     color: "#262626"
-    collection: "node_ptrs"
+    collection: "node_views"
     item_template: "GraphNode"
     
     children:

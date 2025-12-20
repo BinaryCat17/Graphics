@@ -45,9 +45,7 @@ typedef struct MathNode {
     // Stores the IDs of the nodes connected to input slots.
     MathNodeId inputs[MATH_NODE_MAX_INPUTS]; 
     
-    // UI / Editor Data
-    float ui_x;             // REFLECT
-    float ui_y;             // REFLECT
+    // UI / Editor Data (Moved to MathNodeView in Editor)
     char name[32];          // REFLECT
 } MathNode;
 

@@ -1,7 +1,7 @@
 # The Architecture Guide
 
-**Version:** 0.4 (UI Optimization & Stability)
-**Date:** December 19, 2025
+**Version:** 0.5 (Refined)
+**Date:** December 20, 2025
 
 This document explains **how** the system is built and, more importantly, **why** it is built that way.
 
@@ -9,7 +9,7 @@ This document explains **how** the system is built and, more importantly, **why*
 
 ## 1. The "Layered Cake" Philosophy
 
-The codebase is organized into four strict layers. Think of it like a building: you can change the furniture (App) without rebuilding the foundation, but if the foundation cracks, everything falls.
+The codebase is organized into four strict layers. Dependencies flow **downwards only**.
 
 ```mermaid
 graph TD
@@ -21,145 +21,110 @@ graph TD
 ### 🧱 Foundation (`src/foundation/`)
 **"The Bedrock"**
 These are the tools that have **zero dependencies** on the rest of the engine.
-*   **Memory:** Custom allocators (Arenas, Pools). We rarely use `malloc` in the game loop.
-*   **Platform:** Wrappers for Windows/Linux stuff (Window creation, File IO).
-*   **Math:** Vectors, Matrices.
-*   **Logger:** `LOG_INFO`, `LOG_ERROR`.
-*   **Meta (Reflection):** A custom system allowing the engine to inspect C structs at runtime. Essential for UI Data Binding.
+*   **Memory:** Custom allocators (`Arena`, `Pool`). We strictly manage memory lifetimes.
+*   **Platform:** OS Abstraction (`fs`, `platform`). Wraps Window creation, File IO, and Time.
+*   **Math:** Linear algebra (`vec2`, `mat4`, `rect`).
+*   **Logger:** Centralized logging (`LOG_INFO`, `LOG_ERROR`).
+*   **Config:** Simple YAML parser (`simple_yaml`) for loading configuration files.
+*   **Meta (Reflection):** Runtime introspection system for C structs. Essential for UI Data Binding.
 
 ### ⚙️ Engine (`src/engine/`)
 **"The Machine"**
-This layer manages the lifecycle of the application. It knows how to draw things, play sounds, and handle input, but it doesn't know *what* game you are making.
-*   **Graphics:** The renderer.
+This layer manages the systems required to run an interactive application. It is agnostic to the specific game or tool being built.
+*   **Core:** Lifecycle management (`Engine` struct), Main Loop.
+*   **Graphics:** 
+    *   `RenderSystem`: High-level command sorter and batcher.
+    *   `RendererBackend`: Low-level Vulkan/Graphics API wrapper.
+    *   `Scene`: Unified scene representation.
 *   **UI:** The layout, widget, and command system.
-*   **Assets:** Loading files from disk.
+*   **Assets:** Asset management and loading.
 
 ### 🧩 Features (`src/features/`)
 **"The Logic"**
-These are reusable modules that define specific business logic. They use the Engine to do work, but they don't *contain* engine code.
-*   **Math Engine:** The node graph editor logic. It calculates values and generates code, but it asks the App to actually run that code on the GPU.
+These are reusable, domain-specific modules. They use the Engine to function but contain their own business logic.
+*   **Math Engine:** A visual programming node graph.
+    *   **Graph:** The data structure of nodes and connections.
+    *   **Transpiler:** Converts the graph into an intermediate representation (IR).
+    *   **Emitters:** Converts IR into target code (e.g., GLSL).
 
 ### 🚀 App (`src/app/`)
 **"The Glue"**
-This is the entry point (`main.c`). It connects everything together.
-*   It initializes the **Engine**.
-*   It registers **Commands** (e.g., `Graph.AddNode`).
-*   It tells the Engine to render the Feature.
+The entry point (`main.c`). It orchestrates the layers.
+*   It initializes the **Engine** with a config.
+*   It instantiates **Features**.
+*   It connects **UI Events** to **Feature Logic**.
 
 ---
 
 ## 2. Core Principles
 
-These are the non-negotiable rules that guide every architectural decision in the project.
-
 ### 🧠 Data-Driven Design
-*   **Definition:** Behavior and structure should be defined in data (YAML, C Structs), not hardcoded in logic.
-*   **Implementation:** The UI is built entirely from `manifest.yaml` and layout files. The engine logic simply interprets this data.
-*   **Benefit:** faster iteration time and separation of design from engineering.
+*   **Definition:** Behavior is defined in data, not code.
+*   **Example:** The UI is built from `manifest.yaml`. The Engine purely interprets this data.
 
 ### ⚡ Reactivity (MVVM)
-*   **Definition:** The UI automatically reflects the state of the application without manual updates.
-*   **Implementation:** We use a custom **Reflection System**. UI components bind to C struct fields (e.g., `text_source: "node_name"`). When the C data changes, the UI updates automatically.
+*   **Definition:** The View updates automatically when the Model changes.
+*   **Mechanism:** The Reflection system binds UI fields (strings in YAML) to C struct offsets.
 
-### 🛡 Memory Safety & Performance
-*   **Definition:** No garbage collection, predictable memory usage, and zero leaks.
-*   **Implementation:**
-    *   **Arenas:** Used for permanent frame-agnostic data (Assets, Specs).
-    *   **Pools:** Used for dynamic objects that need frequent allocation/deallocation (UI Elements).
-    *   **Stack/Temp:** Used for per-frame data.
-*   **Rule:** `malloc`/`free` are forbidden in the hot loop.
+### 🛡 Memory Safety
+*   **Rule:** No `malloc`/`free` in the hot loop.
+*   **Mechanism:**
+    *   **Arenas:** Linear allocators for frame-scope or permanent data.
+    *   **Pools:** O(1) alloc/free for dynamic objects with stable IDs.
 
 ### 🔗 Strict Decoupling
-*   **Definition:** Systems should not know about each other unless absolutely necessary.
-*   **Implementation:**
-    *   The **UI Engine** knows nothing about the **Math Engine**.
-    *   They communicate via a **Command System** using String IDs (FNV-1a).
-    *   The UI sends a string event ("Graph.AddNode"), and the App handles it.
+*   **Rule:** Systems communicate via opaque IDs or Commands, not pointers.
+*   **Mechanism:** The UI doesn't know about the Graph. It sends a "Graph.AddNode" command (String ID), which the App handles.
 
 ---
 
-## 3. Deep Dive: The UI System (v0.3)
+## 3. Detailed Subsystems
 
-The UI system follows a **Data-Driven, Reactive, MVVM** architecture.
+### The Graphics System
+Split into Data, Manager, and Worker.
+1.  **Unified Scene (`scene.h`):** A flat array of `SceneObject`s. Everything (Text, UI, 3D) is an object.
+2.  **RenderSystem (`render_system.h`):** Sorts objects (Z-index), culls, and builds render packets.
+3.  **RendererBackend (`renderer_backend.h`):** Executes Vulkan commands.
 
-### The Philosophy
-1.  **Manifest (`manifest.yaml`):** The entry point that registers **Templates** (The Registry) and imports the **Root Layout**.
-2.  **View (YAML Layouts)::** The structure defined in files like `editor_layout.yaml`.
-3.  **Model (C Structs):** The state is plain C data.
-4.  **ViewModel (Bindings):** The engine uses Reflection to glue them together.
+### The Math Engine (Feature)
+A complete transpiler pipeline embedded in the application.
+1.  **Graph Model:** Nodes and connections stored in Memory Pools.
+2.  **IR (Intermediate Representation):** The graph is flattened into a linear instruction set (SSA-like).
+3.  **Codegen:** The IR is traversed to emit GLSL code, which is then compiled by the backend.
 
-### Key Features
-*   **Manifest-Based Loading:** The engine loads a single manifest that acts as a "Library" of available components. This separates component definitions from the main layout.
-*   **Templates & Instances:** UI components are loaded as templates and instantiated via `type: instance`.
-*   **Strict Import Rules:** Imports are ONLY allowed at the top level. `import` inside `children` is forbidden.
-*   **Memory Management:** 
-    *   **Spec (Assets):** Stored in a permanent Arena.
-    *   **Elements (Instances):** Allocated from a **Memory Pool** to allow efficient reuse and freeing of dynamic UI trees (like Graph Nodes).
-*   **Command System:** Decoupled via **String IDs** (FNV-1a). The UI triggers events by ID, and the App executes registered callbacks.
-
----
-
-## 3. Deep Dive: The Graphics System
-
-The graphics layer is split into two parts to keep things clean.
-
-### The Data: Unified Scene (`scene/scene.h`)
-Instead of having separate lists for UI, 2D Sprites, and 3D Models, the engine uses a **Single Linear Array** of `SceneObject`s.
-
-*   **Everything is an Object:** A UI button, a text character, and a 3D cube are all `SceneObject` structs.
-*   **Why?** This makes the `RenderSystem` incredibly simple. It iterates the array **once**, sorts by Z-index, and submits to the backend.
-
-### The Manager: `RenderSystem` (`render_system.h`)
-This is the **High-Level API**. Features and the App talk to this.
-*   **You say:** "Draw this UI", "Render this scene", "Set the camera".
-*   **It does:** Sorts objects, culls invisible items, and prepares packets for the backend.
-*   **Optimization:** Uses a static overlay buffer to avoid per-frame allocations for popup/tooltip rendering.
-
-### The Worker: `RendererBackend` (`renderer_backend.h`)
-This is the **Low-Level Hardware Interface**. Only the `RenderSystem` talks to this.
-*   **It does:** "Bind Vulkan Pipeline", "Copy Memory to GPU", "Submit Command Buffer".
+### The UI System
+1.  **Parser:** Reads YAML and creates a simplified internal tree.
+2.  **Layout:** Calculates absolute positions (AABB) for all widgets.
+3.  **Renderer:** Converts widgets into `SceneObject`s for the `RenderSystem`.
 
 ---
 
-## 4. The Build Pipeline & Tools
+## 4. Build & Tooling
 
-We automate the boring stuff using Python scripts invoked by CMake.
-
-### Code Generation (`tools/codegen.py`)
-*   **When:** Runs *before* C compilation.
-*   **What:** Scans source files for structs/enums marked with `// REFLECT`.
-*   **Output:** Generates `src/generated/reflection_registry.c`.
-*   **Why:** Enables the UI to automatically read/write C structs (Data Binding) without manual boilerplate.
-
-### Shader Compilation (`tools/build_shaders.py`)
-*   **When:** Runs during the build.
-*   **What:** Scans `assets/shaders/` for `.vert` and `.frag` files.
-*   **Output:** Generates binary `.spv` files using `glslc`.
+*   **CMake:** Main build system.
+*   **Python Scripts:**
+    *   `tools/codegen.py`: Generates reflection metadata.
+    *   `tools/build_shaders.py`: Compiles GLSL to SPIR-V.
 
 ---
 
-## 5. Directory Structure Guide
+## 5. Directory Structure
 
 ```text
 src/
-├── app/                  
-│   └── main.c            # The "Glue" code. Registers Commands.
-│
-├── features/             
-│   └── math_engine/      # The Logic Layer
-│
-├── engine/               
-│   ├── core/             # Application lifecycle.
-│   ├── graphics/         
-│   └── ui/               # The UI System (Parser, Layout, Input, Renderer)
-│       ├── ui_command_system.c
+├── app/                  # Application Entry Point
+├── features/             # Business Logic Modules
+│   └── math_engine/      # Example: Node Graph Editor
+│       ├── emitters/     # Code generation backends
 │       └── ...
-│
-└── foundation/           # Independent Utilities (Memory, Math, Logs).
+├── engine/               # Core Systems
+│   ├── core/             # Engine Lifecycle
+│   ├── assets/           # Asset Loading
+│   ├── graphics/         # Rendering Pipeline
+│   └── ui/               # UI System
+└── foundation/           # Low-level Utilities
+    ├── config/           # YAML Parser
+    ├── logger/           # Logging
+    ├── memory/           # Arenas/Pools
+    └── ...
 ```
-
----
-
-## 6. Known Constraints (Technical Debt)
-
-*   **Text Rendering:** Each letter is a separate object (inefficient). Needs batching.

@@ -22,6 +22,12 @@ We are now shifting focus from **Tooling/UI** to **Core Graphics/3D**.
 - [ ] **Camera System:** Implement a proper 3D camera controller (Perspective/Orthographic) with input handling.
 - [ ] **Transform Hierarchy:** Upgrade `SceneObject` to support parent-child transforms (currently flat).
 
+### Phase 6: Architecture Hardening
+**Objective:** Enforce strict layer boundaries and improve compile times.
+- [ ] **Decouple Logic/View:** Remove UI data (`ui_x`, `ui_y`) from `MathNode` struct. Store editor state separately.
+- [ ] **Engine Encapsulation:** Hide `PlatformWindow` and other implementation details from the public `Engine` API.
+- [ ] **Header Hygiene:** Reduce include bloat in `engine.h` by using forward declarations where possible.
+
 ---
 
 ## 🛠 Technical Debt & Backlog

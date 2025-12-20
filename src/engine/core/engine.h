@@ -2,9 +2,8 @@
 
 #include "engine/graphics/render_system.h"
 #include "engine/assets/assets.h"
-#include "engine/ui/ui_parser.h"
 #include "foundation/platform/platform.h"
-#include "engine/ui/ui_core.h"
+#include "engine/core/input_types.h"
 
 typedef struct Engine Engine;
 

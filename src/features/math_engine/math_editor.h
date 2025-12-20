@@ -5,6 +5,17 @@
 #include "engine/ui/ui_core.h"
 #include "engine/ui/ui_input.h"
 
+// ViewModel for a Node in the Editor
+typedef struct MathNodeView {
+    MathNodeId node_id;     // REFLECT
+    float x;                // REFLECT
+    float y;                // REFLECT
+    
+    // Cached Data for UI Binding (ViewModel pattern)
+    char name[32];          // REFLECT
+    float value;            // REFLECT (Input/Output preview)
+} MathNodeView;
+
 // The State of the Graph Editor Feature
 typedef struct MathEditorState {
     MathGraph graph;
@@ -15,6 +26,12 @@ typedef struct MathEditorState {
     UiInstance ui_instance; // Manages UI Element memory
     UiInputContext input_ctx;
     
+    // ViewModel Data
+    // We store views in a parallel array/pool. For simplicity, dynamic array in arena.
+    MathNodeView* node_views;   // REFLECT
+    uint32_t node_view_count;   // REFLECT
+    uint32_t node_view_cap;
+
     // Selection
     MathNodeId selected_node_id;
     bool selection_dirty; 
