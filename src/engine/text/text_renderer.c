@@ -2,7 +2,6 @@
 #include "engine/text/font.h"
 #include "internal/font_internal.h"
 #include "foundation/logger/logger.h"
-#include "engine/graphics/shader_constants.h"
 #include <string.h>
 
 void scene_add_text_clipped(Scene* scene, const char* text, Vec3 pos, float scale, Vec4 color, Vec4 clip_rect) {
@@ -44,7 +43,7 @@ void scene_add_text_clipped(Scene* scene, const char* text, Vec3 pos, float scal
             obj.color = color;
             
             // Texture Params (1.0 = use texture)
-            obj.shader_params_0.x = (float)SHADER_UI_MODE_TEXTURED;
+            obj.shader_params_0.x = (float)SCENE_MODE_TEXTURED;
             
             // UVs
             obj.uv_rect.x = g.u0;

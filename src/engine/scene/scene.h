@@ -31,6 +31,15 @@ typedef enum ScenePrimitiveType {
     SCENE_PRIM_CURVE = 1 // SDF Bezier Curve
 } ScenePrimitiveType;
 
+// Standard Rendering Modes for UI/2D Shader
+typedef enum SceneShaderMode {
+    SCENE_MODE_SOLID        = 0, // Solid Color
+    SCENE_MODE_TEXTURED     = 1, // Font/Bitmap
+    SCENE_MODE_USER_TEXTURE = 2, // Compute Result/Image
+    SCENE_MODE_9_SLICE      = 3, // UI Panel
+    SCENE_MODE_SDF_BOX      = 4  // Rounded Box
+} SceneShaderMode;
+
 // --- Scene Components ---
 
 typedef struct SceneCamera {

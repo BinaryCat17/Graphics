@@ -3,7 +3,7 @@
 **Current Focus:** Phase 6 - Architectural Hardening & 3D
 **Date:** December 20, 2025
 
-## 🏁 Current State (v0.7 Refactoring)
+## 🏁 Current State (v0.7.1 Refactoring)
 
 The project is undergoing a structural standardization to enforce strict public/private API boundaries before expanding into complex 3D features.
 
@@ -12,11 +12,11 @@ The project is undergoing a structural standardization to enforce strict public/
 ## 🚀 Active Phases
 
 ### Phase 6: Architectural Hardening & Cleanup (IMMEDIATE PRIORITY)
-**Objective:** Enforce the "Public/Internal" separation pattern across all modules to prevent technical debt and remove legacy code.
-- [x] **Scene Encapsulation:** Apply Opaque Handle pattern to `Scene` struct (hide implementation in `internal/scene_internal.h`).
-- [x] **Shader Constants:** Extract magic numbers (e.g., UI rendering modes `3.0f`, `4.0f`) into a shared header/enum.
-- [x] **Font Memory Safety:** Replace raw `malloc` in `font.c` with the Foundation memory subsystem (`MemoryArena`).
-- [x] **Backend Cleanup:** Move screenshot IO logic (`stb_image_write`) out of `vulkan_renderer.c` into a dedicated Foundation module.
+**Objective:** Enforce the "Public/Internal" separation pattern, optimize memory usage, and remove hardcoded logic.
+
+- [ ] **Scene Memory Optimization:** Replace `realloc` in `Scene` with `MemoryArena` (Frame Allocator) to eliminate heap fragmentation and allocation spikes during rendering.
+- [ ] **Asset Decoupling:** Refactor `Assets` module to load file content into memory buffers. Update `RenderSystem` to accept data pointers (bytes) instead of file paths, decoupling rendering from the OS file system.
+- [ ] **UI Styling Data-Drive:** Remove hardcoded visual logic (e.g., `color *= 1.1f` for inputs) from `ui_renderer.c`. Move state-based visual changes into `UiStyle` or config data.
 
 ### Phase 7: 3D Visualization & Compute
 **Objective:** Visualize mathematical functions and data in 3D space.
@@ -34,4 +34,5 @@ The project is undergoing a structural standardization to enforce strict public/
 
 ## 🛠 Technical Debt & Backlog
 
-*None currently prioritized.*
+*   **Geometry Utils:** Move generic mesh generation (quads, cubes) from `vk_utils.c` to a backend-agnostic `foundation/geometry` module.
+*   **Input Mapping:** Replace hardcoded keys (e.g., `KEY_Z`) with an Action Mapping system.

@@ -2,7 +2,6 @@
 #include "../ui_core.h"
 #include "ui_internal.h"
 #include "engine/scene/scene.h"
-#include "engine/graphics/shader_constants.h"
 #include "foundation/logger/logger.h"
 #include "engine/text/text_renderer.h" 
 #include "engine/text/font.h" 
@@ -49,7 +48,7 @@ static void render_background(const UiElement* el, Scene* scene, Vec4 clip_vec, 
 
     if ((el->spec->texture_id != 0)) {
         // Use 9-Slice or Textured Quad
-        quad.shader_params_0.x = (float)SHADER_UI_MODE_9_SLICE; // 9-Slice (UI Shader Mode)
+        quad.shader_params_0.x = (float)SCENE_MODE_9_SLICE; // 9-Slice (UI Shader Mode)
         
         float u0, v0, u1, v1;
         font_get_ui_rect_uv(&u0, &v0, &u1, &v1);
@@ -68,7 +67,7 @@ static void render_background(const UiElement* el, Scene* scene, Vec4 clip_vec, 
         
     } else {
         // SDF Rounded Box (Mode 4)
-        quad.shader_params_0.x = (float)SHADER_UI_MODE_SDF_BOX; // Mode 4: SDF Rect
+        quad.shader_params_0.x = (float)SCENE_MODE_SDF_BOX; // Mode 4: SDF Rect
         quad.shader_params_0.y = el->spec->corner_radius; // Radius
         
         // Pass borders for SDF stroke
@@ -120,7 +119,7 @@ static void render_content(const UiElement* el, Scene* scene, Vec4 clip_vec, flo
             caret.clip_rect = clip_vec;
             caret.color = (Vec4){1.0f, 1.0f, 1.0f, 1.0f}; 
             
-            caret.shader_params_0.x = (float)SHADER_UI_MODE_SOLID;
+            caret.shader_params_0.x = (float)SCENE_MODE_SOLID;
             float u, v;
             font_get_white_pixel_uv(&u, &v);
             caret.uv_rect = (Vec4){u, v, 0.001f, 0.001f};

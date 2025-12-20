@@ -1,7 +1,6 @@
 #include "engine/graphics/render_system.h"
 #include "engine/graphics/internal/render_packet.h"
 #include "foundation/logger/logger.h"
-#include "engine/graphics/shader_constants.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -196,7 +195,7 @@ void render_system_update(RenderSystem* sys) {
         quad.position = (Vec3){600.0f, 100.0f, 0.0f};
         quad.scale = (Vec3){512.0f, 512.0f, 1.0f};
         quad.color = (Vec4){1.0f, 1.0f, 1.0f, 1.0f};
-        quad.shader_params_0.x = (float)SHADER_UI_MODE_USER_TEXTURE; // User Texture
+        quad.shader_params_0.x = (float)SCENE_MODE_USER_TEXTURE; // User Texture
         quad.uv_rect = (Vec4){0.0f, 0.0f, 1.0f, 1.0f};
         
         RenderFramePacket* dest = &sys->packets[sys->back_packet_index];
