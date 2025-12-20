@@ -64,8 +64,8 @@ static UiElement* hit_test_recursive(UiElement* el, float x, float y) {
     }
 
     // Check children first (reverse order for Z-sorting: last drawn is top)
-    for (int i = (int)el->child_count - 1; i >= 0; --i) {
-        UiElement* hit = hit_test_recursive(el->children[i], x, y);
+    for (UiElement* child = el->last_child; child; child = child->prev_sibling) {
+        UiElement* hit = hit_test_recursive(child, x, y);
         if (hit) return hit;
     }
 

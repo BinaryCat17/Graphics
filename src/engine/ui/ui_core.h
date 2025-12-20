@@ -143,11 +143,11 @@ typedef struct UiElement {
     
     // Hierarchy
     struct UiElement* parent;
-    struct UiElement** children;
+    struct UiElement* first_child;
+    struct UiElement* last_child;
+    struct UiElement* next_sibling;
+    struct UiElement* prev_sibling;
     size_t child_count;
-    // size_t child_capacity; // Not needed if fixed by spec, but needed for dynamic add?
-    // If we use Arena, realloc is hard. 
-    // Usually we build the tree once. Dynamic children are usually rebuilt from scratch.
     
     // Data Context
     void* data_ptr;         // Pointer to C struct
@@ -210,6 +210,12 @@ UiElement* ui_element_create(UiInstance* instance, const UiNodeSpec* spec, void*
 
 // Rebuilds children (Static + Dynamic) for an existing element.
 void ui_element_rebuild_children(UiElement* element, UiInstance* instance);
+
+// Manually add a child to an element (for dynamic editors)
+void ui_element_add_child(UiElement* parent, UiElement* child);
+
+// Clear all children (destroys them)
+void ui_element_clear_children(UiElement* parent, UiInstance* instance);
 
 // Core Loop
 void ui_element_update(UiElement* element, float dt); // Syncs data

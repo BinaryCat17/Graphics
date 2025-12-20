@@ -201,8 +201,8 @@ static void process_node(const UiElement* el, UiRenderContext* ctx, Rect current
     render_content(el, ctx->scene, clip_vec, base_z);
 
     // 3. Recurse
-    for (size_t i = 0; i < el->child_count; ++i) {
-        process_node(el->children[i], ctx, effective_clip, base_z, is_overlay_pass);
+    for (UiElement* child = el->first_child; child; child = child->next_sibling) {
+        process_node(child, ctx, effective_clip, base_z, is_overlay_pass);
     }
 }
 

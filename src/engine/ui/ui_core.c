@@ -45,10 +45,15 @@ UiNodeSpec* ui_asset_get_template(UiAsset* asset, const char* name) {
 
 static void destroy_recursive(UiInstance* instance, UiElement* el) {
     if (!el) return;
-    for (size_t i = 0; i < el->child_count; ++i) {
-        destroy_recursive(instance, el->children[i]);
+    
+    // Destroy children first
+    UiElement* child = el->first_child;
+    while (child) {
+        UiElement* next = child->next_sibling;
+        destroy_recursive(instance, child);
+        child = next;
     }
-    if (el->children) free(el->children);
+    
     pool_free(instance->element_pool, el);
 }
 
@@ -74,6 +79,37 @@ static UiElement* element_alloc(UiInstance* instance, const UiNodeSpec* spec) {
     UiElement* el = (UiElement*)pool_alloc(instance->element_pool);
     el->spec = spec;
     return el;
+}
+
+// Helper: Append child to linked list
+void ui_element_add_child(UiElement* parent, UiElement* child) {
+    if (!parent || !child) return;
+    
+    child->parent = parent;
+    child->next_sibling = NULL;
+    child->prev_sibling = parent->last_child;
+    
+    if (parent->last_child) {
+        parent->last_child->next_sibling = child;
+    } else {
+        parent->first_child = child;
+    }
+    parent->last_child = child;
+    parent->child_count++;
+}
+
+void ui_element_clear_children(UiElement* parent, UiInstance* instance) {
+    if (!parent || !instance) return;
+    
+    UiElement* curr = parent->first_child;
+    while (curr) {
+        UiElement* next = curr->next_sibling;
+        destroy_recursive(instance, curr);
+        curr = next;
+    }
+    parent->first_child = NULL;
+    parent->last_child = NULL;
+    parent->child_count = 0;
 }
 
 #include "foundation/logger/logger.h"
@@ -107,7 +143,10 @@ static int ui_resolve_count(void* data, const MetaStruct* meta, const char* fiel
 void ui_element_rebuild_children(UiElement* el, UiInstance* instance) {
     if (!el || !instance || !el->spec) return;
     
-    // 1. Re-evaluate counts
+    // 1. Clear existing
+    ui_element_clear_children(el, instance);
+
+    // 2. Resolve Dynamic Count
     size_t static_count = el->spec->child_count;
     size_t dynamic_count = 0;
     const MetaField* collection_field = NULL;
@@ -117,35 +156,19 @@ void ui_element_rebuild_children(UiElement* el, UiInstance* instance) {
         if (collection_field) {
             int cnt = ui_resolve_count(el->data_ptr, el->meta, el->spec->bind_collection);
             if (cnt > 0) dynamic_count = (size_t)cnt;
-            LOG_TRACE("UI Collection '%s': Count=%zu", el->spec->bind_collection, dynamic_count);
+            // LOG_TRACE("UI Collection '%s': Count=%zu", el->spec->bind_collection, dynamic_count);
         } else {
             LOG_ERROR("UiCore: Collection field '%s' not found in struct '%s' (Node: %s)", 
                 el->spec->bind_collection, el->meta->name, el->spec->id ? el->spec->id : "anon");
         }
     }
     
-    size_t total_count = static_count + dynamic_count;
-    // ...
-    
-    // 2. Re-allocate children array
-    // Free existing children to prevent leaks
-    for (size_t i = 0; i < el->child_count; ++i) {
-        destroy_recursive(instance, el->children[i]);
-    }
-    if (el->children) {
-        free(el->children);
-        el->children = NULL;
-    }
-
-    if (total_count > 0) {
-        el->children = (UiElement**)calloc(total_count, sizeof(UiElement*));
-    }
-    el->child_count = total_count;
-    
-    // 3. Re-create Static Children
+    // 3. Create Static Children
     for (size_t i = 0; i < static_count; ++i) {
-        el->children[i] = ui_element_create(instance, el->spec->children[i], el->data_ptr, el->meta);
-        if (el->children[i]) el->children[i]->parent = el;
+        UiElement* child = ui_element_create(instance, el->spec->children[i], el->data_ptr, el->meta);
+        if (child) {
+            ui_element_add_child(el, child);
+        }
     }
     
     // 4. Create Dynamic Children
@@ -159,18 +182,15 @@ void ui_element_rebuild_children(UiElement* el, UiInstance* instance) {
          if (item_meta) {
              void** ptr_array = *(void***)((char*)el->data_ptr + collection_field->offset);
              
-             size_t write_idx = static_count;
              for (size_t i = 0; i < dynamic_count; ++i) {
                  void* item_ptr = ptr_array[i];
                  if (item_ptr) {
                      UiElement* child = ui_element_create(instance, el->spec->item_template, item_ptr, item_meta);
                      if (child) {
-                         child->parent = el;
-                         el->children[write_idx++] = child;
+                        ui_element_add_child(el, child);
                      }
                  }
              }
-             el->child_count = write_idx; 
          }
     }
 }
@@ -301,9 +321,9 @@ void ui_element_update(UiElement* element, float dt) {
         }
     }
 
-    // Recurse
-    for (size_t i = 0; i < element->child_count; ++i) {
-        ui_element_update(element->children[i], dt);
+    // Recurse Linked List
+    for (UiElement* child = element->first_child; child; child = child->next_sibling) {
+        ui_element_update(child, dt);
     }
 }
 

@@ -47,8 +47,8 @@ static float calculate_height(UiElement* el, float available_h) {
     if (h < 0) {
         if (el->child_count > 0 && spec->layout == UI_LAYOUT_FLEX_COLUMN) {
             h = spec->padding * 2;
-             for (size_t i = 0; i < el->child_count; ++i) {
-                float child_h = el->children[i]->spec->height;
+             for (UiElement* child = el->first_child; child; child = child->next_sibling) {
+                float child_h = child->spec->height;
                 if (child_h < 0) child_h = UI_DEFAULT_HEIGHT; 
                 h += child_h + spec->spacing;
             }
@@ -66,8 +66,7 @@ static float calculate_height(UiElement* el, float available_h) {
 
 static void layout_column(UiElement* el, float start_x, float start_y, float* out_max_x, float* out_max_y) {
     float cursor_y = start_y;
-    for (size_t i = 0; i < el->child_count; ++i) {
-        UiElement* child = el->children[i];
+    for (UiElement* child = el->first_child; child; child = child->next_sibling) {
         child->rect.x = start_x;
         child->rect.y = cursor_y;
         cursor_y += child->rect.h + el->spec->spacing;
@@ -81,8 +80,7 @@ static void layout_column(UiElement* el, float start_x, float start_y, float* ou
 
 static void layout_row(UiElement* el, float start_x, float start_y, float* out_max_x, float* out_max_y) {
     float cursor_x = start_x;
-    for (size_t i = 0; i < el->child_count; ++i) {
-        UiElement* child = el->children[i];
+    for (UiElement* child = el->first_child; child; child = child->next_sibling) {
         child->rect.x = cursor_x;
         child->rect.y = start_y;
         cursor_x += child->rect.w + el->spec->spacing;
@@ -97,17 +95,17 @@ static void layout_row(UiElement* el, float start_x, float start_y, float* out_m
 static void layout_canvas(UiElement* el, float* out_max_x, float* out_max_y) {
     *out_max_x = 0;
     *out_max_y = 0;
-    for (size_t i = 0; i < el->child_count; ++i) {
+    for (UiElement* child = el->first_child; child; child = child->next_sibling) {
         if (el->flags & UI_FLAG_SCROLLABLE) {
-            el->children[i]->rect.x -= el->scroll_x;
-            el->children[i]->rect.y -= el->scroll_y;
+            child->rect.x -= el->scroll_x;
+            child->rect.y -= el->scroll_y;
         }
         
         // Calculate content bounds (using logical coordinates, reverting scroll)
-        float logical_x = el->children[i]->rect.x + (el->flags & UI_FLAG_SCROLLABLE ? el->scroll_x : 0);
-        float logical_y = el->children[i]->rect.y + (el->flags & UI_FLAG_SCROLLABLE ? el->scroll_y : 0);
-        float right = logical_x + el->children[i]->rect.w;
-        float bottom = logical_y + el->children[i]->rect.h;
+        float logical_x = child->rect.x + (el->flags & UI_FLAG_SCROLLABLE ? el->scroll_x : 0);
+        float logical_y = child->rect.y + (el->flags & UI_FLAG_SCROLLABLE ? el->scroll_y : 0);
+        float right = logical_x + child->rect.w;
+        float bottom = logical_y + child->rect.h;
         
         if (right > *out_max_x) *out_max_x = right;
         if (bottom > *out_max_y) *out_max_y = bottom;
@@ -116,18 +114,24 @@ static void layout_canvas(UiElement* el, float* out_max_x, float* out_max_y) {
 
 static void layout_split_h(UiElement* el, float start_x, float start_y) {
     if (el->child_count < 2) return;
-    el->children[0]->rect.x = start_x;
-    el->children[0]->rect.y = start_y;
-    el->children[1]->rect.x = start_x + el->children[0]->rect.w;
-    el->children[1]->rect.y = start_y;
+    UiElement* c1 = el->first_child;
+    UiElement* c2 = c1->next_sibling;
+    
+    c1->rect.x = start_x;
+    c1->rect.y = start_y;
+    c2->rect.x = start_x + c1->rect.w;
+    c2->rect.y = start_y;
 }
 
 static void layout_split_v(UiElement* el, float start_x, float start_y) {
     if (el->child_count < 2) return;
-    el->children[0]->rect.x = start_x;
-    el->children[0]->rect.y = start_y;
-    el->children[1]->rect.x = start_x;
-    el->children[1]->rect.y = start_y + el->children[0]->rect.h;
+    UiElement* c1 = el->first_child;
+    UiElement* c2 = c1->next_sibling;
+    
+    c1->rect.x = start_x;
+    c1->rect.y = start_y;
+    c2->rect.x = start_x;
+    c2->rect.y = start_y + c1->rect.h;
 }
 
 static void layout_recursive(UiElement* el, Rect available, uint64_t frame_number, bool log_debug, UiTextMeasureFunc measure_func, void* measure_data) {
@@ -151,7 +155,8 @@ static void layout_recursive(UiElement* el, Rect available, uint64_t frame_numbe
     };
     
     // Recurse First (Depth-first sizing)
-    for (size_t i = 0; i < el->child_count; ++i) {
+    int i = 0;
+    for (UiElement* child = el->first_child; child; child = child->next_sibling) {
         Rect child_avail = { 0, 0, content.w, content.h };
         
         if (spec->layout == UI_LAYOUT_SPLIT_H && el->child_count >= 2) {
@@ -164,7 +169,8 @@ static void layout_recursive(UiElement* el, Rect available, uint64_t frame_numbe
              else child_avail.h = content.h * (1.0f - ratio);
         }
 
-        layout_recursive(el->children[i], child_avail, frame_number, log_debug, measure_func, measure_data);
+        layout_recursive(child, child_avail, frame_number, log_debug, measure_func, measure_data);
+        i++;
     }
 
     // 3. Position Children
@@ -213,8 +219,8 @@ static void update_screen_rects(UiElement* el, float parent_x, float parent_y) {
     el->screen_rect.w = el->rect.w;
     el->screen_rect.h = el->rect.h;
 
-    for (size_t i = 0; i < el->child_count; ++i) {
-        update_screen_rects(el->children[i], el->screen_rect.x, el->screen_rect.y);
+    for (UiElement* child = el->first_child; child; child = child->next_sibling) {
+        update_screen_rects(child, el->screen_rect.x, el->screen_rect.y);
     }
 }
 

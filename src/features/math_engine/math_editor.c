@@ -2,14 +2,15 @@
 
 #include "foundation/logger/logger.h"
 #include "foundation/platform/platform.h"
+#include "foundation/platform/fs.h"
 #include "foundation/meta/reflection.h"
 #include "features/math_engine/transpiler.h"
 #include "engine/graphics/backend/renderer_backend.h"
 #include "engine/ui/ui_parser.h"
 #include "engine/ui/ui_layout.h"
+#include "engine/ui/ui_renderer.h"
 #include "engine/ui/ui_command_system.h"
 #include "engine/graphics/text/font.h"
-#include "engine/graphics/backend/vulkan/vk_utils.h"
 
 #include <stdlib.h>
 #include <stdio.h>
@@ -25,8 +26,8 @@ static float text_measure_wrapper(const char* text, void* user_data) {
 static UiElement* ui_find_element_by_id(UiElement* root, const char* id) {
     if (!root || !root->spec) return NULL;
     if (root->spec->id && strcmp(root->spec->id, id) == 0) return root;
-    for (size_t i = 0; i < root->child_count; ++i) {
-        UiElement* found = ui_find_element_by_id(root->children[i], id);
+    for (UiElement* child = root->first_child; child; child = child->next_sibling) {
+        UiElement* found = ui_find_element_by_id(child, id);
         if (found) return found;
     }
     return NULL;
@@ -110,7 +111,7 @@ static void math_editor_recompile_graph(MathEditorState* state, RenderSystem* rs
 
     // 4. Load SPIR-V
     size_t spv_size = 0;
-    uint32_t* spv_code = read_file_bin_u32(tmp_spv, &spv_size);
+    uint32_t* spv_code = (uint32_t*)fs_read_bin(NULL, tmp_spv, &spv_size);
     if (!spv_code) {
         LOG_ERROR("Failed to read generated SPIR-V");
         return;
@@ -155,31 +156,25 @@ static void math_editor_refresh_inspector(MathEditorState* state) {
     UiElement* inspector = ui_find_element_by_id(state->ui_instance.root, "inspector_area");
     if (!inspector) return;
     
+    // Clear previous
+    ui_element_clear_children(inspector, &state->ui_instance);
+    
     if (state->selected_node_id == MATH_NODE_INVALID_ID) {
-        inspector->child_count = 0;
         return;
     }
     
     MathNode* node = math_graph_get_node(&state->graph, state->selected_node_id);
     if (!node) {
-        inspector->child_count = 0;
         return;
     }
     
     const MetaStruct* node_meta = meta_get_struct("MathNode");
     
-    int ins_count = 1; // Title
-    if (node->type == MATH_NODE_VALUE) ins_count += 1; // Field
-    
-    inspector->children = (UiElement**)arena_alloc_zero(&state->ui_instance.arena, ins_count * sizeof(UiElement*));
-    inspector->child_count = 0;
-    
     // Title
     UiNodeSpec* title_spec = ui_asset_get_template(state->ui_asset, "InspectorTitle");
     if (title_spec) {
         UiElement* title = ui_element_create(&state->ui_instance, title_spec, node, node_meta);
-        inspector->children[inspector->child_count++] = title;
-        title->parent = inspector;
+        ui_element_add_child(inspector, title);
     }
     
     // Value Editor
@@ -187,8 +182,7 @@ static void math_editor_refresh_inspector(MathEditorState* state) {
         UiNodeSpec* field_spec = ui_asset_get_template(state->ui_asset, "InspectorField");
         if (field_spec) {
             UiElement* field = ui_element_create(&state->ui_instance, field_spec, node, node_meta);
-            inspector->children[inspector->child_count++] = field;
-            field->parent = inspector;
+            ui_element_add_child(inspector, field);
         }
     }
 }
@@ -286,9 +280,6 @@ void math_editor_init(MathEditorState* state, Engine* engine) {
             
             // Build Static UI from Asset into Instance
             state->ui_instance.root = ui_element_create(&state->ui_instance, state->ui_asset->root, state, editor_meta);
-
-            // Bind to Renderer
-            render_system_bind_ui(engine->render_system, state->ui_instance.root);
             
             // Initial Select
             if (state->node_view_count > 0) {
@@ -303,6 +294,13 @@ void math_editor_init(MathEditorState* state, Engine* engine) {
     engine->show_compute_visualizer = true;
     render_system_set_show_compute(engine->render_system, true);
     math_editor_recompile_graph(state, engine->render_system);
+}
+
+void math_editor_render(MathEditorState* state, Scene* scene, const Assets* assets) {
+    if (!state || !scene || !state->ui_instance.root) return;
+    
+    // Render UI Tree to Scene
+    ui_renderer_build_scene(state->ui_instance.root, scene, assets);
 }
 
 void math_editor_update(MathEditorState* state, Engine* engine) {

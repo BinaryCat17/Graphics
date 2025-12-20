@@ -52,8 +52,8 @@ int test_column_layout() {
     TEST_ASSERT_FLOAT_EQ(el->rect.w, 100.0f, 0.1f);
     TEST_ASSERT_FLOAT_EQ(el->rect.h, 200.0f, 0.1f);
 
-    UiElement* v1 = el->children[0];
-    UiElement* v2 = el->children[1];
+    UiElement* v1 = el->first_child;
+    UiElement* v2 = el->first_child->next_sibling;
 
     TEST_ASSERT_FLOAT_EQ(v1->rect.x, 5.0f, 0.1f);
     TEST_ASSERT_FLOAT_EQ(v1->rect.y, 5.0f, 0.1f);
