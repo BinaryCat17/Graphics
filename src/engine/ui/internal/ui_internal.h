@@ -2,6 +2,9 @@
 #define UI_INTERNAL_H
 
 #include "../ui_core.h"
+#include "../ui_assets.h"
+#include "../ui_input.h"
+#include "../ui_renderer.h"
 #include "foundation/memory/arena.h"
 #include "foundation/memory/pool.h"
 #include "foundation/string/string_id.h"

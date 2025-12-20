@@ -2,6 +2,7 @@
 #define UI_PARSER_H
 
 #include "../ui_core.h"
+#include "../ui_assets.h"
 
 // INTERNAL API
 // Loads a UI Asset from a YAML file. 

@@ -5,6 +5,7 @@
 // Use ui_core.h (ui_instance_layout) instead.
 
 #include "../ui_core.h"
+#include "../ui_renderer.h"
 
 #include <stdint.h>
 #include <stdbool.h>

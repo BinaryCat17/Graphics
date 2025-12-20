@@ -9,10 +9,7 @@
 // Forward Declarations
 typedef struct MetaStruct MetaStruct;
 typedef struct MetaField MetaField;
-typedef struct MemoryArena MemoryArena;
-typedef struct InputSystem InputSystem;
-typedef struct Scene Scene;
-typedef struct Assets Assets;
+typedef struct UiNodeSpec UiNodeSpec; // From ui_assets.h
 
 // --- CONSTANTS & FLAGS ---
 
@@ -50,39 +47,6 @@ typedef enum UiLayer {
 
 typedef struct UiElement UiElement;
 
-typedef enum UiEventType {
-    UI_EVENT_NONE = 0,
-    UI_EVENT_CLICK,         // Triggered on mouse up (if active)
-    UI_EVENT_VALUE_CHANGE,  // Triggered when input modifies data
-    UI_EVENT_DRAG_START,
-    UI_EVENT_DRAG_END
-} UiEventType;
-
-typedef struct UiEvent {
-    UiEventType type;
-    UiElement* target;
-} UiEvent;
-
-// --- UI SPECIFICATION (The DNA) ---
-// Pure data. Allocated inside a UiAsset arena. Read-only at runtime.
-
-typedef struct UiNodeSpec UiNodeSpec;
-
-// --- UI ASSET (The Resource) ---
-// Owns the memory. Created by the Parser.
-
-typedef struct UiTemplate UiTemplate;
-
-typedef struct UiAsset UiAsset;
-
-// API for Asset
-UiAsset* ui_asset_create(size_t arena_size);
-void ui_asset_free(UiAsset* asset);
-UiNodeSpec* ui_asset_push_node(UiAsset* asset);
-UiNodeSpec* ui_asset_get_template(UiAsset* asset, const char* name);
-UiNodeSpec* ui_asset_get_root(const UiAsset* asset);
-
-
 // --- UI INSTANCE (The Living Tree) ---
 // Created from a UiAsset + Data Context.
 // Managed by a UiInstance container.
@@ -119,39 +83,5 @@ UiElement* ui_element_get_parent(const UiElement* element);
 
 // --- Utils ---
 void ui_bind_read_string(void* data, const MetaField* field, char* out_buf, size_t buf_size);
-
-// --- High-Level Pipeline API ---
-
-typedef float (*UiTextMeasureFunc)(const char* text, void* user_data);
-
-// Layout & Render Pipeline
-// frame_number: used to optimize layout caching (recalc only once per frame per node)
-void ui_instance_layout(UiInstance* instance, float window_w, float window_h, uint64_t frame_number, UiTextMeasureFunc measure_func, void* measure_data);
-
-// Generates render commands into the Scene.
-// arena: Frame allocator for temporary render structures (e.g. overlay lists)
-void ui_instance_render(UiInstance* instance, Scene* scene, const Assets* assets, MemoryArena* arena);
-
-// --- Public Subsystem API ---
-
-// Parser
-UiAsset* ui_parser_load_from_file(const char* path);
-
-// Command System
-typedef void (*UiCommandCallback)(void* user_data, UiElement* target);
-
-void ui_command_init(void);
-void ui_command_shutdown(void);
-void ui_command_register(const char* name, UiCommandCallback callback, void* user_data);
-void ui_command_execute_id(StringId id, UiElement* target);
-
-// Input
-typedef struct UiInputContext UiInputContext;
-
-UiInputContext* ui_input_create(void);
-void ui_input_destroy(UiInputContext* ctx);
-void ui_input_init(UiInputContext* ctx);
-void ui_input_update(UiInputContext* ctx, UiElement* root, const InputSystem* input);
-bool ui_input_pop_event(UiInputContext* ctx, UiEvent* out_event);
 
 #endif // UI_CORE_H

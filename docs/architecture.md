@@ -46,7 +46,7 @@ Every major module (e.g., `src/engine/ui`) must follow this exact layout:
 
 ```text
 src/engine/ui/
-├── ui_core.h          # [PUBLIC] The CONTRACT. The ONLY file external modules may include.
+├── ui_core.h          # [PUBLIC] A public contract. External modules may include this.
 ├── ui_core.c          # [PRIVATE] Implementation of the public API.
 └── internal/          # [PRIVATE] Hidden from the rest of the codebase.
     ├── ui_state.h     # [INTERNAL] Full struct definitions (hidden from public).
@@ -69,17 +69,16 @@ The project strictly enforces **C11 (ISO/IEC 9899:2011)**.
 *   **Standard:** Strictly use traditional `#ifndef MODULE_NAME_H` / `#define MODULE_NAME_H` guards.
 *   **Prohibited:** Do not use `#pragma once` (non-standard).
 
-#### 3. The Public Header (`module.h`)
+#### 3. Public Headers (The Module Root)
 *   **Purpose:** Defines *what* the module does, not *how*.
+*   **Location:** Any `.h` file in the module's root directory (e.g., `src/engine/ui/*.h`).
 *   **Content:**
     *   **Opaque Handles:** Use `typedef struct MySystem MySystem;` instead of defining the struct. This prevents users from accessing internal state directly.
     *   **Enums/Flags:** Only those required for API arguments.
     *   **API Functions:** High-level functions like `system_create()`, `system_update()`.
-*   **Prohibited:**
-    *   Including *any* file from the `internal/` directory.
-    *   Exposing implementation details (e.g., internal helper structs).
+*   **Rule:** External modules may include **ANY** header from the module root.
 
-#### 2. The Internal Directory (`internal/`)
+#### 4. The Internal Directory (`internal/`)
 *   **Purpose:** Defines *how* the module works.
 *   **Content:**
     *   **Full Struct Definitions:** The actual layout of `MySystem`.

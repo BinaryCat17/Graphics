@@ -1,10 +1,11 @@
 #ifndef MATH_EDITOR_INTERNAL_H
 #define MATH_EDITOR_INTERNAL_H
 
-#include "features/math_engine/math_editor.h"
-#include "features/math_engine/math_graph.h"
 #include "engine/ui/ui_core.h"
-#include "foundation/memory/arena.h"
+#include "engine/ui/ui_assets.h"
+#include "engine/ui/ui_input.h"
+#include "engine/ui/ui_renderer.h"
+#include "features/math_engine/math_graph.h"
 
 // ViewModel for a Node in the Editor
 typedef struct MathNodeView {

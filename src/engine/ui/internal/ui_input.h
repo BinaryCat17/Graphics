@@ -1,6 +1,7 @@
-#ifndef UI_INPUT_H
-#define UI_INPUT_H
+#ifndef UI_INPUT_INTERNAL_H
+#define UI_INPUT_INTERNAL_H
 
+#include "../ui_input.h" // Public definition of UiEvent
 #include "../ui_core.h"
 
 // --- UI Input Context ---
@@ -27,4 +28,4 @@ struct UiInputContext {
     int event_count;
 };
 
-#endif // UI_INPUT_H
+#endif // UI_INPUT_INTERNAL_H
