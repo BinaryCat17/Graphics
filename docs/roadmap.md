@@ -20,6 +20,9 @@ The project is undergoing a structural standardization to enforce strict public/
 - [x] **Geometry Deduplication:** Centralize primitive generation (e.g., Unit Quad) in a shared helper to eliminate duplicate vertex data definitions in `Assets` and `VulkanBackend`.
 - [ ] **UI Styling Data-Drive:** Remove hardcoded visual logic (e.g., `color *= 1.1f` for inputs) from `ui_renderer.c`. Move state-based visual changes into `UiStyle` or config data.
 - [ ] **Uniform Error Handling:** Refactor `engine_create` and subsystem initializers to use a standardized `goto cleanup` pattern or shared destructor helper to prevent resource leaks and reduce code duplication on failure.
+- [ ] **Strict Compiler Compliance:** Enable `-Werror` (treat warnings as errors) in CMake and resolve all existing warnings to ensure code hygiene.
+- [ ] **Unified Frame Memory:** Implement a central `FrameArena` in `Engine` that is reset daily. Refactor `UiRenderer` and other systems to use this arena instead of managing their own scratch memory.
+- [ ] **Input Action Mapping:** Implement an abstraction layer to map physical keys (e.g., `KEY_Z`) to logical actions (e.g., `ACTION_UNDO`), removing hardcoded key checks from game logic.
 
 ### Phase 7: 3D Visualization & Compute
 **Objective:** Visualize mathematical functions and data in 3D space.
@@ -37,4 +40,4 @@ The project is undergoing a structural standardization to enforce strict public/
 
 ## 🛠 Technical Debt & Backlog
 
-*   **Input Mapping:** Replace hardcoded keys (e.g., `KEY_Z`) with an Action Mapping system.
+*   **Shader Hot-Reloading:** Allow editing shaders at runtime without restarting.
