@@ -3,6 +3,7 @@
 #include "stb_truetype.h"
 #include "foundation/platform/platform.h"
 #include "foundation/logger/logger.h"
+#include "foundation/memory/arena.h"
 #include <stdlib.h>
 #include <stdio.h>
 #include <math.h>
@@ -14,8 +15,10 @@
 #define UI_RECT_SIZE 32
 #define UI_RECT_X 8
 #define UI_RECT_Y 0
+#define FONT_ARENA_SIZE (4 * 1024 * 1024) // 4MB
 
 static struct {
+    MemoryArena arena;
     FontAtlas atlas;
     stbtt_fontinfo fontinfo;
     unsigned char* ttf_buffer;
@@ -36,9 +39,15 @@ bool font_init(const char* font_path) {
         return false;
     }
 
+    if (!arena_init(&g_font_state.arena, FONT_ARENA_SIZE)) {
+        LOG_FATAL("Failed to initialize Font Arena");
+        return false;
+    }
+
     FILE* f = platform_fopen(font_path, "rb");
     if (!f) {
         LOG_ERROR("Font not found at %s", font_path);
+        arena_destroy(&g_font_state.arena);
         return false;
     }
 
@@ -46,9 +55,10 @@ bool font_init(const char* font_path) {
     long sz = ftell(f);
     fseek(f, 0, SEEK_SET);
 
-    g_font_state.ttf_buffer = malloc(sz);
+    g_font_state.ttf_buffer = arena_alloc(&g_font_state.arena, sz);
     if (!g_font_state.ttf_buffer) {
         fclose(f);
+        arena_destroy(&g_font_state.arena);
         return false;
     }
     
@@ -57,7 +67,8 @@ bool font_init(const char* font_path) {
 
     if (!stbtt_InitFont(&g_font_state.fontinfo, g_font_state.ttf_buffer, 0)) {
         LOG_ERROR("Failed to init stb_truetype");
-        free(g_font_state.ttf_buffer);
+        // No need to free ttf_buffer explicitly, destroying arena handles it
+        arena_destroy(&g_font_state.arena);
         g_font_state.ttf_buffer = NULL;
         return false;
     }
@@ -65,8 +76,8 @@ bool font_init(const char* font_path) {
     // Build Atlas
     g_font_state.atlas.width = ATLAS_WIDTH;
     g_font_state.atlas.height = ATLAS_HEIGHT;
-    g_font_state.atlas.pixels = malloc(g_font_state.atlas.width * g_font_state.atlas.height);
-    memset(g_font_state.atlas.pixels, 0, g_font_state.atlas.width * g_font_state.atlas.height);
+    // Use arena_alloc_zero to clear memory automatically
+    g_font_state.atlas.pixels = arena_alloc_zero(&g_font_state.arena, g_font_state.atlas.width * g_font_state.atlas.height);
     memset(g_font_state.atlas.glyph_valid, 0, sizeof(g_font_state.atlas.glyph_valid));
 
     g_font_state.atlas.font_scale = stbtt_ScaleForPixelHeight(&g_font_state.fontinfo, FONT_SIZE_PIXELS);
@@ -171,15 +182,12 @@ bool font_init(const char* font_path) {
 }
 
 void font_shutdown(void) {
-    if (g_font_state.atlas.pixels) {
-        free(g_font_state.atlas.pixels);
+    if (g_font_state.initialized) {
+        arena_destroy(&g_font_state.arena);
         g_font_state.atlas.pixels = NULL;
-    }
-    if (g_font_state.ttf_buffer) {
-        free(g_font_state.ttf_buffer);
         g_font_state.ttf_buffer = NULL;
+        g_font_state.initialized = false;
     }
-    g_font_state.initialized = false;
 }
 
 void font_get_atlas_data(int* width, int* height, unsigned char** pixels) {

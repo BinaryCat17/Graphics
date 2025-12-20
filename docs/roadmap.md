@@ -15,7 +15,7 @@ The project is undergoing a structural standardization to enforce strict public/
 **Objective:** Enforce the "Public/Internal" separation pattern across all modules to prevent technical debt and remove legacy code.
 - [x] **Scene Encapsulation:** Apply Opaque Handle pattern to `Scene` struct (hide implementation in `internal/scene_internal.h`).
 - [x] **Shader Constants:** Extract magic numbers (e.g., UI rendering modes `3.0f`, `4.0f`) into a shared header/enum.
-- [ ] **Font Memory Safety:** Replace raw `malloc` in `font.c` with the Foundation memory subsystem (`MemoryArena`).
+- [x] **Font Memory Safety:** Replace raw `malloc` in `font.c` with the Foundation memory subsystem (`MemoryArena`).
 - [ ] **Backend Cleanup:** Move screenshot IO logic (`stb_image_write`) out of `vulkan_renderer.c` into a dedicated Foundation module.
 
 ### Phase 7: 3D Visualization & Compute
