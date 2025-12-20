@@ -1,4 +1,5 @@
-#pragma once
+#ifndef ARENA_H
+#define ARENA_H
 
 #include <stddef.h>
 #include <stdint.h>
@@ -33,3 +34,5 @@ char* arena_sprintf(MemoryArena* arena, const char* fmt, ...);
 
 // Prints formatted string into the arena, advancing the offset. Returns ptr to start of printed string.
 char* arena_printf(MemoryArena* arena, const char* fmt, ...);
+
+#endif // ARENA_H

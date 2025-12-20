@@ -1,4 +1,5 @@
 #include "text_renderer.h"
+#include "engine/scene/scene.h"
 #include "engine/text/font.h"
 #include "internal/font_internal.h"
 #include "foundation/logger/logger.h"

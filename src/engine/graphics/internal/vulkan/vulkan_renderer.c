@@ -1,4 +1,5 @@
 #include "engine/graphics/internal/vulkan/vulkan_renderer.h"
+#include "engine/scene/scene.h"
 
 #include "engine/graphics/internal/vulkan/vk_types.h"
 #include "engine/graphics/internal/vulkan/vk_context.h"

@@ -1,4 +1,5 @@
-#pragma once
+#ifndef CONFIG_SYSTEM_H
+#define CONFIG_SYSTEM_H
 
 #include <stdbool.h>
 
@@ -25,3 +26,5 @@ float config_get_float(const char* key, float default_value);
 
 // Get a boolean value. Returns default_value if not found.
 bool config_get_bool(const char* key, bool default_value);
+
+#endif // CONFIG_SYSTEM_H

@@ -3,10 +3,12 @@
 
 #include <stdbool.h>
 #include <stddef.h>
+#include <stdint.h>
 
-#include "foundation/platform/platform.h"
-#include "engine/scene/scene.h"
-
+// Forward Declarations
+typedef struct PlatformWindow PlatformWindow;
+typedef struct PlatformSurface PlatformSurface;
+typedef struct Scene Scene;
 typedef struct Font Font;
 
 // Backend Initialization Parameters

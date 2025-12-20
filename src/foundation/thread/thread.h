@@ -1,4 +1,5 @@
-#pragma once
+#ifndef THREAD_H
+#define THREAD_H
 
 #include <stdbool.h>
 
@@ -67,3 +68,5 @@ void thread_sleep(unsigned int milliseconds);
  * @return Number of threads (e.g., cores).
  */
 unsigned int thread_hardware_concurrency(void);
+
+#endif // THREAD_H

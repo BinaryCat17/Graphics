@@ -1,4 +1,5 @@
 #include "math_editor.h"
+#include "engine/core/engine.h"
 #include "internal/math_editor_internal.h"
 
 #include "foundation/logger/logger.h"

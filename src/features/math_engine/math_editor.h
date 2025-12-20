@@ -1,8 +1,8 @@
-#pragma once
-
-#include "engine/core/engine.h"
+#ifndef MATH_EDITOR_H
+#define MATH_EDITOR_H
 
 // Forward Declarations
+typedef struct Engine Engine;
 typedef struct Scene Scene;
 typedef struct Assets Assets;
 typedef struct MemoryArena MemoryArena;
@@ -23,3 +23,5 @@ void math_editor_render(MathEditor* editor, Scene* scene, const Assets* assets, 
 
 // Shuts down the editor and frees resources
 void math_editor_destroy(MathEditor* editor);
+
+#endif // MATH_EDITOR_H

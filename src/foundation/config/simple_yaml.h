@@ -1,7 +1,10 @@
-#pragma once
+#ifndef SIMPLE_YAML_H
+#define SIMPLE_YAML_H
 
 #include <stddef.h>
-#include "foundation/memory/arena.h"
+
+// Forward Declarations
+typedef struct MemoryArena MemoryArena;
 
 typedef enum ConfigNodeType {
     CONFIG_NODE_UNKNOWN,
@@ -28,9 +31,6 @@ struct ConfigNode {
     size_t item_count;
     size_t item_capacity;
 };
-// Wait, earlier on line 13 it says 'typedef struct ConfigNode ConfigNode;'.
-// So I should change this block to 'struct ConfigNode { ... };'
-
 
 typedef struct ConfigError {
     int line;
@@ -48,4 +48,6 @@ void config_node_free(ConfigNode *node);
 
 // Utility
 int config_node_emit_json(const ConfigNode *node, char **out_json);
+
+#endif // SIMPLE_YAML_H
 

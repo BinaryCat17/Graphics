@@ -1,4 +1,5 @@
-#pragma once
+#ifndef STRING_ID_H
+#define STRING_ID_H
 
 #include <stdint.h>
 
@@ -15,3 +16,5 @@ StringId str_id(const char* str);
  */
 const char* str_id_lookup(StringId id);
 #endif
+
+#endif // STRING_ID_H

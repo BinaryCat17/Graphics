@@ -65,7 +65,11 @@ The project strictly enforces **C11 (ISO/IEC 9899:2011)**.
     *   **Function Signatures:** Use `Name*` (not `struct Name*`).
     *   **Forward Declarations:** Repeat `typedef struct Name Name;` in consuming headers (allowed in C11) to avoid `#include` dependencies.
 
-#### 1. The Public Header (`module.h`)
+#### 2. Header Guards
+*   **Standard:** Strictly use traditional `#ifndef MODULE_NAME_H` / `#define MODULE_NAME_H` guards.
+*   **Prohibited:** Do not use `#pragma once` (non-standard).
+
+#### 3. The Public Header (`module.h`)
 *   **Purpose:** Defines *what* the module does, not *how*.
 *   **Content:**
     *   **Opaque Handles:** Use `typedef struct MySystem MySystem;` instead of defining the struct. This prevents users from accessing internal state directly.

@@ -4,6 +4,8 @@
 #include "internal/ui_renderer.h" // Internal
 #include "internal/ui_parser.h"   // Internal
 #include "foundation/meta/reflection.h"
+#include "foundation/memory/arena.h"
+#include "foundation/memory/pool.h"
 
 #include <stdlib.h>
 #include <string.h>

@@ -1,4 +1,5 @@
-#pragma once
+#ifndef ENGINE_H
+#define ENGINE_H
 
 #include <stdbool.h>
 
@@ -46,3 +47,5 @@ bool engine_is_running(const Engine* engine);
 
 void engine_set_show_compute(Engine* engine, bool show);
 bool engine_get_show_compute(const Engine* engine);
+
+#endif // ENGINE_H

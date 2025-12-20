@@ -1,4 +1,5 @@
-#pragma once
+#ifndef COORDINATE_SYSTEMS_H
+#define COORDINATE_SYSTEMS_H
 
 #include <stddef.h>
 
@@ -133,4 +134,6 @@ Vec3 coordinate_clip_to_world(const Projection3D *projection, Vec3 clip);
 #ifdef __cplusplus
 }
 #endif
+
+#endif // COORDINATE_SYSTEMS_H
 

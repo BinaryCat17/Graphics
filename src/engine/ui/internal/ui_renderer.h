@@ -4,10 +4,13 @@
 // --- INTERNAL HEADER: Do not include in public API ---
 // Use ui_core.h (ui_instance_render) instead.
 
-#include "engine/ui/ui_core.h"
-#include "engine/scene/scene.h"
-#include "engine/assets/assets.h"
-#include "foundation/memory/arena.h"
+#include <stddef.h> // for NULL, size_t, etc. if needed (though strictly not needed for opaque pointers, good practice)
+
+// Forward Declarations
+typedef struct UiElement UiElement;
+typedef struct Scene Scene;
+typedef struct Assets Assets;
+typedef struct MemoryArena MemoryArena;
 
 // Traverses the UiElement tree and populates the Scene with renderable objects.
 void ui_renderer_build_scene(const UiElement* root, Scene* scene, const Assets* assets, MemoryArena* arena);
