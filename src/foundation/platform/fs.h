@@ -1,6 +1,7 @@
 #ifndef PLATFORM_FS_H
 #define PLATFORM_FS_H
 
+#include "foundation/memory/arena.h"
 #include <stdbool.h>
 
 typedef struct PlatformDir PlatformDir;
@@ -10,7 +11,7 @@ typedef struct PlatformDirEntry {
     bool is_dir;
 } PlatformDirEntry;
 
-char* fs_read_text(const char* path);
+char* fs_read_text(MemoryArena* arena, const char* path);
 
 PlatformDir* platform_dir_open(const char* path);
 bool platform_dir_read(PlatformDir* dir, PlatformDirEntry* out_entry);

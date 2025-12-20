@@ -249,19 +249,17 @@ static UiNodeSpec* load_recursive(UiAsset* asset, const ConfigNode* node) {
 
 // --- Generic Reflection for Scalars ---
 
-static ConfigNode* resolve_import(const ConfigNode* node, char** out_imported_text) {
+static ConfigNode* resolve_import(MemoryArena* scratch, const ConfigNode* node) {
     if (node->type == CONFIG_NODE_MAP) {
         const ConfigNode* import_val = config_node_map_get(node, "import");
         if (import_val && import_val->scalar) {
-            char* text = fs_read_text(import_val->scalar);
+            char* text = fs_read_text(scratch, import_val->scalar);
             if (text) {
                 ConfigNode* imported_root = NULL;
                 ConfigError err;
-                if (simple_yaml_parse(text, &imported_root, &err)) {
-                    *out_imported_text = text;
+                if (simple_yaml_parse(scratch, text, &imported_root, &err)) {
                     return imported_root;
                 }
-                free(text);
             }
         }
     }
@@ -297,25 +295,32 @@ UiAsset* ui_parser_load_from_file(const char* path) {
 
     LOG_TRACE("UiParser: Loading UI definition from file: %s", path);
 
-    char* text = fs_read_text(path);
+    // Scratch Arena for parsing (2MB should be plenty for config files)
+    MemoryArena scratch;
+    if (!arena_init(&scratch, 2 * 1024 * 1024)) {
+        LOG_ERROR("UiParser: Failed to init scratch arena");
+        return NULL;
+    }
+
+    char* text = fs_read_text(&scratch, path);
     if (!text) {
         LOG_ERROR("UiParser: Failed to read file %s", path);
+        arena_destroy(&scratch);
         return NULL;
     }
 
     ConfigNode* root = NULL;
     ConfigError err = {0};
-    if (!simple_yaml_parse(text, &root, &err)) {
+    if (!simple_yaml_parse(&scratch, text, &root, &err)) {
         LOG_ERROR("UiParser: YAML Parse error in %s (line %d, col %d): %s", path, err.line, err.column, err.message);
-        free(text);
+        arena_destroy(&scratch);
         return NULL;
     }
 
     // Create Asset (Owner)
     UiAsset* asset = ui_asset_create(64 * 1024);
     if (!asset) {
-        config_node_free(root);
-        free(text);
+        arena_destroy(&scratch);
         return NULL;
     }
 
@@ -326,8 +331,7 @@ UiAsset* ui_parser_load_from_file(const char* path) {
             const char* t_name = templates_node->pairs[i].key;
             const ConfigNode* t_val = templates_node->pairs[i].value;
             
-            char* t_imported_text = NULL;
-            ConfigNode* t_actual = resolve_import(t_val, &t_imported_text);
+            ConfigNode* t_actual = resolve_import(&scratch, t_val);
             
             UiNodeSpec* spec = load_recursive(asset, t_actual ? t_actual : t_val);
             if (spec) {
@@ -338,22 +342,14 @@ UiAsset* ui_parser_load_from_file(const char* path) {
                 asset->templates = t;
                 LOG_TRACE("UiParser: Registered template '%s'", t->name);
             }
-            
-            if (t_actual) config_node_free(t_actual);
-            if (t_imported_text) free(t_imported_text);
         }
     }
 
-    char* root_imported_text = NULL;
-    ConfigNode* root_actual = resolve_import(root, &root_imported_text);
+    ConfigNode* root_actual = resolve_import(&scratch, root);
     asset->root = load_recursive(asset, root_actual ? root_actual : root);
-    
-    if (root_actual) config_node_free(root_actual);
-    if (root_imported_text) free(root_imported_text);
     
     validate_node(asset->root, path);
     
-    config_node_free(root);
-    free(text);
+    arena_destroy(&scratch);
     return asset;
 }

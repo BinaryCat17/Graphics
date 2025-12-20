@@ -46,14 +46,21 @@ FILE* platform_fopen(const char* filename, const char* mode) {
 #endif
 }
 
-char* fs_read_text(const char* path) {
+char* fs_read_text(MemoryArena* arena, const char* path) {
     if (!path) return NULL;
     FILE *f = platform_fopen(path, "rb");
     if (!f) return NULL;
     fseek(f, 0, SEEK_END);
     long len = ftell(f);
     fseek(f, 0, SEEK_SET);
-    char *text = (char *)malloc((size_t)len + 1);
+    
+    char *text = NULL;
+    if (arena) {
+        text = (char*)arena_alloc(arena, (size_t)len + 1);
+    } else {
+        text = (char*)malloc((size_t)len + 1);
+    }
+
     if (!text) {
         fclose(f);
         return NULL;

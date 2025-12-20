@@ -3,8 +3,8 @@
 
 #include <ctype.h>
 #include <stdio.h>
-#include <stdlib.h>
 #include <string.h>
+// #include <stdlib.h> // Malloc removed
 
 typedef struct {
     int indent;
@@ -20,47 +20,58 @@ static void set_error(ConfigError *err, int line, int column, const char *msg)
     err->message[sizeof(err->message) - 1] = 0;
 }
 
-static char *dup_range(const char *begin, const char *end)
+static char *dup_range(MemoryArena* arena, const char *begin, const char *end)
 {
     size_t len = (size_t)(end - begin);
-    char *out = (char *)malloc(len + 1);
+    char *out = (char *)arena_alloc(arena, len + 1);
     if (!out) return NULL;
     memcpy(out, begin, len);
     out[len] = 0;
     return out;
 }
 
-static ConfigNode *yaml_node_new(ConfigNodeType type, int line)
+static ConfigNode *yaml_node_new(MemoryArena* arena, ConfigNodeType type, int line)
 {
-    ConfigNode *n = (ConfigNode *)calloc(1, sizeof(ConfigNode));
+    ConfigNode *n = (ConfigNode *)arena_alloc_zero(arena, sizeof(ConfigNode));
     if (!n) return NULL;
     n->type = type;
     n->line = line;
     return n;
 }
 
-static int yaml_pair_append(ConfigNode *map, const char *key, ConfigNode *value)
+static int yaml_pair_append(MemoryArena* arena, ConfigNode *map, char *key, ConfigNode *value)
 {
     if (map->pair_count + 1 > map->pair_capacity) {
         size_t new_cap = map->pair_capacity == 0 ? 4 : map->pair_capacity * 2;
-        ConfigPair *expanded = (ConfigPair *)realloc(map->pairs, new_cap * sizeof(ConfigPair));
-        if (!expanded) return 0;
-        map->pairs = expanded;
+        ConfigPair *new_pairs = (ConfigPair *)arena_alloc(arena, new_cap * sizeof(ConfigPair));
+        if (!new_pairs) return 0;
+        
+        if (map->pairs) {
+            memcpy(new_pairs, map->pairs, map->pair_count * sizeof(ConfigPair));
+        }
+        
+        map->pairs = new_pairs;
         map->pair_capacity = new_cap;
     }
-    map->pairs[map->pair_count].key = platform_strdup(key);
+    // We take ownership of key (allocated in arena)
+    map->pairs[map->pair_count].key = key; 
     map->pairs[map->pair_count].value = value;
     map->pair_count++;
     return 1;
 }
 
-static int yaml_sequence_append(ConfigNode *seq, ConfigNode *value)
+static int yaml_sequence_append(MemoryArena* arena, ConfigNode *seq, ConfigNode *value)
 {
     if (seq->item_count + 1 > seq->item_capacity) {
         size_t new_cap = seq->item_capacity == 0 ? 4 : seq->item_capacity * 2;
-        ConfigNode **expanded = (ConfigNode **)realloc(seq->items, new_cap * sizeof(ConfigNode *));
-        if (!expanded) return 0;
-        seq->items = expanded;
+        ConfigNode **new_items = (ConfigNode **)arena_alloc(arena, new_cap * sizeof(ConfigNode *));
+        if (!new_items) return 0;
+        
+        if (seq->items) {
+            memcpy(new_items, seq->items, seq->item_count * sizeof(ConfigNode *));
+        }
+        
+        seq->items = new_items;
         seq->item_capacity = new_cap;
     }
     seq->items[seq->item_count++] = value;
@@ -81,7 +92,7 @@ static void rstrip(char *s)
     }
 }
 
-static int parse_scalar_value(const char *raw, char **out_value)
+static int parse_scalar_value(MemoryArena* arena, const char *raw, char **out_value)
 {
     const char *start = trim_left(raw);
     size_t len = strlen(start);
@@ -89,13 +100,15 @@ static int parse_scalar_value(const char *raw, char **out_value)
         start++;
         len -= 2;
     }
-    *out_value = dup_range(start, start + len);
+    *out_value = dup_range(arena, start, start + len);
     return *out_value != NULL;
 }
 
-int simple_yaml_parse(const char *text, ConfigNode **out_root, ConfigError *err)
+int simple_yaml_parse(MemoryArena* arena, const char *text, ConfigNode **out_root, ConfigError *err)
 {
-    ConfigNode *root = yaml_node_new(CONFIG_NODE_MAP, 1);
+    if (!arena || !text) return 0;
+
+    ConfigNode *root = yaml_node_new(arena, CONFIG_NODE_MAP, 1);
     if (!root) return 0;
 
     SimpleYamlContext stack[128];
@@ -108,9 +121,10 @@ int simple_yaml_parse(const char *text, ConfigNode **out_root, ConfigError *err)
         const char *line_start = cursor;
         while (*cursor && *cursor != '\n' && *cursor != '\r') ++cursor;
         size_t line_len = (size_t)(cursor - line_start);
-        char *line = (char *)malloc(line_len + 1);
+        
+        // Use arena for line buffer (temporary, but arena is scratch so it's fine)
+        char *line = (char *)arena_alloc(arena, line_len + 1);
         if (!line) {
-            config_node_free(root);
             return 0;
         }
         memcpy(line, line_start, line_len);
@@ -134,7 +148,7 @@ int simple_yaml_parse(const char *text, ConfigNode **out_root, ConfigError *err)
 
         p = trim_left(p);
         if (*p == 0) {
-            free(line);
+            // free(line); // No-op
             continue;
         }
 
@@ -142,8 +156,8 @@ int simple_yaml_parse(const char *text, ConfigNode **out_root, ConfigError *err)
             depth--;
         }
         if (depth == 0) {
-            free(line);
-            config_node_free(root);
+            // free(line); 
+            // config_node_free(root);
             set_error(err, line_number, 1, "Invalid indentation");
             return 0;
         }
@@ -156,16 +170,14 @@ int simple_yaml_parse(const char *text, ConfigNode **out_root, ConfigError *err)
         if (*p == '-') {
             p = trim_left(p + 1);
             if (parent->type != CONFIG_NODE_SEQUENCE) {
-                config_node_free(root);
-                free(line);
+                // config_node_free(root);
                 set_error(err, line_number, indent + 1, "Sequence item in non-sequence");
                 return 0;
             }
 
-            ConfigNode *item = yaml_node_new(CONFIG_NODE_UNKNOWN, line_number);
-            if (!item || !yaml_sequence_append(parent, item)) {
-                free(line);
-                config_node_free(root);
+            ConfigNode *item = yaml_node_new(arena, CONFIG_NODE_UNKNOWN, line_number);
+            if (!item || !yaml_sequence_append(arena, parent, item)) {
+                // config_node_free(root);
                 return 0;
             }
 
@@ -175,26 +187,26 @@ int simple_yaml_parse(const char *text, ConfigNode **out_root, ConfigError *err)
                 const char *key_start = p;
                 const char *key_end = colon;
                 while (key_end > key_start && isspace((unsigned char)*(key_end - 1))) --key_end;
-                char *key = dup_range(key_start, key_end);
+                
+                char *key = dup_range(arena, key_start, key_end);
                 char *value_text = NULL;
                 const char *value_start = colon + 1;
                 if (*value_start) {
-                    if (!parse_scalar_value(value_start, &value_text)) {
-                        free(line);
-                        config_node_free(root);
+                    if (!parse_scalar_value(arena, value_start, &value_text)) {
+                        // config_node_free(root);
                         return 0;
                     }
-                    ConfigNode *scalar_node = yaml_node_new(CONFIG_NODE_SCALAR, line_number);
+                    ConfigNode *scalar_node = yaml_node_new(arena, CONFIG_NODE_SCALAR, line_number);
                     scalar_node->scalar = value_text;
-                    yaml_pair_append(item, key, scalar_node);
-                    free(key);
+                    yaml_pair_append(arena, item, key, scalar_node);
+                    // free(key); // No-op, ownership transferred or ignored
                 } else {
-                    yaml_pair_append(item, key, yaml_node_new(CONFIG_NODE_UNKNOWN, line_number));
-                    free(key);
+                    yaml_pair_append(arena, item, key, yaml_node_new(arena, CONFIG_NODE_UNKNOWN, line_number));
+                    // free(key);
                 }
             } else if (*p) {
                 char *value_text = NULL;
-                if (parse_scalar_value(p, &value_text)) {
+                if (parse_scalar_value(arena, p, &value_text)) {
                     item->type = CONFIG_NODE_SCALAR;
                     item->scalar = value_text;
                 }
@@ -203,45 +215,42 @@ int simple_yaml_parse(const char *text, ConfigNode **out_root, ConfigError *err)
             stack[depth++] = (SimpleYamlContext){indent, item};
         } else {
             if (parent->type != CONFIG_NODE_MAP) {
-                config_node_free(root);
-                free(line);
+                // config_node_free(root);
                 set_error(err, line_number, indent + 1, "Mapping entry in non-map");
                 return 0;
             }
 
             char *colon = strchr(p, ':');
             if (!colon) {
-                config_node_free(root);
-                free(line);
+                // config_node_free(root);
                 set_error(err, line_number, indent + 1, "Missing ':' in mapping entry");
                 return 0;
             }
             const char *key_start = p;
             const char *key_end = colon;
             while (key_end > key_start && isspace((unsigned char)*(key_end - 1))) --key_end;
-            char *key = dup_range(key_start, key_end);
+            
+            char *key = dup_range(arena, key_start, key_end);
             const char *value_start = colon + 1;
 
             char *value_text = NULL;
             if (*value_start) {
-                if (!parse_scalar_value(value_start, &value_text)) {
-                    free(line);
-                    free(key);
-                    config_node_free(root);
+                if (!parse_scalar_value(arena, value_start, &value_text)) {
+                    // config_node_free(root);
                     return 0;
                 }
-                ConfigNode *scalar = yaml_node_new(CONFIG_NODE_SCALAR, line_number);
+                ConfigNode *scalar = yaml_node_new(arena, CONFIG_NODE_SCALAR, line_number);
                 scalar->scalar = value_text;
-                yaml_pair_append(parent, key, scalar);
+                yaml_pair_append(arena, parent, key, scalar);
                 stack[depth++] = (SimpleYamlContext){indent, scalar};
             } else {
-                ConfigNode *child = yaml_node_new(CONFIG_NODE_UNKNOWN, line_number);
-                yaml_pair_append(parent, key, child);
+                ConfigNode *child = yaml_node_new(arena, CONFIG_NODE_UNKNOWN, line_number);
+                yaml_pair_append(arena, parent, key, child);
                 stack[depth++] = (SimpleYamlContext){indent, child};
             }
-            free(key);
+            // free(key);
         }
-        free(line);
+        // free(line);
     }
 
     *out_root = root;
@@ -259,19 +268,12 @@ const ConfigNode *config_node_map_get(const ConfigNode *map, const char *key)
 
 void config_node_free(ConfigNode *node)
 {
-    if (!node) return;
-    free(node->scalar);
-    for (size_t i = 0; i < node->pair_count; ++i) {
-        free(node->pairs[i].key);
-        config_node_free(node->pairs[i].value);
-    }
-    free(node->pairs);
-    for (size_t i = 0; i < node->item_count; ++i) {
-        config_node_free(node->items[i]);
-    }
-    free(node->items);
-    free(node);
+    // No-op: Memory is managed by the Arena
+    (void)node;
 }
+
+// --- JSON Emit uses malloc still (for now) ---
+#include <stdlib.h> 
 
 static int emit_scalar_json(const ConfigNode *node, char **out)
 {
@@ -366,4 +368,3 @@ int config_node_emit_json(const ConfigNode *node, char **out_json)
 {
     return emit_json_internal(node, out_json);
 }
-

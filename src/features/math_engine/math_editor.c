@@ -34,12 +34,12 @@ static UiElement* ui_find_element_by_id(UiElement* root, const char* id) {
 
 // --- View Model Management ---
 
-static MathNodeView* math_editor_find_view(MathEditorState* state, MathNodeId id) {
-    for(uint32_t i=0; i<state->node_view_count; ++i) {
-        if(state->node_views[i].node_id == id) return &state->node_views[i];
-    }
-    return NULL;
-}
+// static MathNodeView* math_editor_find_view(MathEditorState* state, MathNodeId id) {
+//     for(uint32_t i=0; i<state->node_view_count; ++i) {
+//         if(state->node_views[i].node_id == id) return &state->node_views[i];
+//     }
+//     return NULL;
+// }
 
 static MathNodeView* math_editor_add_view(MathEditorState* state, MathNodeId id, float x, float y) {
     if (state->node_view_count >= state->node_view_cap) {

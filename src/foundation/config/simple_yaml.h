@@ -1,6 +1,7 @@
 #pragma once
 
 #include <stddef.h>
+#include "foundation/memory/arena.h"
 
 typedef enum ConfigNodeType {
     CONFIG_NODE_UNKNOWN,
@@ -35,7 +36,7 @@ typedef struct ConfigError {
 } ConfigError;
 
 // Parser specifically for YAML, but produces a generic ConfigNode tree
-int simple_yaml_parse(const char *text, ConfigNode **out_root, ConfigError *err);
+int simple_yaml_parse(MemoryArena* arena, const char *text, ConfigNode **out_root, ConfigError *err);
 
 // Generic tree traversal
 const ConfigNode *config_node_map_get(const ConfigNode *map, const char *key);

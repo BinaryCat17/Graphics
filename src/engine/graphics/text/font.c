@@ -92,7 +92,7 @@ bool font_init(const char* font_path) {
             
             // Border (2px)
             float inner = radius - 2.0f;
-            float border = smoothstep(inner, inner + 1.0f, d);
+            // float border = smoothstep(inner, inner + 1.0f, d);
             
             unsigned char val = (unsigned char)(alpha * 255);
             // We want it to be a bit thicker at borders for visibility
