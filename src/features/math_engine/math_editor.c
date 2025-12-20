@@ -18,17 +18,6 @@ static float text_measure_wrapper(const char* text, void* user_data) {
     return font_measure_text(text);
 }
 
-// --- Helper: Find Element ---
-static UiElement* ui_find_element_by_id(UiElement* root, const char* id) {
-    if (!root || !root->spec) return NULL;
-    if (root->spec->id && strcmp(root->spec->id, id) == 0) return root;
-    for (UiElement* child = root->first_child; child; child = child->next_sibling) {
-        UiElement* found = ui_find_element_by_id(child, id);
-        if (found) return found;
-    }
-    return NULL;
-}
-
 // --- View Model Management ---
 
 // static MathNodeView* math_editor_find_view(MathEditorState* state, MathNodeId id) {
@@ -103,25 +92,27 @@ static void math_editor_recompile_graph(MathEditorState* state, RenderSystem* rs
 // --- UI Regeneration Logic (Imperative -> Declarative Bridge) ---
 
 static void math_editor_refresh_graph_view(MathEditorState* state) {
-    if (!state->ui_instance.root) return;
+    UiElement* root = ui_instance_get_root(state->ui_instance);
+    if (!root) return;
     
     // Sync data before rebuild
     math_editor_sync_view_data(state);
 
-    UiElement* canvas = ui_find_element_by_id(state->ui_instance.root, "canvas_area");
+    UiElement* canvas = ui_element_find_by_id(root, "canvas_area");
     if (canvas) {
         // Declarative Refresh
-        ui_element_rebuild_children(canvas, &state->ui_instance);
+        ui_element_rebuild_children(canvas, state->ui_instance);
     }
 }
 
 static void math_editor_refresh_inspector(MathEditorState* state) {
-    if (!state->ui_instance.root) return;
-    UiElement* inspector = ui_find_element_by_id(state->ui_instance.root, "inspector_area");
+    UiElement* root = ui_instance_get_root(state->ui_instance);
+    if (!root) return;
+    UiElement* inspector = ui_element_find_by_id(root, "inspector_area");
     if (!inspector) return;
     
     // Clear previous
-    ui_element_clear_children(inspector, &state->ui_instance);
+    ui_element_clear_children(inspector, state->ui_instance);
     
     if (state->selected_node_id == MATH_NODE_INVALID_ID) {
         return;
@@ -137,7 +128,7 @@ static void math_editor_refresh_inspector(MathEditorState* state) {
     // Title
     UiNodeSpec* title_spec = ui_asset_get_template(state->ui_asset, "InspectorTitle");
     if (title_spec) {
-        UiElement* title = ui_element_create(&state->ui_instance, title_spec, node, node_meta);
+        UiElement* title = ui_element_create(state->ui_instance, title_spec, node, node_meta);
         ui_element_add_child(inspector, title);
     }
     
@@ -145,7 +136,7 @@ static void math_editor_refresh_inspector(MathEditorState* state) {
     if (node->type == MATH_NODE_VALUE) {
         UiNodeSpec* field_spec = ui_asset_get_template(state->ui_asset, "InspectorField");
         if (field_spec) {
-            UiElement* field = ui_element_create(&state->ui_instance, field_spec, node, node_meta);
+            UiElement* field = ui_element_create(state->ui_instance, field_spec, node, node_meta);
             ui_element_add_child(inspector, field);
         }
     }
@@ -229,7 +220,7 @@ void math_editor_init(MathEditorState* state, Engine* engine) {
     ui_command_register("Graph.Recompile", cmd_recompile, state);
 
     state->input_ctx = ui_input_create();
-    ui_instance_init(&state->ui_instance, 1024 * 1024); // 1MB for UI Elements
+    state->ui_instance = ui_instance_create(1024 * 1024); // 1MB for UI Elements
 
     // 4. Load UI Asset
     const char* ui_path = engine->config.ui_path; // Use config path
@@ -243,7 +234,8 @@ void math_editor_init(MathEditorState* state, Engine* engine) {
             }
             
             // Build Static UI from Asset into Instance
-            state->ui_instance.root = ui_element_create(&state->ui_instance, state->ui_asset->root, state, editor_meta);
+            UiElement* root = ui_element_create(state->ui_instance, ui_asset_get_root(state->ui_asset), state, editor_meta);
+            ui_instance_set_root(state->ui_instance, root);
             
             // Initial Select
             if (state->node_view_count > 0) {
@@ -261,10 +253,11 @@ void math_editor_init(MathEditorState* state, Engine* engine) {
 }
 
 void math_editor_render(MathEditorState* state, Scene* scene, const Assets* assets) {
-    if (!state || !scene || !state->ui_instance.root) return;
+    UiElement* root = ui_instance_get_root(state->ui_instance);
+    if (!state || !scene || !root) return;
     
     // Render UI Tree to Scene
-    ui_instance_render(&state->ui_instance, scene, assets);
+    ui_instance_render(state->ui_instance, scene, assets);
 }
 
 void math_editor_update(MathEditorState* state, Engine* engine) {
@@ -286,13 +279,15 @@ void math_editor_update(MathEditorState* state, Engine* engine) {
         }
     }
 
+    UiElement* root = ui_instance_get_root(state->ui_instance);
+
     // UI Update Loop
-    if (state->ui_instance.root) {
+    if (root) {
         // Animation / Logic Update
-        ui_element_update(state->ui_instance.root, engine->dt);
+        ui_element_update(root, engine->dt);
         
         // Input Handling
-        ui_input_update(state->input_ctx, state->ui_instance.root, engine->input_system);
+        ui_input_update(state->input_ctx, root, engine->input_system);
         
         // Process Events
         UiEvent evt;
@@ -310,14 +305,17 @@ void math_editor_update(MathEditorState* state, Engine* engine) {
                     UiElement* hit = evt.target;
                     while (hit) {
                         // Check for MathNodeView
-                        if (hit->data_ptr && hit->meta && strcmp(hit->meta->name, "MathNodeView") == 0) {
-                            MathNodeView* v = (MathNodeView*)hit->data_ptr;
+                        void* data = ui_element_get_data(hit);
+                        const MetaStruct* meta = ui_element_get_meta(hit);
+
+                        if (data && meta && strcmp(meta->name, "MathNodeView") == 0) {
+                            MathNodeView* v = (MathNodeView*)data;
                             state->selected_node_id = v->node_id;
                             state->selection_dirty = true;
                             LOG_INFO("Selected Node: %d", v->node_id);
                             break;
                         }
-                        hit = hit->parent;
+                        hit = ui_element_get_parent(hit);
                     }
                 } break;
                 default: break;
@@ -332,7 +330,7 @@ void math_editor_update(MathEditorState* state, Engine* engine) {
         
         // Layout
         PlatformWindowSize size = platform_get_framebuffer_size(engine->window);
-        ui_instance_layout(&state->ui_instance, (float)size.width, (float)size.height, render_system_get_frame_count(engine->render_system), text_measure_wrapper, NULL);
+        ui_instance_layout(state->ui_instance, (float)size.width, (float)size.height, render_system_get_frame_count(engine->render_system), text_measure_wrapper, NULL);
     }
 
     // Graph Evaluation (Naive interpretation on CPU for debugging/node values)
@@ -355,7 +353,7 @@ void math_editor_shutdown(MathEditorState* state, Engine* engine) {
     if (!state) return;
     
     ui_input_destroy(state->input_ctx);
-    ui_instance_destroy(&state->ui_instance);
+    ui_instance_free(state->ui_instance);
     arena_destroy(&state->graph_arena);
     
     if (state->ui_asset) ui_asset_free(state->ui_asset);

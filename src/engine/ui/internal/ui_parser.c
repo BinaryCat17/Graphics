@@ -1,4 +1,5 @@
 #include "ui_parser.h"
+#include "ui_internal.h"
 #include "foundation/config/simple_yaml.h"
 #include "foundation/logger/logger.h"
 #include "foundation/memory/arena.h"

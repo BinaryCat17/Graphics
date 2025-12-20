@@ -90,7 +90,11 @@ def scan_files(src_dir):
     
     for root, _, files in os.walk(src_dir):
         root = root.replace('\\', '/')
-        if 'backend' in root or 'generated' in root or 'internal' in root:
+        if 'backend' in root or 'generated' in root:
+            continue
+            
+        # Generally skip internal, but allow UI internal for UiNodeSpec reflection
+        if 'internal' in root and '/engine/ui/internal' not in root:
             continue
 
         for file in files:

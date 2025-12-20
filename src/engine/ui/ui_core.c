@@ -1,4 +1,5 @@
 #include "ui_core.h"
+#include "internal/ui_internal.h"
 #include "internal/ui_layout.h"   // Internal
 #include "internal/ui_renderer.h" // Internal
 
@@ -44,6 +45,10 @@ UiNodeSpec* ui_asset_get_template(UiAsset* asset, const char* name) {
     return NULL;
 }
 
+UiNodeSpec* ui_asset_get_root(const UiAsset* asset) {
+    return asset ? asset->root : NULL;
+}
+
 // --- UiInstance (Memory Owner for Runtime) ---
 
 static void destroy_recursive(UiInstance* instance, UiElement* el) {
@@ -60,19 +65,64 @@ static void destroy_recursive(UiInstance* instance, UiElement* el) {
     pool_free(instance->element_pool, el);
 }
 
-void ui_instance_init(UiInstance* instance, size_t size) {
-    if (!instance) return;
-    arena_init(&instance->arena, size);
+UiInstance* ui_instance_create(size_t size) {
+    UiInstance* instance = (UiInstance*)calloc(1, sizeof(UiInstance));
+    if (!instance) return NULL;
+    
+    if (!arena_init(&instance->arena, size)) {
+        free(instance);
+        return NULL;
+    }
+    
     instance->element_pool = pool_create(sizeof(UiElement), 256);
     instance->root = NULL;
+    return instance;
 }
 
-void ui_instance_destroy(UiInstance* instance) {
+void ui_instance_free(UiInstance* instance) {
     if (!instance) return;
     if (instance->root) destroy_recursive(instance, instance->root);
     pool_destroy(instance->element_pool);
     arena_destroy(&instance->arena);
-    instance->root = NULL;
+    free(instance);
+}
+
+UiElement* ui_instance_get_root(const UiInstance* instance) {
+    return instance ? instance->root : NULL;
+}
+
+void ui_instance_set_root(UiInstance* instance, UiElement* root) {
+    if (instance) instance->root = root;
+}
+
+// --- Accessors ---
+
+const char* ui_element_get_id(const UiElement* element) {
+    if (element && element->spec) return element->spec->id;
+    return NULL;
+}
+
+UiElement* ui_element_find_by_id(UiElement* root, const char* id) {
+    if (!root || !root->spec || !id) return NULL;
+    if (root->spec->id && strcmp(root->spec->id, id) == 0) return root;
+    
+    for (UiElement* child = root->first_child; child; child = child->next_sibling) {
+        UiElement* found = ui_element_find_by_id(child, id);
+        if (found) return found;
+    }
+    return NULL;
+}
+
+void* ui_element_get_data(const UiElement* element) {
+    return element ? element->data_ptr : NULL;
+}
+
+const MetaStruct* ui_element_get_meta(const UiElement* element) {
+    return element ? element->meta : NULL;
+}
+
+UiElement* ui_element_get_parent(const UiElement* element) {
+    return element ? element->parent : NULL;
 }
 
 // --- UiElement (Instance) ---

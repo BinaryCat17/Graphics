@@ -22,7 +22,7 @@ typedef struct MathEditorState {
     
     // UI State
     UiAsset* ui_asset;
-    UiInstance ui_instance; // Manages UI Element memory
+    UiInstance* ui_instance; // Manages UI Element memory
     UiInputContext* input_ctx;
     
     // ViewModel Data
