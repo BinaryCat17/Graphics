@@ -90,6 +90,10 @@ typedef struct UiElement UiElement;
 
 typedef struct UiInstance UiInstance;
 
+// Forward Declarations for Render Pipeline
+typedef struct Scene Scene;
+typedef struct Assets Assets;
+
 // API for Instance
 UiInstance* ui_instance_create(size_t size);
 void ui_instance_free(UiInstance* instance);
@@ -125,16 +129,13 @@ void ui_bind_read_string(void* data, const MetaField* field, char* out_buf, size
 
 typedef float (*UiTextMeasureFunc)(const char* text, void* user_data);
 
-// Performs layout calculation for the entire UI tree.
-// Should be called before rendering.
+// Layout & Render Pipeline
+// frame_number: used to optimize layout caching (recalc only once per frame per node)
 void ui_instance_layout(UiInstance* instance, float window_w, float window_h, uint64_t frame_number, UiTextMeasureFunc measure_func, void* measure_data);
 
-#include "engine/scene/scene.h"
-#include "engine/assets/assets.h"
-
-// Builds the render packets for the scene.
-// Should be called after layout.
-void ui_instance_render(UiInstance* instance, Scene* scene, const Assets* assets);
+// Generates render commands into the Scene.
+// arena: Frame allocator for temporary render structures (e.g. overlay lists)
+void ui_instance_render(UiInstance* instance, Scene* scene, const Assets* assets, MemoryArena* arena);
 
 // --- Public Subsystem API ---
 

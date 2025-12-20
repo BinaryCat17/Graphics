@@ -145,37 +145,33 @@ static void render_content(const UiElement* el, Scene* scene, Vec4 clip_vec, flo
     }
 }
 
-// Internal Render Context to avoid passing too many args
-typedef struct UiRenderContext {
-    Scene* scene;
-} UiRenderContext;
-
-// Persistent scratch arena for frame-local data (Overlay List)
-static MemoryArena g_ui_renderer_arena = {0};
-static bool g_ui_renderer_arena_init = false;
-
 typedef struct OverlayNode {
     const UiElement* el;
     struct OverlayNode* next;
 } OverlayNode;
 
-static OverlayNode* g_overlay_head = NULL;
-static OverlayNode* g_overlay_tail = NULL;
+// Internal Render Context to avoid passing too many args
+typedef struct UiRenderContext {
+    Scene* scene;
+    MemoryArena* arena;
+    OverlayNode* overlay_head;
+    OverlayNode* overlay_tail;
+} UiRenderContext;
 
 static void push_overlay(UiRenderContext* ctx, const UiElement* el) {
-    (void)ctx;
-    OverlayNode* node = arena_alloc_zero(&g_ui_renderer_arena, sizeof(OverlayNode));
+    if (!ctx || !ctx->arena) return;
+    OverlayNode* node = arena_alloc_zero(ctx->arena, sizeof(OverlayNode));
     if (!node) return;
     
     node->el = el;
     node->next = NULL;
     
-    if (!g_overlay_head) {
-        g_overlay_head = node;
-        g_overlay_tail = node;
+    if (!ctx->overlay_head) {
+        ctx->overlay_head = node;
+        ctx->overlay_tail = node;
     } else {
-        g_overlay_tail->next = node;
-        g_overlay_tail = node;
+        ctx->overlay_tail->next = node;
+        ctx->overlay_tail = node;
     }
 }
 
@@ -223,36 +219,21 @@ static void process_node(const UiElement* el, UiRenderContext* ctx, Rect current
     }
 }
 
-void ui_renderer_build_scene(const UiElement* root, Scene* scene, const Assets* assets) {
+void ui_renderer_build_scene(const UiElement* root, Scene* scene, const Assets* assets, MemoryArena* arena) {
     (void)assets;
-    if (!root) return;
+    if (!root || !arena) return;
 
-    // Lazy Init Arena
-    if (!g_ui_renderer_arena_init) {
-        // 1MB scratch for overlay pointers is plenty
-        if (arena_init(&g_ui_renderer_arena, 1024 * 1024)) {
-            g_ui_renderer_arena_init = true;
-        } else {
-            LOG_ERROR("UiRenderer: Failed to init scratch arena");
-            return;
-        }
-    }
-    
-    // Reset per frame
-    arena_reset(&g_ui_renderer_arena);
-    g_overlay_head = NULL;
-    g_overlay_tail = NULL;
-    
     Rect infinite_clip = {-10000.0f, -10000.0f, 20000.0f, 20000.0f};
     
     UiRenderContext ctx = {0};
     ctx.scene = scene;
+    ctx.arena = arena;
     
     // Pass 1: Draw Normal, Defer Overlays
     process_node(root, &ctx, infinite_clip, 0.0f, false);
     
     // Pass 2: Draw Overlays
-    OverlayNode* curr = g_overlay_head;
+    OverlayNode* curr = ctx.overlay_head;
     while (curr) {
         process_node(curr->el, &ctx, infinite_clip, 0.8f, true);
         curr = curr->next;

@@ -48,7 +48,7 @@ static void app_on_update(Engine* engine) {
 
     if (scene) {
 
-        math_editor_render(editor_state, scene, engine_get_assets(engine));
+        math_editor_render(editor_state, scene, engine_get_assets(engine), engine_get_frame_arena(engine));
 
     }
 

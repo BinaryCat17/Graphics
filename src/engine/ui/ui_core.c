@@ -407,7 +407,7 @@ void ui_instance_layout(UiInstance* instance, float window_w, float window_h, ui
     ui_layout_root(instance->root, window_w, window_h, frame_number, false, measure_func, measure_data);
 }
 
-void ui_instance_render(UiInstance* instance, Scene* scene, const Assets* assets) {
-    if (!instance || !instance->root || !scene || !assets) return;
-    ui_renderer_build_scene(instance->root, scene, assets);
+void ui_instance_render(UiInstance* instance, Scene* scene, const Assets* assets, MemoryArena* arena) {
+    if (!instance || !instance->root || !scene || !assets || !arena) return;
+    ui_renderer_build_scene(instance->root, scene, assets, arena);
 }

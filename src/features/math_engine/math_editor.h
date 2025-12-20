@@ -44,7 +44,7 @@ void math_editor_init(MathEditorState* state, Engine* engine);
 void math_editor_update(MathEditorState* state, Engine* engine);
 
 // Renders the editor UI to the provided scene
-void math_editor_render(MathEditorState* state, Scene* scene, const Assets* assets);
+void math_editor_render(MathEditorState* state, Scene* scene, const Assets* assets, MemoryArena* arena);
 
 // Shuts down the editor and frees resources
 void math_editor_shutdown(MathEditorState* state, Engine* engine);

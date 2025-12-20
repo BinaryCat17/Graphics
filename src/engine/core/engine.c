@@ -4,6 +4,7 @@
 #include "foundation/platform/fs.h"
 #include "foundation/meta/reflection.h"
 #include "engine/text/font.h"
+#include "foundation/memory/arena.h"
 
 #include <stdio.h>
 #include <string.h>
@@ -20,6 +21,7 @@ struct Engine {
     
     // Application Data
     void* user_data;
+    MemoryArena frame_arena;
     
     // State
     bool running;
@@ -52,6 +54,12 @@ Engine* engine_create(const EngineConfig* config) {
     Engine* engine = (Engine*)calloc(1, sizeof(Engine));
     if (!engine) return NULL;
 
+    // Init Frame Arena (16MB)
+    if (!arena_init(&engine->frame_arena, 16 * 1024 * 1024)) {
+        LOG_FATAL("Failed to initialize Frame Arena.");
+        goto cleanup_engine;
+    }
+
     engine->config = *config;
 
     // Store Callbacks
@@ -64,15 +72,13 @@ Engine* engine_create(const EngineConfig* config) {
     // 2. Platform & Window
     if (!platform_layer_init()) {
         LOG_FATAL("Failed to initialize platform layer.");
-        free(engine);
-        return NULL;
+        goto cleanup_frame_arena;
     }
     
     engine->window = platform_create_window(config->width, config->height, config->title);
     if (!engine->window) {
         LOG_FATAL("Failed to create window.");
-        free(engine);
-        return NULL;
+        goto cleanup_platform;
     }
     
     // Callbacks
@@ -84,44 +90,27 @@ Engine* engine_create(const EngineConfig* config) {
     engine->input_system = input_system_create(engine->window);
     if (!engine->input_system) {
         LOG_FATAL("Failed to initialize InputSystem.");
-        // Cleanup partial init
-        platform_destroy_window(engine->window);
-        free(engine);
-        return NULL;
+        goto cleanup_window;
     }
 
     // 4. Assets
     engine->assets = assets_create(config->assets_path);
     if (!engine->assets) {
         LOG_FATAL("Failed to initialize assets from '%s'", config->assets_path);
-        // Cleanup
-        input_system_destroy(engine->input_system);
-        platform_destroy_window(engine->window);
-        free(engine);
-        return NULL;
+        goto cleanup_input;
     }
 
     // Load font from assets
     AssetData font_data = assets_load_file(engine->assets, "fonts/font.ttf");
     if (!font_data.data) {
         LOG_FATAL("Failed to load default font from assets/fonts/font.ttf");
-         // Cleanup
-        assets_destroy(engine->assets);
-        input_system_destroy(engine->input_system);
-        platform_destroy_window(engine->window);
-        free(engine);
-        return NULL;
+        goto cleanup_assets;
     }
 
     if (!font_init(font_data.data, font_data.size)) {
         LOG_FATAL("Failed to initialize font system");
         assets_free_file(&font_data);
-        // Cleanup
-        assets_destroy(engine->assets);
-        input_system_destroy(engine->input_system);
-        platform_destroy_window(engine->window);
-        free(engine);
-        return NULL;
+        goto cleanup_assets;
     }
     assets_free_file(&font_data);
 
@@ -133,13 +122,7 @@ Engine* engine_create(const EngineConfig* config) {
     engine->render_system = render_system_create(&rs_config);
     if (!engine->render_system) {
         LOG_FATAL("Failed to initialize RenderSystem.");
-        // Cleanup
-        font_shutdown();
-        assets_destroy(engine->assets);
-        input_system_destroy(engine->input_system);
-        platform_destroy_window(engine->window);
-        free(engine);
-        return NULL;
+        goto cleanup_font;
     }
 
     // Bindings
@@ -177,6 +160,22 @@ Engine* engine_create(const EngineConfig* config) {
 
     engine->running = true;
     return engine;
+
+cleanup_font:
+    font_shutdown();
+cleanup_assets:
+    assets_destroy(engine->assets);
+cleanup_input:
+    input_system_destroy(engine->input_system);
+cleanup_window:
+    platform_destroy_window(engine->window);
+cleanup_platform:
+    platform_layer_shutdown();
+cleanup_frame_arena:
+    arena_destroy(&engine->frame_arena);
+cleanup_engine:
+    free(engine);
+    return NULL;
 }
 
 void engine_run(Engine* engine) {
@@ -191,6 +190,9 @@ void engine_run(Engine* engine) {
         double now = platform_get_time_ms() / 1000.0;
         engine->dt = (float)(now - engine->last_time);
         engine->last_time = now;
+
+        // Reset Frame Arena
+        arena_reset(&engine->frame_arena);
         
         // Auto Screenshot
         if (engine->screenshot_interval > 0.0 && (now - engine->last_screenshot_time) > engine->screenshot_interval) {
@@ -234,6 +236,7 @@ void engine_destroy(Engine* engine) {
         platform_destroy_window(engine->window);
     }
     platform_layer_shutdown();
+    arena_destroy(&engine->frame_arena);
     free(engine);
 }
 
@@ -253,6 +256,10 @@ Assets* engine_get_assets(Engine* engine) {
 
 PlatformWindow* engine_get_window(Engine* engine) {
     return engine ? engine->window : NULL;
+}
+
+MemoryArena* engine_get_frame_arena(Engine* engine) {
+    return engine ? &engine->frame_arena : NULL;
 }
 
 const EngineConfig* engine_get_config(Engine* engine) {

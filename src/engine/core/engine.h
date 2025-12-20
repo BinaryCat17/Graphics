@@ -4,6 +4,7 @@
 #include "engine/assets/assets.h"
 #include "foundation/platform/platform.h"
 #include "engine/input/input.h"
+#include "foundation/memory/arena.h"
 
 typedef struct Engine Engine;
 
@@ -31,6 +32,7 @@ RenderSystem* engine_get_render_system(Engine* engine);
 InputSystem* engine_get_input_system(Engine* engine);
 Assets* engine_get_assets(Engine* engine);
 PlatformWindow* engine_get_window(Engine* engine);
+MemoryArena* engine_get_frame_arena(Engine* engine);
 const EngineConfig* engine_get_config(Engine* engine);
 
 void* engine_get_user_data(Engine* engine);

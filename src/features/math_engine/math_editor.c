@@ -252,12 +252,12 @@ void math_editor_init(MathEditorState* state, Engine* engine) {
     math_editor_recompile_graph(state, engine_get_render_system(engine));
 }
 
-void math_editor_render(MathEditorState* state, Scene* scene, const Assets* assets) {
+void math_editor_render(MathEditorState* state, Scene* scene, const Assets* assets, MemoryArena* arena) {
     UiElement* root = ui_instance_get_root(state->ui_instance);
     if (!state || !scene || !root) return;
     
     // Render UI Tree to Scene
-    ui_instance_render(state->ui_instance, scene, assets);
+    ui_instance_render(state->ui_instance, scene, assets, arena);
 }
 
 void math_editor_update(MathEditorState* state, Engine* engine) {
