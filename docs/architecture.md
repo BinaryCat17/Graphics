@@ -116,6 +116,11 @@ Systems communicate via **IDs** (integers) or **Commands**, never raw pointers. 
 *   **Public:** `Scene`, `SceneObject`, `SceneCamera`.
 *   **Goal:** Logic representation of the world. Decoupled from rendering implementation.
 
+### Input
+*   **Public:** `InputSystem` (Opaque handle).
+*   **Internal:** `InputState`, `InputEventQueue`.
+*   **Goal:** Event handling and input state management. Decoupled from platform callbacks.
+
 ### Text
 *   **Public:** `Font`, `TextRenderer`.
 *   **Internal:** `stb_truetype` implementation.

@@ -11,18 +11,12 @@ The project is undergoing a structural standardization to enforce strict public/
 
 ## 🚀 Active Phases
 
-### Phase 6: Architectural Hardening (IMMEDIATE PRIORITY)
-**Objective:** Enforce the "Public/Internal" separation pattern across all modules to prevent technical debt.
-- [x] **UI System:** Refactor to `src/engine/ui/internal/`.
-    - Move `ui_layout.*`, `ui_renderer.*`, `ui_parser.*`, `ui_command_system.*`.
-    - Update includes.
-- [x] **Math Engine:** Refactor to `src/features/math_engine/internal/`.
-    - Move `transpiler.*`, `emitters/`, `shader_ir.h`.
-- [x] **Graphics Engine:** Refactor to `src/engine/graphics/internal/`.
-    - Move backend implementations and internal headers.
-- [x] **Scene & Text:** Extract from Graphics to `src/engine/scene` and `src/engine/text`.
-- [x] **Input System:** Extract from `engine.c` to `src/engine/input`.
-- [x] **Feature Decoupling:** Remove Vulkan dependency from `feature_math_engine`.
+### Phase 6: Architectural Hardening & Cleanup (IMMEDIATE PRIORITY)
+**Objective:** Enforce the "Public/Internal" separation pattern across all modules to prevent technical debt and remove legacy code.
+- [ ] **Input System:** Enforce Opaque Handle pattern (hide `InputSystem` struct).
+- [ ] **UI System:** Enforce Opaque Handle pattern (hide `UiElement`, `UiNodeSpec` structs).
+- [ ] **Cleanup:** Remove legacy monolithic code patterns from `src/engine/core`.
+- [ ] **Cleanup:** Verify and remove any remaining direct Vulkan dependencies in Feature layer.
 
 ### Phase 7: 3D Visualization & Compute
 **Objective:** Visualize mathematical functions and data in 3D space.
