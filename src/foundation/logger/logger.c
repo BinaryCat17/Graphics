@@ -1,30 +1,61 @@
-#define _POSIX_C_SOURCE 200809L // For localtime_r
+#if !defined(_WIN32) && !defined(_POSIX_C_SOURCE)
+#define _POSIX_C_SOURCE 200809L // NOLINT: For localtime_r on Linux
+#endif
+
 #include "logger.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <time.h>
 #include <string.h>
-#include <pthread.h>
+#include <stdarg.h>
 #include <stdbool.h>
 
 #ifdef _WIN32
-#include <direct.h>
+    #define WIN32_LEAN_AND_MEAN
+    #include <windows.h>
+    #include <direct.h>
+    
+    // Windows SRWLock is lighter and supports static init
+    static SRWLOCK g_log_lock = SRWLOCK_INIT;
+    static void lock_mutex(void) { AcquireSRWLockExclusive(&g_log_lock); }
+    static void unlock_mutex(void) { ReleaseSRWLockExclusive(&g_log_lock); }
+
+    static void safe_localtime(const time_t* timep, struct tm* result) {
+        localtime_s(result, timep);
+    }
+
+    static void safe_mkdir(const char* path) {
+        _mkdir(path);
+    }
 #else
-#include <sys/stat.h>
-#include <sys/types.h>
+    #include <pthread.h>
+    #include <sys/stat.h>
+    #include <sys/types.h> // NOLINT
+
+    static pthread_mutex_t g_log_lock = PTHREAD_MUTEX_INITIALIZER; // NOLINT
+    static void lock_mutex(void) { pthread_mutex_lock(&g_log_lock); }
+    static void unlock_mutex(void) { pthread_mutex_unlock(&g_log_lock); }
+
+    static void safe_localtime(const time_t* timep, struct tm* result) {
+        localtime_r(timep, result);
+    }
+
+    static void safe_mkdir(const char* path) {
+        mkdir(path, 0755);
+    }
 #endif
 
 static LogLevel g_console_level = LOG_LEVEL_INFO;
 static LogLevel g_file_level = LOG_LEVEL_TRACE;
 
 static FILE* g_log_file = NULL;
-static pthread_mutex_t g_log_mutex = PTHREAD_MUTEX_INITIALIZER;
 static bool g_initialized = false;
 
 static const char* level_strings[] = {
     "TRACE", "DEBUG", "INFO ", "WARN ", "ERROR", "FATAL"
 };
 
+// ANSI colors are supported in Win10/11 console now, but we might want to strip them for file
 static const char* level_colors[] = {
     "\033[90m", // TRACE - Gray
     "\033[36m", // DEBUG - Cyan
@@ -46,12 +77,12 @@ static void create_dir_if_needed(const char* path) {
     // Copy path to temp
     len = strlen(path);
     if (len >= sizeof(temp)) return; // Too long
-    strncpy(temp, path, sizeof(temp));
-    temp[sizeof(temp) - 1] = 0;
+    snprintf(temp, sizeof(temp), "%s", path);
+    // temp is already null-terminated by snprintf
 
     // Remove file name
     p = strrchr(temp, '/');
-    if (!p) p = strrchr(temp, '\\');
+    if (!p) p = strrchr(temp, '\\'); // Check both separators
     if (p) {
         *p = 0; // Truncate to directory
     } else {
@@ -59,17 +90,13 @@ static void create_dir_if_needed(const char* path) {
     }
 
     // Attempt create
-#ifdef _WIN32
-    _mkdir(temp);
-#else
-    mkdir(temp, 0755);
-#endif
+    safe_mkdir(temp);
 }
 
 void logger_init(const char* log_file_path) {
-    pthread_mutex_lock(&g_log_mutex);
+    lock_mutex();
     if (g_initialized) {
-        pthread_mutex_unlock(&g_log_mutex);
+        unlock_mutex();
         return;
     }
 
@@ -82,17 +109,17 @@ void logger_init(const char* log_file_path) {
     }
 
     g_initialized = true;
-    pthread_mutex_unlock(&g_log_mutex);
+    unlock_mutex();
 }
 
 void logger_shutdown(void) {
-    pthread_mutex_lock(&g_log_mutex);
+    lock_mutex();
     if (g_log_file) {
         fclose(g_log_file);
         g_log_file = NULL;
     }
     g_initialized = false;
-    pthread_mutex_unlock(&g_log_mutex);
+    unlock_mutex();
 }
 
 void logger_set_console_level(LogLevel level) {
@@ -127,7 +154,7 @@ void logger_log(LogLevel level, const char* file, int line, const char* fmt, ...
     // Get time
     time_t now = time(NULL);
     struct tm t;
-    localtime_r(&now, &t); // Thread-safe
+    safe_localtime(&now, &t);
     
     char time_short[16];
     char time_long[32];
@@ -136,13 +163,15 @@ void logger_log(LogLevel level, const char* file, int line, const char* fmt, ...
 
     // Simplify file path
     const char* short_file = strrchr(file, '/');
+    if (!short_file) short_file = strrchr(file, '\\'); // Win path support
+    
     if (short_file) {
         short_file++; 
     } else {
         short_file = file; 
     }
 
-    pthread_mutex_lock(&g_log_mutex);
+    lock_mutex();
 
     // Console Output
     if (level >= g_console_level) {
@@ -150,7 +179,7 @@ void logger_log(LogLevel level, const char* file, int line, const char* fmt, ...
         fprintf(out, "%s[%s] [%s]%s %s:%d: ", 
             level_colors[level], 
             time_short, 
-            level_strings[level], 
+            level_strings[level],
             reset_color, 
             short_file, 
             line);
@@ -179,7 +208,7 @@ void logger_log(LogLevel level, const char* file, int line, const char* fmt, ...
         fflush(g_log_file); // Flush file to ensure logs are saved on crash
     }
 
-    pthread_mutex_unlock(&g_log_mutex);
+    unlock_mutex();
 
     if (level == LOG_LEVEL_FATAL) {
         logger_shutdown(); // Close file properly

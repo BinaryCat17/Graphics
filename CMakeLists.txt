@@ -4,10 +4,18 @@ project ("Graphics" LANGUAGES C)
 
 # --- Options & Output ---
 
-if (MSVC)
-    add_compile_options(/utf-8 /W4)
+find_program(CLANG_TIDY "clang-tidy")
+if(CLANG_TIDY)
+    message(STATUS "Clang-tidy found: ${CLANG_TIDY}")
+    set(CMAKE_C_CLANG_TIDY "${CLANG_TIDY}")
 else()
-    add_compile_options(-Wall -Wextra -Wpedantic)
+    message(STATUS "Clang-tidy not found")
+endif()
+
+if (MSVC)
+    add_compile_options(/utf-8 /W4 /WX)
+else()
+    add_compile_options(-Wall -Wextra -Wpedantic -Werror)
 endif()
 
 enable_testing()

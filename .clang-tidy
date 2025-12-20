@@ -1,0 +1,24 @@
+Checks: >
+  clang-diagnostic-*,
+  clang-analyzer-*,
+  bugprone-*,
+  performance-*,
+  portability-*,
+  misc-*,
+  readability-inconsistent-declaration-parameter-name,
+  readability-redundant-*,
+  -clang-analyzer-security.insecureAPI.DeprecatedOrUnsafeBufferHandling,
+  -bugprone-easily-swappable-parameters,
+  -readability-function-cognitive-complexity,
+  -misc-no-recursion
+
+# Check only files in src/ to avoid linting vendor headers (stb, glfw, etc)
+HeaderFilterRegex: 'src/.*'
+
+# Treat all warnings as errors
+WarningsAsErrors: '*'
+
+CheckOptions:
+  # Allow short variable names like 'x', 'y', 'i', 'dt' common in graphics
+  - key: readability-identifier-naming.MinimumVariableNameLength
+    value: 1
