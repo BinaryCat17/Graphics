@@ -1,7 +1,6 @@
 #include "test_framework.h"
 #include "engine/ui/ui_core.h"
 #include "engine/ui/ui_parser.h"
-#include "engine/ui/ui_layout.h"
 #include "foundation/memory/arena.h"
 #include <stdio.h>
 #include <string.h>
@@ -47,7 +46,8 @@ int test_column_layout() {
     ui_instance_init(&instance, 4096);
 
     UiElement* el = ui_element_create(&instance, root, NULL, NULL);
-    ui_layout_root(el, 800, 600, 0, false, NULL, NULL);
+    instance.root = el;
+    ui_instance_layout(&instance, 800, 600, 0, NULL, NULL);
 
     TEST_ASSERT_FLOAT_EQ(el->rect.w, 100.0f, 0.1f);
     TEST_ASSERT_FLOAT_EQ(el->rect.h, 200.0f, 0.1f);

@@ -1,6 +1,9 @@
 #ifndef UI_LAYOUT_H
 #define UI_LAYOUT_H
 
+// --- INTERNAL HEADER: Do not include in public API ---
+// Use ui_core.h (ui_instance_layout) instead.
+
 #include "ui_core.h"
 
 #include <stdint.h>

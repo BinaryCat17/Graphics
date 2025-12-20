@@ -4,7 +4,6 @@
 #include <stdbool.h>
 
 #include "engine/assets/assets.h"
-#include "engine/ui/ui_core.h"
 #include "engine/graphics/scene/render_packet.h"
 #include "foundation/platform/platform.h"
 
@@ -20,13 +19,15 @@ void render_system_destroy(RenderSystem* sys);
 
 // Connect dependencies
 void render_system_bind_assets(RenderSystem* sys, Assets* assets);
-void render_system_bind_ui(RenderSystem* sys, UiElement* root_view);
 
 // Updates the render system (Syncs logic to render packet)
 void render_system_update(RenderSystem* sys);
 
-// Begins a new frame (updates time and frame count)
+// Begins a new frame (updates time and frame count, clears scene)
 void render_system_begin_frame(RenderSystem* sys, double time);
+
+// Gets the current mutable scene for the frame being prepared
+Scene* render_system_get_scene(RenderSystem* sys);
 
 // Draws the current packet (Executes backend render)
 void render_system_draw(RenderSystem* sys);

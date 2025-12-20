@@ -1,6 +1,9 @@
 #ifndef UI_RENDERER_H
 #define UI_RENDERER_H
 
+// --- INTERNAL HEADER: Do not include in public API ---
+// Use ui_core.h (ui_instance_render) instead.
+
 #include "engine/ui/ui_core.h"
 #include "engine/graphics/scene/scene.h"
 #include "engine/assets/assets.h"

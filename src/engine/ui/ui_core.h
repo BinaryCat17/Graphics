@@ -223,4 +223,19 @@ void ui_element_update(UiElement* element, float dt); // Syncs data
 // --- Utils ---
 void ui_bind_read_string(void* data, const MetaField* field, char* out_buf, size_t buf_size);
 
+// --- High-Level Pipeline API ---
+
+typedef float (*UiTextMeasureFunc)(const char* text, void* user_data);
+
+// Performs layout calculation for the entire UI tree.
+// Should be called before rendering.
+void ui_instance_layout(UiInstance* instance, float window_w, float window_h, uint64_t frame_number, UiTextMeasureFunc measure_func, void* measure_data);
+
+#include "engine/graphics/scene/scene.h"
+#include "engine/assets/assets.h"
+
+// Builds the render packets for the scene.
+// Should be called after layout.
+void ui_instance_render(UiInstance* instance, Scene* scene, const Assets* assets);
+
 #endif // UI_CORE_H

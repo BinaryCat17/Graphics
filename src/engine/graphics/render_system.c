@@ -9,16 +9,12 @@
 #include "foundation/platform/platform.h"
 #include "engine/graphics/backend/renderer_backend.h"
 #include "engine/graphics/backend/vulkan/vulkan_renderer.h"
-#include "engine/ui/ui_renderer.h"
-#include "engine/ui/ui_core.h"
-#include "engine/ui/ui_layout.h"
 #include "engine/graphics/text/font.h"
 #include "engine/graphics/text/text_renderer.h"
 
 struct RenderSystem {
     // Dependencies (Injectable)
     Assets* assets;
-    UiElement* ui_root_view;
 
     // Internal State
     PlatformWindow* window;
@@ -48,53 +44,6 @@ static void render_packet_free_resources(RenderFramePacket* packet) {
     scene_clear(&packet->scene);
 }
 
-static void try_sync_packet(RenderSystem* sys) {
-    if (!sys) return;
-    
-    // 1. Unified Scene Generation
-    mtx_lock(&sys->packet_mutex);
-    
-    RenderFramePacket* dest = &sys->packets[sys->back_packet_index];
-    
-    // Clear old scene
-    render_packet_free_resources(dest);
-    
-    dest->scene.frame_number = sys->frame_count;
-
-    // Setup Camera (Ortho)
-    PlatformWindowSize size = platform_get_framebuffer_size(sys->window);
-    float w = (float)size.width;
-    float h = (float)size.height;
-    if (w < 1.0f) w = 1.0f;
-    if (h < 1.0f) h = 1.0f;
-
-    // View: Identity (Camera at 0,0)
-    dest->scene.camera.view_matrix = mat4_identity();
-    
-    Mat4 proj = mat4_orthographic(0.0f, w, 0.0f, h, -100.0f, 100.0f);
-    dest->scene.camera.view_matrix = proj; 
-
-    // 2. Generate UI Scene (if bound)
-    if (sys->ui_root_view) {
-        ui_renderer_build_scene(sys->ui_root_view, &dest->scene, sys->assets);
-    }
-
-    // DEBUG: Compute Result Visualization
-    if (sys->show_compute_result) {
-        SceneObject quad = {0};
-        quad.id = 9999;
-        quad.position = (Vec3){600.0f, 100.0f, 0.0f};
-        quad.scale = (Vec3){512.0f, 512.0f, 1.0f};
-        quad.color = (Vec4){1.0f, 1.0f, 1.0f, 1.0f};
-        quad.shader_params_0.x = 2.0f; // User Texture
-        quad.uv_rect = (Vec4){0.0f, 0.0f, 1.0f, 1.0f};
-        scene_add_object(&dest->scene, quad);
-    }
-
-    sys->packet_ready = true;
-    mtx_unlock(&sys->packet_mutex);
-}
-
 const RenderFramePacket* render_system_acquire_packet(RenderSystem* sys) {
     if (!sys) return NULL;
 
@@ -108,6 +57,11 @@ const RenderFramePacket* render_system_acquire_packet(RenderSystem* sys) {
     mtx_unlock(&sys->packet_mutex);
 
     return &sys->packets[sys->front_packet_index];
+}
+
+Scene* render_system_get_scene(RenderSystem* sys) {
+    if (!sys) return NULL;
+    return &sys->packets[sys->back_packet_index].scene;
 }
 
 // --- Init & Bootstrap ---
@@ -176,15 +130,31 @@ void render_system_bind_assets(RenderSystem* sys, Assets* assets) {
     try_bootstrap_renderer(sys);
 }
 
-void render_system_bind_ui(RenderSystem* sys, UiElement* root_view) {
-    sys->ui_root_view = root_view;
-    try_bootstrap_renderer(sys);
-}
-
 void render_system_begin_frame(RenderSystem* sys, double time) {
     if (!sys) return;
     sys->frame_count++;
     sys->current_time = time;
+
+    // Prepare Back Packet
+    RenderFramePacket* dest = &sys->packets[sys->back_packet_index];
+    
+    // Clear old scene
+    render_packet_free_resources(dest);
+    
+    dest->scene.frame_number = sys->frame_count;
+
+    // Setup Camera (Ortho)
+    PlatformWindowSize size = platform_get_framebuffer_size(sys->window);
+    float w = (float)size.width;
+    float h = (float)size.height;
+    if (w < 1.0f) w = 1.0f;
+    if (h < 1.0f) h = 1.0f;
+
+    // View: Identity (Camera at 0,0)
+    dest->scene.camera.view_matrix = mat4_identity();
+    
+    Mat4 proj = mat4_orthographic(0.0f, w, 0.0f, h, -100.0f, 100.0f);
+    dest->scene.camera.view_matrix = proj; 
 }
 
 void render_system_update(RenderSystem* sys) {
@@ -206,7 +176,24 @@ void render_system_update(RenderSystem* sys) {
         sys->backend->compute_dispatch(sys->backend, sys->active_compute_pipeline, 32, 32, 1, &push, sizeof(push));
     }
 
-    try_sync_packet(sys);
+    // DEBUG: Compute Result Visualization
+    if (sys->show_compute_result) {
+        SceneObject quad = {0};
+        quad.id = 9999;
+        quad.position = (Vec3){600.0f, 100.0f, 0.0f};
+        quad.scale = (Vec3){512.0f, 512.0f, 1.0f};
+        quad.color = (Vec4){1.0f, 1.0f, 1.0f, 1.0f};
+        quad.shader_params_0.x = 2.0f; // User Texture
+        quad.uv_rect = (Vec4){0.0f, 0.0f, 1.0f, 1.0f};
+        
+        RenderFramePacket* dest = &sys->packets[sys->back_packet_index];
+        scene_add_object(&dest->scene, quad);
+    }
+
+    // Mark Packet Ready
+    mtx_lock(&sys->packet_mutex);
+    sys->packet_ready = true;
+    mtx_unlock(&sys->packet_mutex);
 }
 
 void render_system_draw(RenderSystem* sys) {

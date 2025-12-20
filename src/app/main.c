@@ -22,6 +22,12 @@ static void app_on_update(Engine* engine) {
 
     // Update the Editor Feature
     math_editor_update(editor_state, engine);
+
+    // Render the Editor Feature
+    Scene* scene = render_system_get_scene(engine->render_system);
+    if (scene) {
+        math_editor_render(editor_state, scene, &engine->assets);
+    }
 }
 
 static void app_on_shutdown(Engine* engine) {

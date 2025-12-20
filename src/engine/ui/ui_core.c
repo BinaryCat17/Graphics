@@ -1,4 +1,7 @@
 #include "ui_core.h"
+#include "ui_layout.h"   // Internal
+#include "ui_renderer.h" // Internal
+
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
@@ -343,4 +346,17 @@ void ui_bind_read_string(void* data, const MetaField* field, char* out_buf, size
         int val = meta_get_int(data, field);
         snprintf(out_buf, buf_size, "%d", val);
     }
+}
+
+// --- High-Level Pipeline API ---
+
+void ui_instance_layout(UiInstance* instance, float window_w, float window_h, uint64_t frame_number, UiTextMeasureFunc measure_func, void* measure_data) {
+    if (!instance || !instance->root) return;
+    // Log debug info only for specific frames or conditions if needed. Currently false.
+    ui_layout_root(instance->root, window_w, window_h, frame_number, false, measure_func, measure_data);
+}
+
+void ui_instance_render(UiInstance* instance, Scene* scene, const Assets* assets) {
+    if (!instance || !instance->root || !scene || !assets) return;
+    ui_renderer_build_scene(instance->root, scene, assets);
 }

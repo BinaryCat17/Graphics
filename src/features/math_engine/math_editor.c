@@ -7,8 +7,6 @@
 #include "features/math_engine/transpiler.h"
 #include "engine/graphics/backend/renderer_backend.h"
 #include "engine/ui/ui_parser.h"
-#include "engine/ui/ui_layout.h"
-#include "engine/ui/ui_renderer.h"
 #include "engine/ui/ui_command_system.h"
 #include "engine/graphics/text/font.h"
 
@@ -300,7 +298,7 @@ void math_editor_render(MathEditorState* state, Scene* scene, const Assets* asse
     if (!state || !scene || !state->ui_instance.root) return;
     
     // Render UI Tree to Scene
-    ui_renderer_build_scene(state->ui_instance.root, scene, assets);
+    ui_instance_render(&state->ui_instance, scene, assets);
 }
 
 void math_editor_update(MathEditorState* state, Engine* engine) {
@@ -367,7 +365,7 @@ void math_editor_update(MathEditorState* state, Engine* engine) {
         
         // Layout
         PlatformWindowSize size = platform_get_framebuffer_size(engine->window);
-        ui_layout_root(state->ui_instance.root, (float)size.width, (float)size.height, render_system_get_frame_count(engine->render_system), false, text_measure_wrapper, NULL);
+        ui_instance_layout(&state->ui_instance, (float)size.width, (float)size.height, render_system_get_frame_count(engine->render_system), text_measure_wrapper, NULL);
     }
 
     // Graph Evaluation (Naive interpretation on CPU for debugging/node values)
