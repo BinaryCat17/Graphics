@@ -18,12 +18,14 @@ Structural standardization (Phase 6) is largely complete, but critical limitatio
 - [x] **Fix: Exit Crash:** Resolve Segmentation Fault during shutdown.
 - [x] **Fix: Screenshot Shutdown:** Ensure the last screenshot is saved before the process terminates.
 - [x] **Build System:** Integrate `codegen.py` into CMake as a pre-build step to prevent reflection desync.
-- [x] **Fix: White Inspector:** Resolve the persistent white background issue and ensure empty state visibility works.
-- [x] **Fix: Missing Wires:** Debug why connections are invisible (check Z-order or shader output).
+- [ ] **Fix: White Inspector:** Resolve the persistent white background issue (still visible in screenshots).
+- [ ] **Fix: Missing Wires:** Debug why connections are invisible (Check Z-Order vs Canvas Background).
 - [x] **Fix: Palette Styling:** Correct 9-slice parameters for side buttons to fix distorted oval shapes.
 - [x] **Fix: Port Alignment:** Offset port/wire rendering by the Canvas Element's screen position to fix alignment.
 - [x] **Fix: Node Value Sync:** Sync `cached_output` to UI instead of static `value` field for operation nodes.
 - [x] **Fix: Color Parsing:** Implement HEX string to `Vec4` conversion in the reflection system to fix UI colors.
+- [ ] **Fix: Clear Button:** Fix layout overflow and remove white artifact under the button.
+- [ ] **Fix: UI Gradient:** Remove unwanted white gradient/highlight in the top-left sidebar header.
 - [ ] **Refactor: Magic Numbers:** Extract hardcoded layout constants (`150.0f`, `45.0f`) from `math_editor.c` into a `LayoutConfig` struct or defines.
 - [ ] **Refactor: Coordinate Spaces:** Fix the "Clip Rect Offset" hack by implementing proper Screen-to-World coordinate transformation for Graph connections.
 - [ ] **Refactor: MathEditor Split:** Split `math_editor.c` into `_view` (Rendering) and `_logic` (Input/State) to reduce file complexity.
