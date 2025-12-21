@@ -27,6 +27,9 @@ Structural standardization (Phase 6) is largely complete, but critical limitatio
 - [ ] **Refactor: Magic Numbers:** Extract hardcoded layout constants (`150.0f`, `45.0f`) from `math_editor.c` into a `LayoutConfig` struct or defines.
 - [ ] **Refactor: Coordinate Spaces:** Fix the "Clip Rect Offset" hack by implementing proper Screen-to-World coordinate transformation for Graph connections.
 - [ ] **Refactor: MathEditor Split:** Split `math_editor.c` into `_view` (Rendering) and `_logic` (Input/State) to reduce file complexity.
+- [ ] **Fix: String Ownership:** Fix `meta_set_string` to avoid `free()` on Arena-allocated strings (Critical for stability).
+- [ ] **Feature: UI Z-Order:** Implement Z-indexing or "bring to front" logic for nodes in the Canvas.
+- [ ] **Refactor: Wire ID Logic:** Replace bit-shifting ID generation with a safer 64-bit ID or hash-based system to avoid collisions.
 
 ### Phase 6: Structural Standardization (Refinement)
 **Objective:** Address architectural limitations in the UI system to support complex editors.
