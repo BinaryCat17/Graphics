@@ -14,6 +14,8 @@ Structural standardization (Phase 6) is largely complete, but critical limitatio
 - [ ] **Fix: Clear Button:** Fix layout overflow and remove white artifact under the button.
 - [x] **Fix: UI Gradient:** Remove unwanted white gradient/highlight in the top-left sidebar header.
 - [x] **Refactor: Magic Numbers:** Extract hardcoded layout constants (`150.0f`, `45.0f`) from `math_editor.c` into a `LayoutConfig` struct or defines.
+- [ ] **Refactor: Z-Order Calibration:** Fine-tune Z-values to ensure Wires render behind Nodes and the entire Canvas area remains below the Sidebar/Inspector.
+- [ ] **Fix: Global UI Clipping:** Ensure procedural elements (Wires, Ports) strictly respect the Canvas clipping rect to prevent overlapping with the Sidebar.
 - [ ] **Optimization: Event-Based Evaluation:** Optimize `math_editor_update` to evaluate the graph only when dirty, not every frame.
 - [ ] **Refactor: String Memory Strategy:** Replace the temporary leak fix in `reflection.c` with a proper Arena-based string allocation strategy.
 - [ ] **Refactor: Auto-Layout Buttons:** Remove hardcoded widths (e.g., "Clear" button) and use padding/flex-growth for localization support.
