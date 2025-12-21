@@ -15,7 +15,7 @@ Structural standardization (Phase 6) is largely complete, but critical limitatio
 - [ ] **UI Layout:** Implement Flexbox-style properties (`flex-grow`, `justify-content`) for robust responsive layouts.
 - [ ] **Graph Serialization:** Move hardcoded default graph setup to a data file (YAML/JSON) to support saving/loading.
 - [x] **Declarative Node Palette:** Replace hardcoded "Add Node" logic with a data-driven palette system.
-- [ ] **Generic YAML Deserializer:** Implement a reflection-based YAML loader (`config_load_struct_array`) to replace manual parsing logic.
+- [x] **Generic YAML Deserializer:** Implement a reflection-based YAML loader (`config_load_struct_array`) to replace manual parsing logic.
 
 The codebase enforces strict Public/Internal API boundaries across all modules. The Math Engine is fully encapsulated, and the foundation is covered by unit tests. The system is now ready for 3D procedural geometry and compute shader integration.
 

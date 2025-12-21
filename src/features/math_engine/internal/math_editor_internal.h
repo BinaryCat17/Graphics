@@ -40,8 +40,8 @@ typedef struct MathEditor {
     uint32_t node_view_cap;
 
     // Palette Data
-    MathNodePaletteItem* palette_items; // REFLECT
-    uint32_t palette_count;             // REFLECT
+    MathNodePaletteItem** palette_items; // REFLECT
+    size_t palette_count;                // REFLECT
 
     // Selection
     MathNodeId selected_node_id;

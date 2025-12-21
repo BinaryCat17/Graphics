@@ -42,6 +42,13 @@ const MetaEnum* meta_get_enum(const char* name) {
     return NULL;
 }
 
+bool meta_enum_get_value(const MetaEnum* meta_enum, const char* name_str, int* out_value) {
+    (void)meta_enum;
+    (void)name_str;
+    (void)out_value;
+    return false;
+}
+
 // --- Tests ---
 
 int test_simple_struct(void) {

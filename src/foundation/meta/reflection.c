@@ -94,13 +94,4 @@ const char* meta_enum_get_name(const MetaEnum* meta_enum, int value) {
     return NULL;
 }
 
-bool meta_enum_get_value(const MetaEnum* meta_enum, const char* name_str, int* out_value) {
-    if (!meta_enum || !name_str || !out_value) return false;
-    for (size_t i = 0; i < meta_enum->count; ++i) {
-        if (strcmp(meta_enum->values[i].name, name_str) == 0) {
-            *out_value = meta_enum->values[i].value;
-            return true;
-        }
-    }
-    return false;
-}
+

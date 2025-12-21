@@ -7,6 +7,7 @@
 #include "foundation/platform/fs.h"
 #include "foundation/meta/reflection.h"
 #include "foundation/config/simple_yaml.h"
+#include "foundation/config/config_system.h"
 #include "features/math_engine/internal/transpiler.h"
 #include "features/math_engine/internal/math_graph_internal.h" // Access to internal Graph/Node structs
 #include "engine/graphics/internal/renderer_backend.h"
@@ -230,36 +231,15 @@ static void math_editor_load_palette(MathEditor* editor, const char* path) {
     }
     
     const ConfigNode* items_node = config_node_map_get(root, "items");
-    if (items_node && items_node->type == CONFIG_NODE_SEQUENCE) {
-        // Allocate palette array
-        editor->palette_items = arena_alloc_zero(&editor->graph_arena, 64 * sizeof(MathNodePaletteItem));
-        editor->palette_count = 0;
-        
-        for (size_t i = 0; i < items_node->item_count && editor->palette_count < 64; ++i) {
-             ConfigNode* item_node = items_node->items[i];
-             if (item_node->type == CONFIG_NODE_MAP) {
-                 MathNodePaletteItem* pal_item = &editor->palette_items[editor->palette_count++];
-                 
-                 const ConfigNode* label_node = config_node_map_get(item_node, "label");
-                 if (label_node && label_node->scalar) {
-                     strncpy(pal_item->label, label_node->scalar, 31);
-                 }
-                 
-                 const ConfigNode* type_node = config_node_map_get(item_node, "type");
-                 if (type_node && type_node->scalar) {
-                      const MetaEnum* e = meta_get_enum("MathNodeType");
-                      int val = 0;
-                      if (e && meta_enum_get_value(e, type_node->scalar, &val)) {
-                          pal_item->type = val;
-                      } else {
-                          LOG_WARN("Unknown node type in palette: %s", type_node->scalar);
-                      }
-                 }
-             }
+    if (items_node) {
+        const MetaStruct* meta = meta_get_struct("MathNodePaletteItem");
+        if (meta) {
+            config_load_struct_array(items_node, meta, (void***)&editor->palette_items, &editor->palette_count, &editor->graph_arena);
+            LOG_INFO("Editor: Loaded %zu palette items from %s", editor->palette_count, path);
+        } else {
+            LOG_ERROR("MathNodePaletteItem meta not found! Check codegen.");
         }
     }
-    
-    LOG_INFO("Editor: Loaded %d palette items from %s", editor->palette_count, path);
 }
 
 MathEditor* math_editor_create(Engine* engine) {
