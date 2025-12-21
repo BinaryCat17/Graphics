@@ -119,6 +119,9 @@ static void math_editor_update_selection(MathEditor* editor) {
             editor->selected_nodes_count = 1;
         }
     }
+    
+    editor->has_selection = (editor->selected_nodes_count > 0);
+    editor->no_selection = !editor->has_selection;
 
     // 2. Trigger UI Rebuild for Inspector
     // The UI system will read 'selected_nodes_count' and 'selected_nodes' 
@@ -330,6 +333,8 @@ MathEditor* math_editor_create(Engine* engine) {
     editor->node_view_cap = 0;
     
     editor->selected_node_id = MATH_NODE_INVALID_ID;
+    editor->has_selection = false;
+    editor->no_selection = true;
     
     // 2. Setup Default Data
     math_editor_load_graph(editor, "assets/ui/default_graph.yaml");
@@ -416,7 +421,7 @@ static int get_node_input_count(MathNodeType type) {
     }
 }
 
-static void math_editor_render_ports(MathEditor* editor, Scene* scene) {
+static void math_editor_render_ports(MathEditor* editor, Scene* scene, Vec4 clip_rect) {
     if (!editor || !editor->graph || !scene) return;
 
     for (uint32_t i = 0; i < editor->node_views_count; ++i) {
@@ -439,6 +444,7 @@ static void math_editor_render_ports(MathEditor* editor, Scene* scene) {
             port.scale = (Vec3){10.0f, 10.0f, 1.0f};
             port.color = (Vec4){0.5f, 0.5f, 0.5f, 1.0f}; // Grey
             port.uv_rect = (Vec4){0.0f, 0.0f, 1.0f, 1.0f};
+            port.ui.clip_rect = clip_rect;
             
             // SDF Circle
             port.ui.style_params.x = 4.0f; // SCENE_MODE_SDF_BOX
@@ -463,6 +469,7 @@ static void math_editor_render_ports(MathEditor* editor, Scene* scene) {
             port.scale = (Vec3){10.0f, 10.0f, 1.0f};
             port.color = (Vec4){0.5f, 0.5f, 0.5f, 1.0f};
             port.uv_rect = (Vec4){0.0f, 0.0f, 1.0f, 1.0f};
+            port.ui.clip_rect = clip_rect;
             
             port.ui.style_params.x = 4.0f; // SCENE_MODE_SDF_BOX
             port.ui.style_params.y = 5.0f; // Radius
@@ -473,7 +480,7 @@ static void math_editor_render_ports(MathEditor* editor, Scene* scene) {
     }
 }
 
-static void math_editor_render_connections(MathEditor* editor, Scene* scene) {
+static void math_editor_render_connections(MathEditor* editor, Scene* scene, Vec4 clip_rect) {
     if (!editor || !editor->graph || !scene) return;
 
     for (uint32_t i = 0; i < editor->graph->node_count; ++i) {
@@ -530,6 +537,7 @@ static void math_editor_render_connections(MathEditor* editor, Scene* scene) {
             
             // Fix: Set UV Rect so shader receives correct UVs
             wire.uv_rect = (Vec4){0.0f, 0.0f, 1.0f, 1.0f};
+            wire.ui.clip_rect = clip_rect;
 
             wire.ui.style_params.y = 1.0f; // Curve Type
             wire.ui.extra_params = (Vec4){u1, v1, u2, v2};
@@ -545,31 +553,22 @@ void math_editor_render(MathEditor* editor, Scene* scene, const struct Assets* a
     UiElement* root = ui_instance_get_root(editor->ui_instance);
     if (!editor || !scene || !root) return;
 
-    // 0. Manual Canvas Background (Behind Connections)
+    // Resolve Clipping Rect from Canvas Area
+    Vec4 canvas_clip = {-10000.0f, -10000.0f, 20000.0f, 20000.0f};
     UiElement* canvas_area = ui_element_find_by_id(root, "canvas_area");
     if (canvas_area) {
-        SceneObject bg = {0};
-        bg.prim_type = SCENE_PRIM_QUAD;
-        bg.layer = LAYER_UI_BACKGROUND;
-        
-        Rect canvas_rect = ui_element_get_screen_rect(canvas_area);
-        bg.position = (Vec3){canvas_rect.x, canvas_rect.y, 0.0f};
-        bg.scale = (Vec3){canvas_rect.w, canvas_rect.h, 1.0f};
-        
-        bg.color = (Vec4){0.149f, 0.149f, 0.149f, 1.0f}; // #262626
-        bg.uv_rect = (Vec4){0.0f, 0.0f, 1.0f, 1.0f};
-        
-        scene_add_object(scene, bg);
+        Rect r = ui_element_get_screen_rect(canvas_area);
+        canvas_clip = (Vec4){r.x, r.y, r.w, r.h};
     }
     
     // 1. Render Connections (Background)
-    math_editor_render_connections(editor, scene);
+    math_editor_render_connections(editor, scene, canvas_clip);
     
     // 2. Render UI Tree to Scene
     ui_instance_render(editor->ui_instance, scene, assets, arena);
 
     // 3. Render Ports (Overlay/Content) - Drawn last to be on top
-    math_editor_render_ports(editor, scene);
+    math_editor_render_ports(editor, scene, canvas_clip);
 }
 
 void math_editor_update(MathEditor* editor, Engine* engine) {

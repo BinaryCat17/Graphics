@@ -49,6 +49,7 @@ static float calculate_height(UiElement* el, float available_h) {
         if (el->child_count > 0 && spec->layout == UI_LAYOUT_FLEX_COLUMN) {
             h = spec->padding * 2;
              for (UiElement* child = el->first_child; child; child = child->next_sibling) {
+                if (child->flags & UI_FLAG_HIDDEN) continue;
                 float child_h = child->spec->height;
                 if (child_h < 0) child_h = UI_DEFAULT_HEIGHT; 
                 h += child_h + spec->spacing;
@@ -68,6 +69,7 @@ static float calculate_height(UiElement* el, float available_h) {
 static void layout_column(UiElement* el, float start_x, float start_y, float* out_max_x, float* out_max_y) {
     float cursor_y = start_y;
     for (UiElement* child = el->first_child; child; child = child->next_sibling) {
+        if (child->flags & UI_FLAG_HIDDEN) continue;
         child->rect.x = start_x;
         child->rect.y = cursor_y;
         cursor_y += child->rect.h + el->spec->spacing;
@@ -82,6 +84,7 @@ static void layout_column(UiElement* el, float start_x, float start_y, float* ou
 static void layout_row(UiElement* el, float start_x, float start_y, float* out_max_x, float* out_max_y) {
     float cursor_x = start_x;
     for (UiElement* child = el->first_child; child; child = child->next_sibling) {
+        if (child->flags & UI_FLAG_HIDDEN) continue;
         child->rect.x = cursor_x;
         child->rect.y = start_y;
         cursor_x += child->rect.w + el->spec->spacing;
@@ -141,6 +144,13 @@ static void layout_split_v(UiElement* el, float start_x, float start_y) {
 
 static void layout_recursive(UiElement* el, Rect available, uint64_t frame_number, bool log_debug, UiTextMeasureFunc measure_func, void* measure_data) {
     if (!el || !el->spec) return;
+    
+    if (el->flags & UI_FLAG_HIDDEN) {
+        el->rect.w = 0;
+        el->rect.h = 0;
+        return;
+    }
+
     const UiNodeSpec* spec = el->spec;
 
     // 1. Self Size

@@ -50,12 +50,26 @@ children:
     color: "#CCCCCC"
     
   - type: container
+    layout: flex_column
+    height: -1
+    padding: 20
+    bind_visible: "no_selection"
+    children:
+      - type: text
+        text: "Select a node to"
+        color: "#666666"
+      - type: text
+        text: "edit properties"
+        color: "#666666"
+
+  - type: container
     id: inspector_area
     layout: flex_column
     height: -1 # Fill rest
     corner_radius: 4
     color: "#26262B"
     padding: 5
+    bind_visible: "has_selection"
     collection: "selected_nodes"
     template_selector: "type"
     item_template: "DefaultNodeInspector"

@@ -29,6 +29,11 @@ typedef struct ScreenshotContext {
     uint8_t* data;
 } ScreenshotContext;
 
+typedef struct ThreadNode {
+    Thread* thread;
+    struct ThreadNode* next;
+} ThreadNode;
+
 static int save_screenshot_task(void* arg) {
     ScreenshotContext* ctx = (ScreenshotContext*)arg;
     if (ctx) {
@@ -623,8 +628,16 @@ static void vulkan_renderer_render_scene(RendererBackend* backend, const Scene* 
 
                     Thread* t = thread_create(save_screenshot_task, ctx);
                     if (t) {
-                        thread_detach(t);
-                        LOG_TRACE("Screenshot: Offloaded to thread.");
+                        ThreadNode* node = (ThreadNode*)malloc(sizeof(ThreadNode));
+                        if (node) {
+                            node->thread = t;
+                            node->next = (ThreadNode*)state->screenshot_threads_head;
+                            state->screenshot_threads_head = (void*)node;
+                            LOG_TRACE("Screenshot: Offloaded to thread (tracked).");
+                        } else {
+                            LOG_ERROR("Screenshot: Failed to allocate thread node! Detaching fallback.");
+                            thread_detach(t);
+                        }
                     } else {
                         LOG_ERROR("Screenshot: Failed to create thread!");
                         free(host_copy);
@@ -667,6 +680,17 @@ static void vulkan_renderer_cleanup(RendererBackend* backend) {
     VulkanRendererState* state = (VulkanRendererState*)backend->state;
     if (state) {
         vkDeviceWaitIdle(state->device);
+        
+        // Join active screenshot threads
+        ThreadNode* curr = (ThreadNode*)state->screenshot_threads_head;
+        while (curr) {
+            LOG_TRACE("Waiting for screenshot thread...");
+            thread_join(curr->thread);
+            ThreadNode* next = curr->next;
+            free(curr);
+            curr = next;
+        }
+        state->screenshot_threads_head = NULL;
         
         // Clean up per-frame resources
         for (int i = 0; i < 2; ++i) {

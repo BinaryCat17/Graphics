@@ -81,6 +81,9 @@ typedef struct MathEditor {
     // UI Binding for Inspector (Polymorphic List of 0 or 1 item)
     MathNode** selected_nodes;   // REFLECT
     int selected_nodes_count;    // REFLECT
+    
+    bool has_selection;          // REFLECT (helper for UI visibility)
+    bool no_selection;           // REFLECT (helper for UI visibility)
 } MathEditor;
 
 #endif // MATH_EDITOR_INTERNAL_H

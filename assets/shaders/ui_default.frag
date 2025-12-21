@@ -36,25 +36,28 @@ float sdSegment(in vec2 p, in vec2 a, in vec2 b) {
     return length( pa - ba*h );
 }
 
+vec2 cubicBezier(vec2 p0, vec2 p1, vec2 p2, vec2 p3, float t) {
+    float u = 1.0 - t;
+    float tt = t * t;
+    float uu = u * u;
+    float uuu = uu * u;
+    float ttt = tt * t;
+    return uuu * p0 + 3.0 * uu * t * p1 + 3.0 * u * tt * p2 + ttt * p3;
+}
+
 float sdWire(vec2 p, vec2 a, vec2 b) {
     vec2 c1 = a + vec2((b.x - a.x) * 0.5, 0.0);
     vec2 c2 = b - vec2((b.x - a.x) * 0.5, 0.0);
     
-    vec2 pts[5];
-    pts[0] = a;
-    pts[4] = b;
-    
-    vec2 m = 0.125*a + 0.375*c1 + 0.375*c2 + 0.125*b;
-    pts[2] = m;
-    
-    pts[1] = mix(a, m, 0.5);
-    pts[3] = mix(m, b, 0.5);
-    
     float d = 1e5;
-    d = min(d, sdSegment(p, pts[0], pts[1]));
-    d = min(d, sdSegment(p, pts[1], pts[2]));
-    d = min(d, sdSegment(p, pts[2], pts[3]));
-    d = min(d, sdSegment(p, pts[3], pts[4]));
+    vec2 prev = a;
+    const int STEPS = 16;
+    for (int i = 1; i <= STEPS; ++i) {
+        float t = float(i) / float(STEPS);
+        vec2 curr = cubicBezier(a, c1, c2, b, t);
+        d = min(d, sdSegment(p, prev, curr));
+        prev = curr;
+    }
     
     return d;
 }

@@ -9,16 +9,14 @@ Structural standardization (Phase 6) is largely complete, but critical limitatio
 
 ### Phase 5: Stability & Validation (Refinement)
 **Objective:** Resolve data-binding warnings and schema inconsistencies found during enhanced logging.
-- [x] **Fix: Graph Schema:** Correct nesting of `type`, `value`, and `inputs` in `default_graph.yaml` to match `MathNodeBlueprint` structure.
-- [x] **UI: Parser Noise:** Update `ui_parser.c` to skip the `instance` field in the reflection loop to avoid "Unknown field" warnings for parser directives.
-- [x] **UI: Position Support:** Add `x` and `y` fields to `UiNodeSpec` and map them to `rect.x/y` in `UiElement` to support absolute positioning in Canvas layouts.
-- [x] **UI: Palette Items:** Add `text_source` to `UiNodeSpec` reflection to properly support dynamic label sources in palette templates.
-- [x] **Fix: Node Titles:** Titles are visible but have poor contrast/alignment.
-- [x] **Fix: Connection Rendering:** Wires are still not visible. Check Z-order and coordinate scaling.
-- [x] **Fix: Node Ports:** Sockets are still missing. Verify LAYER_UI_CONTENT visibility.
-- [ ] **Fix: Inspector:** Panel remains empty/white. Check 'selected_nodes' binding and template selector.
-- [ ] **Fix: Sidebar Layout:** Palette items have incorrect backgrounds and spacing.
-- [ ] **Fix: Remove Canvas Background:** Remove the manual grey background that blocks the compute visualization.
+- [x] **Fix: Inspector:** Panel remains empty/white. Check 'selected_nodes' binding and template selector.
+- [x] **Fix: Sidebar Layout:** Palette items have incorrect backgrounds and spacing.
+- [x] **Fix: Remove Canvas Background:** Remove the manual grey background that blocks the compute visualization.
+- [x] **Fix: UI Clipping for Ports/Wires:** Ensure graph elements are clipped by the canvas area and don't overlap the sidebar.
+- [x] **Fix: Wire Shader Stroke:** Debug why `sdWire` renders only endpoints.
+- [x] **Fix: Palette Item Styling:** Resolve white background artifacts on sidebar buttons.
+- [x] **Fix: Exit Crash:** Resolve Segmentation Fault during shutdown.
+- [x] **Fix: Screenshot Shutdown:** Ensure the last screenshot is saved before the process terminates.
 
 ### Phase 6: Structural Standardization (Refinement)
 **Objective:** Address architectural limitations in the UI system to support complex editors.

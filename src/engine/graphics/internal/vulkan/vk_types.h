@@ -99,6 +99,7 @@ typedef struct VulkanRendererState {
     // Screenshot State
     bool screenshot_pending;
     char screenshot_path[256];
+    void* screenshot_threads_head; // Linked list of active screenshot threads
 
     // Unified Resources
     VkBuffer unit_quad_buffer;
