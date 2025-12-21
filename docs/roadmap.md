@@ -7,6 +7,14 @@
 
 Structural standardization (Phase 6) is largely complete, but critical limitations in the UI module were identified during the Phase 7 kickoff.
 
+### Phase 4: Architectural Integrity & Custom Widgets (IMMEDIATE PRIORITY)
+**Objective:** Restore architectural boundaries by implementing a "Custom Widget" protocol, eliminating the need for hardcoded Z-depths and dependency leaks between Engine and Features.
+- [ ] **Clean Up:** Revert `src/engine/graphics/layer_constants.h` to only contain engine-level constants (UI_BASE, UI_OVERLAY). Remove feature-specific constants.
+- [ ] **Engine API:** Implement `UI_KIND_CUSTOM` in `ui_core.h` and a renderer registry `ui_register_renderer(name, callback)`.
+- [ ] **Render Loop Refactor:** Update `ui_renderer.c` to dispatch `UI_KIND_CUSTOM` elements to their registered callbacks, passing the correct Z-depth and clip rect.
+- [ ] **Feature Integration:** Refactor `MathEditor` to register a "GraphWires" renderer. Move wire/port drawing logic into this callback.
+- [ ] **YAML Migration:** Update `manifest.yaml` to use `type: custom` and `renderer: GraphWires` for the graph canvas.
+
 ### Phase 5: Stability & Validation (Refinement)
 **Objective:** Resolve data-binding warnings and schema inconsistencies found during enhanced logging.
 - [x] **Fix: White Inspector:** Resolve the persistent white background issue (still visible in screenshots).
@@ -21,7 +29,6 @@ Structural standardization (Phase 6) is largely complete, but critical limitatio
 - [x] **Refactor: Auto-Layout Buttons:** Remove hardcoded widths (e.g., "Clear" button) and use padding/flex-growth for localization support.
 - [x] **Refactor: Z-Layer Constants:** Replace magic float values (`-9.985`, etc.) with a centralized `LayerDepth` enum or constants system to prevent sorting fragility.
 - [ ] **Refactor: Input State Machine:** Replace the growing switch-statement in `math_editor_update` with a formal State Machine (Idle, DraggingNode, DraggingWire) for maintainability.
-- [ ] **Architecture: Custom UI Widgets:** Investigate wrapping Wires/Ports into a custom `UiElement` type (or specific render pass) to unify them with the standard UI sorting/clipping logic.
 - [ ] **Fix: Sidebar Overflow:** Resolve layout overlap where the "Clear" button covers the "Time" palette item by adjusting container height or enabling scrolling.
 - [ ] **Fix: Dangling Wire Artifact:** Investigate and fix the stray wire curve rendering artifact visible below the Multiply node.
 - [ ] **Refactor: Inspector Style:** Style the white placeholder rectangle in the Properties panel to match the dark theme.
