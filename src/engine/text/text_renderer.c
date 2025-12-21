@@ -10,7 +10,9 @@ void scene_add_text_clipped(Scene* scene, const Font* font, const char* text, Ve
     if (!scene || !text || !font) return;
 
     float cursor_x = pos.x;
-    float cursor_y = pos.y;
+    // Shift cursor down to baseline because 'pos' is top-left, 
+    // but glyph offsets are relative to baseline.
+    float cursor_y = pos.y + (font->ascent * scale);
     
     const char* ptr = text;
     while (*ptr) {

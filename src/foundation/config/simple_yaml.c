@@ -131,12 +131,20 @@ int simple_yaml_parse(MemoryArena* arena, const char *text, ConfigNode **out_roo
         if (*cursor == '\r' && *(cursor + 1) == '\n') cursor += 2; else if (*cursor) ++cursor;
 
         line_number++;
-        rstrip(line);
-        char *comment = strchr(line, '#');
-        if (comment) {
-            *comment = 0;
-            rstrip(line);
+        
+        // Handle comments, respecting quotes
+        char *c = line;
+        int in_quote = 0; // 0=none, 1=', 2="
+        while (*c) {
+            if (*c == '\'' && in_quote != 2) in_quote = (in_quote == 1) ? 0 : 1;
+            else if (*c == '"' && in_quote != 1) in_quote = (in_quote == 2) ? 0 : 2;
+            else if (*c == '#' && in_quote == 0) {
+                *c = 0; // Terminate at comment start
+                break;
+            }
+            c++;
         }
+        rstrip(line);
 
         const char *p = line;
         int indent = 0;

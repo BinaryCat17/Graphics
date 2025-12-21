@@ -110,9 +110,8 @@ void main() {
              
              uv = vec2(u9, v9) * inUVRect.zw + inUVRect.xy;
              
-             vec4 texColor = texture(texSampler, uv);
-             color = texColor * inColor;
-             alpha = texColor.a * inColor.a;
+             float mask = texture(texSampler, uv).r;
+             alpha *= mask;
         } else if (inParams.x < 4.5) {
              // 4.0: SDF Rounded Box
              // inParams.y = radius (px)

@@ -90,12 +90,12 @@ Font* font_create(const void* ttf_data, size_t ttf_size) {
             float alpha = 1.0f - smoothstep(radius, radius + 1.0f, d);
             
             // Border (2px)
-            float inner = radius - 2.0f;
+            // float inner = radius - 2.0f; // Unused
             
             unsigned char val;
             // We want it to be a bit thicker at borders for visibility
-            if (d > inner) val = (unsigned char)(alpha * 255); 
-            else val = (unsigned char)(alpha * 180); // Lighter center
+            // if (d > inner) ... else ... -> Combined since both are solid now
+            val = (unsigned char)(alpha * 255);
             
             font->pixels[(ui_y + j) * font->width + (ui_x + i)] = val;
         }
