@@ -29,7 +29,7 @@ children:
         - type: container
           flags: clickable | focusable
           text: "Clear"
-          width: 80
+          padding: 15
           height: 30
           corner_radius: 8
           color: "#663333"
