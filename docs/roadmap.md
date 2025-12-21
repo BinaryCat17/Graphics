@@ -16,8 +16,9 @@ Structural standardization (Phase 6) is largely complete, but critical limitatio
 - [x] **Fix: Node Titles:** Titles are visible but have poor contrast/alignment.
 - [x] **Fix: Connection Rendering:** Wires are still not visible. Check Z-order and coordinate scaling.
 - [x] **Fix: Node Ports:** Sockets are still missing. Verify LAYER_UI_CONTENT visibility.
-- [x] **Fix: Inspector:** Panel remains empty/white. Check 'selected_nodes' binding and template selector.
-- [x] **Fix: Sidebar Layout:** Palette items have incorrect backgrounds and spacing.
+- [ ] **Fix: Inspector:** Panel remains empty/white. Check 'selected_nodes' binding and template selector.
+- [ ] **Fix: Sidebar Layout:** Palette items have incorrect backgrounds and spacing.
+- [ ] **Fix: Remove Canvas Background:** Remove the manual grey background that blocks the compute visualization.
 
 ### Phase 6: Structural Standardization (Refinement)
 **Objective:** Address architectural limitations in the UI system to support complex editors.
