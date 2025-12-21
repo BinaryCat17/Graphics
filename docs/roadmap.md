@@ -10,10 +10,10 @@ Structural standardization (Phase 6) is largely complete, but critical limitatio
 ### Phase 4: Architectural Integrity & Viewport System (IMMEDIATE PRIORITY)
 **Objective:** Implement a "Viewport" mechanism where UI Elements can act as containers for delegated scene generation, strictly decoupling the Engine from Feature-specific rendering logic.
 - [ ] **Clean Up:** Revert `src/engine/graphics/layer_constants.h` to only contain engine-level constants. Move editor-specific constants to local defines within the feature.
-- [ ] **Engine API:** Define the `SceneObjectProvider` interface (callback accepting dimensions and a Frame Arena, returning SceneObjects).
+- [ ] **Engine API:** Define `SceneObjectProvider` callback signature: `void (*callback)(void* instance_data, Rect screen_rect, float z_depth, Scene* scene, MemoryArena* frame_arena)`.
 - [ ] **UI Core:** Implement `UI_KIND_VIEWPORT` in `ui_core.h` and `UiNodeSpec`. Add `provider_id` support to the parser.
-- [ ] **Renderer Evolution:** Update `ui_renderer.c` to handle `UI_KIND_VIEWPORT`. It must request objects from the provider, transform them to screen space, apply clipping, and submit them to the Scene.
-- [ ] **Feature Migration:** Refactor `MathEditor` to implement `SceneObjectProvider` for Wires/Ports instead of manual rendering.
+- [ ] **Renderer Evolution:** Update `ui_renderer.c` to handle `UI_KIND_VIEWPORT`. It calculates the `screen_rect` and `z_depth`, then invokes the provider.
+- [ ] **Feature Migration:** Refactor `MathEditor` to implement `SceneObjectProvider` for Wires/Ports. The provider manually applies `screen_rect.x/y` offsets to its objects.
 - [ ] **YAML Migration:** Update `manifest.yaml` to define the graph canvas as a `viewport` with `provider: GraphNetwork`.
 
 ### Phase 5: Stability & Validation (Refinement)
