@@ -2,7 +2,7 @@ type: container
 layout: column
 width: 150
 height: 100
-flags: "UI_FLAG_CLICKABLE | UI_FLAG_DRAGGABLE"
+flags: "clickable | draggable"
 bind_x: "x"
 bind_y: "y"
 color: "#333333"
