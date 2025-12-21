@@ -145,15 +145,6 @@ static UiNodeSpec* load_recursive(UiAsset* asset, const ConfigNode* node) {
             continue;
         }
 
-        // Flags manual overrides (mixes with kind)
-        if (strcmp(key, "draggable") == 0 && val->scalar && strcmp(val->scalar, "true") == 0) {
-            spec->flags |= UI_FLAG_DRAGGABLE;
-            continue;
-        }
-        if (strcmp(key, "clickable") == 0 && val->scalar && strcmp(val->scalar, "true") == 0) {
-            spec->flags |= UI_FLAG_CLICKABLE;
-            continue;
-        }
         
         // --- Generic Reflection ---
         const MetaField* field = meta_find_field(meta, key);
