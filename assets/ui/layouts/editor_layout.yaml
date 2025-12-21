@@ -19,7 +19,7 @@ children:
     layout: canvas
     width: -1 # Fill rest
     height: -1
-    color: "#262626"
+    color: "#00000000"
     collection: "node_views"
     item_template: "GraphNode"
     

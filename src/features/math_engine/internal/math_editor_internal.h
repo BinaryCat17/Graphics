@@ -79,7 +79,7 @@ typedef struct MathEditor {
     uint32_t current_pipeline; // Vulkan Compute Pipeline ID
 
     // UI Binding for Inspector (Polymorphic List of 0 or 1 item)
-    MathNode* selected_nodes[1]; // REFLECT
+    MathNode** selected_nodes;   // REFLECT
     int selected_nodes_count;    // REFLECT
 } MathEditor;
 

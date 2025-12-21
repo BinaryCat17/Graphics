@@ -142,6 +142,11 @@ UiElement* ui_element_get_parent(const UiElement* element) {
     return element ? element->parent : NULL;
 }
 
+Rect ui_element_get_screen_rect(const UiElement* element) {
+    if (element) return element->screen_rect;
+    return (Rect){0};
+}
+
 // --- UiElement (Instance) ---
 
 static UiElement* element_alloc(UiInstance* instance, const UiNodeSpec* spec) {

@@ -8,9 +8,13 @@ bind_y: "y"
 color: "#333333"
 padding: 5
 children:
-  - type: text
-    bind: "name"
-    height: 20
-    color: "#FFFFFF"
+  - type: container
+    height: 25
+    color: "#444444"
+    padding: 5
+    children:
+      - type: text
+        bind: "name"
+        color: "#FFFFFF"
   - type: instance
     instance: "ValueRow"

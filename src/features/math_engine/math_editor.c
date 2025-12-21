@@ -317,6 +317,9 @@ MathEditor* math_editor_create(Engine* engine) {
     MathEditor* editor = (MathEditor*)calloc(1, sizeof(MathEditor));
     if (!editor) return NULL;
 
+    // Allocate selection array (Capacity 1 for now)
+    editor->selected_nodes = (MathNode**)calloc(1, sizeof(MathNode*));
+
     // 1. Init Memory
     arena_init(&editor->graph_arena, 1024 * 1024); // 1MB for Graph Data
     // Use factory function (Heap alloc via Arena)
@@ -435,6 +438,7 @@ static void math_editor_render_ports(MathEditor* editor, Scene* scene) {
             port.position = (Vec3){x, y, 0.0f};
             port.scale = (Vec3){10.0f, 10.0f, 1.0f};
             port.color = (Vec4){0.5f, 0.5f, 0.5f, 1.0f}; // Grey
+            port.uv_rect = (Vec4){0.0f, 0.0f, 1.0f, 1.0f};
             
             // SDF Circle
             port.ui.style_params.x = 4.0f; // SCENE_MODE_SDF_BOX
@@ -458,6 +462,7 @@ static void math_editor_render_ports(MathEditor* editor, Scene* scene) {
             port.position = (Vec3){x, y, 0.0f};
             port.scale = (Vec3){10.0f, 10.0f, 1.0f};
             port.color = (Vec4){0.5f, 0.5f, 0.5f, 1.0f};
+            port.uv_rect = (Vec4){0.0f, 0.0f, 1.0f, 1.0f};
             
             port.ui.style_params.x = 4.0f; // SCENE_MODE_SDF_BOX
             port.ui.style_params.y = 5.0f; // Radius
@@ -523,6 +528,9 @@ static void math_editor_render_connections(MathEditor* editor, Scene* scene) {
             wire.scale = (Vec3){width, height, 1.0f};
             wire.color = (Vec4){0.8f, 0.8f, 0.8f, 1.0f}; 
             
+            // Fix: Set UV Rect so shader receives correct UVs
+            wire.uv_rect = (Vec4){0.0f, 0.0f, 1.0f, 1.0f};
+
             wire.ui.style_params.y = 1.0f; // Curve Type
             wire.ui.extra_params = (Vec4){u1, v1, u2, v2};
             wire.ui.style_params.z = 3.0f / height; 
@@ -536,15 +544,32 @@ static void math_editor_render_connections(MathEditor* editor, Scene* scene) {
 void math_editor_render(MathEditor* editor, Scene* scene, const struct Assets* assets, MemoryArena* arena) {
     UiElement* root = ui_instance_get_root(editor->ui_instance);
     if (!editor || !scene || !root) return;
+
+    // 0. Manual Canvas Background (Behind Connections)
+    UiElement* canvas_area = ui_element_find_by_id(root, "canvas_area");
+    if (canvas_area) {
+        SceneObject bg = {0};
+        bg.prim_type = SCENE_PRIM_QUAD;
+        bg.layer = LAYER_UI_BACKGROUND;
+        
+        Rect canvas_rect = ui_element_get_screen_rect(canvas_area);
+        bg.position = (Vec3){canvas_rect.x, canvas_rect.y, 0.0f};
+        bg.scale = (Vec3){canvas_rect.w, canvas_rect.h, 1.0f};
+        
+        bg.color = (Vec4){0.149f, 0.149f, 0.149f, 1.0f}; // #262626
+        bg.uv_rect = (Vec4){0.0f, 0.0f, 1.0f, 1.0f};
+        
+        scene_add_object(scene, bg);
+    }
     
     // 1. Render Connections (Background)
     math_editor_render_connections(editor, scene);
     
-    // 2. Render Ports (Overlay/Content)
-    math_editor_render_ports(editor, scene);
-    
-    // 3. Render UI Tree to Scene
+    // 2. Render UI Tree to Scene
     ui_instance_render(editor->ui_instance, scene, assets, arena);
+
+    // 3. Render Ports (Overlay/Content) - Drawn last to be on top
+    math_editor_render_ports(editor, scene);
 }
 
 void math_editor_update(MathEditor* editor, Engine* engine) {
@@ -646,6 +671,13 @@ void math_editor_destroy(MathEditor* editor) {
     arena_destroy(&editor->graph_arena);
     
     if (editor->ui_asset) ui_asset_free(editor->ui_asset);
+
+    if (editor->selected_nodes) free((void*)editor->selected_nodes);
+    if (editor->palette_items) {
+        // Items are in arena, but array pointer might be arena or heap? 
+        // config_load_struct_array uses arena. So no free needed for palette_items if arena is destroyed.
+        // But selected_nodes was malloc'd.
+    }
 
     free(editor);
 }

@@ -85,5 +85,6 @@ UiElement* ui_element_find_by_id(UiElement* root, const char* id);
 void* ui_element_get_data(const UiElement* element);
 const MetaStruct* ui_element_get_meta(const UiElement* element);
 UiElement* ui_element_get_parent(const UiElement* element);
+Rect ui_element_get_screen_rect(const UiElement* element);
 
 #endif // UI_CORE_H
