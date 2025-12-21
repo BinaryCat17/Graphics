@@ -7,14 +7,14 @@
 
 Structural standardization (Phase 6) is largely complete, but critical limitations in the UI module were identified during the Phase 7 kickoff.
 
-### Phase 4: Architectural Integrity & Custom Widgets (IMMEDIATE PRIORITY)
-**Objective:** Restore architectural boundaries by implementing a "Custom Widget" protocol, eliminating the need for hardcoded Z-depths and dependency leaks between Engine and Features.
-- [ ] **Clean Up:** Revert `src/engine/graphics/layer_constants.h` to only contain engine-level constants (UI_BASE, UI_OVERLAY). Remove feature-specific constants.
-- [ ] **UI Core Extension:** Implement `UI_KIND_CUSTOM` in `ui_core.h`, add `custom_renderer_id` to `UiNodeSpec`, and create a renderer registry.
-- [ ] **YAML Parser:** Update `ui_parser.c` to parse the `renderer` field from YAML into `UiNodeSpec.custom_renderer_id`.
-- [ ] **Render Loop Refactor:** Update `ui_renderer.c` to dispatch `UI_KIND_CUSTOM` elements to their registered callbacks, passing the correct Z-depth and clip rect.
-- [ ] **Feature Integration:** Refactor `MathEditor` to register a "GraphWires" renderer. Ensure the UI element has access to the Graph context via `el->data`.
-- [ ] **YAML Migration:** Update `manifest.yaml` to use `type: custom` and `renderer: GraphWires` for the graph canvas.
+### Phase 4: Architectural Integrity & Viewport System (IMMEDIATE PRIORITY)
+**Objective:** Implement a "Viewport" mechanism where UI Elements can act as containers for delegated scene generation, strictly decoupling the Engine from Feature-specific rendering logic.
+- [ ] **Clean Up:** Revert `src/engine/graphics/layer_constants.h` to only contain engine-level constants. Move editor-specific constants to local defines within the feature.
+- [ ] **Engine API:** Define the `SceneObjectProvider` interface (callback accepting dimensions and a Frame Arena, returning SceneObjects).
+- [ ] **UI Core:** Implement `UI_KIND_VIEWPORT` in `ui_core.h` and `UiNodeSpec`. Add `provider_id` support to the parser.
+- [ ] **Renderer Evolution:** Update `ui_renderer.c` to handle `UI_KIND_VIEWPORT`. It must request objects from the provider, transform them to screen space, apply clipping, and submit them to the Scene.
+- [ ] **Feature Migration:** Refactor `MathEditor` to implement `SceneObjectProvider` for Wires/Ports instead of manual rendering.
+- [ ] **YAML Migration:** Update `manifest.yaml` to define the graph canvas as a `viewport` with `provider: GraphNetwork`.
 
 ### Phase 5: Stability & Validation (Refinement)
 **Objective:** Resolve data-binding warnings and schema inconsistencies found during enhanced logging.
