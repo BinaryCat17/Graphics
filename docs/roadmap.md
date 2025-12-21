@@ -24,6 +24,9 @@ Structural standardization (Phase 6) is largely complete, but critical limitatio
 - [x] **Fix: Port Alignment:** Offset port/wire rendering by the Canvas Element's screen position to fix alignment.
 - [x] **Fix: Node Value Sync:** Sync `cached_output` to UI instead of static `value` field for operation nodes.
 - [x] **Fix: Color Parsing:** Implement HEX string to `Vec4` conversion in the reflection system to fix UI colors.
+- [ ] **Refactor: Magic Numbers:** Extract hardcoded layout constants (`150.0f`, `45.0f`) from `math_editor.c` into a `LayoutConfig` struct or defines.
+- [ ] **Refactor: Coordinate Spaces:** Fix the "Clip Rect Offset" hack by implementing proper Screen-to-World coordinate transformation for Graph connections.
+- [ ] **Refactor: MathEditor Split:** Split `math_editor.c` into `_view` (Rendering) and `_logic` (Input/State) to reduce file complexity.
 
 ### Phase 6: Structural Standardization (Refinement)
 **Objective:** Address architectural limitations in the UI system to support complex editors.
