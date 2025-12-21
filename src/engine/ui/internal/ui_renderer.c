@@ -2,6 +2,7 @@
 #include "../ui_core.h"
 #include "ui_internal.h"
 #include "engine/scene/scene.h"
+#include "engine/graphics/layer_constants.h"
 #include "foundation/logger/logger.h"
 #include "engine/text/text_renderer.h" 
 #include "engine/text/font.h" 
@@ -117,7 +118,7 @@ static void render_content(const UiElement* el, UiRenderContext* ctx, Vec4 clip_
     if ((!text || text[0] == '\0') && !is_input) return;
 
     if (text) {
-        Vec3 pos = {el->screen_rect.x + el->spec->padding, el->screen_rect.y + el->spec->padding, z + 0.001f};
+        Vec3 pos = {el->screen_rect.x + el->spec->padding, el->screen_rect.y + el->spec->padding, z + RENDER_DEPTH_STEP_CONTENT};
         
         float txt_scale = el->spec->text_scale > 0.0f ? el->spec->text_scale : 0.5f;
         Vec4 txt_color = el->spec->text_color.w > 0.0f ? el->spec->text_color : (Vec4){1.0f, 1.0f, 1.0f, 1.0f};
@@ -140,7 +141,7 @@ static void render_content(const UiElement* el, UiRenderContext* ctx, Vec4 clip_
             
             SceneObject caret = {0};
             caret.prim_type = SCENE_PRIM_QUAD;
-            caret.position = (Vec3){pos.x + text_width, pos.y, z + 0.002f}; 
+            caret.position = (Vec3){pos.x + text_width, pos.y, z + (RENDER_DEPTH_STEP_CONTENT * 2)}; 
             
             float cw = el->spec->caret_width > 0.0f ? el->spec->caret_width : 2.0f;
             float ch = el->spec->caret_height > 0.0f ? el->spec->caret_height : 20.0f;
@@ -218,7 +219,7 @@ static void process_node(const UiElement* el, UiRenderContext* ctx, Rect current
 
     // 3. Recurse
     for (UiElement* child = el->first_child; child; child = child->next_sibling) {
-        process_node(child, ctx, effective_clip, base_z + 0.01f, is_overlay_pass);
+        process_node(child, ctx, effective_clip, base_z + RENDER_DEPTH_STEP_UI, is_overlay_pass);
     }
 }
 
@@ -233,12 +234,12 @@ void ui_renderer_build_scene(const UiElement* root, Scene* scene, const Assets* 
     ctx.arena = arena;
     
     // Pass 1: Draw Normal, Defer Overlays
-    process_node(root, &ctx, infinite_clip, -10.0f, false);
+    process_node(root, &ctx, infinite_clip, RENDER_LAYER_UI_BASE, false);
     
     // Pass 2: Draw Overlays
     OverlayNode* curr = ctx.overlay_head;
     while (curr) {
-        process_node(curr->el, &ctx, infinite_clip, -1.0f, true);
+        process_node(curr->el, &ctx, infinite_clip, RENDER_LAYER_UI_OVERLAY, true);
         curr = curr->next;
     }
 }

@@ -19,6 +19,12 @@ Structural standardization (Phase 6) is largely complete, but critical limitatio
 - [ ] **Optimization: Event-Based Evaluation:** Optimize `math_editor_update` to evaluate the graph only when dirty, not every frame.
 - [ ] **Refactor: String Memory Strategy:** Replace the temporary leak fix in `reflection.c` with a proper Arena-based string allocation strategy.
 - [x] **Refactor: Auto-Layout Buttons:** Remove hardcoded widths (e.g., "Clear" button) and use padding/flex-growth for localization support.
+- [x] **Refactor: Z-Layer Constants:** Replace magic float values (`-9.985`, etc.) with a centralized `LayerDepth` enum or constants system to prevent sorting fragility.
+- [ ] **Refactor: Input State Machine:** Replace the growing switch-statement in `math_editor_update` with a formal State Machine (Idle, DraggingNode, DraggingWire) for maintainability.
+- [ ] **Architecture: Custom UI Widgets:** Investigate wrapping Wires/Ports into a custom `UiElement` type (or specific render pass) to unify them with the standard UI sorting/clipping logic.
+- [ ] **Fix: Sidebar Overflow:** Resolve layout overlap where the "Clear" button covers the "Time" palette item by adjusting container height or enabling scrolling.
+- [ ] **Fix: Dangling Wire Artifact:** Investigate and fix the stray wire curve rendering artifact visible below the Multiply node.
+- [ ] **Refactor: Inspector Style:** Style the white placeholder rectangle in the Properties panel to match the dark theme.
 - [ ] **Refactor: Coordinate Spaces:** Fix the "Clip Rect Offset" hack by implementing proper Screen-to-World coordinate transformation for Graph connections.
 - [ ] **Refactor: MathEditor Split:** Split `math_editor.c` into `_view` (Rendering) and `_logic` (Input/State) to reduce file complexity.
 - [x] **Fix: String Ownership:** Fix `meta_set_string` to avoid `free()` on Arena-allocated strings (Critical for stability).
