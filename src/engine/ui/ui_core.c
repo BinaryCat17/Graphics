@@ -311,30 +311,22 @@ UiElement* ui_element_create(UiInstance* instance, const UiNodeSpec* spec, void*
 
     // Cache Bindings
     if (meta) {
-        if (spec->bind_text) {
-            el->bind_text = meta_find_field(meta, spec->bind_text);
-            if (!el->bind_text) LOG_ERROR("UiCore: Failed to bind 'text: %s' on Node ID:%u. Field not found in struct '%s'", spec->bind_text, spec->id, meta->name);
+#define RESOLVE_BINDING(name_suffix) \
+        if (spec->bind_##name_suffix) { \
+            el->bind_##name_suffix = meta_find_field(meta, spec->bind_##name_suffix); \
+            if (!el->bind_##name_suffix) { \
+                LOG_ERROR("UiCore: Failed to bind '%s: %s' on Node ID:%u. Field not found in struct '%s'", \
+                          #name_suffix, spec->bind_##name_suffix, spec->id, meta->name); \
+            } \
         }
-        if (spec->bind_visible) {
-            el->bind_visible = meta_find_field(meta, spec->bind_visible);
-            if (!el->bind_visible) LOG_ERROR("UiCore: Failed to bind 'visible: %s' on Node ID:%u. Field not found in struct '%s'", spec->bind_visible, spec->id, meta->name);
-        }
-        if (spec->bind_x) {
-            el->bind_x = meta_find_field(meta, spec->bind_x);
-            if (!el->bind_x) LOG_ERROR("UiCore: Failed to bind 'x: %s' on Node ID:%u. Field not found in struct '%s'", spec->bind_x, spec->id, meta->name);
-        }
-        if (spec->bind_y) {
-            el->bind_y = meta_find_field(meta, spec->bind_y);
-            if (!el->bind_y) LOG_ERROR("UiCore: Failed to bind 'y: %s' on Node ID:%u. Field not found in struct '%s'", spec->bind_y, spec->id, meta->name);
-        }
-        if (spec->bind_w) {
-            el->bind_w = meta_find_field(meta, spec->bind_w);
-            if (!el->bind_w) LOG_ERROR("UiCore: Failed to bind 'w: %s' on Node ID:%u. Field not found in struct '%s'", spec->bind_w, spec->id, meta->name);
-        }
-        if (spec->bind_h) {
-            el->bind_h = meta_find_field(meta, spec->bind_h);
-            if (!el->bind_h) LOG_ERROR("UiCore: Failed to bind 'h: %s' on Node ID:%u. Field not found in struct '%s'", spec->bind_h, spec->id, meta->name);
-        }
+
+        RESOLVE_BINDING(text);
+        RESOLVE_BINDING(visible);
+        RESOLVE_BINDING(x);
+        RESOLVE_BINDING(y);
+        RESOLVE_BINDING(w);
+        RESOLVE_BINDING(h);
+#undef RESOLVE_BINDING
     }
 
     // Populate Children
@@ -386,30 +378,18 @@ void ui_element_update(UiElement* element, float dt) {
     
     // 2. Resolve Geometry Bindings (X/Y)
     if (element->data_ptr) {
-        if (element->bind_x) {
-            float val = meta_get_float(element->data_ptr, element->bind_x);
-            if (element->rect.x != val) {
-                element->rect.x = val;
-            }
+#define SYNC_GEO(bind_ptr, rect_field) \
+        if (element->bind_ptr) { \
+            float val = meta_get_float(element->data_ptr, element->bind_ptr); \
+            if (element->rect.rect_field != val) element->rect.rect_field = val; \
         }
-        if (element->bind_y) {
-            float val = meta_get_float(element->data_ptr, element->bind_y);
-            if (element->rect.y != val) {
-                element->rect.y = val;
-            }
-        }
-        if (element->bind_w) {
-            float val = meta_get_float(element->data_ptr, element->bind_w);
-            if (element->rect.w != val) {
-                element->rect.w = val;
-            }
-        }
-        if (element->bind_h) {
-            float val = meta_get_float(element->data_ptr, element->bind_h);
-            if (element->rect.h != val) {
-                element->rect.h = val;
-            }
-        }
+
+        SYNC_GEO(bind_x, x);
+        SYNC_GEO(bind_y, y);
+        SYNC_GEO(bind_w, w);
+        SYNC_GEO(bind_h, h);
+#undef SYNC_GEO
+
         // 3. Resolve Visibility
         if (element->bind_visible) {
              bool visible = meta_get_bool(element->data_ptr, element->bind_visible);
