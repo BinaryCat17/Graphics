@@ -326,6 +326,15 @@ UiElement* ui_element_create(UiInstance* instance, const UiNodeSpec* spec, void*
 
         RESOLVE_BINDING(text);
 
+        // Fallback for generic 'bind' property (common in templates)
+        if (!el->bind_text && spec->bind) {
+            el->bind_text = meta_find_field(meta, spec->bind);
+            if (!el->bind_text) {
+                LOG_ERROR("UiCore: Failed to bind 'bind: %s' on Node ID:%u. Field not found in struct '%s'", 
+                          spec->bind, spec->id, meta->name);
+            }
+        }
+
         if (!el->bind_text && spec->text_source) {
             el->bind_text = meta_find_field(meta, spec->text_source);
             if (!el->bind_text) {

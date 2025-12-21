@@ -385,11 +385,165 @@ MathEditor* math_editor_create(Engine* engine) {
     return editor;
 }
 
+#include "engine/scene/scene.h"
+
+// --- Helper: Find View ---
+static MathNodeView* math_editor_find_view(MathEditor* editor, MathNodeId id) {
+    for(uint32_t i=0; i<editor->node_views_count; ++i) {
+        if (editor->node_views[i].node_id == id) {
+            return &editor->node_views[i];
+        }
+    }
+    return NULL;
+}
+
+static int get_node_input_count(MathNodeType type) {
+    switch (type) {
+        case MATH_NODE_ADD: 
+        case MATH_NODE_SUB: 
+        case MATH_NODE_MUL: 
+        case MATH_NODE_DIV: return 2;
+        case MATH_NODE_SIN: 
+        case MATH_NODE_COS: 
+        case MATH_NODE_OUTPUT: return 1;
+        case MATH_NODE_UV:  
+        case MATH_NODE_VALUE: 
+        case MATH_NODE_TIME: 
+        default: return 0;
+    }
+}
+
+static void math_editor_render_ports(MathEditor* editor, Scene* scene) {
+    if (!editor || !editor->graph || !scene) return;
+
+    for (uint32_t i = 0; i < editor->node_views_count; ++i) {
+        MathNodeView* view = &editor->node_views[i];
+        MathNode* node = math_graph_get_node(editor->graph, view->node_id);
+        if (!node) continue;
+
+        int input_count = get_node_input_count(node->type);
+        
+        // Render Inputs
+        for (int k = 0; k < input_count; ++k) {
+            float x = view->x;
+            float y = view->y + 45.0f + (k * 25.0f);
+            
+            SceneObject port = {0};
+            port.id = (node->id << 8) | (k + 1); // Pseudo ID
+            port.layer = LAYER_UI_CONTENT; // Draw on top of background but below text? Or just content.
+            port.prim_type = SCENE_PRIM_QUAD;
+            port.position = (Vec3){x, y, 0.0f};
+            port.scale = (Vec3){10.0f, 10.0f, 1.0f};
+            port.color = (Vec4){0.5f, 0.5f, 0.5f, 1.0f}; // Grey
+            
+            // SDF Circle
+            port.ui.style_params.x = 4.0f; // SCENE_MODE_SDF_BOX
+            port.ui.style_params.y = 5.0f; // Radius (Half size)
+            port.ui.style_params.z = 1.0f; // Border thickness
+            
+            scene_add_object(scene, port);
+        }
+
+        // Render Output (All nodes have 1 output except OUTPUT node? Actually OUTPUT node consumes input.
+        // Value nodes have output. Math ops have output.
+        // Let's assume all nodes except OUTPUT have an output port on the right.
+        if (node->type != MATH_NODE_OUTPUT) {
+            float x = view->x + 150.0f;
+            float y = view->y + 45.0f;
+            
+            SceneObject port = {0};
+            port.id = (node->id << 8) | 0xFF; // Pseudo ID
+            port.layer = LAYER_UI_CONTENT;
+            port.prim_type = SCENE_PRIM_QUAD;
+            port.position = (Vec3){x, y, 0.0f};
+            port.scale = (Vec3){10.0f, 10.0f, 1.0f};
+            port.color = (Vec4){0.5f, 0.5f, 0.5f, 1.0f};
+            
+            port.ui.style_params.x = 4.0f; // SCENE_MODE_SDF_BOX
+            port.ui.style_params.y = 5.0f; // Radius
+            port.ui.style_params.z = 1.0f; // Border
+            
+            scene_add_object(scene, port);
+        }
+    }
+}
+
+static void math_editor_render_connections(MathEditor* editor, Scene* scene) {
+    if (!editor || !editor->graph || !scene) return;
+
+    for (uint32_t i = 0; i < editor->graph->node_count; ++i) {
+        MathNode* target_node = math_graph_get_node(editor->graph, i);
+        if (!target_node) continue;
+        
+        MathNodeView* target_view = math_editor_find_view(editor, target_node->id);
+        if (!target_view) continue;
+
+        // Draw connections for each input
+        for (int k = 0; k < MATH_NODE_MAX_INPUTS; ++k) {
+            MathNodeId source_id = target_node->inputs[k];
+            if (source_id == MATH_NODE_INVALID_ID) continue;
+            
+            MathNodeView* source_view = math_editor_find_view(editor, source_id);
+            if (!source_view) continue;
+
+            // Calculate endpoints (Must match render_ports logic)
+            float start_x = source_view->x + 150.0f; 
+            float start_y = source_view->y + 45.0f; 
+            
+            float end_x = target_view->x;
+            float end_y = target_view->y + 45.0f + (k * 25.0f);
+            
+            // Bounding Box
+            float min_x = start_x < end_x ? start_x : end_x;
+            float max_x = start_x > end_x ? start_x : end_x;
+            float min_y = start_y < end_y ? start_y : end_y;
+            float max_y = start_y > end_y ? start_y : end_y;
+            
+            float padding = 50.0f;
+            min_x -= padding; min_y -= padding;
+            max_x += padding; max_y += padding;
+            
+            float width = max_x - min_x;
+            float height = max_y - min_y;
+            
+            if (width < 1.0f) width = 1.0f;
+            if (height < 1.0f) height = 1.0f;
+
+            // Normalize Points to 0..1 relative to Quad
+            float u1 = (start_x - min_x) / width;
+            float v1 = (start_y - min_y) / height;
+            float u2 = (end_x - min_x) / width;
+            float v2 = (end_y - min_y) / height;
+
+            SceneObject wire = {0};
+            wire.id = (target_node->id << 16) | (source_id & 0xFFFF); 
+            wire.layer = LAYER_UI_BACKGROUND;
+            wire.prim_type = SCENE_PRIM_CURVE; 
+            wire.position = (Vec3){min_x + width*0.5f, min_y + height*0.5f, 0.0f};
+            wire.scale = (Vec3){width, height, 1.0f};
+            wire.color = (Vec4){0.8f, 0.8f, 0.8f, 1.0f}; 
+            
+            wire.ui.style_params.y = 1.0f; // Curve Type
+            wire.ui.extra_params = (Vec4){u1, v1, u2, v2};
+            wire.ui.style_params.z = 3.0f / height; 
+            wire.ui.style_params.w = width / height; // AR
+            
+            scene_add_object(scene, wire);
+        }
+    }
+}
+
 void math_editor_render(MathEditor* editor, Scene* scene, const struct Assets* assets, MemoryArena* arena) {
     UiElement* root = ui_instance_get_root(editor->ui_instance);
     if (!editor || !scene || !root) return;
     
-    // Render UI Tree to Scene
+    // 1. Render Connections (Background)
+    math_editor_render_connections(editor, scene);
+    
+    // 2. Render Ports (Overlay/Content)
+    math_editor_render_ports(editor, scene);
+    
+    // 3. Render UI Tree to Scene
     ui_instance_render(editor->ui_instance, scene, assets, arena);
 }
 
