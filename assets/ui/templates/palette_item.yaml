@@ -1,0 +1,8 @@
+type: button
+text_source: "label"
+width: 100
+height: 30
+corner_radius: 8
+color: "#4D4D59"
+hover_color: "#6D6D7F"
+on_click: "Graph.AddNode"

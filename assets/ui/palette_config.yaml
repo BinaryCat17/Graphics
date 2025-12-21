@@ -1,0 +1,21 @@
+items:
+  - label: "Number"
+    type: "MATH_NODE_VALUE"
+
+  - label: "Add"
+    type: "MATH_NODE_ADD"
+
+  - label: "Subtract"
+    type: "MATH_NODE_SUB"
+
+  - label: "Multiply"
+    type: "MATH_NODE_MUL"
+
+  - label: "Sine Wave"
+    type: "MATH_NODE_SIN"
+
+  - label: "UV Coords"
+    type: "MATH_NODE_UV"
+
+  - label: "Time"
+    type: "MATH_NODE_TIME"

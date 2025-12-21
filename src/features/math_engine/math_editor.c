@@ -6,6 +6,7 @@
 #include "foundation/platform/platform.h"
 #include "foundation/platform/fs.h"
 #include "foundation/meta/reflection.h"
+#include "foundation/config/simple_yaml.h"
 #include "features/math_engine/internal/transpiler.h"
 #include "features/math_engine/internal/math_graph_internal.h" // Access to internal Graph/Node structs
 #include "engine/graphics/internal/renderer_backend.h"
@@ -132,28 +133,45 @@ static void math_editor_update_selection(MathEditor* editor) {
 
 // --- Commands ---
 
-static void cmd_add_node(void* user_data, UiElement* target) {
-    (void)target;
-    MathEditor* editor = (MathEditor*)user_data;
+UI_COMMAND(cmd_add_node, MathEditor) {
     LOG_INFO("Command: Graph.AddNode");
     
-    MathNodeId id = math_graph_add_node(editor->graph, MATH_NODE_VALUE);
-    math_editor_add_view(editor, id, 100, 100);
+    MathNodeType type = MATH_NODE_VALUE;
+
+    // Try to extract type from PaletteItem data bound to the UI element
+    if (target) {
+        void* data = ui_element_get_data(target);
+        const MetaStruct* meta = ui_element_get_meta(target);
+        
+        // If the button itself doesn't have data, check parent
+        if (!data) {
+             UiElement* p = ui_element_get_parent(target);
+             if(p) {
+                 data = ui_element_get_data(p);
+                 meta = ui_element_get_meta(p);
+             }
+        }
+
+        if (data && meta && strcmp(meta->name, "MathNodePaletteItem") == 0) {
+            MathNodePaletteItem* item = (MathNodePaletteItem*)data;
+            type = (MathNodeType)item->type;
+        }
+    }
     
-    math_editor_refresh_graph_view(editor);
+    MathNodeId id = math_graph_add_node(ctx->graph, type);
+    // Center roughly or use mouse pos if available (future)
+    math_editor_add_view(ctx, id, 100, 100); 
+    
+    math_editor_refresh_graph_view(ctx);
 }
 
-static void cmd_clear_graph(void* user_data, UiElement* target) {
-    (void)target;
-    (void)user_data;
+UI_COMMAND(cmd_clear_graph, MathEditor) {
     LOG_INFO("Command: Graph.Clear");
     // TODO: Implement proper clear
 }
 
-static void cmd_recompile(void* user_data, UiElement* target) {
-    (void)target;
-    MathEditor* editor = (MathEditor*)user_data;
-    editor->graph_dirty = true;
+UI_COMMAND(cmd_recompile, MathEditor) {
+    ctx->graph_dirty = true;
 }
 
 // --- Lifecycle ---
@@ -188,6 +206,62 @@ static void math_editor_setup_default_graph(MathEditor* editor) {
     math_editor_sync_view_data(editor);
 }
 
+static void math_editor_load_palette(MathEditor* editor, const char* path) {
+    char* content = fs_read_text(NULL, path);
+    if (!content) {
+        LOG_WARN("Failed to load palette config: %s", path);
+        return;
+    }
+    
+    ConfigNode* root = NULL;
+    ConfigError err = {0};
+    
+    // Parse into the graph arena (persists until editor destroy)
+    if (!simple_yaml_parse(&editor->graph_arena, content, &root, &err)) {
+        LOG_ERROR("YAML Parse Error in %s line %d: %s", path, err.line, err.message);
+        free(content);
+        return;
+    }
+    
+    free(content); // Raw text no longer needed
+    
+    if (!root || root->type != CONFIG_NODE_MAP) {
+        return;
+    }
+    
+    const ConfigNode* items_node = config_node_map_get(root, "items");
+    if (items_node && items_node->type == CONFIG_NODE_SEQUENCE) {
+        // Allocate palette array
+        editor->palette_items = arena_alloc_zero(&editor->graph_arena, 64 * sizeof(MathNodePaletteItem));
+        editor->palette_count = 0;
+        
+        for (size_t i = 0; i < items_node->item_count && editor->palette_count < 64; ++i) {
+             ConfigNode* item_node = items_node->items[i];
+             if (item_node->type == CONFIG_NODE_MAP) {
+                 MathNodePaletteItem* pal_item = &editor->palette_items[editor->palette_count++];
+                 
+                 const ConfigNode* label_node = config_node_map_get(item_node, "label");
+                 if (label_node && label_node->scalar) {
+                     strncpy(pal_item->label, label_node->scalar, 31);
+                 }
+                 
+                 const ConfigNode* type_node = config_node_map_get(item_node, "type");
+                 if (type_node && type_node->scalar) {
+                      const MetaEnum* e = meta_get_enum("MathNodeType");
+                      int val = 0;
+                      if (e && meta_enum_get_value(e, type_node->scalar, &val)) {
+                          pal_item->type = val;
+                      } else {
+                          LOG_WARN("Unknown node type in palette: %s", type_node->scalar);
+                      }
+                 }
+             }
+        }
+    }
+    
+    LOG_INFO("Editor: Loaded %d palette items from %s", editor->palette_count, path);
+}
+
 MathEditor* math_editor_create(Engine* engine) {
     MathEditor* editor = (MathEditor*)calloc(1, sizeof(MathEditor));
     if (!editor) return NULL;
@@ -205,12 +279,13 @@ MathEditor* math_editor_create(Engine* engine) {
     
     // 2. Setup Default Data
     math_editor_setup_default_graph(editor);
+    math_editor_load_palette(editor, "assets/ui/palette_config.yaml");
 
     // 3. Init UI System
     ui_command_init();
-    ui_command_register("Graph.AddNode", cmd_add_node, editor);
-    ui_command_register("Graph.Clear", cmd_clear_graph, editor);
-    ui_command_register("Graph.Recompile", cmd_recompile, editor);
+    UI_REGISTER_COMMAND("Graph.AddNode", cmd_add_node, editor);
+    UI_REGISTER_COMMAND("Graph.Clear", cmd_clear_graph, editor);
+    UI_REGISTER_COMMAND("Graph.Recompile", cmd_recompile, editor);
 
     editor->input_ctx = ui_input_create();
 

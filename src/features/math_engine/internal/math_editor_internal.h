@@ -18,6 +18,11 @@ typedef struct MathNodeView {
     float value;            // REFLECT (Input/Output preview)
 } MathNodeView;
 
+typedef struct MathNodePaletteItem {
+    char label[32];         // REFLECT
+    int type;               // REFLECT (MathNodeType)
+} MathNodePaletteItem;
+
 // The State of the Graph Editor Feature
 typedef struct MathEditor {
     MathGraph* graph;
@@ -33,6 +38,10 @@ typedef struct MathEditor {
     MathNodeView* node_views;   // REFLECT
     uint32_t node_view_count;   // REFLECT
     uint32_t node_view_cap;
+
+    // Palette Data
+    MathNodePaletteItem* palette_items; // REFLECT
+    uint32_t palette_count;             // REFLECT
 
     // Selection
     MathNodeId selected_node_id;

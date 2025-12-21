@@ -28,6 +28,8 @@ templates:
     import: "assets/ui/templates/math/uv.yaml"
 
   # Layouts
+  PaletteItem:
+    import: "assets/ui/templates/palette_item.yaml"
   EditorSidebar:
     import: "assets/ui/templates/sidebar.yaml"
 

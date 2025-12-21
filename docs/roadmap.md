@@ -11,7 +11,7 @@ Structural standardization (Phase 6) is largely complete, but critical limitatio
 **Objective:** Address architectural limitations in the UI system to support complex editors.
 - [x] **UI Data Binding:** Support iteration over contiguous arrays and generic pointer arrays (currently limited to specific pointer arrays).
 - [x] **UI Conditional Templates:** Support logic-based template selection (e.g., `template_selector: "type"`) to handle polymorphic collections (like heterogeneous node lists).
-- [ ] **UI Event Safety:** Implement typesafe wrappers for event callbacks to replace brittle `void*` casting and string-based logic.
+- [x] **UI Event Safety:** Implement typesafe wrappers for event callbacks to replace brittle `void*` casting and string-based logic.
 - [ ] **UI Layout:** Implement Flexbox-style properties (`flex-grow`, `justify-content`) for robust responsive layouts.
 - [ ] **Graph Serialization:** Move hardcoded default graph setup to a data file (YAML/JSON) to support saving/loading.
 - [ ] **Declarative Node Palette:** Replace hardcoded "Add Node" logic with a data-driven palette system.

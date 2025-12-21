@@ -4,8 +4,8 @@ vcpkg_installed
 *.spv
 .gemini
 worktmp/
-generated/
 __pycache__/
 CMakeFiles
 CMakeCache.txt
-logs/
+logs
+src/generated
