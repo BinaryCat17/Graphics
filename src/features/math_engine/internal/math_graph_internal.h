@@ -13,7 +13,6 @@ struct MathNode {
     
     // Logic Data
     float value;            // REFLECT
-    float x, y;             // REFLECT
     bool dirty;             // REFLECT
     float cached_output;    // Last calculated result
     
