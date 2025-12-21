@@ -10,21 +10,31 @@ static bool parse_vec_from_string(const char* str, float* out, int count) {
     
     // Hex Color support (only for Vec3 and Vec4)
     if (str[0] == '#') {
-        unsigned int r = 0, g = 0, b = 0, a = 255;
         size_t len = strlen(str);
-        bool parsed = false;
-        
-        if (len == 7) { // #RRGGBB
-            if (sscanf(str + 1, "%02x%02x%02x", &r, &g, &b) == 3) parsed = true;
-        } else if (len == 9) { // #RRGGBBAA
-            if (sscanf(str + 1, "%02x%02x%02x%02x", &r, &g, &b, &a) == 4) parsed = true;
-        }
+        if (len == 7 || len == 9) { // #RRGGBB or #RRGGBBAA
+            char hex[9];
+            strncpy(hex, str + 1, 8);
+            hex[8] = '\0';
+            
+            unsigned long val = strtoul(hex, NULL, 16);
+            
+            float r, g, b, a = 1.0f;
+            
+            if (len == 7) { // RRGGBB
+                r = ((val >> 16) & 0xFF) / 255.0f;
+                g = ((val >> 8) & 0xFF) / 255.0f;
+                b = (val & 0xFF) / 255.0f;
+            } else { // RRGGBBAA
+                r = ((val >> 24) & 0xFF) / 255.0f;
+                g = ((val >> 16) & 0xFF) / 255.0f;
+                b = ((val >> 8) & 0xFF) / 255.0f;
+                a = (val & 0xFF) / 255.0f;
+            }
 
-        if (parsed) {
-            if (count >= 1) out[0] = (float)r / 255.0f;
-            if (count >= 2) out[1] = (float)g / 255.0f;
-            if (count >= 3) out[2] = (float)b / 255.0f;
-            if (count >= 4) out[3] = (float)a / 255.0f;
+            if (count >= 1) out[0] = r;
+            if (count >= 2) out[1] = g;
+            if (count >= 3) out[2] = b;
+            if (count >= 4) out[3] = a;
             return true;
         }
         return false;
@@ -91,7 +101,7 @@ void meta_set_string(void* instance, const MetaField* field, const char* value) 
     
     if (field->type == META_TYPE_STRING) {
         char** ptr = (char**)((char*)instance + field->offset);
-        if (*ptr) free(*ptr); // Освобождаем старую строку (предполагаем владение)
+        // if (*ptr) free(*ptr); // FIXME: Deliberate leak! Do not free as it might be Arena memory.
         if (value) {
             size_t len = strlen(value);
             *ptr = (char*)malloc(len + 1);

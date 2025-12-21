@@ -218,7 +218,7 @@ static void process_node(const UiElement* el, UiRenderContext* ctx, Rect current
 
     // 3. Recurse
     for (UiElement* child = el->first_child; child; child = child->next_sibling) {
-        process_node(child, ctx, effective_clip, base_z - 0.001f, is_overlay_pass);
+        process_node(child, ctx, effective_clip, base_z + 0.001f, is_overlay_pass);
     }
 }
 

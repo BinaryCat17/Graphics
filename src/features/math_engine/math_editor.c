@@ -20,6 +20,12 @@
 #include <stdio.h>
 #include <string.h>
 
+// --- Layout Constants ---
+#define NODE_WIDTH          150.0f
+#define NODE_HEADER_HEIGHT  45.0f
+#define NODE_PORT_SPACING   25.0f
+#define NODE_PORT_SIZE      10.0f
+
 // --- Helper: Text Measurement for UI Layout ---
 static float text_measure_wrapper(const char* text, void* user_data) {
     const Font* font = (const Font*)user_data;
@@ -434,14 +440,14 @@ static void math_editor_render_ports(MathEditor* editor, Scene* scene, Vec4 clip
         // Render Inputs
         for (int k = 0; k < input_count; ++k) {
             float x = view->x + clip_rect.x;
-            float y = view->y + 45.0f + (k * 25.0f) + clip_rect.y;
+            float y = view->y + NODE_HEADER_HEIGHT + (k * NODE_PORT_SPACING) + clip_rect.y;
             
             SceneObject port = {0};
             port.id = (node->id << 8) | (k + 1); // Pseudo ID
             port.layer = LAYER_UI_CONTENT; // Draw on top of background but below text? Or just content.
             port.prim_type = SCENE_PRIM_QUAD;
             port.position = (Vec3){x, y, 0.0f};
-            port.scale = (Vec3){10.0f, 10.0f, 1.0f};
+            port.scale = (Vec3){NODE_PORT_SIZE, NODE_PORT_SIZE, 1.0f};
             port.color = (Vec4){0.5f, 0.5f, 0.5f, 1.0f}; // Grey
             port.uv_rect = (Vec4){0.0f, 0.0f, 1.0f, 1.0f};
             port.ui.clip_rect = clip_rect;
@@ -458,15 +464,15 @@ static void math_editor_render_ports(MathEditor* editor, Scene* scene, Vec4 clip
         // Value nodes have output. Math ops have output.
         // Let's assume all nodes except OUTPUT have an output port on the right.
         if (node->type != MATH_NODE_OUTPUT) {
-            float x = view->x + 150.0f + clip_rect.x;
-            float y = view->y + 45.0f + clip_rect.y;
+            float x = view->x + NODE_WIDTH + clip_rect.x;
+            float y = view->y + NODE_HEADER_HEIGHT + clip_rect.y;
             
             SceneObject port = {0};
             port.id = (node->id << 8) | 0xFF; // Pseudo ID
             port.layer = LAYER_UI_CONTENT;
             port.prim_type = SCENE_PRIM_QUAD;
             port.position = (Vec3){x, y, 0.0f};
-            port.scale = (Vec3){10.0f, 10.0f, 1.0f};
+            port.scale = (Vec3){NODE_PORT_SIZE, NODE_PORT_SIZE, 1.0f};
             port.color = (Vec4){0.5f, 0.5f, 0.5f, 1.0f};
             port.uv_rect = (Vec4){0.0f, 0.0f, 1.0f, 1.0f};
             port.ui.clip_rect = clip_rect;
@@ -499,11 +505,11 @@ static void math_editor_render_connections(MathEditor* editor, Scene* scene, Vec
             if (!source_view) continue;
 
             // Calculate endpoints (Must match render_ports logic)
-            float start_x = source_view->x + 150.0f + clip_rect.x; 
-            float start_y = source_view->y + 45.0f + clip_rect.y; 
+            float start_x = source_view->x + NODE_WIDTH + clip_rect.x; 
+            float start_y = source_view->y + NODE_HEADER_HEIGHT + clip_rect.y; 
             
             float end_x = target_view->x + clip_rect.x;
-            float end_y = target_view->y + 45.0f + (k * 25.0f) + clip_rect.y;
+            float end_y = target_view->y + NODE_HEADER_HEIGHT + (k * NODE_PORT_SPACING) + clip_rect.y;
             
             // Bounding Box
             float min_x = start_x < end_x ? start_x : end_x;
@@ -531,7 +537,7 @@ static void math_editor_render_connections(MathEditor* editor, Scene* scene, Vec
             wire.id = (target_node->id << 16) | (source_id & 0xFFFF); 
             wire.layer = LAYER_UI_BACKGROUND;
             wire.prim_type = SCENE_PRIM_CURVE; 
-            wire.position = (Vec3){min_x + width*0.5f, min_y + height*0.5f, 0.0f};
+            wire.position = (Vec3){min_x + width*0.5f, min_y + height*0.5f, 0.005f};
             wire.scale = (Vec3){width, height, 1.0f};
             wire.color = (Vec4){0.8f, 0.8f, 0.8f, 1.0f}; 
             

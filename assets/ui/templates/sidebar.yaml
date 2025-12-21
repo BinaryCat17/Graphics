@@ -7,15 +7,6 @@ color: "#333338"
 padding: 10
 spacing: 5
 
-# 9-Slice Test
-border_l: 4
-border_t: 4
-border_r: 4
-border_b: 4
-tex_w: 32
-tex_h: 32
-texture: "ui_rect"
-
 children:
   - type: text
     text: "Graph Editor"
