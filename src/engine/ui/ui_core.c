@@ -208,6 +208,8 @@ static int ui_resolve_count(void* data, const MetaStruct* meta, const char* fiel
     f = meta_find_field(meta, "count");
     if (f && f->type == META_TYPE_INT) return meta_get_int(data, f);
     
+    LOG_WARN("UiCore: Failed to resolve count for collection '%s' in struct '%s'. Expected '%s_count' or 'count'.", 
+             field_name, meta->name, field_name);
     return 0;
 }
 
@@ -300,6 +302,8 @@ UiElement* ui_element_create(UiInstance* instance, const UiNodeSpec* spec, void*
     el->meta = meta;
     el->render_color = spec->color;
     el->flags = spec->flags; // Init Flags
+    el->rect.x = spec->x;
+    el->rect.y = spec->y;
 
     // Resolve Commands
     if (spec->on_click) {
@@ -321,6 +325,15 @@ UiElement* ui_element_create(UiInstance* instance, const UiNodeSpec* spec, void*
         }
 
         RESOLVE_BINDING(text);
+
+        if (!el->bind_text && spec->text_source) {
+            el->bind_text = meta_find_field(meta, spec->text_source);
+            if (!el->bind_text) {
+                LOG_ERROR("UiCore: Failed to bind 'text_source: %s' on Node ID:%u. Field not found in struct '%s'", 
+                          spec->text_source, spec->id, meta->name);
+            }
+        }
+
         RESOLVE_BINDING(visible);
         RESOLVE_BINDING(x);
         RESOLVE_BINDING(y);

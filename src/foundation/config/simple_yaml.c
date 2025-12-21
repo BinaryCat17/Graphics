@@ -193,6 +193,9 @@ int simple_yaml_parse(MemoryArena* arena, const char *text, ConfigNode **out_roo
                 char *key = dup_range(arena, key_start, key_end);
                 char *value_text = NULL;
                 const char *value_start = colon + 1;
+                
+                stack[depth++] = (SimpleYamlContext){indent, item};
+
                 if (*value_start) {
                     if (!parse_scalar_value(arena, value_start, &value_text)) {
                         return 0;
@@ -201,7 +204,11 @@ int simple_yaml_parse(MemoryArena* arena, const char *text, ConfigNode **out_roo
                     scalar_node->scalar = value_text;
                     yaml_pair_append(arena, item, key, scalar_node);
                 } else {
-                    yaml_pair_append(arena, item, key, yaml_node_new(arena, CONFIG_NODE_UNKNOWN, line_number));
+                    ConfigNode *child = yaml_node_new(arena, CONFIG_NODE_UNKNOWN, line_number);
+                    yaml_pair_append(arena, item, key, child);
+                    
+                    int key_indent = (int)(key_start - line);
+                    stack[depth++] = (SimpleYamlContext){key_indent, child};
                 }
             } else if (*p) {
                 char *value_text = NULL;
@@ -209,9 +216,10 @@ int simple_yaml_parse(MemoryArena* arena, const char *text, ConfigNode **out_roo
                     item->type = CONFIG_NODE_SCALAR;
                     item->scalar = value_text;
                 }
+                stack[depth++] = (SimpleYamlContext){indent, item};
+            } else {
+                stack[depth++] = (SimpleYamlContext){indent, item};
             }
-
-            stack[depth++] = (SimpleYamlContext){indent, item};
         } else {
             if (parent->type != CONFIG_NODE_MAP) {
                 set_error(err, line_number, indent + 1, "Mapping entry in non-map");

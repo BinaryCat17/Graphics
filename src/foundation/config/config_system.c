@@ -244,11 +244,17 @@ bool config_load_struct_array(const ConfigNode* node, const MetaStruct* meta, vo
 bool config_load_struct(const ConfigNode* node, const MetaStruct* meta, void* instance, MemoryArena* arena) {
     if (!node || node->type != CONFIG_NODE_MAP || !meta || !instance || !arena) return false;
 
-    for (size_t i = 0; i < meta->field_count; ++i) {
-        const MetaField* field = &meta->fields[i];
-        const ConfigNode* child = config_node_map_get(node, field->name);
+    for (size_t i = 0; i < node->pair_count; ++i) {
+        const char* key = node->pairs[i].key;
+        const ConfigNode* child = node->pairs[i].value;
+        
+        if (!key || !child) continue;
 
-        if (!child) continue;
+        const MetaField* field = meta_find_field(meta, key);
+        if (!field) {
+            LOG_WARN("Config: Unknown field '%s' in struct '%s'", key, meta->name);
+            continue;
+        }
 
         switch (field->type) {
             case META_TYPE_INT:

@@ -65,12 +65,12 @@ typedef struct MathEditor {
     // ViewModel Data
     // We store views in a parallel array/pool. For simplicity, dynamic array in arena.
     MathNodeView* node_views;   // REFLECT
-    uint32_t node_view_count;   // REFLECT
+    uint32_t node_views_count;  // REFLECT
     uint32_t node_view_cap;
 
     // Palette Data
     MathNodePaletteItem** palette_items; // REFLECT
-    size_t palette_count;                // REFLECT
+    size_t palette_items_count;          // REFLECT
 
     // Selection
     MathNodeId selected_node_id;

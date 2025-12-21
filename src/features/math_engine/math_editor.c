@@ -29,16 +29,16 @@ static float text_measure_wrapper(const char* text, void* user_data) {
 // --- View Model Management ---
 
 static MathNodeView* math_editor_add_view(MathEditor* editor, MathNodeId id, float x, float y) {
-    if (editor->node_view_count >= editor->node_view_cap) {
+    if (editor->node_views_count >= editor->node_view_cap) {
         uint32_t new_cap = editor->node_view_cap ? editor->node_view_cap * 2 : 16;
         MathNodeView* new_arr = arena_alloc_zero(&editor->graph_arena, new_cap * sizeof(MathNodeView));
         if (editor->node_views) {
-            memcpy(new_arr, editor->node_views, editor->node_view_count * sizeof(MathNodeView));
+            memcpy(new_arr, editor->node_views, editor->node_views_count * sizeof(MathNodeView));
         }
         editor->node_views = new_arr;
         editor->node_view_cap = new_cap;
     }
-    MathNodeView* view = &editor->node_views[editor->node_view_count++];
+    MathNodeView* view = &editor->node_views[editor->node_views_count++];
     view->node_id = id;
     view->x = x;
     view->y = y;
@@ -46,7 +46,7 @@ static MathNodeView* math_editor_add_view(MathEditor* editor, MathNodeId id, flo
 }
 
 static void math_editor_sync_view_data(MathEditor* editor) {
-    for(uint32_t i=0; i<editor->node_view_count; ++i) {
+    for(uint32_t i=0; i<editor->node_views_count; ++i) {
         MathNodeView* view = &editor->node_views[i];
         // Use internal accessor (visible via math_graph_internal.h)
         MathNode* node = math_graph_get_node(editor->graph, view->node_id);
@@ -175,7 +175,7 @@ UI_COMMAND(cmd_clear_graph, MathEditor) {
     // 2. Clear View
     // We don't free node_views memory, just reset count. 
     // The memory will be reused.
-    ctx->node_view_count = 0;
+    ctx->node_views_count = 0;
     
     // 3. Clear Selection
     ctx->selected_node_id = MATH_NODE_INVALID_ID;
@@ -305,8 +305,8 @@ static void math_editor_load_palette(MathEditor* editor, const char* path) {
     if (items_node) {
         const MetaStruct* meta = meta_get_struct("MathNodePaletteItem");
         if (meta) {
-            config_load_struct_array(items_node, meta, (void***)&editor->palette_items, &editor->palette_count, &editor->graph_arena);
-            LOG_INFO("Editor: Loaded %zu palette items from %s", editor->palette_count, path);
+            config_load_struct_array(items_node, meta, (void***)&editor->palette_items, &editor->palette_items_count, &editor->graph_arena);
+            LOG_INFO("Editor: Loaded %zu palette items from %s", editor->palette_items_count, path);
         } else {
             LOG_ERROR("MathNodePaletteItem meta not found! Check codegen.");
         }
@@ -323,7 +323,7 @@ MathEditor* math_editor_create(Engine* engine) {
     editor->graph = math_graph_create(&editor->graph_arena);
     
     editor->node_views = NULL;
-    editor->node_view_count = 0;
+    editor->node_views_count = 0;
     editor->node_view_cap = 0;
     
     editor->selected_node_id = MATH_NODE_INVALID_ID;
@@ -365,7 +365,7 @@ MathEditor* math_editor_create(Engine* engine) {
             ui_instance_set_root(editor->ui_instance, root);
             
             // Initial Select
-            if (editor->node_view_count > 0) {
+            if (editor->node_views_count > 0) {
                 editor->selected_node_id = editor->node_views[0].node_id;
                 math_editor_update_selection(editor);
             }

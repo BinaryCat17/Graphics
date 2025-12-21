@@ -58,7 +58,10 @@ struct UiNodeSpec {
     char* bind_h;           // REFLECT
 
     // 5. Properties (Static defaults)
+    float x;                // REFLECT
+    float y;                // REFLECT
     char* text;             // REFLECT
+    char* text_source;      // REFLECT
     float width;            // REFLECT
     float height;           // REFLECT
     float padding;          // REFLECT

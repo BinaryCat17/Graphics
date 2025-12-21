@@ -97,6 +97,8 @@ static UiNodeSpec* load_recursive(UiAsset* asset, const ConfigNode* node) {
              }
              continue;
         }
+
+        if (strcmp(key, "instance") == 0) continue;
         
         if (strcmp(key, "children") == 0) {
             if (val->type == CONFIG_NODE_SEQUENCE) {
@@ -172,6 +174,8 @@ static UiNodeSpec* load_recursive(UiAsset* asset, const ConfigNode* node) {
                      }
                  }
             }
+        } else {
+            LOG_WARN("UiParser: Unknown field '%s' in UiNodeSpec (Node ID:%u). Check indentation or spelling.", key, spec->id);
         }
     }
 

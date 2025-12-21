@@ -7,6 +7,13 @@
 
 Structural standardization (Phase 6) is largely complete, but critical limitations in the UI module were identified during the Phase 7 kickoff.
 
+### Phase 5: Stability & Validation (Refinement)
+**Objective:** Resolve data-binding warnings and schema inconsistencies found during enhanced logging.
+- [x] **Fix: Graph Schema:** Correct nesting of `type`, `value`, and `inputs` in `default_graph.yaml` to match `MathNodeBlueprint` structure.
+- [x] **UI: Parser Noise:** Update `ui_parser.c` to skip the `instance` field in the reflection loop to avoid "Unknown field" warnings for parser directives.
+- [x] **UI: Position Support:** Add `x` and `y` fields to `UiNodeSpec` and map them to `rect.x/y` in `UiElement` to support absolute positioning in Canvas layouts.
+- [x] **UI: Palette Items:** Add `text_source` to `UiNodeSpec` reflection to properly support dynamic label sources in palette templates.
+
 ### Phase 6: Structural Standardization (Refinement)
 **Objective:** Address architectural limitations in the UI system to support complex editors.
 - [ ] **UI Layout:** Implement Flexbox-style properties (`flex-grow`, `justify-content`) for robust responsive layouts.
