@@ -27,4 +27,26 @@ float config_get_float(const char* key, float default_value);
 // Get a boolean value. Returns default_value if not found.
 bool config_get_bool(const char* key, bool default_value);
 
+// --- Generic Deserializer ---
+
+#include "../meta/reflection.h"
+
+typedef struct ConfigNode ConfigNode;
+typedef struct MemoryArena MemoryArena;
+
+// Deserializes a YAML node into a C struct using reflection.
+// - node: The YAML node (must be CONFIG_NODE_MAP for structs).
+// - meta: The reflection metadata for the target struct.
+// - instance: Pointer to the struct instance to fill.
+// - arena: Arena for allocating strings and arrays.
+bool config_load_struct(const ConfigNode* node, const MetaStruct* meta, void* instance, MemoryArena* arena);
+
+// Deserializes a YAML sequence into an array of pointers to structs.
+// - node: The YAML node (must be CONFIG_NODE_SEQUENCE).
+// - meta: The reflection metadata for the element type.
+// - out_array: Output pointer to the array of pointers (e.g. Node***).
+// - out_count: Output pointer to the element count.
+// - arena: Arena for allocating the array and elements.
+bool config_load_struct_array(const ConfigNode* node, const MetaStruct* meta, void*** out_array, size_t* out_count, MemoryArena* arena);
+
 #endif // CONFIG_SYSTEM_H

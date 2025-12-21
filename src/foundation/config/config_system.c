@@ -1,4 +1,5 @@
 #include "config_system.h"
+#include "foundation/string/string_id.h"
 #include "simple_yaml.h"
 #include "foundation/memory/arena.h"
 #include "foundation/platform/platform.h"
@@ -204,4 +205,164 @@ bool config_get_bool(const char* key, bool default_value) {
     if (strcmp(val, "true") == 0 || strcmp(val, "1") == 0 || strcmp(val, "yes") == 0) return true;
     if (strcmp(val, "false") == 0 || strcmp(val, "0") == 0 || strcmp(val, "no") == 0) return false;
     return default_value;
+}
+
+// --- Generic Deserializer Implementation ---
+
+bool config_load_struct_array(const ConfigNode* node, const MetaStruct* meta, void*** out_array, size_t* out_count, MemoryArena* arena) {
+    if (!node || node->type != CONFIG_NODE_SEQUENCE || !meta || !out_array || !out_count || !arena) return false;
+
+    size_t count = node->item_count;
+    *out_count = count;
+    
+    if (count == 0) {
+        *out_array = NULL;
+        return true;
+    }
+
+    // Allocate array of pointers
+    void** array = (void**)arena_alloc(arena, count * sizeof(void*));
+    *out_array = array;
+
+    for (size_t i = 0; i < count; ++i) {
+        ConfigNode* item_node = node->items[i];
+        if (item_node->type != CONFIG_NODE_MAP) {
+             array[i] = NULL;
+             continue;
+        }
+
+        // Allocate struct instance
+        void* instance = arena_alloc_zero(arena, meta->size);
+        array[i] = instance;
+
+        // Recursive load
+        config_load_struct(item_node, meta, instance, arena);
+    }
+    return true;
+}
+
+bool config_load_struct(const ConfigNode* node, const MetaStruct* meta, void* instance, MemoryArena* arena) {
+    if (!node || node->type != CONFIG_NODE_MAP || !meta || !instance || !arena) return false;
+
+    for (size_t i = 0; i < meta->field_count; ++i) {
+        const MetaField* field = &meta->fields[i];
+        const ConfigNode* child = config_node_map_get(node, field->name);
+
+        if (!child) continue;
+
+        switch (field->type) {
+            case META_TYPE_INT:
+                if (child->type == CONFIG_NODE_SCALAR) {
+                    meta_set_int(instance, field, atoi(child->scalar));
+                }
+                break;
+            case META_TYPE_FLOAT:
+                if (child->type == CONFIG_NODE_SCALAR) {
+                    meta_set_float(instance, field, (float)atof(child->scalar));
+                }
+                break;
+            case META_TYPE_BOOL:
+                if (child->type == CONFIG_NODE_SCALAR) {
+                    bool val = (strcmp(child->scalar, "true") == 0 || strcmp(child->scalar, "yes") == 0 || strcmp(child->scalar, "1") == 0);
+                    meta_set_bool(instance, field, val);
+                }
+                break;
+            case META_TYPE_STRING:
+                if (child->type == CONFIG_NODE_SCALAR) {
+                    size_t len = strlen(child->scalar);
+                    char* copy = arena_alloc(arena, len + 1);
+                    memcpy(copy, child->scalar, len + 1);
+                    
+                    char** ptr = (char**)meta_get_field_ptr(instance, field);
+                    *ptr = copy;
+                }
+                break;
+            case META_TYPE_STRING_ARRAY:
+                if (child->type == CONFIG_NODE_SCALAR) {
+                    char* ptr = (char*)meta_get_field_ptr(instance, field);
+                    strncpy(ptr, child->scalar, 255);
+                    ptr[255] = 0;
+                }
+                break;
+            case META_TYPE_STRING_ID:
+                if (child->type == CONFIG_NODE_SCALAR) {
+                    StringId id = str_id(child->scalar);
+                    *(StringId*)meta_get_field_ptr(instance, field) = id;
+                }
+                break;
+            case META_TYPE_ENUM:
+                if (child->type == CONFIG_NODE_SCALAR) {
+                    const MetaEnum* e = meta_get_enum(field->type_name);
+                    int val = 0;
+                    if (e && meta_enum_get_value(e, child->scalar, &val)) {
+                        meta_set_int(instance, field, val);
+                    }
+                }
+                break;
+            case META_TYPE_STRUCT:
+                if (child->type == CONFIG_NODE_MAP) {
+                    const MetaStruct* s = meta_get_struct(field->type_name);
+                    void* sub_inst = meta_get_field_ptr(instance, field);
+                    if (s && sub_inst) {
+                        config_load_struct(child, s, sub_inst, arena);
+                    }
+                }
+                break;
+            case META_TYPE_POINTER_ARRAY:
+                if (child->type == CONFIG_NODE_SEQUENCE) {
+                    const MetaStruct* elem_meta = meta_get_struct(field->type_name);
+                    if (!elem_meta) continue;
+
+                    void** array_out = NULL;
+                    size_t count = 0;
+
+                    if (config_load_struct_array(child, elem_meta, &array_out, &count, arena)) {
+                        // Set array
+                        void*** ptr_to_array = (void***)meta_get_field_ptr(instance, field);
+                        *ptr_to_array = array_out;
+
+                        // Set count (Heuristic)
+                        char count_name[512];
+                        snprintf(count_name, sizeof(count_name), "%.400s_count", field->name);
+                        const MetaField* count_field = meta_find_field(meta, count_name);
+                        
+                        // Fallback: "children" -> "child_count"
+                        if (!count_field) {
+                            size_t name_len = strlen(field->name);
+                            if (name_len > 1 && field->name[name_len-1] == 's') {
+                                char singular[256];
+                                if (name_len < sizeof(singular)) {
+                                    strncpy(singular, field->name, name_len - 1);
+                                    singular[name_len - 1] = 0;
+                                    snprintf(count_name, sizeof(count_name), "%s_count", singular);
+                                    count_field = meta_find_field(meta, count_name);
+                                }
+                            }
+                        }
+                        
+                        if (!count_field && strcmp(field->name, "children") == 0) {
+                             count_field = meta_find_field(meta, "child_count");
+                        }
+
+                        if (count_field && count_field->type == META_TYPE_INT) {
+                            meta_set_int(instance, count_field, (int)count);
+                        }
+                    }
+                }
+                break;
+            case META_TYPE_POINTER:
+                 if (child->type == CONFIG_NODE_MAP) {
+                    const MetaStruct* s = meta_get_struct(field->type_name);
+                    if (s) {
+                        void* sub_inst = arena_alloc_zero(arena, s->size);
+                         if (config_load_struct(child, s, sub_inst, arena)) {
+                             void** ptr = (void**)meta_get_field_ptr(instance, field);
+                             *ptr = sub_inst;
+                         }
+                    }
+                }
+                break;
+        }
+    }
+    return true;
 }
