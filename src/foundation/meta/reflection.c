@@ -1,4 +1,5 @@
 #include "reflection.h"
+#include "foundation/string/string_id.h"
 #include <string.h>
 #include <stdlib.h>
 #include <stdio.h>
@@ -34,7 +35,7 @@ bool meta_get_bool(const void* instance, const MetaField* field) {
 }
 
 void meta_set_int(void* instance, const MetaField* field, int value) {
-    if (!instance || !field || field->type != META_TYPE_INT) return;
+    if (!instance || !field || (field->type != META_TYPE_INT && field->type != META_TYPE_ENUM)) return;
     *(int*)((char*)instance + field->offset) = value;
 }
 
@@ -94,4 +95,45 @@ const char* meta_enum_get_name(const MetaEnum* meta_enum, int value) {
     return NULL;
 }
 
+bool meta_set_from_string(void* instance, const MetaField* field, const char* value_str) {
+    if (!instance || !field || !value_str) return false;
 
+    switch (field->type) {
+        case META_TYPE_INT: {
+            meta_set_int(instance, field, atoi(value_str));
+            return true;
+        }
+        case META_TYPE_FLOAT: {
+            meta_set_float(instance, field, (float)atof(value_str));
+            return true;
+        }
+        case META_TYPE_BOOL: {
+            bool val = (strcmp(value_str, "true") == 0 || strcmp(value_str, "1") == 0);
+            meta_set_bool(instance, field, val);
+            return true;
+        }
+        case META_TYPE_STRING:
+        case META_TYPE_STRING_ARRAY: {
+            meta_set_string(instance, field, value_str);
+            return true;
+        }
+        case META_TYPE_ENUM: {
+            const MetaEnum* e = meta_get_enum(field->type_name);
+            int enum_val = 0;
+            if (e && meta_enum_get_value(e, value_str, &enum_val)) {
+                // Assuming enums are stored as ints
+                *(int*)((char*)instance + field->offset) = enum_val;
+                return true;
+            }
+            return false;
+        }
+        case META_TYPE_STRING_ID: {
+            StringId id = str_id(value_str);
+            // StringId is uint32_t
+            *(uint32_t*)((char*)instance + field->offset) = id;
+            return true;
+        }
+        default:
+            return false;
+    }
+}

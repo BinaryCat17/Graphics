@@ -9,16 +9,25 @@ Structural standardization (Phase 6) is largely complete, but critical limitatio
 
 ### Phase 6: Structural Standardization (Refinement)
 **Objective:** Address architectural limitations in the UI system to support complex editors.
-- [x] **UI Data Binding:** Support iteration over contiguous arrays and generic pointer arrays (currently limited to specific pointer arrays).
-- [x] **UI Conditional Templates:** Support logic-based template selection (e.g., `template_selector: "type"`) to handle polymorphic collections (like heterogeneous node lists).
-- [x] **UI Event Safety:** Implement typesafe wrappers for event callbacks to replace brittle `void*` casting and string-based logic.
-- [x] **Declarative Node Palette:** Replace hardcoded "Add Node" logic with a data-driven palette system.
-- [x] **Generic YAML Deserializer:** Implement a reflection-based YAML loader (`config_load_struct_array`) to replace manual parsing logic.
-- [x] **Graph Serialization:** Move hardcoded default graph setup to a data file (YAML/JSON) to support saving/loading. Use strict DTO separation (Logic/Layout).
 - [ ] **UI Layout:** Implement Flexbox-style properties (`flex-grow`, `justify-content`) for robust responsive layouts.
 - [ ] **Dynamic Node Inputs:** Remove `MATH_NODE_MAX_INPUTS` (4) limit. Implement dynamic array support for node inputs to allow variadic nodes (e.g., Sum(A, B, C, D, E)).
 - [ ] **Asset Hot-Reloading:** Watch asset files for changes and reload graph/UI automatically without restarting.
 - [ ] **Frame Allocator:** Introduce a per-frame temporary memory arena to avoid persistent memory leaks during hot-reloading or temporary parsing.
+- [ ] **UI Text Input:** Implement proper UTF-8 support for text fields to handle Cyrillic and special characters.
+- [ ] **UI Scrolling & Events:** Add inertia/smoothing to scrolling and use a dynamic event queue to prevent input loss.
+
+### Phase 6.5: Graphics & Pipeline Maturity
+**Objective:** Eliminate development shortcuts in the rendering pipeline and enforce strict architecture.
+- [x] **Reflection: Generic String Setter:** Move `atoi`/`strtof` logic from UI to `meta_set_from_string` to centralize type parsing.
+- [ ] **UI: Dynamic Command Registry:** Replace static `MAX_COMMANDS` array with a dynamic structure to support unlimited commands.
+- [ ] **Refactor: MathEditor Separation:** Split `math_editor.c` into `math_editor_view.c` (Rendering) and `math_editor.c` (Logic/Input).
+- [ ] **Foundation: String Safety:** Replace manual `strncpy`/`snprintf` with safe foundation wrappers to prevent buffer overflows.
+- [ ] **Async Shader Compilation:** Replace blocking `system("glslc ...")` calls with a dedicated thread or library (shaderc) integration to prevent UI freezes.
+- [ ] **Non-Blocking Screenshots:** Implement async GPU readback (PBO-style) to avoid `vkQueueWaitIdle` stalls during capture.
+- [ ] **Configurable V-Sync:** Expose Swapchain Present Mode configuration (Immediate/FIFO/Mailbox) to the RenderSystem API.
+- [ ] **Compute Visualization:** Move the debug Compute Result quad (currently hardcoded in `render_system_update`) to a proper UI Image Panel or Editor Node.
+- [ ] **UTF-8 Text Rendering:** Implement UTF-8 decoding in the text renderer loop to support Cyrillic and other multi-byte characters.
+- [ ] **Scene API Decoupling:** Introduce helper functions for creating common SceneObjects (Text, Panels) to avoid manual struct poking and magic numbers in higher layers.
 
 The codebase enforces strict Public/Internal API boundaries across all modules. The Math Engine is fully encapsulated, and the foundation is covered by unit tests. The system is now ready for 3D procedural geometry and compute shader integration.
 

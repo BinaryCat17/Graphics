@@ -22,16 +22,6 @@ static void push_event(UiInputContext* ctx, UiEventType type, UiElement* target)
     }
 }
 
-static void set_field_from_string(void* data, const MetaField* field, const char* val_str) {
-    if (field->type == META_TYPE_STRING) {
-        meta_set_string(data, field, val_str);
-    } else if (field->type == META_TYPE_FLOAT) {
-        meta_set_float(data, field, strtof(val_str, NULL));
-    } else if (field->type == META_TYPE_INT) {
-        meta_set_int(data, field, atoi(val_str));
-    }
-}
-
 // --- Public API ---
 
 void ui_input_init(UiInputContext* ctx) {
@@ -203,7 +193,7 @@ static void handle_char_event(UiInputContext* ctx, const InputEvent* event) {
              if (len < 255) {
                  buf[len] = (char)event->data.character.codepoint;
                  buf[len+1] = '\0';
-                 set_field_from_string(el->data_ptr, el->bind_text, buf);
+                 meta_set_from_string(el->data_ptr, el->bind_text, buf);
                  el->cursor_idx++;
                  
                  push_event(ctx, UI_EVENT_VALUE_CHANGE, el);
@@ -228,7 +218,7 @@ static void handle_key_event(UiInputContext* ctx, const InputEvent* event) {
                  size_t len = strlen(buf);
                  if (len > 0) {
                      buf[len-1] = '\0';
-                     set_field_from_string(el->data_ptr, el->bind_text, buf);
+                     meta_set_from_string(el->data_ptr, el->bind_text, buf);
                      if (el->cursor_idx > 0) el->cursor_idx--;
                      
                      push_event(ctx, UI_EVENT_VALUE_CHANGE, el);

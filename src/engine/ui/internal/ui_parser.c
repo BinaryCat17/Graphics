@@ -118,12 +118,6 @@ static UiNodeSpec* load_recursive(UiAsset* asset, const ConfigNode* node) {
         spec->width = -1.0f;
         spec->height = -1.0f;
         spec->color = (Vec4){1,1,1,1};
-        // Style defaults (Legacy behavior)
-        spec->active_tint = 0.5f;
-        spec->hover_tint = 1.2f;
-        spec->text_scale = 0.5f;
-        spec->caret_width = 2.0f;
-        spec->caret_height = 20.0f;
         spec->text_color = (Vec4){1,1,1,1};
         spec->caret_color = (Vec4){1,1,1,1};
     }
@@ -235,23 +229,7 @@ static UiNodeSpec* load_recursive(UiAsset* asset, const ConfigNode* node) {
 
         if (field) {
             // Handle scalar types
-            if (field->type == META_TYPE_FLOAT) {
-                 float fv = val->scalar ? (float)atof(val->scalar) : 0.0f;
-                 meta_set_float(spec, field, fv);
-            } else if (field->type == META_TYPE_INT) {
-                 int iv = val->scalar ? atoi(val->scalar) : 0;
-                 meta_set_int(spec, field, iv);
-            } else if (field->type == META_TYPE_ENUM) {
-                 int enum_val = 0;
-                 const MetaEnum* e = meta_get_enum(field->type_name);
-                 if (e && val->scalar) {
-                     if (meta_enum_get_value(e, val->scalar, &enum_val)) {
-                         meta_set_int(spec, field, enum_val);
-                     } else {
-                         LOG_WARN("UiParser: Unknown enum value '%s' for type '%s'", val->scalar, field->type_name);
-                     }
-                 }
-            } else if (field->type == META_TYPE_STRING) {
+            if (field->type == META_TYPE_STRING) {
                  const char* s = val->scalar ? val->scalar : "";
                  
                  if (strcmp(field->name, "static_text") == 0 && s[0] == '{') {
@@ -267,12 +245,13 @@ static UiNodeSpec* load_recursive(UiAsset* asset, const ConfigNode* node) {
                      char** field_ptr = (char**)meta_get_field_ptr(spec, field);
                      if (field_ptr) *field_ptr = str_copy;
                  }
-            } else if (field->type == META_TYPE_STRING_ID) {
+            } else {
                  const char* s = val->scalar ? val->scalar : "";
-                 StringId id = str_id(s);
-                 // We reuse meta_set_int because StringId is compatible with int (32-bit)
-                 // and we don't have meta_set_uint or meta_set_string_id
-                 meta_set_int(spec, field, (int)id);
+                 if (!meta_set_from_string(spec, field, s)) {
+                     if (field->type == META_TYPE_ENUM) {
+                         LOG_WARN("UiParser: Unknown enum value '%s' for type '%s'", s, field->type_name);
+                     }
+                 }
             }
         }
     }
