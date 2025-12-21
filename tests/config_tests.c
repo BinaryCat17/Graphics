@@ -3,6 +3,7 @@
 #include "foundation/config/simple_yaml.h"
 #include "foundation/memory/arena.h"
 #include "foundation/meta/reflection.h"
+#include "foundation/math/math_types.h"
 #include "foundation/string/string_id.h"
 
 // --- Mock Data ---
@@ -14,6 +15,10 @@ typedef struct TestNode {
     struct TestNode** children;
     size_t child_count;
 } TestNode;
+
+typedef struct TestColor {
+    Vec4 color;
+} TestColor;
 
 static MetaField test_node_fields[] = {
     { "id", META_TYPE_INT, offsetof(TestNode, id), "int" },
@@ -30,10 +35,22 @@ static MetaStruct test_node_meta = {
     5
 };
 
+static MetaField test_color_fields[] = {
+    { "color", META_TYPE_VEC4, offsetof(TestColor, color), "Vec4" },
+};
+
+static MetaStruct test_color_meta = {
+    "TestColor",
+    sizeof(TestColor),
+    test_color_fields,
+    1
+};
+
 // --- Mock Registry ---
 
 const MetaStruct* meta_get_struct(const char* name) {
     if (strcmp(name, "TestNode") == 0) return &test_node_meta;
+    if (strcmp(name, "TestColor") == 0) return &test_color_meta;
     return NULL;
 }
 
@@ -121,9 +138,35 @@ int test_nested_array(void) {
     return 1;
 }
 
+int test_hex_color(void) {
+    MemoryArena arena;
+    arena_init(&arena, 1024);
+
+    const char* yaml = "color: \"#FF0000FF\"\n"; // Red fully opaque
+    
+    ConfigNode* root;
+    ConfigError err;
+    int res = simple_yaml_parse(&arena, yaml, &root, &err);
+    TEST_ASSERT(res);
+
+    TestColor obj = {0};
+    bool ok = config_load_struct(root, &test_color_meta, &obj, &arena);
+    
+    TEST_ASSERT(ok);
+    // x=r, y=g, z=b, w=a
+    ASSERT_EQ_FLOAT(1.0f, obj.color.x, 0.001f);
+    ASSERT_EQ_FLOAT(0.0f, obj.color.y, 0.001f);
+    ASSERT_EQ_FLOAT(0.0f, obj.color.z, 0.001f);
+    ASSERT_EQ_FLOAT(1.0f, obj.color.w, 0.001f);
+
+    arena_destroy(&arena);
+    return 1;
+}
+
 int main(void) {
     TEST_INIT("Config Deserializer");
     TEST_RUN(test_simple_struct);
     TEST_RUN(test_nested_array);
+    TEST_RUN(test_hex_color);
     TEST_REPORT();
 }

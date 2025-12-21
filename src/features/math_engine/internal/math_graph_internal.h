@@ -14,7 +14,7 @@ struct MathNode {
     // Logic Data
     float value;            // REFLECT
     bool dirty;             // REFLECT
-    float cached_output;    // Last calculated result
+    float cached_output;    // REFLECT
     
     // Connections (Dependencies)
     // Stores the IDs of the nodes connected to input slots.

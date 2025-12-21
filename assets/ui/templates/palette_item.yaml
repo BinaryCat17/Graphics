@@ -8,13 +8,4 @@ padding: 4
 color: "#5A5A66"
 hover_color: "#6D6D7F"
 on_click: "Graph.AddNode"
-
-# 9-Slice Style
-texture: "ui_rect"
-tex_w: 32
-tex_h: 32
-border_l: 4
-border_t: 4
-border_r: 4
-border_b: 4
-corner_radius: 0 # Using texture corners instead
+corner_radius: 6

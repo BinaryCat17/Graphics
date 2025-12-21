@@ -17,9 +17,19 @@ Structural standardization (Phase 6) is largely complete, but critical limitatio
 - [x] **Fix: Palette Item Styling:** Resolve white background artifacts on sidebar buttons.
 - [x] **Fix: Exit Crash:** Resolve Segmentation Fault during shutdown.
 - [x] **Fix: Screenshot Shutdown:** Ensure the last screenshot is saved before the process terminates.
+- [ ] **Build System:** Integrate `codegen.py` into CMake as a pre-build step to prevent reflection desync.
+- [ ] **Fix: White Inspector:** Resolve the persistent white background issue and ensure empty state visibility works.
+- [ ] **Fix: Missing Wires:** Debug why connections are invisible (check Z-order or shader output).
+- [ ] **Fix: Palette Styling:** Correct 9-slice parameters for side buttons to fix distorted oval shapes.
+- [ ] **Fix: Port Alignment:** Offset port/wire rendering by the Canvas Element's screen position to fix alignment.
+- [ ] **Fix: Node Value Sync:** Sync `cached_output` to UI instead of static `value` field for operation nodes.
+- [ ] **Fix: Color Parsing:** Implement HEX string to `Vec4` conversion in the reflection system to fix UI colors.
 
 ### Phase 6: Structural Standardization (Refinement)
 **Objective:** Address architectural limitations in the UI system to support complex editors.
+- [ ] **Optimization:** Optimize Graph CPU evaluation to only recalculate dirty nodes.
+- [ ] **Stability:** Implement Graph Cycle Detection to prevent stack overflow crashes on recursive evaluation.
+- [ ] **Refactor:** Optimize Input System to use `StringId` instead of `strcmp` in the update loop.
 - [ ] **UI Layout:** Implement Flexbox-style properties (`flex-grow`, `justify-content`) for robust responsive layouts.
 - [ ] **Dynamic Node Inputs:** Remove `MATH_NODE_MAX_INPUTS` (4) limit. Implement dynamic array support for node inputs to allow variadic nodes (e.g., Sum(A, B, C, D, E)).
 - [ ] **Asset Hot-Reloading:** Watch asset files for changes and reload graph/UI automatically without restarting.

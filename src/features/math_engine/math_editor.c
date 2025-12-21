@@ -433,8 +433,8 @@ static void math_editor_render_ports(MathEditor* editor, Scene* scene, Vec4 clip
         
         // Render Inputs
         for (int k = 0; k < input_count; ++k) {
-            float x = view->x;
-            float y = view->y + 45.0f + (k * 25.0f);
+            float x = view->x + clip_rect.x;
+            float y = view->y + 45.0f + (k * 25.0f) + clip_rect.y;
             
             SceneObject port = {0};
             port.id = (node->id << 8) | (k + 1); // Pseudo ID
@@ -458,8 +458,8 @@ static void math_editor_render_ports(MathEditor* editor, Scene* scene, Vec4 clip
         // Value nodes have output. Math ops have output.
         // Let's assume all nodes except OUTPUT have an output port on the right.
         if (node->type != MATH_NODE_OUTPUT) {
-            float x = view->x + 150.0f;
-            float y = view->y + 45.0f;
+            float x = view->x + 150.0f + clip_rect.x;
+            float y = view->y + 45.0f + clip_rect.y;
             
             SceneObject port = {0};
             port.id = (node->id << 8) | 0xFF; // Pseudo ID
@@ -499,11 +499,11 @@ static void math_editor_render_connections(MathEditor* editor, Scene* scene, Vec
             if (!source_view) continue;
 
             // Calculate endpoints (Must match render_ports logic)
-            float start_x = source_view->x + 150.0f; 
-            float start_y = source_view->y + 45.0f; 
+            float start_x = source_view->x + 150.0f + clip_rect.x; 
+            float start_y = source_view->y + 45.0f + clip_rect.y; 
             
-            float end_x = target_view->x;
-            float end_y = target_view->y + 45.0f + (k * 25.0f);
+            float end_x = target_view->x + clip_rect.x;
+            float end_y = target_view->y + 45.0f + (k * 25.0f) + clip_rect.y;
             
             // Bounding Box
             float min_x = start_x < end_x ? start_x : end_x;

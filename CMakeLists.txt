@@ -50,12 +50,13 @@ find_package(Python3 REQUIRED)
 set(GENERATED_DIR "${CMAKE_CURRENT_SOURCE_DIR}/src/generated")
 set(REFLECTION_REGISTRY "${GENERATED_DIR}/reflection_registry.c")
 
-add_custom_command(
-    OUTPUT ${REFLECTION_REGISTRY}
-    COMMAND ${Python3_EXECUTABLE} "${CMAKE_CURRENT_SOURCE_DIR}/tools/codegen.py" "${CMAKE_CURRENT_SOURCE_DIR}/src" "${REFLECTION_REGISTRY}"
-    DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/tools/codegen.py"
-    COMMENT "Generating reflection metadata..."
+add_custom_target(Codegen
+    COMMAND ${Python3_EXECUTABLE} "${CMAKE_CURRENT_SOURCE_DIR}/tools/codegen.py"
+    WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
+    COMMENT "Running reflection codegen..."
+    BYPRODUCTS ${REFLECTION_REGISTRY}
 )
+set_source_files_properties(${REFLECTION_REGISTRY} PROPERTIES GENERATED TRUE)
 
 # --- FOUNDATION LAYER ---
 
@@ -81,6 +82,7 @@ set(FOUNDATION_META_SOURCES
 add_library(foundation_meta STATIC ${FOUNDATION_META_SOURCES})
 target_include_directories(foundation_meta PUBLIC "src/")
 target_link_libraries(foundation_meta PUBLIC foundation_logger foundation_string)
+add_dependencies(foundation_meta Codegen)
 
 # Platform
 set(FOUNDATION_PLATFORM_SOURCES

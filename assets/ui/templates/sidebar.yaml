@@ -54,6 +54,7 @@ children:
     height: -1
     padding: 20
     bind_visible: "no_selection"
+    color: "#26262B"
     children:
       - type: text
         text: "Select a node to"

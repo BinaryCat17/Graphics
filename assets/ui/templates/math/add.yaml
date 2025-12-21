@@ -5,5 +5,5 @@ children:
   - type: instance
     instance: InspectorTitle
   - type: text
-    text: "Add (A + B)"
+    bind_text: "cached_output"
     color: "#888888"
