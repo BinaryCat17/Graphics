@@ -20,7 +20,6 @@ typedef struct UiTemplate UiTemplate;
 // API for Asset
 UiAsset* ui_asset_create(size_t arena_size);
 void ui_asset_free(UiAsset* asset);
-UiNodeSpec* ui_asset_push_node(UiAsset* asset);
 UiNodeSpec* ui_asset_get_template(UiAsset* asset, const char* name);
 UiNodeSpec* ui_asset_get_root(const UiAsset* asset);
 

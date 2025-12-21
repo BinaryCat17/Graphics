@@ -21,6 +21,16 @@ void ui_command_init(void) {
     g_command_count = 0;
 }
 
+void ui_command_shutdown(void) {
+    for (int i = 0; i < g_command_count; ++i) {
+        if (g_commands[i].name) {
+            free(g_commands[i].name);
+            g_commands[i].name = NULL;
+        }
+    }
+    g_command_count = 0;
+}
+
 void ui_command_register(const char* name, UiCommandCallback callback, void* user_data) {
     if (g_command_count >= MAX_COMMANDS) {
         LOG_ERROR("CommandSystem: Max commands reached (%d)", MAX_COMMANDS);

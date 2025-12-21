@@ -142,6 +142,23 @@ void math_graph_remove_node(MathGraph* graph, MathNodeId id) {
     graph->node_ptrs[id] = NULL; // Mark as dead
 }
 
+void math_graph_clear(MathGraph* graph) {
+    if (!graph) return;
+    
+    // 1. Reset Pool (Recycles all blocks)
+    if (graph->node_pool) {
+        pool_clear(graph->node_pool);
+    }
+    
+    // 2. Clear ID Map
+    if (graph->node_ptrs && graph->node_capacity > 0) {
+        memset((void*)graph->node_ptrs, 0, graph->node_capacity * sizeof(MathNode*));
+    }
+    
+    // 3. Reset Counters
+    graph->node_count = 0;
+}
+
 void math_graph_connect(MathGraph* graph, MathNodeId target_id, int input_index, MathNodeId source_id) {
     if (input_index < 0 || input_index >= MATH_NODE_MAX_INPUTS) return;
     

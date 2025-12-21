@@ -153,4 +153,8 @@ struct UiInstance {
     UiAsset* assets;
 };
 
+// --- Internal Helper Functions ---
+void ui_bind_read_string(void* data, const MetaField* field, char* out_buf, size_t buf_size);
+UiNodeSpec* ui_asset_push_node(UiAsset* asset);
+
 #endif // UI_INTERNAL_H

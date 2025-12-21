@@ -49,6 +49,9 @@ MathNodeId math_graph_add_node(MathGraph* graph, MathNodeType type);
 // Remove a node (marks slot as free).
 void math_graph_remove_node(MathGraph* graph, MathNodeId id);
 
+// Remove all nodes.
+void math_graph_clear(MathGraph* graph);
+
 // Connect source_node's output to target_node's input_slot.
 void math_graph_connect(MathGraph* graph, MathNodeId target, int input_index, MathNodeId source);
 

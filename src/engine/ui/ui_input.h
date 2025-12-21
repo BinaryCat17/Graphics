@@ -56,8 +56,6 @@ typedef void (*UiCommandCallback)(void* user_data, UiElement* target);
 #define UI_REGISTER_COMMAND(NameStr, CmdFunc, ContextPtr) \
     ui_command_register((NameStr), (CmdFunc), (void*)(ContextPtr))
 
-void ui_command_init(void);
-void ui_command_shutdown(void);
 void ui_command_register(const char* name, UiCommandCallback callback, void* user_data);
 void ui_command_execute_id(StringId id, UiElement* target);
 

@@ -3,6 +3,7 @@
 #include "internal/ui_layout.h"   // Internal
 #include "internal/ui_renderer.h" // Internal
 #include "internal/ui_parser.h"   // Internal
+#include "internal/ui_command_system.h" // Internal
 #include "foundation/meta/reflection.h"
 #include "foundation/memory/arena.h"
 #include "foundation/memory/pool.h"
@@ -11,6 +12,16 @@
 #include <string.h>
 #include <stdio.h>
 #include <math.h>
+
+// --- System Lifecycle ---
+
+void ui_system_init(void) {
+    ui_command_init();
+}
+
+void ui_system_shutdown(void) {
+    ui_command_shutdown();
+}
 
 // --- UiAsset (Memory Owner) ---
 

@@ -168,7 +168,24 @@ UI_COMMAND(cmd_add_node, MathEditor) {
 
 UI_COMMAND(cmd_clear_graph, MathEditor) {
     LOG_INFO("Command: Graph.Clear");
-    // TODO: Implement proper clear
+    
+    // 1. Clear Logic
+    math_graph_clear(ctx->graph);
+    
+    // 2. Clear View
+    // We don't free node_views memory, just reset count. 
+    // The memory will be reused.
+    ctx->node_view_count = 0;
+    
+    // 3. Clear Selection
+    ctx->selected_node_id = MATH_NODE_INVALID_ID;
+    ctx->selection_dirty = true; // Trigger inspector clear
+    
+    // 4. Trigger UI Refresh
+    math_editor_refresh_graph_view(ctx);
+    
+    // 5. Trigger Compute Recompile (empty graph)
+    ctx->graph_dirty = true;
 }
 
 UI_COMMAND(cmd_recompile, MathEditor) {
@@ -316,7 +333,7 @@ MathEditor* math_editor_create(Engine* engine) {
     math_editor_load_palette(editor, "assets/ui/palette_config.yaml");
 
     // 3. Init UI System
-    ui_command_init();
+    // ui_command_init(); // Managed by Engine Core
     UI_REGISTER_COMMAND("Graph.AddNode", cmd_add_node, editor);
     UI_REGISTER_COMMAND("Graph.Clear", cmd_clear_graph, editor);
     UI_REGISTER_COMMAND("Graph.Recompile", cmd_recompile, editor);

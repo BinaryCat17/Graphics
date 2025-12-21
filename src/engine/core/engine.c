@@ -8,6 +8,7 @@
 #include "engine/graphics/render_system.h"
 #include "engine/assets/assets.h"
 #include "engine/input/input.h"
+#include "engine/ui/ui_core.h"
 
 #include <stdio.h>
 #include <string.h>
@@ -114,10 +115,13 @@ Engine* engine_create(const EngineConfig* config) {
         goto cleanup_assets;
     }
 
+    // 6. UI System
+    ui_system_init();
+
     // Bindings
     render_system_bind_assets(engine->render_system, engine->assets);
     
-    // 6. Application Init Hook (App sets up Graph, UI, binds them to Renderer)
+    // 7. Application Init Hook (App sets up Graph, UI, binds them to Renderer)
     if (config->on_init) {
         config->on_init(engine);
     }
@@ -214,6 +218,7 @@ void engine_run(Engine* engine) {
 void engine_destroy(Engine* engine) {
     if (!engine) return;
     
+    ui_system_shutdown();
     render_system_destroy(engine->render_system);
     input_system_destroy(engine->input_system);
     assets_destroy(engine->assets);
