@@ -218,7 +218,7 @@ static void process_node(const UiElement* el, UiRenderContext* ctx, Rect current
 
     // 3. Recurse
     for (UiElement* child = el->first_child; child; child = child->next_sibling) {
-        process_node(child, ctx, effective_clip, base_z + 0.001f, is_overlay_pass);
+        process_node(child, ctx, effective_clip, base_z + 0.01f, is_overlay_pass);
     }
 }
 
@@ -233,12 +233,12 @@ void ui_renderer_build_scene(const UiElement* root, Scene* scene, const Assets* 
     ctx.arena = arena;
     
     // Pass 1: Draw Normal, Defer Overlays
-    process_node(root, &ctx, infinite_clip, 0.0f, false);
+    process_node(root, &ctx, infinite_clip, -10.0f, false);
     
     // Pass 2: Draw Overlays
     OverlayNode* curr = ctx.overlay_head;
     while (curr) {
-        process_node(curr->el, &ctx, infinite_clip, 0.8f, true);
+        process_node(curr->el, &ctx, infinite_clip, -1.0f, true);
         curr = curr->next;
     }
 }

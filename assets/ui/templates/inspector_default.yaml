@@ -1,5 +1,6 @@
 type: container
 layout: flex_column
+color: "#26262B"
 children:
   - type: instance
     instance: InspectorTitle

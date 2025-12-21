@@ -446,14 +446,14 @@ static void math_editor_render_ports(MathEditor* editor, Scene* scene, Vec4 clip
             port.id = (node->id << 8) | (k + 1); // Pseudo ID
             port.layer = LAYER_UI_CONTENT; // Draw on top of background but below text? Or just content.
             port.prim_type = SCENE_PRIM_QUAD;
-            port.position = (Vec3){x, y, 0.0f};
+            port.position = (Vec3){x, y, -0.5f};
             port.scale = (Vec3){NODE_PORT_SIZE, NODE_PORT_SIZE, 1.0f};
             port.color = (Vec4){0.5f, 0.5f, 0.5f, 1.0f}; // Grey
             port.uv_rect = (Vec4){0.0f, 0.0f, 1.0f, 1.0f};
             port.ui.clip_rect = clip_rect;
             
             // SDF Circle
-            port.ui.style_params.x = 4.0f; // SCENE_MODE_SDF_BOX
+            port.ui.style_params.x = (float)SCENE_MODE_SDF_BOX; 
             port.ui.style_params.y = 5.0f; // Radius (Half size)
             port.ui.style_params.z = 1.0f; // Border thickness
             
@@ -471,13 +471,13 @@ static void math_editor_render_ports(MathEditor* editor, Scene* scene, Vec4 clip
             port.id = (node->id << 8) | 0xFF; // Pseudo ID
             port.layer = LAYER_UI_CONTENT;
             port.prim_type = SCENE_PRIM_QUAD;
-            port.position = (Vec3){x, y, 0.0f};
+            port.position = (Vec3){x, y, -0.5f};
             port.scale = (Vec3){NODE_PORT_SIZE, NODE_PORT_SIZE, 1.0f};
             port.color = (Vec4){0.5f, 0.5f, 0.5f, 1.0f};
             port.uv_rect = (Vec4){0.0f, 0.0f, 1.0f, 1.0f};
             port.ui.clip_rect = clip_rect;
             
-            port.ui.style_params.x = 4.0f; // SCENE_MODE_SDF_BOX
+            port.ui.style_params.x = (float)SCENE_MODE_SDF_BOX; 
             port.ui.style_params.y = 5.0f; // Radius
             port.ui.style_params.z = 1.0f; // Border
             
@@ -537,7 +537,7 @@ static void math_editor_render_connections(MathEditor* editor, Scene* scene, Vec
             wire.id = (target_node->id << 16) | (source_id & 0xFFFF); 
             wire.layer = LAYER_UI_BACKGROUND;
             wire.prim_type = SCENE_PRIM_CURVE; 
-            wire.position = (Vec3){min_x + width*0.5f, min_y + height*0.5f, 0.005f};
+            wire.position = (Vec3){min_x + width*0.5f, min_y + height*0.5f, -9.9f};
             wire.scale = (Vec3){width, height, 1.0f};
             wire.color = (Vec4){0.8f, 0.8f, 0.8f, 1.0f}; 
             
@@ -648,8 +648,8 @@ void math_editor_update(MathEditor* editor, Engine* engine) {
     }
 
     // Graph Evaluation (Naive interpretation on CPU for debugging/node values)
-    if (editor->graph) { // Check pointer
-        for (uint32_t i = 0; i < editor->graph->node_count; ++i) { // Use ->
+    if (editor->graph && (editor->graph_dirty || editor->selection_dirty)) { 
+        for (uint32_t i = 0; i < editor->graph->node_count; ++i) { 
             const MathNode* n = math_graph_get_node(editor->graph, i);
             if (n && n->type != MATH_NODE_NONE) {
                 math_graph_evaluate(editor->graph, i);
