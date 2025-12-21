@@ -4,7 +4,7 @@ import sys
 
 # Regex Patterns
 ENUM_PATTERN = re.compile(r'typedef\s+enum\s*\w*\s*\{([^}]*)\}\s*(\w+);\s*//\s*REFLECT', re.MULTILINE | re.DOTALL)
-STRUCT_PATTERN = re.compile(r'typedef\s+struct\s*\w*\s*\{([^}]*)\}\s*(\w+);', re.MULTILINE | re.DOTALL)
+STRUCT_PATTERN = re.compile(r'(typedef\s+)?struct\s*(\w*)\s*\{([^}]*)\}\s*(\w+)?\s*;', re.MULTILINE | re.DOTALL)
 REFLECT_PATTERN = re.compile(r'^\s*(.+?);\s*//\s*REFLECT(.*)', re.MULTILINE)
 
 BASE_TYPES = {
@@ -114,8 +114,13 @@ def scan_files(src_dir):
                         has_reflection = True
 
                 for match in STRUCT_PATTERN.finditer(content):
-                    body = match.group(1)
-                    name = match.group(2)
+                    name_tag = match.group(2)
+                    body = match.group(3)
+                    name_typedef = match.group(4)
+                    
+                    name = name_typedef if name_typedef else name_tag
+                    if not name: continue
+
                     fields = []
                     for f_match in REFLECT_PATTERN.finditer(body):
                         decl = f_match.group(1).strip()

@@ -35,9 +35,13 @@ struct UiNodeSpec {
     float animation_speed;  // REFLECT
     
     // 9-Slice Sizing (if kind == UI_KIND_CONTAINER and texture is used)
-    float border_l, border_t, border_r, border_b; // REFLECT
+    float border_l;         // REFLECT
+    float border_t;         // REFLECT
+    float border_r;         // REFLECT
+    float border_b;         // REFLECT
     float corner_radius;    // REFLECT
-    float tex_w, tex_h;     // REFLECT
+    float tex_w;            // REFLECT
+    float tex_h;            // REFLECT
     StringId texture;       // REFLECT
     
     // 4. Data Bindings (Sources)
@@ -55,7 +59,8 @@ struct UiNodeSpec {
 
     // 5. Properties (Static defaults)
     char* text;             // REFLECT
-    float width, height;    // REFLECT
+    float width;            // REFLECT
+    float height;           // REFLECT
     float padding;          // REFLECT
     float spacing;          // REFLECT
     float split_ratio;      // REFLECT
