@@ -37,34 +37,9 @@ static UiKind parse_kind(const char* type_str, uint32_t* out_flags) {
     *out_flags = UI_FLAG_NONE;
     if (!type_str) return UI_KIND_CONTAINER;
 
-    if (strcmp(type_str, "panel") == 0) return UI_KIND_CONTAINER;
-    if (strcmp(type_str, "container") == 0) return UI_KIND_CONTAINER;
-    
-    if (strcmp(type_str, "label") == 0) return UI_KIND_TEXT;
     if (strcmp(type_str, "text") == 0) return UI_KIND_TEXT;
     
-    if (strcmp(type_str, "button") == 0) {
-        *out_flags |= UI_FLAG_CLICKABLE | UI_FLAG_FOCUSABLE;
-        return UI_KIND_CONTAINER;
-    }
-    
-    if (strcmp(type_str, "text_input") == 0 || strcmp(type_str, "textfield") == 0 || strcmp(type_str, "input") == 0) {
-        *out_flags |= UI_FLAG_CLICKABLE | UI_FLAG_FOCUSABLE | UI_FLAG_EDITABLE;
-        return UI_KIND_TEXT_INPUT;
-    }
-    
-    if (strcmp(type_str, "checkbox") == 0) {
-        *out_flags |= UI_FLAG_CLICKABLE;
-        return UI_KIND_CONTAINER; 
-    }
-
-    if (strcmp(type_str, "slider") == 0) {
-        *out_flags |= UI_FLAG_CLICKABLE | UI_FLAG_DRAGGABLE;
-        return UI_KIND_CONTAINER; 
-    }
-
-    if (strcmp(type_str, "curve") == 0) return UI_KIND_CONTAINER;
-
+    // Default to container for everything else (including 'container')
     return UI_KIND_CONTAINER;
 }
 

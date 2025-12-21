@@ -1,9 +1,9 @@
-type: panel
+type: container
 layout: flex_column
 spacing: 5
 children:
   - type: instance
     instance: InspectorTitle
-  - type: label
+  - type: text
     text: "Subtract (A - B)"
     color: "#888888"

@@ -182,7 +182,7 @@ static void handle_mouse_press_event(UiInputContext* ctx, const InputEvent* even
 static void handle_char_event(UiInputContext* ctx, const InputEvent* event) {
     if (!ctx->focused) return;
     UiElement* el = ctx->focused;
-    if (!((el->flags & UI_FLAG_EDITABLE) && el->spec->kind == UI_KIND_TEXT_INPUT)) return;
+    if (!(el->flags & UI_FLAG_EDITABLE)) return;
 
     if (event->type == INPUT_EVENT_CHAR) {
          char buf[256] = {0};
@@ -208,7 +208,7 @@ static void handle_char_event(UiInputContext* ctx, const InputEvent* event) {
 static void handle_key_event(UiInputContext* ctx, const InputEvent* event) {
     if (!ctx->focused) return;
     UiElement* el = ctx->focused;
-    if (!((el->flags & UI_FLAG_EDITABLE) && el->spec->kind == UI_KIND_TEXT_INPUT)) return;
+    if (!(el->flags & UI_FLAG_EDITABLE)) return;
 
     if (event->type == INPUT_EVENT_KEY_PRESSED || event->type == INPUT_EVENT_KEY_REPEAT) {
         if (event->data.key.key == INPUT_KEY_BACKSPACE) {

@@ -1,4 +1,4 @@
-type: panel
+type: container
 id: left_panel
 layout: flex_column
 width: 250
@@ -17,12 +17,12 @@ tex_h: 32
 texture: "ui_rect"
 
 children:
-  - type: label
+  - type: text
     text: "Graph Editor"
     height: 30
     color: "#FFFFFF"
 
-  - type: panel
+  - type: container
     layout: flex_column
     height: 200
     spacing: 5
@@ -30,12 +30,13 @@ children:
     collection: "palette_items"
     item_template: "PaletteItem"
 
-  - type: panel
+  - type: container
     layout: flex_row
     height: 40
     spacing: 5
     children:
-        - type: button
+        - type: container
+          flags: clickable | focusable
           text: "Clear"
           width: 80
           height: 30
@@ -43,12 +44,12 @@ children:
           color: "#663333"
           on_click: "Graph.Clear"
 
-  - type: label
+  - type: text
     text: "Properties"
     height: 20
     color: "#CCCCCC"
     
-  - type: panel
+  - type: container
     id: inspector_area
     layout: flex_column
     height: -1 # Fill rest

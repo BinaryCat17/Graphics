@@ -1,4 +1,4 @@
-type: panel
+type: container
 id: root
 layout: split_h
 width: -1
@@ -14,7 +14,7 @@ children:
     instance: "EditorSidebar"
 
   # Right Area (Canvas)
-  - type: panel
+  - type: container
     id: canvas_area
     layout: canvas
     width: -1 # Fill rest
@@ -24,7 +24,7 @@ children:
     item_template: "GraphNode"
     
     children:
-        - type: label
+        - type: text
           text: "Canvas Area (Drag nodes here)"
           x: 20
           y: 20

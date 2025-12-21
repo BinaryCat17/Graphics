@@ -1,8 +1,8 @@
-type: panel
+type: container
 layout: row
 height: 25
 children:
-  - type: label
+  - type: text
     text: "Value:"
     width: 60
     color: "#AAAAAA"

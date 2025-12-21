@@ -38,7 +38,8 @@ static Rect rect_intersect(Rect a, Rect b) {
 }
 
 static void render_background(const UiElement* el, UiRenderContext* ctx, Vec4 clip_vec, float z) {
-    if (el->spec->kind != UI_KIND_CONTAINER && el->spec->kind != UI_KIND_TEXT_INPUT) return;
+    bool is_input = (el->flags & UI_FLAG_EDITABLE);
+    if (el->spec->kind != UI_KIND_CONTAINER && !is_input) return;
 
     SceneObject quad = {0};
     quad.prim_type = SCENE_PRIM_QUAD; 
@@ -62,9 +63,8 @@ static void render_background(const UiElement* el, UiRenderContext* ctx, Vec4 cl
         // Only apply legacy tint if no declarative hover color is set
         float tint = el->spec->hover_tint > 0.0f ? el->spec->hover_tint : 1.2f;
         quad.color.x *= tint; quad.color.y *= tint; quad.color.z *= tint;
-    } else if (el->spec->kind == UI_KIND_TEXT_INPUT) {
+    } else if (is_input) {
          // Make inputs slightly lighter by default (Legacy/Default behavior)
-         // Could be parameterized later if needed
          quad.color.x *= 1.1f; quad.color.y *= 1.1f; quad.color.z *= 1.1f;
     }
 
@@ -110,10 +110,11 @@ static void render_content(const UiElement* el, UiRenderContext* ctx, Vec4 clip_
         text = el->spec->text;
     }
     
-    if (el->spec->kind == UI_KIND_TEXT_INPUT && !text) text = "";
+    bool is_input = (el->flags & UI_FLAG_EDITABLE);
+    if (is_input && !text) text = "";
 
     // Skip if nothing to draw
-    if ((!text || text[0] == '\0') && el->spec->kind != UI_KIND_TEXT_INPUT) return;
+    if ((!text || text[0] == '\0') && !is_input) return;
 
     if (text) {
         Vec3 pos = {el->screen_rect.x + el->spec->padding, el->screen_rect.y + el->spec->padding, z + 0.001f};
@@ -124,7 +125,7 @@ static void render_content(const UiElement* el, UiRenderContext* ctx, Vec4 clip_
         scene_add_text_clipped(ctx->scene, ctx->font, text, pos, txt_scale, txt_color, clip_vec);
 
         // Draw Caret
-        if (el->spec->kind == UI_KIND_TEXT_INPUT && el->is_focused) {
+        if (is_input && el->is_focused) {
             char temp[256];
             int len = (int)strlen(text);
             int c_idx = el->cursor_idx;

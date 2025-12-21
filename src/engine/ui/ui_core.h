@@ -36,8 +36,7 @@ typedef enum UiFlags {
 // but functional behavior is driven by flags.
 typedef enum UiKind {
     UI_KIND_CONTAINER, // Generic Rect
-    UI_KIND_TEXT,      // Renders text
-    UI_KIND_TEXT_INPUT // Text Field
+    UI_KIND_TEXT       // Renders text
 } UiKind; // REFLECT
 
 typedef enum UiLayer {

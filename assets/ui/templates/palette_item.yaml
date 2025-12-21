@@ -1,4 +1,6 @@
-type: button
+type: container
+flags: clickable | focusable
+id: palette_item
 text_source: "label"
 width: 100
 height: 30

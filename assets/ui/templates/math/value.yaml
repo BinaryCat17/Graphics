@@ -1,4 +1,4 @@
-type: panel
+type: container
 layout: flex_column
 spacing: 5
 children:

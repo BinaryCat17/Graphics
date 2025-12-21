@@ -182,6 +182,10 @@ Unlike traditional engines that maintain separate render pipelines for UI (2D) a
     *   **Spec (`UiNodeSpec`):** Immutable "DNA" loaded from YAML. Lives in `UiAsset`.
     *   **Element (`UiElement`):** Live runtime object created from a Spec. Lives in `UiInstance`.
     *   **Usage:** Logic calls `ui_element_create(instance, spec)` to spawn dynamic UI (like Graph Nodes) from static templates.
+*   **Orthogonal Typing:**
+    *   **Primitives:** Only `Container` (Rect) and `Text` exist as fundamental Kinds.
+    *   **Behavior:** Defined via Flags (`Clickable`, `Editable`, `Draggable`).
+    *   *Example:* A "Button" is a `Container` + `UI_FLAG_CLICKABLE`. A "TextField" is `Text` + `UI_FLAG_EDITABLE`.
 *   **Hybrid Update Strategy:**
     *   **Retained Structure:** The tree persists across frames (unlike ImGui).
     *   **Partial Rebuilds:** Structural changes (e.g., selecting a new object) trigger `ui_element_rebuild_children` for specific sub-trees.
