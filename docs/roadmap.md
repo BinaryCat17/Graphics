@@ -40,3 +40,4 @@ The codebase enforces strict Public/Internal API boundaries across all modules. 
 
 *   **Shader Hot-Reloading:** Allow editing shaders at runtime without restarting.
 *   **API Documentation:** Setup Doxygen or a similar tool to generate up-to-date API documentation from public headers.
+*   **Generic YAML Deserializer:** Implement a reflection-based YAML loader (`config_load_struct_array`) to replace manual parsing logic.
