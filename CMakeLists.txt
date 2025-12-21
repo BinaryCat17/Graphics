@@ -92,6 +92,7 @@ target_link_libraries(foundation_platform PUBLIC glfw Vulkan::Vulkan foundation_
 
 # Math
 set(FOUNDATION_MATH_SOURCES
+    "src/foundation/math/math_types.c"
     "src/foundation/math/coordinate_systems.c")
 add_library(foundation_math STATIC ${FOUNDATION_MATH_SOURCES})
 target_include_directories(foundation_math PUBLIC "src/")
