@@ -177,32 +177,86 @@ UI_COMMAND(cmd_recompile, MathEditor) {
 
 // --- Lifecycle ---
 
-static void math_editor_setup_default_graph(MathEditor* editor) {
-    LOG_INFO("Editor: Setting up default Math Graph...");
+static void math_editor_load_graph(MathEditor* editor, const char* path) {
+    LOG_INFO("Editor: Loading graph from %s", path);
+    char* content = fs_read_text(NULL, path);
+    if (!content) {
+        LOG_WARN("Failed to load graph: %s. Using fallback.", path);
+        // Fallback: simple UV node
+        MathNodeId uv_id = math_graph_add_node(editor->graph, MATH_NODE_UV);
+        math_editor_add_view(editor, uv_id, 100, 100);
+        return;
+    }
+
+    ConfigNode* root = NULL;
+    ConfigError err = {0};
     
-    MathNodeId uv_id = math_graph_add_node(editor->graph, MATH_NODE_UV);
-    MathNode* uv = math_graph_get_node(editor->graph, uv_id);
-    if(uv) { math_graph_set_name(editor->graph, uv_id, "UV.x"); }
-    math_editor_add_view(editor, uv_id, 50, 100);
+    // Parse into the graph arena
+    if (!simple_yaml_parse(&editor->graph_arena, content, &root, &err)) {
+        LOG_ERROR("YAML Error in %s: %s", path, err.message);
+        free(content);
+        return;
+    }
+    free(content);
+
+    const ConfigNode* nodes_list = config_node_map_get(root, "nodes");
+    if (!nodes_list || nodes_list->type != CONFIG_NODE_SEQUENCE) return;
+
+    size_t count = nodes_list->item_count;
+    if (count == 0) return;
+
+    MathNodeBlueprint* bps = arena_alloc_zero(&editor->graph_arena, count * sizeof(MathNodeBlueprint));
+    const MetaStruct* meta_bp = meta_get_struct("MathNodeBlueprint");
+    if (!meta_bp) {
+        LOG_ERROR("MathNodeBlueprint meta not found!");
+        return;
+    }
+
+    // 1. Load Blueprints
+    for(size_t i=0; i<count; ++i) {
+        // Init Defaults
+        bps[i].logic.input_0 = -1;
+        bps[i].logic.input_1 = -1;
+        bps[i].logic.input_2 = -1;
+        bps[i].logic.input_3 = -1;
+        
+        config_load_struct(nodes_list->items[i], meta_bp, &bps[i], &editor->graph_arena);
+    }
+
+    // 2. Create Nodes
+    MathNodeId* id_map = arena_alloc(&editor->graph_arena, count * sizeof(MathNodeId)); 
     
-    MathNodeId freq_id = math_graph_add_node(editor->graph, MATH_NODE_VALUE);
-    MathNode* freq = math_graph_get_node(editor->graph, freq_id);
-    if(freq) { math_graph_set_name(editor->graph, freq_id, "Frequency"); freq->value = 20.0f; }
-    math_editor_add_view(editor, freq_id, 50, 250);
-    
-    MathNodeId mul_id = math_graph_add_node(editor->graph, MATH_NODE_MUL);
-    MathNode* mul = math_graph_get_node(editor->graph, mul_id);
-    if(mul) { math_graph_set_name(editor->graph, mul_id, "Multiply"); }
-    math_editor_add_view(editor, mul_id, 250, 175);
-    
-    MathNodeId sin_id = math_graph_add_node(editor->graph, MATH_NODE_SIN);
-    MathNode* s = math_graph_get_node(editor->graph, sin_id);
-    if(s) { math_graph_set_name(editor->graph, sin_id, "Sin"); }
-    math_editor_add_view(editor, sin_id, 450, 175);
-    
-    math_graph_connect(editor->graph, mul_id, 0, uv_id); 
-    math_graph_connect(editor->graph, mul_id, 1, freq_id); 
-    math_graph_connect(editor->graph, sin_id, 0, mul_id);
+    for(size_t i=0; i<count; ++i) {
+        MathNodeBlueprint* bp = &bps[i];
+        
+        // Ensure type is valid (defaults to 0 which might be MATH_NODE_NONE)
+        if (bp->logic.type == 0) bp->logic.type = MATH_NODE_VALUE; 
+
+        MathNodeId id = math_graph_add_node(editor->graph, bp->logic.type);
+        id_map[i] = id;
+        
+        // Logic Properties
+        math_graph_set_value(editor->graph, id, bp->logic.value);
+        math_graph_set_name(editor->graph, id, bp->layout.name); 
+        
+        // View Properties
+        math_editor_add_view(editor, id, bp->layout.x, bp->layout.y);
+    }
+
+    // 3. Connect Nodes
+    for(size_t i=0; i<count; ++i) {
+        MathNodeBlueprint* bp = &bps[i];
+        MathNodeId target_id = id_map[i];
+
+        int inputs[4] = {bp->logic.input_0, bp->logic.input_1, bp->logic.input_2, bp->logic.input_3};
+        
+        for(int k=0; k<4; ++k) {
+            int source_idx = inputs[k];
+            if (source_idx >= 0 && source_idx < (int)count) {
+                math_graph_connect(editor->graph, target_id, k, id_map[source_idx]);
+            }
+        }
+    }
     
     math_editor_sync_view_data(editor);
 }
@@ -258,7 +312,7 @@ MathEditor* math_editor_create(Engine* engine) {
     editor->selected_node_id = MATH_NODE_INVALID_ID;
     
     // 2. Setup Default Data
-    math_editor_setup_default_graph(editor);
+    math_editor_load_graph(editor, "assets/ui/default_graph.yaml");
     math_editor_load_palette(editor, "assets/ui/palette_config.yaml");
 
     // 3. Init UI System

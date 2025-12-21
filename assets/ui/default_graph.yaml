@@ -1,0 +1,29 @@
+nodes:
+  - logic:
+      type: MATH_NODE_UV
+    layout:
+      x: 50
+      y: 100
+      name: "UV.x"
+  - logic:
+      type: MATH_NODE_VALUE
+      value: 20.0
+    layout:
+      x: 50
+      y: 250
+      name: "Frequency"
+  - logic:
+      type: MATH_NODE_MUL
+      input_0: 0 # UV.x
+      input_1: 1 # Frequency
+    layout:
+      x: 250
+      y: 175
+      name: "Multiply"
+  - logic:
+      type: MATH_NODE_SIN
+      input_0: 2 # Multiply
+    layout:
+      x: 450
+      y: 175
+      name: "Sin"

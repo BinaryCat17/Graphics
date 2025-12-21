@@ -18,6 +18,35 @@ typedef struct MathNodeView {
     float value;            // REFLECT (Input/Output preview)
 } MathNodeView;
 
+// --- Serialization DTOs (Strict Separation) ---
+
+typedef struct MathNodeLogicBP {
+    MathNodeType type;      // REFLECT
+    float value;            // REFLECT (Default value)
+    
+    // Connections: Indices in the blueprint array (-1 = none)
+    int input_0;            // REFLECT 
+    int input_1;            // REFLECT
+    int input_2;            // REFLECT
+    int input_3;            // REFLECT
+} MathNodeLogicBP;
+
+typedef struct MathNodeLayoutBP {
+    float x;                // REFLECT
+    float y;                // REFLECT
+    char name[32];          // REFLECT
+} MathNodeLayoutBP;
+
+typedef struct MathNodeBlueprint {
+    MathNodeLogicBP logic;   // REFLECT
+    MathNodeLayoutBP layout; // REFLECT
+} MathNodeBlueprint;
+
+typedef struct MathGraphBlueprint {
+    MathNodeBlueprint** nodes;  // REFLECT
+    size_t node_count;          // REFLECT
+} MathGraphBlueprint;
+
 typedef struct MathNodePaletteItem {
     char label[32];         // REFLECT
     int type;               // REFLECT (MathNodeType)
