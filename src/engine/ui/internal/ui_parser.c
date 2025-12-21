@@ -33,28 +33,6 @@ static UiNodeSpec* ui_node_spec_copy(UiAsset* asset, const UiNodeSpec* src) {
     return dst;
 }
 
-static bool parse_hex_color(const char* str, Vec4* out_color) {
-    if (!str || str[0] != '#') return false;
-    str++; // Skip '#'
-    
-    unsigned int r = 0, g = 0, b = 0, a = 255;
-    int len = (int)strlen(str);
-    
-    if (len == 6) {
-        if (sscanf(str, "%02x%02x%02x", &r, &g, &b) != 3) return false;
-    } else if (len == 8) {
-        if (sscanf(str, "%02x%02x%02x%02x", &r, &g, &b, &a) != 4) return false;
-    } else {
-        return false;
-    }
-    
-    out_color->x = (float)r / 255.0f;
-    out_color->y = (float)g / 255.0f;
-    out_color->z = (float)b / 255.0f;
-    out_color->w = (float)a / 255.0f;
-    return true;
-}
-
 static UiKind parse_kind(const char* type_str, uint32_t* out_flags) {
     *out_flags = UI_FLAG_NONE;
     if (!type_str) return UI_KIND_CONTAINER;
@@ -167,41 +145,6 @@ static UiNodeSpec* load_recursive(UiAsset* asset, const ConfigNode* node) {
             continue;
         }
 
-        // --- Colors ---
-        Vec4* target_color = NULL;
-        if (strcmp(key, "color") == 0) target_color = &spec->color;
-        else if (strcmp(key, "hover_color") == 0) target_color = &spec->hover_color;
-        else if (strcmp(key, "active_color") == 0) target_color = &spec->active_color;
-        else if (strcmp(key, "text_color") == 0) target_color = &spec->text_color;
-        else if (strcmp(key, "caret_color") == 0) target_color = &spec->caret_color;
-
-        if (target_color) {
-            if (val->type == CONFIG_NODE_SEQUENCE && val->item_count >= 3) {
-                 float r = val->items[0]->scalar ? (float)atof(val->items[0]->scalar) : 1.0f;
-                 float g = val->items[1]->scalar ? (float)atof(val->items[1]->scalar) : 1.0f;
-                 float b = val->items[2]->scalar ? (float)atof(val->items[2]->scalar) : 1.0f;
-                 float a = 1.0f;
-                 if (val->item_count > 3 && val->items[3]->scalar) a = (float)atof(val->items[3]->scalar);
-                 *target_color = (Vec4){r, g, b, a};
-            } else if (val->type == CONFIG_NODE_SCALAR) {
-                parse_hex_color(val->scalar, target_color);
-            }
-            continue;
-        }
-
-        // --- Floats ---
-        float* target_float = NULL;
-        if (strcmp(key, "animation_speed") == 0) target_float = &spec->animation_speed;
-        else if (strcmp(key, "active_tint") == 0) target_float = &spec->active_tint;
-        else if (strcmp(key, "hover_tint") == 0) target_float = &spec->hover_tint;
-        else if (strcmp(key, "text_scale") == 0) target_float = &spec->text_scale;
-        else if (strcmp(key, "caret_width") == 0) target_float = &spec->caret_width;
-        else if (strcmp(key, "caret_height") == 0) target_float = &spec->caret_height;
-
-        if (target_float) {
-            *target_float = val->scalar ? (float)atof(val->scalar) : 0.0f;
-            continue;
-        }
         // Flags manual overrides (mixes with kind)
         if (strcmp(key, "draggable") == 0 && val->scalar && strcmp(val->scalar, "true") == 0) {
             spec->flags |= UI_FLAG_DRAGGABLE;
@@ -212,7 +155,7 @@ static UiNodeSpec* load_recursive(UiAsset* asset, const ConfigNode* node) {
             continue;
         }
         
-        // --- Generic Reflection for Scalars ---
+        // --- Generic Reflection ---
         const MetaField* field = meta_find_field(meta, key);
         if (!field) {
             // Check alias mappings (YAML key -> Struct field)
@@ -228,8 +171,24 @@ static UiNodeSpec* load_recursive(UiAsset* asset, const ConfigNode* node) {
         }
 
         if (field) {
-            // Handle scalar types
-            if (field->type == META_TYPE_STRING) {
+            // Handle Sequence for Vectors (e.g. color: [1, 0, 0, 1])
+            if (val->type == CONFIG_NODE_SEQUENCE && (field->type >= META_TYPE_VEC2 && field->type <= META_TYPE_VEC4)) {
+                int vec_size = field->type - META_TYPE_VEC2 + 2; // VEC2->2, VEC3->3, VEC4->4
+                float* data_ptr = (float*)meta_get_field_ptr(spec, field);
+                if (data_ptr) {
+                    for (int k = 0; k < vec_size; ++k) {
+                        float v = 0.0f;
+                        if (k < (int)val->item_count && val->items[k]->scalar) {
+                            v = (float)atof(val->items[k]->scalar);
+                        } else if (k == 3) {
+                            v = 1.0f; // Alpha defaults to 1.0
+                        }
+                        data_ptr[k] = v;
+                    }
+                }
+            }
+            // Handle Strings
+            else if (field->type == META_TYPE_STRING) {
                  const char* s = val->scalar ? val->scalar : "";
                  
                  if (strcmp(field->name, "static_text") == 0 && s[0] == '{') {
@@ -245,10 +204,13 @@ static UiNodeSpec* load_recursive(UiAsset* asset, const ConfigNode* node) {
                      char** field_ptr = (char**)meta_get_field_ptr(spec, field);
                      if (field_ptr) *field_ptr = str_copy;
                  }
-            } else {
+            } 
+            // Handle Scalars (Int, Float, Bool, Enum, StringId, Vec Hex)
+            else {
                  const char* s = val->scalar ? val->scalar : "";
                  if (!meta_set_from_string(spec, field, s)) {
-                     if (field->type == META_TYPE_ENUM) {
+                     // Only warn if it's not empty string (sometimes empty strings happen)
+                     if (s[0] != '\0' && field->type == META_TYPE_ENUM) {
                          LOG_WARN("UiParser: Unknown enum value '%s' for type '%s'", s, field->type_name);
                      }
                  }

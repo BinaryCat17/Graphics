@@ -1,8 +1,50 @@
 #include "reflection.h"
 #include "foundation/string/string_id.h"
+#include "foundation/math/math_types.h"
 #include <string.h>
 #include <stdlib.h>
 #include <stdio.h>
+
+static bool parse_vec_from_string(const char* str, float* out, int count) {
+    if (!str || !out || count < 1 || count > 4) return false;
+    
+    // Hex Color support (only for Vec3 and Vec4)
+    if (str[0] == '#') {
+        unsigned int r = 0, g = 0, b = 0, a = 255;
+        size_t len = strlen(str);
+        bool parsed = false;
+        
+        if (len == 7) { // #RRGGBB
+            if (sscanf(str + 1, "%02x%02x%02x", &r, &g, &b) == 3) parsed = true;
+        } else if (len == 9) { // #RRGGBBAA
+            if (sscanf(str + 1, "%02x%02x%02x%02x", &r, &g, &b, &a) == 4) parsed = true;
+        }
+
+        if (parsed) {
+            if (count >= 1) out[0] = (float)r / 255.0f;
+            if (count >= 2) out[1] = (float)g / 255.0f;
+            if (count >= 3) out[2] = (float)b / 255.0f;
+            if (count >= 4) out[3] = (float)a / 255.0f;
+            return true;
+        }
+        return false;
+    }
+
+    // Space separated floats
+    // Simple scan logic
+    int scanned = 0;
+    if (count == 2) scanned = sscanf(str, "%f %f", &out[0], &out[1]);
+    else if (count == 3) scanned = sscanf(str, "%f %f %f", &out[0], &out[1], &out[2]);
+    else if (count == 4) scanned = sscanf(str, "%f %f %f %f", &out[0], &out[1], &out[2], &out[3]);
+    
+    // Allow implicit W=1.0 for Vec4 if only 3 components provided
+    if (count == 4 && scanned == 3) {
+        out[3] = 1.0f;
+        return true;
+    }
+    
+    return scanned == count;
+}
 
 void* meta_get_field_ptr(void* instance, const MetaField* field) {
     if (!instance || !field) return NULL;
@@ -132,6 +174,15 @@ bool meta_set_from_string(void* instance, const MetaField* field, const char* va
             // StringId is uint32_t
             *(uint32_t*)((char*)instance + field->offset) = id;
             return true;
+        }
+        case META_TYPE_VEC2: {
+            return parse_vec_from_string(value_str, (float*)((char*)instance + field->offset), 2);
+        }
+        case META_TYPE_VEC3: {
+            return parse_vec_from_string(value_str, (float*)((char*)instance + field->offset), 3);
+        }
+        case META_TYPE_VEC4: {
+            return parse_vec_from_string(value_str, (float*)((char*)instance + field->offset), 4);
         }
         default:
             return false;

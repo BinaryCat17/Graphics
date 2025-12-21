@@ -299,6 +299,26 @@ bool config_load_struct(const ConfigNode* node, const MetaStruct* meta, void* in
                     }
                 }
                 break;
+            case META_TYPE_VEC2:
+            case META_TYPE_VEC3:
+            case META_TYPE_VEC4: {
+                if (child->type == CONFIG_NODE_SCALAR) {
+                    meta_set_from_string(instance, field, child->scalar);
+                } else if (child->type == CONFIG_NODE_SEQUENCE) {
+                    int vec_size = field->type - META_TYPE_VEC2 + 2;
+                    float* ptr = (float*)meta_get_field_ptr(instance, field);
+                    for(int k=0; k < vec_size; ++k) {
+                        float v = 0.0f;
+                        if (k < (int)child->item_count && child->items[k]->scalar) {
+                             v = (float)atof(child->items[k]->scalar);
+                        } else if (k == 3) {
+                             v = 1.0f; // Alpha
+                        }
+                        ptr[k] = v;
+                    }
+                }
+                break;
+            }
             case META_TYPE_STRUCT:
                 if (child->type == CONFIG_NODE_MAP) {
                     const MetaStruct* s = meta_get_struct(field->type_name);
