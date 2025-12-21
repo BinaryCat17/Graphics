@@ -14,6 +14,9 @@ Structural standardization (Phase 6) is largely complete, but critical limitatio
 - [ ] **Fix: Clear Button:** Fix layout overflow and remove white artifact under the button.
 - [x] **Fix: UI Gradient:** Remove unwanted white gradient/highlight in the top-left sidebar header.
 - [x] **Refactor: Magic Numbers:** Extract hardcoded layout constants (`150.0f`, `45.0f`) from `math_editor.c` into a `LayoutConfig` struct or defines.
+- [ ] **Optimization: Event-Based Evaluation:** Optimize `math_editor_update` to evaluate the graph only when dirty, not every frame.
+- [ ] **Refactor: String Memory Strategy:** Replace the temporary leak fix in `reflection.c` with a proper Arena-based string allocation strategy.
+- [ ] **Refactor: Auto-Layout Buttons:** Remove hardcoded widths (e.g., "Clear" button) and use padding/flex-growth for localization support.
 - [ ] **Refactor: Coordinate Spaces:** Fix the "Clip Rect Offset" hack by implementing proper Screen-to-World coordinate transformation for Graph connections.
 - [ ] **Refactor: MathEditor Split:** Split `math_editor.c` into `_view` (Rendering) and `_logic` (Input/State) to reduce file complexity.
 - [x] **Fix: String Ownership:** Fix `meta_set_string` to avoid `free()` on Arena-allocated strings (Critical for stability).
