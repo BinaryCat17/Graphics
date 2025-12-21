@@ -116,6 +116,7 @@ target_link_libraries(foundation_image PUBLIC foundation_logger)
 # Config
 set(FOUNDATION_CONFIG_SOURCES
     "src/foundation/config/simple_yaml.c"
+    "src/foundation/config/config_types.c"
     "src/foundation/config/config_system.c")
 add_library(foundation_config STATIC ${FOUNDATION_CONFIG_SOURCES})
 target_include_directories(foundation_config PUBLIC "src/")
