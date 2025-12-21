@@ -10,9 +10,10 @@ Structural standardization (Phase 6) is largely complete, but critical limitatio
 ### Phase 4: Architectural Integrity & Custom Widgets (IMMEDIATE PRIORITY)
 **Objective:** Restore architectural boundaries by implementing a "Custom Widget" protocol, eliminating the need for hardcoded Z-depths and dependency leaks between Engine and Features.
 - [ ] **Clean Up:** Revert `src/engine/graphics/layer_constants.h` to only contain engine-level constants (UI_BASE, UI_OVERLAY). Remove feature-specific constants.
-- [ ] **Engine API:** Implement `UI_KIND_CUSTOM` in `ui_core.h` and a renderer registry `ui_register_renderer(name, callback)`.
+- [ ] **UI Core Extension:** Implement `UI_KIND_CUSTOM` in `ui_core.h`, add `custom_renderer_id` to `UiNodeSpec`, and create a renderer registry.
+- [ ] **YAML Parser:** Update `ui_parser.c` to parse the `renderer` field from YAML into `UiNodeSpec.custom_renderer_id`.
 - [ ] **Render Loop Refactor:** Update `ui_renderer.c` to dispatch `UI_KIND_CUSTOM` elements to their registered callbacks, passing the correct Z-depth and clip rect.
-- [ ] **Feature Integration:** Refactor `MathEditor` to register a "GraphWires" renderer. Move wire/port drawing logic into this callback.
+- [ ] **Feature Integration:** Refactor `MathEditor` to register a "GraphWires" renderer. Ensure the UI element has access to the Graph context via `el->data`.
 - [ ] **YAML Migration:** Update `manifest.yaml` to use `type: custom` and `renderer: GraphWires` for the graph canvas.
 
 ### Phase 5: Stability & Validation (Refinement)
