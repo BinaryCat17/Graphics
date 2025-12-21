@@ -12,10 +12,13 @@ Structural standardization (Phase 6) is largely complete, but critical limitatio
 - [x] **UI Data Binding:** Support iteration over contiguous arrays and generic pointer arrays (currently limited to specific pointer arrays).
 - [x] **UI Conditional Templates:** Support logic-based template selection (e.g., `template_selector: "type"`) to handle polymorphic collections (like heterogeneous node lists).
 - [x] **UI Event Safety:** Implement typesafe wrappers for event callbacks to replace brittle `void*` casting and string-based logic.
-- [ ] **UI Layout:** Implement Flexbox-style properties (`flex-grow`, `justify-content`) for robust responsive layouts.
-- [ ] **Graph Serialization:** Move hardcoded default graph setup to a data file (YAML/JSON) to support saving/loading.
 - [x] **Declarative Node Palette:** Replace hardcoded "Add Node" logic with a data-driven palette system.
 - [x] **Generic YAML Deserializer:** Implement a reflection-based YAML loader (`config_load_struct_array`) to replace manual parsing logic.
+- [x] **Graph Serialization:** Move hardcoded default graph setup to a data file (YAML/JSON) to support saving/loading. Use strict DTO separation (Logic/Layout).
+- [ ] **UI Layout:** Implement Flexbox-style properties (`flex-grow`, `justify-content`) for robust responsive layouts.
+- [ ] **Dynamic Node Inputs:** Remove `MATH_NODE_MAX_INPUTS` (4) limit. Implement dynamic array support for node inputs to allow variadic nodes (e.g., Sum(A, B, C, D, E)).
+- [ ] **Asset Hot-Reloading:** Watch asset files for changes and reload graph/UI automatically without restarting.
+- [ ] **Frame Allocator:** Introduce a per-frame temporary memory arena to avoid persistent memory leaks during hot-reloading or temporary parsing.
 
 The codebase enforces strict Public/Internal API boundaries across all modules. The Math Engine is fully encapsulated, and the foundation is covered by unit tests. The system is now ready for 3D procedural geometry and compute shader integration.
 
@@ -34,6 +37,8 @@ The codebase enforces strict Public/Internal API boundaries across all modules. 
 - [ ] **Undo/Redo System:** Implement command history for graph operations.
 - [ ] **Node Library Expansion:** Add Noise (Perlin/Simplex), Trigonometry, and Logic nodes.
 - [ ] **Export System:** Export generated shaders (GLSL/SPIR-V) for external use.
+- [ ] **Topological Sort Evaluation:** Replace recursive CPU graph evaluation with a flat loop to prevent stack overflow on deep graphs.
+
 
 ---
 
