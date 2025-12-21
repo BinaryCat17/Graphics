@@ -184,6 +184,53 @@ bool meta_set_from_string(void* instance, const MetaField* field, const char* va
         case META_TYPE_VEC4: {
             return parse_vec_from_string(value_str, (float*)((char*)instance + field->offset), 4);
         }
+        case META_TYPE_FLAGS: {
+            const MetaEnum* e = meta_get_enum(field->type_name);
+            if (!e) return false;
+
+            uint32_t final_mask = 0;
+            
+            // Work on a copy
+            char buf[256];
+            strncpy(buf, value_str, 255);
+            buf[255] = '\0';
+            
+            char* start = buf;
+            while (*start) {
+                // 1. Skip leading spaces
+                while (*start == ' ' || *start == '\t') start++;
+                if (*start == '\0') break;
+
+                // 2. Find end of token
+                char* end = start;
+                while (*end && *end != '|') end++;
+
+                // 3. Trim trailing spaces
+                char* token_end = end;
+                while (token_end > start && (*(token_end - 1) == ' ' || *(token_end - 1) == '\t')) {
+                    token_end--;
+                }
+                
+                // Temporarily null-terminate to lookup
+                char saved = *token_end;
+                *token_end = '\0';
+                
+                int enum_val = 0;
+                if (meta_enum_get_value(e, start, &enum_val)) {
+                    final_mask |= (uint32_t)enum_val;
+                }
+                
+                // Restore if needed (though we move past it anyway)
+                *token_end = saved;
+
+                // 4. Advance
+                if (*end == '|') start = end + 1;
+                else start = end;
+            }
+            
+            *(uint32_t*)((char*)instance + field->offset) = final_mask;
+            return true;
+        }
         default:
             return false;
     }

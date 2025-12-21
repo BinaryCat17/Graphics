@@ -68,7 +68,7 @@ static void render_background(const UiElement* el, UiRenderContext* ctx, Vec4 cl
          quad.color.x *= 1.1f; quad.color.y *= 1.1f; quad.color.z *= 1.1f;
     }
 
-    if ((el->spec->texture_id != 0)) {
+    if ((el->spec->texture != 0)) {
         // Use 9-Slice or Textured Quad
         quad.ui.style_params.x = (float)SCENE_MODE_9_SLICE; // 9-Slice (UI Shader Mode)
         
@@ -107,7 +107,7 @@ static void render_content(const UiElement* el, UiRenderContext* ctx, Vec4 clip_
     // Resolve Text (Use Cache)
     const char* text = el->cached_text;
     if (!text || text[0] == '\0') {
-        text = el->spec->static_text;
+        text = el->spec->text;
     }
     
     if (el->spec->kind == UI_KIND_TEXT_INPUT && !text) text = "";

@@ -299,6 +299,11 @@ bool config_load_struct(const ConfigNode* node, const MetaStruct* meta, void* in
                     }
                 }
                 break;
+            case META_TYPE_FLAGS:
+                if (child->type == CONFIG_NODE_SCALAR) {
+                    meta_set_from_string(instance, field, child->scalar);
+                }
+                break;
             case META_TYPE_VEC2:
             case META_TYPE_VEC3:
             case META_TYPE_VEC4: {

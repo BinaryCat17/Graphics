@@ -157,18 +157,8 @@ static UiNodeSpec* load_recursive(UiAsset* asset, const ConfigNode* node) {
         
         // --- Generic Reflection ---
         const MetaField* field = meta_find_field(meta, key);
-        if (!field) {
-            // Check alias mappings (YAML key -> Struct field)
-            if (strcmp(key, "text") == 0) field = meta_find_field(meta, "static_text");
-            else if (strcmp(key, "texture") == 0) field = meta_find_field(meta, "texture_id");
-            else if (strcmp(key, "bind") == 0) field = meta_find_field(meta, "value_source");
-            else if (strcmp(key, "bind_visible") == 0 || strcmp(key, "bind_if") == 0) field = meta_find_field(meta, "visible_source");
-            else if (strcmp(key, "bind_x") == 0) field = meta_find_field(meta, "x_source");
-            else if (strcmp(key, "bind_y") == 0) field = meta_find_field(meta, "y_source");
-            else if (strcmp(key, "collection") == 0) field = meta_find_field(meta, "bind_collection");
-            else if (strcmp(key, "on_click") == 0) field = meta_find_field(meta, "on_click_cmd");
-            else if (strcmp(key, "on_change") == 0) field = meta_find_field(meta, "on_change_cmd");
-        }
+        // NOTE: Manual alias checking removed! YAML keys must match C struct fields now.
+        // e.g. "text" -> field "text", "bind_x" -> field "bind_x"
 
         if (field) {
             // Handle Sequence for Vectors (e.g. color: [1, 0, 0, 1])
@@ -191,13 +181,14 @@ static UiNodeSpec* load_recursive(UiAsset* asset, const ConfigNode* node) {
             else if (field->type == META_TYPE_STRING) {
                  const char* s = val->scalar ? val->scalar : "";
                  
-                 if (strcmp(field->name, "static_text") == 0 && s[0] == '{') {
-                     // Reroute to text_source
+                 // Special handling for 'text' field to support Binding Syntax "{...}"
+                 if (strcmp(field->name, "text") == 0 && s[0] == '{') {
+                     // Reroute to bind_text
                      size_t len = strlen(s);
                      if (len > 2) {
                          char* buf = arena_push_string_n(&asset->arena, s + 1, len - 2);
-                         spec->text_source = buf;
-                         spec->static_text = NULL; 
+                         spec->bind_text = buf;
+                         spec->text = NULL; 
                      }
                  } else {
                      char* str_copy = arena_push_string(&asset->arena, s);
@@ -246,7 +237,7 @@ static void validate_node(UiNodeSpec* spec, const char* path) {
     if (!spec) return;
     
     if (spec->layout == UI_LAYOUT_FLEX_COLUMN || spec->layout == UI_LAYOUT_FLEX_ROW) {
-        if (spec->x_source || spec->y_source) {
+        if (spec->bind_x || spec->bind_y) {
             LOG_WARN("UiParser: Node ID:%u uses x/y bindings inside a Flex container. These will be ignored.", spec->id);
         }
     }

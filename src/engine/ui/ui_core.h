@@ -30,7 +30,7 @@ typedef enum UiFlags {
     UI_FLAG_HIDDEN      = 1 << 4,
     UI_FLAG_CLIPPED     = 1 << 5, // Masks children outside bounds
     UI_FLAG_EDITABLE    = 1 << 6  // Supports text input
-} UiFlags;
+} UiFlags; // REFLECT
 
 // "Kind" helps the renderer choose a default visual style, 
 // but functional behavior is driven by flags.

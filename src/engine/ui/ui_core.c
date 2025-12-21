@@ -222,15 +222,15 @@ void ui_element_rebuild_children(UiElement* el, UiInstance* instance) {
     size_t dynamic_count = 0;
     const MetaField* collection_field = NULL;
     
-    if (el->spec->bind_collection && el->meta && el->data_ptr) {
-        collection_field = meta_find_field(el->meta, el->spec->bind_collection);
+    if (el->spec->collection && el->meta && el->data_ptr) {
+        collection_field = meta_find_field(el->meta, el->spec->collection);
         if (collection_field) {
-            int cnt = ui_resolve_count(el->data_ptr, el->meta, el->spec->bind_collection);
+            int cnt = ui_resolve_count(el->data_ptr, el->meta, el->spec->collection);
             if (cnt > 0) dynamic_count = (size_t)cnt;
-            // LOG_TRACE("UI Collection '%s': Count=%zu", el->spec->bind_collection, dynamic_count);
+            // LOG_TRACE("UI Collection '%s': Count=%zu", el->spec->collection, dynamic_count);
         } else {
             LOG_ERROR("UiCore: Collection field '%s' not found in struct '%s' (Node ID:%u)", 
-                el->spec->bind_collection, el->meta->name, el->spec->id);
+                el->spec->collection, el->meta->name, el->spec->id);
         }
     }
     
@@ -302,38 +302,38 @@ UiElement* ui_element_create(UiInstance* instance, const UiNodeSpec* spec, void*
     el->flags = spec->flags; // Init Flags
 
     // Resolve Commands
-    if (spec->on_click_cmd) {
-        el->on_click_cmd_id = spec->on_click_cmd;
+    if (spec->on_click) {
+        el->on_click_cmd_id = spec->on_click;
     }
-    if (spec->on_change_cmd) {
-        el->on_change_cmd_id = spec->on_change_cmd;
+    if (spec->on_change) {
+        el->on_change_cmd_id = spec->on_change;
     }
 
     // Cache Bindings
     if (meta) {
-        if (spec->text_source) {
-            el->bind_text = meta_find_field(meta, spec->text_source);
-            if (!el->bind_text) LOG_ERROR("UiCore: Failed to bind 'text: %s' on Node ID:%u. Field not found in struct '%s'", spec->text_source, spec->id, meta->name);
+        if (spec->bind_text) {
+            el->bind_text = meta_find_field(meta, spec->bind_text);
+            if (!el->bind_text) LOG_ERROR("UiCore: Failed to bind 'text: %s' on Node ID:%u. Field not found in struct '%s'", spec->bind_text, spec->id, meta->name);
         }
-        if (spec->visible_source) {
-            el->bind_visible = meta_find_field(meta, spec->visible_source);
-            if (!el->bind_visible) LOG_ERROR("UiCore: Failed to bind 'visible: %s' on Node ID:%u. Field not found in struct '%s'", spec->visible_source, spec->id, meta->name);
+        if (spec->bind_visible) {
+            el->bind_visible = meta_find_field(meta, spec->bind_visible);
+            if (!el->bind_visible) LOG_ERROR("UiCore: Failed to bind 'visible: %s' on Node ID:%u. Field not found in struct '%s'", spec->bind_visible, spec->id, meta->name);
         }
-        if (spec->x_source) {
-            el->bind_x = meta_find_field(meta, spec->x_source);
-            if (!el->bind_x) LOG_ERROR("UiCore: Failed to bind 'x: %s' on Node ID:%u. Field not found in struct '%s'", spec->x_source, spec->id, meta->name);
+        if (spec->bind_x) {
+            el->bind_x = meta_find_field(meta, spec->bind_x);
+            if (!el->bind_x) LOG_ERROR("UiCore: Failed to bind 'x: %s' on Node ID:%u. Field not found in struct '%s'", spec->bind_x, spec->id, meta->name);
         }
-        if (spec->y_source) {
-            el->bind_y = meta_find_field(meta, spec->y_source);
-            if (!el->bind_y) LOG_ERROR("UiCore: Failed to bind 'y: %s' on Node ID:%u. Field not found in struct '%s'", spec->y_source, spec->id, meta->name);
+        if (spec->bind_y) {
+            el->bind_y = meta_find_field(meta, spec->bind_y);
+            if (!el->bind_y) LOG_ERROR("UiCore: Failed to bind 'y: %s' on Node ID:%u. Field not found in struct '%s'", spec->bind_y, spec->id, meta->name);
         }
-        if (spec->w_source) {
-            el->bind_w = meta_find_field(meta, spec->w_source);
-            if (!el->bind_w) LOG_ERROR("UiCore: Failed to bind 'w: %s' on Node ID:%u. Field not found in struct '%s'", spec->w_source, spec->id, meta->name);
+        if (spec->bind_w) {
+            el->bind_w = meta_find_field(meta, spec->bind_w);
+            if (!el->bind_w) LOG_ERROR("UiCore: Failed to bind 'w: %s' on Node ID:%u. Field not found in struct '%s'", spec->bind_w, spec->id, meta->name);
         }
-        if (spec->h_source) {
-            el->bind_h = meta_find_field(meta, spec->h_source);
-            if (!el->bind_h) LOG_ERROR("UiCore: Failed to bind 'h: %s' on Node ID:%u. Field not found in struct '%s'", spec->h_source, spec->id, meta->name);
+        if (spec->bind_h) {
+            el->bind_h = meta_find_field(meta, spec->bind_h);
+            if (!el->bind_h) LOG_ERROR("UiCore: Failed to bind 'h: %s' on Node ID:%u. Field not found in struct '%s'", spec->bind_h, spec->id, meta->name);
         }
     }
 
@@ -375,11 +375,11 @@ void ui_element_update(UiElement* element, float dt) {
             strncpy(element->cached_text, new_text, 128 - 1); // safe copy
             element->cached_text[127] = '\0';
         }
-    } else if (element->spec->static_text) {
+    } else if (element->spec->text) {
         // Init cache from static text if empty (first run or if static text is used without binding)
         // Optimization: Check if match first
-        if (strncmp(element->cached_text, element->spec->static_text, 128) != 0) {
-            strncpy(element->cached_text, element->spec->static_text, 128 - 1);
+        if (strncmp(element->cached_text, element->spec->text, 128) != 0) {
+            strncpy(element->cached_text, element->spec->text, 128 - 1);
             element->cached_text[127] = '\0';
         }
     }
@@ -460,4 +460,3 @@ void ui_instance_render(UiInstance* instance, Scene* scene, const Assets* assets
 UiAsset* ui_parser_load_from_file(const char* path) {
     return ui_parser_load_internal(path);
 }
-

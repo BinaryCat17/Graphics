@@ -27,7 +27,7 @@ children:
     height: 200
     spacing: 5
     padding: 5
-    bind_collection: "palette_items"
+    collection: "palette_items"
     item_template: "PaletteItem"
 
   - type: panel
@@ -55,6 +55,6 @@ children:
     corner_radius: 4
     color: "#26262B"
     padding: 5
-    bind_collection: "selected_nodes"
+    collection: "selected_nodes"
     template_selector: "type"
     item_template: "DefaultNodeInspector"

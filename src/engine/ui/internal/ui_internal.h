@@ -19,7 +19,7 @@ struct UiNodeSpec {
     UiKind kind;            // REFLECT
     UiLayoutStrategy layout;// REFLECT
     UiLayer layer;          // REFLECT
-    uint32_t flags;         // REFLECT
+    uint32_t flags;         // REFLECT(UiFlags)
     
     // 3. Styling (Reference to style sheet, not implemented yet)
     Vec4 color;             // REFLECT
@@ -38,23 +38,23 @@ struct UiNodeSpec {
     float border_l, border_t, border_r, border_b; // REFLECT
     float corner_radius;    // REFLECT
     float tex_w, tex_h;     // REFLECT
-    StringId texture_id;    // REFLECT
+    StringId texture;       // REFLECT
     
     // 4. Data Bindings (Sources)
-    char* text_source;      // REFLECT
-    char* value_source;     // REFLECT
-    char* visible_source;   // REFLECT
-    char* bind_collection;  // REFLECT
+    char* bind_text;        // REFLECT
+    char* bind;             // REFLECT
+    char* bind_visible;     // REFLECT
+    char* collection;       // REFLECT
     char* template_selector;// REFLECT
     
     // 4. Geometry Bindings (For CANVAS layout or manual overrides)
-    char* x_source;         // REFLECT
-    char* y_source;         // REFLECT
-    char* w_source;         // REFLECT
-    char* h_source;         // REFLECT
+    char* bind_x;           // REFLECT
+    char* bind_y;           // REFLECT
+    char* bind_w;           // REFLECT
+    char* bind_h;           // REFLECT
 
     // 5. Properties (Static defaults)
-    char* static_text;      // REFLECT
+    char* text;             // REFLECT
     float width, height;    // REFLECT
     float padding;          // REFLECT
     float spacing;          // REFLECT
@@ -66,8 +66,8 @@ struct UiNodeSpec {
     size_t child_count;               // REFLECT
     
     // 7. Commands
-    StringId on_click_cmd;  // REFLECT
-    StringId on_change_cmd; // REFLECT
+    StringId on_click;      // REFLECT
+    StringId on_change;     // REFLECT
 };
 
 // --- UI ASSET (The Resource) ---

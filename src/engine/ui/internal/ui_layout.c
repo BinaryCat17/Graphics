@@ -15,14 +15,14 @@
 static float calculate_width(UiElement* el, float available_w, UiTextMeasureFunc measure_func, void* measure_data) {
     const UiNodeSpec* spec = el->spec;
     float w = spec->width;
-    if (spec->w_source) w = el->rect.w; // updated by ui_core
+    if (spec->bind_w) w = el->rect.w; // updated by ui_core
 
     if (w < 0) {
         bool parent_is_row = (el->parent && el->parent->spec->layout == UI_LAYOUT_FLEX_ROW);
         
         if (parent_is_row || spec->kind == UI_KIND_TEXT || (el->flags & UI_FLAG_CLICKABLE)) {
              const char* text = el->cached_text;
-             if (!text || text[0] == '\0') text = spec->static_text;
+             if (!text || text[0] == '\0') text = spec->text;
 
              if (text && text[0] != '\0') {
                  if (measure_func) {
@@ -43,7 +43,7 @@ static float calculate_width(UiElement* el, float available_w, UiTextMeasureFunc
 static float calculate_height(UiElement* el, float available_h) {
     const UiNodeSpec* spec = el->spec;
     float h = spec->height;
-    if (spec->h_source) h = el->rect.h;
+    if (spec->bind_h) h = el->rect.h;
 
     if (h < 0) {
         if (el->child_count > 0 && spec->layout == UI_LAYOUT_FLEX_COLUMN) {
