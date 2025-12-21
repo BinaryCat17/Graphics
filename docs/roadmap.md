@@ -13,11 +13,11 @@ Structural standardization (Phase 6) is largely complete, but critical limitatio
 - [x] **UI: Parser Noise:** Update `ui_parser.c` to skip the `instance` field in the reflection loop to avoid "Unknown field" warnings for parser directives.
 - [x] **UI: Position Support:** Add `x` and `y` fields to `UiNodeSpec` and map them to `rect.x/y` in `UiElement` to support absolute positioning in Canvas layouts.
 - [x] **UI: Palette Items:** Add `text_source` to `UiNodeSpec` reflection to properly support dynamic label sources in palette templates.
-- [ ] **Fix: Node Titles:** Titles are visible but have poor contrast/alignment.
-- [ ] **Fix: Connection Rendering:** Wires are still not visible. Check Z-order and coordinate scaling.
-- [ ] **Fix: Node Ports:** Sockets are still missing. Verify LAYER_UI_CONTENT visibility.
-- [ ] **Fix: Inspector:** Panel remains empty/white. Check 'selected_nodes' binding and template selector.
-- [ ] **Fix: Sidebar Layout:** Palette items have incorrect backgrounds and spacing.
+- [x] **Fix: Node Titles:** Titles are visible but have poor contrast/alignment.
+- [x] **Fix: Connection Rendering:** Wires are still not visible. Check Z-order and coordinate scaling.
+- [x] **Fix: Node Ports:** Sockets are still missing. Verify LAYER_UI_CONTENT visibility.
+- [x] **Fix: Inspector:** Panel remains empty/white. Check 'selected_nodes' binding and template selector.
+- [x] **Fix: Sidebar Layout:** Palette items have incorrect backgrounds and spacing.
 
 ### Phase 6: Structural Standardization (Refinement)
 **Objective:** Address architectural limitations in the UI system to support complex editors.
