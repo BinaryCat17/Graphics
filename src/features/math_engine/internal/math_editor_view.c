@@ -163,12 +163,3 @@ void math_editor_sync_wires(MathEditor* editor) {
         }
     }
 }
-
-void math_graph_view_provider(void* instance_data, Rect screen_rect, float z_depth, Scene* scene, MemoryArena* arena) {
-    (void)arena; 
-    (void)instance_data;
-    (void)screen_rect;
-    (void)z_depth;
-    (void)scene;
-    // Ports are now rendered via UI system (declarative)
-}

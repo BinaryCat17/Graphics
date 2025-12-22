@@ -14,10 +14,9 @@ children:
     instance: "EditorSidebar"
 
   # Right Area (Canvas)
-  - type: viewport
+  - type: container
     id: canvas_area
     layout: canvas
-    provider: GraphNetwork
     width: -1 # Fill rest
     height: -1
     color: "#00000000"

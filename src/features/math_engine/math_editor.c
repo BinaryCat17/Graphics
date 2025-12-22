@@ -281,7 +281,7 @@ MathEditor* math_editor_create(Engine* engine) {
     UI_REGISTER_COMMAND("Graph.Clear", cmd_clear_graph, editor);
     UI_REGISTER_COMMAND("Graph.Recompile", cmd_recompile, editor);
     
-    ui_register_provider("GraphNetwork", math_graph_view_provider);
+    // ui_register_provider("GraphNetwork", math_graph_view_provider); // Removed: All UI is declarative now
 
     editor->input_ctx = ui_input_create();
 
@@ -336,7 +336,6 @@ void math_editor_render(MathEditor* editor, Scene* scene, const struct Assets* a
     if (!editor || !scene || !editor->ui_instance) return;
 
     // Delegate entire rendering to UI system.
-    // The UI system will callback 'math_graph_view_provider' for the Canvas Viewport.
     ui_instance_render(editor->ui_instance, scene, assets, arena);
 }
 

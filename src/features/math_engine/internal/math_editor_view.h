@@ -21,7 +21,4 @@ void math_editor_refresh_graph_view(MathEditor* editor);
 // Updates selection state and rebuilds Inspector UI
 void math_editor_update_selection(MathEditor* editor);
 
-// The Provider callback invoked by the UI System to render the graph (ports, wires)
-void math_graph_view_provider(void* instance_data, Rect screen_rect, float z_depth, Scene* scene, MemoryArena* arena);
-
 #endif // MATH_EDITOR_VIEW_H
