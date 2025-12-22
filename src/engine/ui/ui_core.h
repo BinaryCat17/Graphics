@@ -5,6 +5,7 @@
 #include <stdint.h>
 #include <stddef.h>
 #include "foundation/string/string_id.h"
+#include "foundation/math/coordinate_systems.h"
 
 // Forward Declarations
 typedef struct MetaStruct MetaStruct;
@@ -36,7 +37,8 @@ typedef enum UiFlags {
 // but functional behavior is driven by flags.
 typedef enum UiKind {
     UI_KIND_CONTAINER, // Generic Rect
-    UI_KIND_TEXT       // Renders text
+    UI_KIND_TEXT,      // Renders text
+    UI_KIND_VIEWPORT   // Delegates rendering to a provider
 } UiKind; // REFLECT
 
 typedef enum UiLayer {
@@ -45,6 +47,15 @@ typedef enum UiLayer {
 } UiLayer; // REFLECT
 
 typedef struct UiElement UiElement;
+typedef struct Scene Scene;
+typedef struct MemoryArena MemoryArena;
+
+// Callback for Viewport Rendering
+// instance_data: The data pointer bound to the UI Element (or its parent context)
+typedef void (*SceneObjectProvider)(void* instance_data, Rect screen_rect, float z_depth, Scene* scene, MemoryArena* frame_arena);
+
+// Register a provider globally (e.g., "GraphNetwork" -> math_graph_view_provider)
+void ui_register_provider(const char* name, SceneObjectProvider callback);
 
 // --- UI INSTANCE (The Living Tree) ---
 // Created from a UiAsset + Data Context.

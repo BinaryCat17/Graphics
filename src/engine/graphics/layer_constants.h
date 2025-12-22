@@ -29,19 +29,4 @@
 // Finer increment for content within the same container (text on button)
 #define RENDER_DEPTH_STEP_CONTENT   (0.001f)
 
-// --- Editor Specific Layers (Interleaved) ---
-// These are used by the Math Graph Editor to inject elements between UI layers.
-// They are relative to RENDER_LAYER_UI_BASE (since the editor lives in a canvas).
-
-// Wires connect nodes. They should be slightly above the canvas background 
-// but strictly BEHIND the nodes (which usually start at UI_BASE + nesting).
-// Base (-10.0) < Wires (-9.985) < Nodes (-9.90 usually)
-#define RENDER_LAYER_EDITOR_WIRE    (RENDER_LAYER_UI_BASE + 0.015f) // -9.985
-
-// Ports (Connection dots) should be above wires but behind the node body?
-// Actually, ports are usually children of the node, so they inherit node depth.
-// However, in the current implementation, they might be drawn separately.
-// Existing code used -9.97.
-#define RENDER_LAYER_EDITOR_PORT    (RENDER_LAYER_UI_BASE + 0.030f) // -9.97
-
 #endif // LAYER_CONSTANTS_H

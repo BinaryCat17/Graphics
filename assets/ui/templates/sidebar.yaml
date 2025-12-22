@@ -15,7 +15,8 @@ children:
 
   - type: container
     layout: flex_column
-    height: 200
+    flags: scrollable
+    height: 300
     spacing: 5
     padding: 5
     collection: "palette_items"

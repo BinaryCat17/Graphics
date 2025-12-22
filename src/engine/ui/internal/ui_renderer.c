@@ -11,6 +11,35 @@
 #include <string.h> 
 // #include <stdlib.h> // Malloc removed
 
+// --- Provider Registry ---
+#define MAX_UI_PROVIDERS 32
+
+typedef struct {
+    StringId id;
+    SceneObjectProvider callback;
+} UiProviderEntry;
+
+static UiProviderEntry s_providers[MAX_UI_PROVIDERS];
+static int s_provider_count = 0;
+
+void ui_register_provider(const char* name, SceneObjectProvider callback) {
+    if (s_provider_count >= MAX_UI_PROVIDERS) {
+        LOG_ERROR("UiRenderer: Max providers reached");
+        return;
+    }
+    s_providers[s_provider_count].id = str_id(name);
+    s_providers[s_provider_count].callback = callback;
+    s_provider_count++;
+    LOG_INFO("UiRenderer: Registered provider '%s'", name);
+}
+
+static SceneObjectProvider ui_find_provider(StringId id) {
+    for(int i=0; i<s_provider_count; ++i) {
+        if (s_providers[i].id == id) return s_providers[i].callback;
+    }
+    return NULL;
+}
+
 typedef struct OverlayNode {
     const UiElement* el;
     struct OverlayNode* next;
@@ -214,10 +243,20 @@ static void process_node(const UiElement* el, UiRenderContext* ctx, Rect current
     // 1. Draw Background
     render_background(el, ctx, clip_vec, base_z);
 
-    // 2. Draw Content
+    // 2. Viewport Delegation
+    if (el->spec->kind == UI_KIND_VIEWPORT && el->spec->provider_id) {
+         SceneObjectProvider cb = ui_find_provider(el->spec->provider_id);
+         if (cb) {
+             // Invoke provider (e.g. Graph Editor) to inject scene objects
+             // Z-Depth: slightly above background
+             cb(el->data_ptr, el->screen_rect, base_z + RENDER_DEPTH_STEP_UI, ctx->scene, ctx->arena);
+         }
+    }
+
+    // 3. Draw Content
     render_content(el, ctx, clip_vec, base_z);
 
-    // 3. Recurse
+    // 4. Recurse
     for (UiElement* child = el->first_child; child; child = child->next_sibling) {
         process_node(child, ctx, effective_clip, base_z + RENDER_DEPTH_STEP_UI, is_overlay_pass);
     }

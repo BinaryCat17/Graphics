@@ -38,6 +38,7 @@ static UiKind parse_kind(const char* type_str, uint32_t* out_flags) {
     if (!type_str) return UI_KIND_CONTAINER;
 
     if (strcmp(type_str, "text") == 0) return UI_KIND_TEXT;
+    if (strcmp(type_str, "viewport") == 0) return UI_KIND_VIEWPORT;
     
     // Default to container for everything else (including 'container')
     return UI_KIND_CONTAINER;
@@ -174,6 +175,10 @@ static UiNodeSpec* load_recursive(UiAsset* asset, const ConfigNode* node) {
                      }
                  }
             }
+        } else if (strcmp(key, "provider") == 0) {
+             if (val->scalar) {
+                 spec->provider_id = str_id(val->scalar);
+             }
         } else {
             LOG_WARN("UiParser: Unknown field '%s' in UiNodeSpec (Node ID:%u). Check indentation or spelling.", key, spec->id);
         }

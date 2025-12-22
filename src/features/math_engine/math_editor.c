@@ -27,11 +27,21 @@
 #define NODE_PORT_SPACING   25.0f
 #define NODE_PORT_SIZE      10.0f
 
+// --- Z-Layer Offsets (Relative to Viewport Plane) ---
+// Viewport is at Base + UI_STEP (-9.99).
+// Wires: -9.985 -> Offset +0.005
+// Ports: -9.970 -> Offset +0.020
+#define LAYER_OFFSET_WIRE    0.005f
+#define LAYER_OFFSET_PORT    0.020f
+
 // --- Helper: Text Measurement for UI Layout ---
 static float text_measure_wrapper(const char* text, void* user_data) {
     const Font* font = (const Font*)user_data;
     return font_measure_text(font, text);
 }
+
+// Forward Declaration for Provider
+static void math_graph_view_provider(void* instance_data, Rect screen_rect, float z_depth, Scene* scene, MemoryArena* arena);
 
 // --- View Model Management ---
 
@@ -352,6 +362,8 @@ MathEditor* math_editor_create(Engine* engine) {
     UI_REGISTER_COMMAND("Graph.AddNode", cmd_add_node, editor);
     UI_REGISTER_COMMAND("Graph.Clear", cmd_clear_graph, editor);
     UI_REGISTER_COMMAND("Graph.Recompile", cmd_recompile, editor);
+    
+    ui_register_provider("GraphNetwork", math_graph_view_provider);
 
     editor->input_ctx = ui_input_create();
 
@@ -428,7 +440,7 @@ static int get_node_input_count(MathNodeType type) {
     }
 }
 
-static void math_editor_render_ports(MathEditor* editor, Scene* scene, Vec4 clip_rect) {
+static void math_editor_render_ports(MathEditor* editor, Scene* scene, Vec4 clip_rect, float base_z) {
     if (!editor || !editor->graph || !scene) return;
 
     for (uint32_t i = 0; i < editor->node_views_count; ++i) {
@@ -447,7 +459,7 @@ static void math_editor_render_ports(MathEditor* editor, Scene* scene, Vec4 clip
             port.id = (node->id << 8) | (k + 1); // Pseudo ID
             port.layer = LAYER_UI_CONTENT; // Draw on top of background but below text? Or just content.
             port.prim_type = SCENE_PRIM_QUAD;
-            port.position = (Vec3){x, y, RENDER_LAYER_EDITOR_PORT};
+            port.position = (Vec3){x, y, base_z + LAYER_OFFSET_PORT};
             port.scale = (Vec3){NODE_PORT_SIZE, NODE_PORT_SIZE, 1.0f};
             port.color = (Vec4){0.5f, 0.5f, 0.5f, 1.0f}; // Grey
             port.uv_rect = (Vec4){0.0f, 0.0f, 1.0f, 1.0f};
@@ -472,7 +484,7 @@ static void math_editor_render_ports(MathEditor* editor, Scene* scene, Vec4 clip
             port.id = (node->id << 8) | 0xFF; // Pseudo ID
             port.layer = LAYER_UI_CONTENT;
             port.prim_type = SCENE_PRIM_QUAD;
-            port.position = (Vec3){x, y, RENDER_LAYER_EDITOR_PORT};
+            port.position = (Vec3){x, y, base_z + LAYER_OFFSET_PORT};
             port.scale = (Vec3){NODE_PORT_SIZE, NODE_PORT_SIZE, 1.0f};
             port.color = (Vec4){0.5f, 0.5f, 0.5f, 1.0f};
             port.uv_rect = (Vec4){0.0f, 0.0f, 1.0f, 1.0f};
@@ -487,7 +499,7 @@ static void math_editor_render_ports(MathEditor* editor, Scene* scene, Vec4 clip
     }
 }
 
-static void math_editor_render_connections(MathEditor* editor, Scene* scene, Vec4 clip_rect) {
+static void math_editor_render_connections(MathEditor* editor, Scene* scene, Vec4 clip_rect, float base_z) {
     if (!editor || !editor->graph || !scene) return;
 
     for (uint32_t i = 0; i < editor->graph->node_count; ++i) {
@@ -538,7 +550,7 @@ static void math_editor_render_connections(MathEditor* editor, Scene* scene, Vec
             wire.id = (target_node->id << 16) | (source_id & 0xFFFF); 
             wire.layer = LAYER_UI_BACKGROUND;
             wire.prim_type = SCENE_PRIM_CURVE; 
-            wire.position = (Vec3){min_x + width*0.5f, min_y + height*0.5f, RENDER_LAYER_EDITOR_WIRE};
+            wire.position = (Vec3){min_x + width*0.5f, min_y + height*0.5f, base_z + LAYER_OFFSET_WIRE};
             wire.scale = (Vec3){width, height, 1.0f};
             wire.color = (Vec4){0.8f, 0.8f, 0.8f, 1.0f}; 
             
@@ -556,26 +568,23 @@ static void math_editor_render_connections(MathEditor* editor, Scene* scene, Vec
     }
 }
 
+static void math_graph_view_provider(void* instance_data, Rect screen_rect, float z_depth, Scene* scene, MemoryArena* arena) {
+    (void)arena; // Unused
+    MathEditor* editor = (MathEditor*)instance_data;
+    if (!editor) return;
+    
+    Vec4 clip_vec = {screen_rect.x, screen_rect.y, screen_rect.w, screen_rect.h};
+    
+    math_editor_render_connections(editor, scene, clip_vec, z_depth);
+    math_editor_render_ports(editor, scene, clip_vec, z_depth);
+}
+
 void math_editor_render(MathEditor* editor, Scene* scene, const struct Assets* assets, MemoryArena* arena) {
-    UiElement* root = ui_instance_get_root(editor->ui_instance);
-    if (!editor || !scene || !root) return;
+    if (!editor || !scene || !editor->ui_instance) return;
 
-    // Resolve Clipping Rect from Canvas Area
-    Vec4 canvas_clip = {-10000.0f, -10000.0f, 20000.0f, 20000.0f};
-    UiElement* canvas_area = ui_element_find_by_id(root, "canvas_area");
-    if (canvas_area) {
-        Rect r = ui_element_get_screen_rect(canvas_area);
-        canvas_clip = (Vec4){r.x, r.y, r.w, r.h};
-    }
-    
-    // 1. Render Connections (Background)
-    math_editor_render_connections(editor, scene, canvas_clip);
-    
-    // 2. Render UI Tree to Scene
+    // Delegate entire rendering to UI system.
+    // The UI system will callback 'math_graph_view_provider' for the Canvas Viewport.
     ui_instance_render(editor->ui_instance, scene, assets, arena);
-
-    // 3. Render Ports (Overlay/Content) - Drawn last to be on top
-    math_editor_render_ports(editor, scene, canvas_clip);
 }
 
 void math_editor_update(MathEditor* editor, Engine* engine) {

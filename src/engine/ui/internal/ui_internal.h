@@ -76,6 +76,9 @@ struct UiNodeSpec {
     // 7. Commands
     StringId on_click;      // REFLECT
     StringId on_change;     // REFLECT
+    
+    // 8. Viewport
+    StringId provider_id;   // REFLECT (e.g., "GraphNetwork")
 };
 
 // --- UI ASSET (The Resource) ---
