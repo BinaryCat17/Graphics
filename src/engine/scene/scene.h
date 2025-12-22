@@ -2,137 +2,63 @@
 #define SCENE_H
 
 #include "foundation/math/coordinate_systems.h"
-#include <stddef.h> // size_t
-#include <stdint.h> // uint64_t
+#include "foundation/string/string_id.h"
+#include <stdbool.h>
+#include <stdint.h>
+#include <stddef.h>
 
-// --- Basic Types ---
+// Forward Declarations
+typedef struct SceneNode SceneNode;
+typedef struct SceneTree SceneTree;
+typedef struct SceneAsset SceneAsset;
+typedef struct SceneNodeSpec SceneNodeSpec;
+typedef struct MetaStruct MetaStruct;
 
-// Simple mesh descriptor for the Unified Scene
-typedef struct Mesh {
-    float *positions; // xyz triplets
-    size_t position_count;
-    float *uvs; // uv pairs
-    size_t uv_count;
-    unsigned int *indices;
-    size_t index_count;
-    float aabb_min[3];
-    float aabb_max[3];
-} Mesh;
+// --- CORE TYPES ---
 
-typedef enum RenderLayer {
-    LAYER_WORLD_OPAQUE = 0,
-    LAYER_WORLD_TRANSPARENT,
-    LAYER_UI_BACKGROUND,
-    LAYER_UI_CONTENT,
-    LAYER_UI_OVERLAY,
-    LAYER_COUNT
-} RenderLayer;
+typedef enum SceneNodeFlags {
+    SCENE_NODE_NONE        = 0,
+    SCENE_NODE_HIDDEN      = 1 << 0,
+    SCENE_NODE_DIRTY       = 1 << 1, // Transform needs update
+    // Systems can use upper bits for their own flags
+    SCENE_NODE_SYSTEM_BIT  = 1 << 8
+} SceneNodeFlags;
 
-typedef enum ScenePrimitiveType {
-    SCENE_PRIM_QUAD = 0, // Standard Mesh/Quad
-    SCENE_PRIM_CURVE = 1 // SDF Bezier Curve
-} ScenePrimitiveType;
+// --- SCENE ASSET (The DNA) ---
 
-// Standard Rendering Modes for UI/2D Shader
-typedef enum SceneShaderMode {
-    SCENE_MODE_SOLID        = 0, // Solid Color
-    SCENE_MODE_TEXTURED     = 1, // Font/Bitmap
-    SCENE_MODE_USER_TEXTURE = 2, // Compute Result/Image
-    SCENE_MODE_9_SLICE      = 3, // UI Panel
-    SCENE_MODE_SDF_BOX      = 4  // Rounded Box
-} SceneShaderMode;
+SceneAsset* scene_asset_create(size_t arena_size);
+void scene_asset_destroy(SceneAsset* asset);
 
-// --- Scene Components ---
+SceneNodeSpec* scene_asset_push_node(SceneAsset* asset);
+SceneNodeSpec* scene_asset_get_template(SceneAsset* asset, const char* name);
+SceneNodeSpec* scene_asset_get_root(const SceneAsset* asset);
 
-typedef struct SceneCamera {
-    Mat4 view_matrix;
-    Mat4 proj_matrix;
-} SceneCamera;
-
-typedef struct SceneObject {
-    // --- Identification & Classification ---
-    int id;
-    RenderLayer layer;
-    ScenePrimitiveType prim_type;
-    
-    // --- Transform ---
-    Vec3 position;
-    Vec3 rotation; 
-    Vec3 scale;
-    
-    // --- Rendering ---
-    const Mesh* mesh; 
-
-    // --- Material & Styling ---
-    Vec4 color; 
-    Vec4 uv_rect; // Texture Subset (xy=off, zw=scale)
-
-    // --- Advanced / Generic Shader Data ---
-    // Domain-specific data accessed via union to save memory and improve semantics
-    union {
-        // UI Context
-        struct {
-            Vec4 style_params; // x=type, y=radius, z=width, w=height
-            Vec4 extra_params; // Borders etc.
-            Vec4 clip_rect;    // Scissor bounds (x,y,w,h)
-        } ui;
-
-        // PBR / 3D Context (Reserved)
-        struct {
-            Vec4 pbr_data;     // x=roughness, y=metal, z=ao
-            Vec4 user_data;
-            Vec4 emission;
-        } pbr;
-
-        // Raw Access
-        struct {
-            Vec4 params_0; // Maps to style_params
-            Vec4 params_1; // Maps to extra_params
-            Vec4 params_2; // Maps to clip_rect
-        } raw;
-    };
-
-    // --- Instancing (Data-Driven Visualization) ---
-    void* instance_buffer; // Pointer to GpuBuffer (if massive instancing)
-    size_t instance_count;
-} SceneObject;
-
-// --- The Scene Container ---
-
-typedef struct Scene Scene;
-
-// --- API ---
+// --- SCENE CORE API ---
 
 // Lifecycle
-Scene* scene_create(void);
-void scene_destroy(Scene* scene);
+void scene_system_init(void);
+void scene_system_shutdown(void);
 
-void scene_clear(Scene* scene);
+SceneTree* scene_tree_create(SceneAsset* assets, size_t arena_size);
+void scene_tree_destroy(SceneTree* tree);
 
-// Adds an object to the scene. 
-// Uses a fast linear allocator (MemoryArena), so this is very cheap.
-void scene_add_object(Scene* scene, SceneObject obj); 
+SceneNode* scene_tree_get_root(const SceneTree* tree);
+void scene_tree_set_root(SceneTree* tree, SceneNode* root);
+
+// Node Management
+SceneNode* scene_node_create(SceneTree* tree, const SceneNodeSpec* spec, void* data, const MetaStruct* meta);
+void scene_node_add_child(SceneNode* parent, SceneNode* child);
+void scene_node_remove_child(SceneNode* parent, SceneNode* child);
+void scene_node_clear_children(SceneNode* parent, SceneTree* tree);
+
+// Transform & Update
+void scene_node_update_transforms(SceneNode* node, const Mat4* parent_world);
 
 // Accessors
-void scene_set_camera(Scene* scene, SceneCamera camera);
-SceneCamera scene_get_camera(const Scene* scene);
-
-void scene_set_frame_number(Scene* scene, uint64_t frame_number);
-uint64_t scene_get_frame_number(const Scene* scene);
-
-// Returns pointer to internal linear array and sets out_count. 
-// Do not free or persist this pointer across frames.
-const SceneObject* scene_get_all_objects(const Scene* scene, size_t* out_count);
-
-// --- High-Level Drawing API ---
-
-void scene_push_rect_sdf(Scene* scene, Vec3 pos, Vec2 size, Vec4 color, float radius, float border, Vec4 clip_rect);
-void scene_push_circle_sdf(Scene* scene, Vec3 center, float radius, Vec4 color, Vec4 clip_rect);
-void scene_push_curve(Scene* scene, Vec3 start, Vec3 end, float thickness, Vec4 color, Vec4 clip_rect);
-
-// New Basic Primitives
-void scene_push_quad(Scene* scene, Vec3 pos, Vec2 size, Vec4 color, Vec4 clip_rect);
-void scene_push_quad_textured(Scene* scene, Vec3 pos, Vec2 size, Vec4 color, Vec4 uv_rect, Vec4 clip_rect);
-void scene_push_quad_9slice(Scene* scene, Vec3 pos, Vec2 size, Vec4 color, Vec4 uv_rect, Vec2 texture_size, Vec4 borders, Vec4 clip_rect);
+StringId scene_node_get_id(const SceneNode* node);
+SceneNode* scene_node_find_by_id(SceneNode* root, const char* id);
+void* scene_node_get_data(const SceneNode* node);
+SceneNode* scene_node_get_parent(const SceneNode* node);
+const struct MetaStruct* scene_node_get_meta(const SceneNode* node);
 
 #endif // SCENE_H

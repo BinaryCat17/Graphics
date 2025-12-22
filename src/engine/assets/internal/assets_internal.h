@@ -3,7 +3,7 @@
 
 #include "../assets.h"
 #include "foundation/memory/arena.h"
-#include "engine/scene/scene.h"
+#include "engine/scene/render_packet.h"
 
 struct Assets {
     MemoryArena arena; // For storing paths and metadata

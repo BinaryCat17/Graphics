@@ -43,6 +43,12 @@ Structural standardization (Phase 6) is largely complete, but critical limitatio
     *   **Objective:** Remove legacy hardcoded binding fields (`bind_x`, `bind_y`, `bind_w`, `bind_h`, `bind_text`, `bind_visible`) from the root `SceneNodeSpec`.
     *   **Implementation:** The binding system should resolve targets recursively within components (`spec->layout.width`) rather than expecting them at the root.
 
+**3.4. The Great Refactoring: Scene vs. UI Separation (New) - DONE ✅**
+*   [x] **Analysis:** Determine exact ownership of `SceneNode` data. Split "Graph Structure" from "UI Behavior".
+*   [x] **Refactor: Scene Core:** Move `SceneNode`, `Transform`, `SceneTree`, and Hierarchy logic into `src/engine/scene`. Make `src/engine/scene` the "Owner of the World".
+*   [x] **Refactor: UI Resurrection:** Re-create `src/engine/ui` as a System that operates *on* `SceneNode`s. It handles Layout, Styling, and Input Bubbling.
+*   [x] **Cleanup:** Dissolve `src/engine/scene_system`, distributing its contents between `scene` (core) and `ui` (system).
+
 **4. 3D Interaction & Logic (New)**
 *   [ ] **Camera Component:** Implement `SceneCameraSpec` (FOV, type: Ortho/Perspective) to define viewports dynamically within the Scene Graph.
 *   [ ] **Input Raycasting:** Extend `ui_input.c` to support Ray-AABB/Ray-Sphere intersection for clicking 3D objects (replacing pure 2D `point_in_rect` for 3D nodes).

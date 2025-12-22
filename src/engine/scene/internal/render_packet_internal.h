@@ -1,7 +1,7 @@
-#ifndef SCENE_INTERNAL_H
-#define SCENE_INTERNAL_H
+#ifndef RENDER_PACKET_INTERNAL_H
+#define RENDER_PACKET_INTERNAL_H
 
-#include "../scene.h"
+#include "../render_packet.h"
 #include "foundation/memory/arena.h"
 
 // The Scene Container implementation
@@ -21,4 +21,4 @@ struct Scene {
     uint64_t frame_number;
 };
 
-#endif // SCENE_INTERNAL_H
+#endif // RENDER_PACKET_INTERNAL_H

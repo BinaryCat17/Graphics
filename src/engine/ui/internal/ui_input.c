@@ -144,8 +144,8 @@ static void handle_mouse_press_event(UiInputContext* ctx, const InputEvent* even
         } else if (ctx->active->flags & UI_FLAG_DRAGGABLE) {
              // Cache bound values
              if (ctx->active->data_ptr) {
-                 const SceneBinding* bind_x = scene_node_get_binding(ctx->active, BINDING_TARGET_LAYOUT_X);
-                 const SceneBinding* bind_y = scene_node_get_binding(ctx->active, BINDING_TARGET_LAYOUT_Y);
+                 const UiBinding* bind_x = ui_node_get_binding(ctx->active, BINDING_TARGET_LAYOUT_X);
+                 const UiBinding* bind_y = ui_node_get_binding(ctx->active, BINDING_TARGET_LAYOUT_Y);
                  
                  if (bind_x) {
                      void* ptr = (char*)ctx->active->data_ptr + bind_x->source_offset;
@@ -191,7 +191,7 @@ static void handle_char_event(UiInputContext* ctx, const InputEvent* event) {
 
     if (event->type == INPUT_EVENT_CHAR) {
          char buf[256] = {0};
-         const SceneBinding* bind_text = scene_node_get_binding(el, BINDING_TARGET_TEXT);
+         const UiBinding* bind_text = ui_node_get_binding(el, BINDING_TARGET_TEXT);
          
          if (el->data_ptr && bind_text) {
              // Read current value
@@ -202,7 +202,7 @@ static void handle_char_event(UiInputContext* ctx, const InputEvent* event) {
                  buf[len] = (char)event->data.character.codepoint;
                  buf[len+1] = '\0';
                  
-                 scene_node_write_binding_string(el, BINDING_TARGET_TEXT, buf);
+                 ui_node_write_binding_string(el, BINDING_TARGET_TEXT, buf);
                  el->cursor_idx++;
                  
                  push_event(ctx, UI_EVENT_VALUE_CHANGE, el);
@@ -222,14 +222,14 @@ static void handle_key_event(UiInputContext* ctx, const InputEvent* event) {
     if (event->type == INPUT_EVENT_KEY_PRESSED || event->type == INPUT_EVENT_KEY_REPEAT) {
         if (event->data.key.key == INPUT_KEY_BACKSPACE) {
              char buf[256] = {0};
-             const SceneBinding* bind_text = scene_node_get_binding(el, BINDING_TARGET_TEXT);
+             const UiBinding* bind_text = ui_node_get_binding(el, BINDING_TARGET_TEXT);
              
              if (el->data_ptr && bind_text) {
                  ui_bind_read_string(el->data_ptr, bind_text->source_field, buf, sizeof(buf));
                  size_t len = strlen(buf);
                  if (len > 0) {
                      buf[len-1] = '\0';
-                     scene_node_write_binding_string(el, BINDING_TARGET_TEXT, buf);
+                     ui_node_write_binding_string(el, BINDING_TARGET_TEXT, buf);
                      if (el->cursor_idx > 0) el->cursor_idx--;
                      
                      push_event(ctx, UI_EVENT_VALUE_CHANGE, el);
@@ -266,12 +266,12 @@ static void handle_drag_logic(UiInputContext* ctx, const InputSystem* input) {
         // Case A: Draggable Object (updates data model)
         if (ctx->active->flags & UI_FLAG_DRAGGABLE) {
             if (ctx->active->data_ptr) {
-                if (scene_node_get_binding(ctx->active, BINDING_TARGET_LAYOUT_X)) {
-                    scene_node_write_binding_float(ctx->active, BINDING_TARGET_LAYOUT_X, ctx->drag_start_elem_x + dx);
+                if (ui_node_get_binding(ctx->active, BINDING_TARGET_LAYOUT_X)) {
+                    ui_node_write_binding_float(ctx->active, BINDING_TARGET_LAYOUT_X, ctx->drag_start_elem_x + dx);
                     changed = true;
                 }
-                if (scene_node_get_binding(ctx->active, BINDING_TARGET_LAYOUT_Y)) {
-                    scene_node_write_binding_float(ctx->active, BINDING_TARGET_LAYOUT_Y, ctx->drag_start_elem_y + dy);
+                if (ui_node_get_binding(ctx->active, BINDING_TARGET_LAYOUT_Y)) {
+                    ui_node_write_binding_float(ctx->active, BINDING_TARGET_LAYOUT_Y, ctx->drag_start_elem_y + dy);
                     changed = true;
                 }
             }

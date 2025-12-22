@@ -15,7 +15,7 @@
 static float calculate_width(SceneNode* el, float available_w, UiTextMeasureFunc measure_func, void* measure_data) {
     const SceneNodeSpec* spec = el->spec;
     float w = spec->layout.width;
-    if (scene_node_get_binding(el, BINDING_TARGET_LAYOUT_WIDTH)) w = el->rect.w; // updated by ui_core
+    if (ui_node_get_binding(el, BINDING_TARGET_LAYOUT_WIDTH)) w = el->rect.w; // updated by ui_core
 
     if (w < 0) {
         bool parent_is_row = (el->parent && el->parent->spec->layout.type == UI_LAYOUT_FLEX_ROW);
@@ -26,7 +26,7 @@ static float calculate_width(SceneNode* el, float available_w, UiTextMeasureFunc
 
              if (text && text[0] != '\0') {
                  if (measure_func) {
-                     w = measure_func(text, measure_data) + spec->layout.padding * 2;
+                     w = measure_func(text, 0.5f, measure_data).x + spec->layout.padding * 2;
                  } else {
                      w = strlen(text) * UI_CHAR_WIDTH_EST + spec->layout.padding * 2 + UI_CHAR_WIDTH_EST;
                  }
@@ -43,7 +43,7 @@ static float calculate_width(SceneNode* el, float available_w, UiTextMeasureFunc
 static float calculate_height(SceneNode* el, float available_h) {
     const SceneNodeSpec* spec = el->spec;
     float h = spec->layout.height;
-    if (scene_node_get_binding(el, BINDING_TARGET_LAYOUT_HEIGHT)) h = el->rect.h;
+    if (ui_node_get_binding(el, BINDING_TARGET_LAYOUT_HEIGHT)) h = el->rect.h;
 
     if (h < 0) {
         if (el->child_count > 0 && spec->layout.type == UI_LAYOUT_FLEX_COLUMN) {

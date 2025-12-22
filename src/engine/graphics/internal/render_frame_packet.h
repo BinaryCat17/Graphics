@@ -1,7 +1,7 @@
-#ifndef RENDER_PACKET_H
-#define RENDER_PACKET_H
+#ifndef RENDER_FRAME_PACKET_H
+#define RENDER_FRAME_PACKET_H
 
-#include "engine/scene/scene.h"
+#include "engine/scene/render_packet.h"
 
 struct RenderFramePacket {
     // The unified scene state for this frame
@@ -15,4 +15,4 @@ struct RenderFramePacket {
 // So yes, remove typedef.
 
 
-#endif // RENDER_PACKET_H
+#endif // RENDER_FRAME_PACKET_H

@@ -17,16 +17,20 @@
 #include "engine/assets/assets.h"
 #include "engine/graphics/render_system.h"
 #include "engine/input/input.h"
-#include "engine/scene/scene.h"
+#include "engine/scene/render_packet.h"
 
+#include "engine/ui/ui_core.h"
+#include "engine/ui/ui_input.h"
+#include "engine/ui/ui_assets.h"
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
 
 // --- Helper: Text Measurement for UI Layout ---
-static float text_measure_wrapper(const char* text, void* user_data) {
+static Vec2 text_measure_wrapper(const char* text, float scale, void* user_data) {
     const Font* font = (const Font*)user_data;
-    return font_measure_text(font, text);
+    float w = font_measure_text(font, text) * scale;
+    return (Vec2){w, 20.0f * scale}; // Fixed height for now
 }
 
 // --- Recompilation Logic ---
@@ -306,7 +310,7 @@ MathEditor* math_editor_create(Engine* engine) {
             }
             
             // Build Static UI from Asset into Instance
-            SceneNode* root = scene_node_create(editor->ui_instance, scene_asset_get_root(editor->ui_asset), editor, editor_meta);
+            SceneNode* root = ui_node_create(editor->ui_instance, scene_asset_get_root(editor->ui_asset), editor, editor_meta);
             scene_tree_set_root(editor->ui_instance, root);
             
             // Initial Select
@@ -330,13 +334,13 @@ MathEditor* math_editor_create(Engine* engine) {
     return editor;
 }
 
-#include "engine/scene/scene.h"
+#include "engine/scene/render_packet.h"
 
 void math_editor_render(MathEditor* editor, Scene* scene, const struct Assets* assets, MemoryArena* arena) {
     if (!editor || !scene || !editor->ui_instance) return;
 
     // Delegate entire rendering to UI system.
-    scene_tree_render(editor->ui_instance, scene, assets, arena);
+    ui_system_render(editor->ui_instance, scene, assets, arena);
 }
 
 void math_editor_update(MathEditor* editor, Engine* engine) {
@@ -360,7 +364,7 @@ void math_editor_update(MathEditor* editor, Engine* engine) {
     // UI Update Loop
     if (root) {
         // Animation / Logic Update
-        scene_node_update(root, engine_get_dt(engine));
+        ui_node_update(root, engine_get_dt(engine));
         
         // Input Handling
         ui_input_update(editor->input_ctx, root, engine_get_input_system(engine));
@@ -409,7 +413,7 @@ void math_editor_update(MathEditor* editor, Engine* engine) {
         
         // Layout
         PlatformWindowSize size = platform_get_framebuffer_size(engine_get_window(engine));
-        scene_tree_layout(editor->ui_instance, (float)size.width, (float)size.height, render_system_get_frame_count(engine_get_render_system(engine)), text_measure_wrapper, (void*)assets_get_font(engine_get_assets(engine)));
+        ui_system_layout(editor->ui_instance, (float)size.width, (float)size.height, render_system_get_frame_count(engine_get_render_system(engine)), text_measure_wrapper, (void*)assets_get_font(engine_get_assets(engine)));
     }
 
     // Graph Evaluation (Naive interpretation on CPU for debugging/node values)

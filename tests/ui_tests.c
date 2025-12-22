@@ -1,5 +1,5 @@
 #include "test_framework.h"
-#include "engine/scene_system/internal/ui_internal.h"
+#include "engine/ui/internal/ui_internal.h"
 #include "foundation/memory/arena.h"
 #include <stdio.h>
 #include <string.h>
@@ -45,7 +45,7 @@ int test_column_layout(void) {
 
     SceneNode* el = scene_node_create(instance, root, NULL, NULL);
     instance->root = el;
-    scene_tree_layout(instance, 800, 600, 0, NULL, NULL);
+    ui_system_layout(instance, 800, 600, 0, NULL, NULL);
 
     TEST_ASSERT_FLOAT_EQ(el->rect.w, 100.0f, 0.1f);
     TEST_ASSERT_FLOAT_EQ(el->rect.h, 200.0f, 0.1f);

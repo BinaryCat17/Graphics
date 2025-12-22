@@ -8,7 +8,7 @@
 #include "engine/graphics/render_system.h"
 #include "engine/assets/assets.h"
 #include "engine/input/input.h"
-#include "engine/scene_system/ui_core.h"
+#include "engine/ui/ui_core.h"
 
 #include <stdio.h>
 #include <string.h>

@@ -1,7 +1,7 @@
 #include "math_editor_view.h"
 #include "math_editor_internal.h"
 #include "math_graph_internal.h"
-#include "engine/scene/scene.h"
+#include "engine/scene/render_packet.h"
 #include "foundation/logger/logger.h"
 #include <string.h>
 
@@ -89,7 +89,7 @@ void math_editor_refresh_graph_view(MathEditor* editor) {
     SceneNode* canvas = scene_node_find_by_id(root, "canvas_area");
     if (canvas) {
         // Declarative Refresh
-        scene_node_rebuild_children(canvas, editor->ui_instance);
+        ui_node_rebuild_children(canvas, editor->ui_instance);
     }
 }
 
@@ -114,7 +114,7 @@ void math_editor_update_selection(MathEditor* editor) {
     if (root) {
         SceneNode* inspector = scene_node_find_by_id(root, "inspector_area");
         if (inspector) {
-             scene_node_rebuild_children(inspector, editor->ui_instance);
+             ui_node_rebuild_children(inspector, editor->ui_instance);
         }
     }
 }

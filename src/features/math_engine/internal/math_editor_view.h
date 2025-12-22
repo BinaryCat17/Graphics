@@ -2,7 +2,7 @@
 #define MATH_EDITOR_VIEW_H
 
 #include "math_editor_internal.h"
-#include "engine/scene/scene.h"
+#include "engine/scene/render_packet.h"
 #include "foundation/memory/arena.h"
 
 // --- View Model Management ---

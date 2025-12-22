@@ -128,9 +128,12 @@ target_link_libraries(foundation_config PUBLIC foundation_platform foundation_lo
 # --- ENGINE LAYER ---
 
 # Scene
-add_library(engine_scene STATIC "src/engine/scene/scene.c")
+add_library(engine_scene STATIC 
+    "src/engine/scene/scene.c"
+    "src/engine/scene/scene_tree.c"
+)
 target_include_directories(engine_scene PUBLIC "src/")
-target_link_libraries(engine_scene PUBLIC foundation_math foundation_memory)
+target_link_libraries(engine_scene PUBLIC foundation_math foundation_memory foundation_string foundation_meta)
 
 # Input
 add_library(engine_input STATIC "src/engine/input/input.c")
@@ -174,12 +177,12 @@ target_link_libraries(engine_graphics PUBLIC
 
 # UI
 set(ENGINE_UI_SOURCES
-    src/engine/scene_system/ui_core.c
-    src/engine/scene_system/internal/ui_input.c
-    src/engine/scene_system/internal/ui_layout.c
-    src/engine/scene_system/internal/ui_parser.c
-    src/engine/scene_system/internal/ui_renderer.c
-    src/engine/scene_system/internal/ui_command_system.c)
+    src/engine/ui/ui_core.c
+    src/engine/ui/internal/ui_input.c
+    src/engine/ui/internal/ui_layout.c
+    src/engine/ui/internal/ui_parser.c
+    src/engine/ui/internal/ui_renderer.c
+    src/engine/ui/internal/ui_command_system.c)
 add_library(engine_ui STATIC ${ENGINE_UI_SOURCES})
 target_include_directories(engine_ui PUBLIC "src/" ${Stb_INCLUDE_DIR})
 target_link_libraries(engine_ui PUBLIC 
