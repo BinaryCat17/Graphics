@@ -9,7 +9,6 @@
 #include "engine/assets/assets.h"
 #include "foundation/memory/arena.h"
 #include <string.h> 
-// #include <stdlib.h> // Malloc removed
 
 // --- Provider Registry ---
 #define MAX_UI_PROVIDERS 32
@@ -71,66 +70,68 @@ static void render_background(const UiElement* el, UiRenderContext* ctx, Vec4 cl
     bool is_input = (el->flags & UI_FLAG_EDITABLE);
     if (el->spec->kind != UI_KIND_CONTAINER && !is_input) return;
 
-    SceneObject quad = {0};
-    quad.prim_type = SCENE_PRIM_QUAD; 
-    quad.position = (Vec3){el->screen_rect.x, el->screen_rect.y, z}; 
-    quad.scale = (Vec3){el->screen_rect.w, el->screen_rect.h, 1.0f};
-    quad.ui.clip_rect = clip_vec; 
-    
-    // Use animated color
-    quad.color = el->render_color;
-    if (quad.color.w == 0) quad.color = (Vec4){0.1f, 0.1f, 0.1f, 0.8f}; // Fallback
+    // Resolve base color
+    Vec4 color = el->render_color;
+    if (color.w == 0) color = (Vec4){0.1f, 0.1f, 0.1f, 0.8f}; // Fallback
 
-    // Hover/Active tints
+    // Apply Hover/Active tints
     if (el->is_active) {
         if (el->spec->active_color.w > 0.0f) {
-            quad.color = el->spec->active_color;
+            color = el->spec->active_color;
         } else {
             float tint = el->spec->active_tint > 0.0f ? el->spec->active_tint : 0.5f;
-            quad.color.x *= tint; quad.color.y *= tint; quad.color.z *= tint;
+            color.x *= tint; color.y *= tint; color.z *= tint;
         }
-    } else if (el->is_hovered && (el->spec->hover_color.x == 0 && el->spec->hover_color.y == 0 && el->spec->hover_color.z == 0 && el->spec->hover_color.w == 0)) {
-        // Only apply legacy tint if no declarative hover color is set
-        float tint = el->spec->hover_tint > 0.0f ? el->spec->hover_tint : 1.2f;
-        quad.color.x *= tint; quad.color.y *= tint; quad.color.z *= tint;
+    } else if (el->is_hovered) {
+        if (el->spec->hover_color.w > 0.0f) {
+            color = el->spec->hover_color;
+        } else {
+            float tint = el->spec->hover_tint > 0.0f ? el->spec->hover_tint : 1.2f;
+            color.x *= tint; color.y *= tint; color.z *= tint;
+        }
     } else if (is_input) {
-         // Make inputs slightly lighter by default (Legacy/Default behavior)
-         quad.color.x *= 1.1f; quad.color.y *= 1.1f; quad.color.z *= 1.1f;
+         // Default style for inputs: slightly lighter when idle
+         color.x *= 1.1f; color.y *= 1.1f; color.z *= 1.1f;
     }
 
     if ((el->spec->texture != 0)) {
         // Use 9-Slice or Textured Quad
-        quad.ui.style_params.x = (float)SCENE_MODE_9_SLICE; // 9-Slice (UI Shader Mode)
-        
         float u0, v0, u1, v1;
         font_get_ui_rect_uv(ctx->font, &u0, &v0, &u1, &v1);
-        quad.uv_rect = (Vec4){u0, v0, u1 - u0, v1 - v0};
+        Vec4 uv_rect = {u0, v0, u1 - u0, v1 - v0};
         
-        // Pass 9-slice data
-        // style_params: x=type, y=unused, z=width, w=height
-        quad.ui.style_params.z = el->spec->tex_w > 0 ? el->spec->tex_w : 32.0f;
-        quad.ui.style_params.w = el->spec->tex_h > 0 ? el->spec->tex_h : 32.0f;
+        float tex_w = el->spec->tex_w > 0 ? el->spec->tex_w : 32.0f;
+        float tex_h = el->spec->tex_h > 0 ? el->spec->tex_h : 32.0f;
         
         // extra_params: borders (top, right, bottom, left)
-        quad.ui.extra_params.x = el->spec->border_t;
-        quad.ui.extra_params.y = el->spec->border_r;
-        quad.ui.extra_params.z = el->spec->border_b;
-        quad.ui.extra_params.w = el->spec->border_l;
+        Vec4 borders = {
+            el->spec->border_t,
+            el->spec->border_r,
+            el->spec->border_b,
+            el->spec->border_l
+        };
+        
+        scene_push_quad_9slice(ctx->scene, 
+            (Vec3){el->screen_rect.x, el->screen_rect.y, z}, 
+            (Vec2){el->screen_rect.w, el->screen_rect.h}, 
+            color, 
+            uv_rect, 
+            (Vec2){tex_w, tex_h}, 
+            borders, 
+            clip_vec
+        );
         
     } else {
         // SDF Rounded Box (Mode 4)
-        quad.ui.style_params.x = (float)SCENE_MODE_SDF_BOX; // Mode 4: SDF Rect
-        quad.ui.style_params.y = el->spec->corner_radius; // Radius
-        
-        // Pass borders for SDF stroke
-        quad.ui.style_params.z = el->spec->border_t; 
-
-        float u, v;
-        font_get_white_pixel_uv(ctx->font, &u, &v);
-        quad.uv_rect = (Vec4){u, v, 0.001f, 0.001f}; 
+        scene_push_rect_sdf(ctx->scene,
+            (Vec3){el->screen_rect.x, el->screen_rect.y, z},
+            (Vec2){el->screen_rect.w, el->screen_rect.h},
+            color,
+            el->spec->corner_radius,
+            el->spec->border_t,
+            clip_vec
+        );
     }
-    
-    scene_add_object(ctx->scene, quad);
 }
 
 static void render_content(const UiElement* el, UiRenderContext* ctx, Vec4 clip_vec, float z) {
@@ -168,25 +169,17 @@ static void render_content(const UiElement* el, UiRenderContext* ctx, Vec4 clip_
             
             float text_width = font_measure_text(ctx->font, temp) * txt_scale; 
             
-            SceneObject caret = {0};
-            caret.prim_type = SCENE_PRIM_QUAD;
-            caret.position = (Vec3){pos.x + text_width, pos.y, z + (RENDER_DEPTH_STEP_CONTENT * 2)}; 
-            
             float cw = el->spec->caret_width > 0.0f ? el->spec->caret_width : 2.0f;
             float ch = el->spec->caret_height > 0.0f ? el->spec->caret_height : 20.0f;
-            caret.scale = (Vec3){cw, ch, 1.0f}; 
-            
-            caret.ui.clip_rect = clip_vec;
             
             Vec4 cc = el->spec->caret_color.w > 0.0f ? el->spec->caret_color : (Vec4){1.0f, 1.0f, 1.0f, 1.0f};
-            caret.color = cc; 
-            
-            caret.ui.style_params.x = (float)SCENE_MODE_SOLID;
-            float u, v;
-            font_get_white_pixel_uv(ctx->font, &u, &v);
-            caret.uv_rect = (Vec4){u, v, 0.001f, 0.001f};
 
-            scene_add_object(ctx->scene, caret);
+            scene_push_quad(ctx->scene, 
+                (Vec3){pos.x + text_width, pos.y, z + (RENDER_DEPTH_STEP_CONTENT * 2)}, 
+                (Vec2){cw, ch}, 
+                cc, 
+                clip_vec
+            );
         }
     }
 }

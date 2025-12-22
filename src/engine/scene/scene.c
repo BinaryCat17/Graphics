@@ -149,3 +149,51 @@ void scene_push_curve(Scene* scene, Vec3 start, Vec3 end, float thickness, Vec4 
     
     scene_add_object(scene, wire);
 }
+
+void scene_push_quad(Scene* scene, Vec3 pos, Vec2 size, Vec4 color, Vec4 clip_rect) {
+    SceneObject obj = {0};
+    obj.prim_type = SCENE_PRIM_QUAD;
+    obj.position = pos;
+    obj.scale = (Vec3){size.x, size.y, 1.0f};
+    obj.color = color;
+    obj.ui.clip_rect = clip_rect;
+    
+    obj.ui.style_params.x = (float)SCENE_MODE_SOLID;
+    // UVs should point to a white pixel in the atlas for solid color to work with tint
+    // We assume default 0,0,1,1 maps to full white or handled by shader fallback
+    obj.uv_rect = (Vec4){0.0f, 0.0f, 1.0f, 1.0f}; 
+    
+    scene_add_object(scene, obj);
+}
+
+void scene_push_quad_textured(Scene* scene, Vec3 pos, Vec2 size, Vec4 color, Vec4 uv_rect, Vec4 clip_rect) {
+    SceneObject obj = {0};
+    obj.prim_type = SCENE_PRIM_QUAD;
+    obj.position = pos;
+    obj.scale = (Vec3){size.x, size.y, 1.0f};
+    obj.color = color;
+    obj.ui.clip_rect = clip_rect;
+    obj.uv_rect = uv_rect;
+    
+    obj.ui.style_params.x = (float)SCENE_MODE_TEXTURED;
+    
+    scene_add_object(scene, obj);
+}
+
+void scene_push_quad_9slice(Scene* scene, Vec3 pos, Vec2 size, Vec4 color, Vec4 uv_rect, Vec2 texture_size, Vec4 borders, Vec4 clip_rect) {
+    SceneObject obj = {0};
+    obj.prim_type = SCENE_PRIM_QUAD;
+    obj.position = pos;
+    obj.scale = (Vec3){size.x, size.y, 1.0f};
+    obj.color = color;
+    obj.ui.clip_rect = clip_rect;
+    obj.uv_rect = uv_rect;
+    
+    obj.ui.style_params.x = (float)SCENE_MODE_9_SLICE;
+    obj.ui.style_params.z = texture_size.x; 
+    obj.ui.style_params.w = texture_size.y; 
+    
+    obj.ui.extra_params = borders; // top, right, bottom, left
+    
+    scene_add_object(scene, obj);
+}
