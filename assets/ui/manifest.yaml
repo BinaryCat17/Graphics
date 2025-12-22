@@ -2,6 +2,8 @@ templates:
   # Core Templates
   ValueRow:
     import: "assets/ui/templates/value_row.yaml"
+  GraphPort:
+    import: "assets/ui/templates/port.yaml"
   GraphNode:
     import: "assets/ui/templates/node.yaml"
   GraphWire:

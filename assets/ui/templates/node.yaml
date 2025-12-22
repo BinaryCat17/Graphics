@@ -1,21 +1,44 @@
 type: container
-layout: column
-width: 150
-height: 100
+layout: row
 flags: "clickable | draggable"
 bind_x: "x"
 bind_y: "y"
-color: "#333333"
-padding: 5
+color: "#00000000" # Transparent wrapper
 children:
+  # Input Ports (Left)
   - type: container
-    render_mode: box
-    height: 25
-    color: "#444444"
+    layout: column
+    width: 10
+    collection: "input_ports"
+    item_template: "GraphPort"
+    padding:
+      top: 32 # Header offset
+
+  # Main Body
+  - type: container
+    layout: column
+    width: 150
+    # height: auto (implied)
+    color: "#333333"
     padding: 5
     children:
-      - type: text
-        bind: "name"
-        color: "#FFFFFF"
-  - type: instance
-    instance: "ValueRow"
+      - type: container
+        render_mode: box
+        height: 25
+        color: "#444444"
+        padding: 5
+        children:
+          - type: text
+            bind: "name"
+            color: "#FFFFFF"
+      - type: instance
+        instance: "ValueRow"
+
+  # Output Ports (Right)
+  - type: container
+    layout: column
+    width: 10
+    collection: "output_ports"
+    item_template: "GraphPort"
+    padding:
+      top: 32 # Header offset

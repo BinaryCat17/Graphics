@@ -33,6 +33,22 @@ MathNodeView* math_editor_find_view(MathEditor* editor, MathNodeId id) {
     return NULL;
 }
 
+static int get_node_input_count(MathNodeType type) {
+    switch (type) {
+        case MATH_NODE_ADD: 
+        case MATH_NODE_SUB: 
+        case MATH_NODE_MUL: 
+        case MATH_NODE_DIV: return 2;
+        case MATH_NODE_SIN: 
+        case MATH_NODE_COS: 
+        case MATH_NODE_OUTPUT: return 1;
+        case MATH_NODE_UV:  
+        case MATH_NODE_VALUE: 
+        case MATH_NODE_TIME: 
+        default: return 0;
+    }
+}
+
 void math_editor_sync_view_data(MathEditor* editor) {
     for(uint32_t i=0; i<editor->node_views_count; ++i) {
         MathNodeView* view = &editor->node_views[i];
@@ -42,6 +58,21 @@ void math_editor_sync_view_data(MathEditor* editor) {
             // One-way binding: Logic -> View
             strncpy(view->name, node->name, 31);
             view->value = node->value;
+
+            // Sync Inputs
+            int input_count = get_node_input_count(node->type);
+            view->input_ports_count = input_count;
+            for(int k=0; k<input_count; ++k) {
+                view->input_ports[k].index = k;
+            }
+
+            // Sync Outputs (Most nodes have 1 output, except OUTPUT node)
+            if (node->type != MATH_NODE_OUTPUT) {
+                view->output_ports_count = 1;
+                view->output_ports[0].index = -1; 
+            } else {
+                view->output_ports_count = 0;
+            }
         }
     }
 }
@@ -94,22 +125,6 @@ void math_editor_update_selection(MathEditor* editor) {
 #define LAYER_OFFSET_WIRE    0.005f
 #define LAYER_OFFSET_PORT    0.020f
 
-static int get_node_input_count(MathNodeType type) {
-    switch (type) {
-        case MATH_NODE_ADD: 
-        case MATH_NODE_SUB: 
-        case MATH_NODE_MUL: 
-        case MATH_NODE_DIV: return 2;
-        case MATH_NODE_SIN: 
-        case MATH_NODE_COS: 
-        case MATH_NODE_OUTPUT: return 1;
-        case MATH_NODE_UV:  
-        case MATH_NODE_VALUE: 
-        case MATH_NODE_TIME: 
-        default: return 0;
-    }
-}
-
 void math_editor_sync_wires(MathEditor* editor) {
     if (!editor || !editor->wires) return;
 
@@ -149,46 +164,11 @@ void math_editor_sync_wires(MathEditor* editor) {
     }
 }
 
-static void math_editor_render_ports(MathEditor* editor, Scene* scene, Vec4 clip_rect, float base_z) {
-    if (!editor || !editor->graph || !scene) return;
-
-    for (uint32_t i = 0; i < editor->node_views_count; ++i) {
-        MathNodeView* view = &editor->node_views[i];
-        MathNode* node = math_graph_get_node(editor->graph, view->node_id);
-        if (!node) continue;
-
-        int input_count = get_node_input_count(node->type);
-        
-        // Render Inputs
-        for (int k = 0; k < input_count; ++k) {
-            float x = view->x + clip_rect.x;
-            float y = view->y + NODE_HEADER_HEIGHT + (k * NODE_PORT_SPACING) + clip_rect.y;
-            
-            // Center of the port
-            Vec3 center = {x + NODE_PORT_SIZE * 0.5f, y + NODE_PORT_SIZE * 0.5f, base_z + LAYER_OFFSET_PORT};
-            
-            scene_push_circle_sdf(scene, center, NODE_PORT_SIZE * 0.5f, (Vec4){0.5f, 0.5f, 0.5f, 1.0f}, clip_rect);
-        }
-
-        // Render Output
-        if (node->type != MATH_NODE_OUTPUT) {
-            float x = view->x + NODE_WIDTH + clip_rect.x;
-            float y = view->y + NODE_HEADER_HEIGHT + clip_rect.y;
-            
-            Vec3 center = {x + NODE_PORT_SIZE * 0.5f, y + NODE_PORT_SIZE * 0.5f, base_z + LAYER_OFFSET_PORT};
-            
-            scene_push_circle_sdf(scene, center, NODE_PORT_SIZE * 0.5f, (Vec4){0.5f, 0.5f, 0.5f, 1.0f}, clip_rect);
-        }
-    }
-}
-
 void math_graph_view_provider(void* instance_data, Rect screen_rect, float z_depth, Scene* scene, MemoryArena* arena) {
-    (void)arena; // Unused
-    MathEditor* editor = (MathEditor*)instance_data;
-    if (!editor) return;
-    
-    Vec4 clip_vec = {screen_rect.x, screen_rect.y, screen_rect.w, screen_rect.h};
-    
-    // Render Ports (Immediate mode on top of UI)
-    math_editor_render_ports(editor, scene, clip_vec, z_depth);
+    (void)arena; 
+    (void)instance_data;
+    (void)screen_rect;
+    (void)z_depth;
+    (void)scene;
+    // Ports are now rendered via UI system (declarative)
 }

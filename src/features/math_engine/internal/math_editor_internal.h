@@ -14,6 +14,10 @@
 #define NODE_PORT_SIZE      10.0f
 
 // --- ViewModel for a Node in the Editor
+typedef struct MathPortView {
+    int index;              // REFLECT
+} MathPortView;
+
 typedef struct MathNodeView {
     MathNodeId node_id;     // REFLECT
     float x;                // REFLECT
@@ -22,6 +26,12 @@ typedef struct MathNodeView {
     // Cached Data for UI Binding (ViewModel pattern)
     char name[32];          // REFLECT
     float value;            // REFLECT (Input/Output preview)
+
+    MathPortView input_ports[4];  // REFLECT
+    int input_ports_count;        // REFLECT
+
+    MathPortView output_ports[1]; // REFLECT
+    int output_ports_count;       // REFLECT
 } MathNodeView;
 
 typedef struct MathWireView {
