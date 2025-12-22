@@ -68,7 +68,7 @@ static Rect rect_intersect(Rect a, Rect b) {
 }
 
 static void render_background(const UiElement* el, UiRenderContext* ctx, Vec4 clip_vec, float z) {
-    UiRenderMode mode = el->spec->render_mode;
+    UiRenderMode mode = el->spec->style.render_mode;
     bool is_input = (el->flags & UI_FLAG_EDITABLE);
 
     // Default / Compatibility Logic resolution
@@ -79,7 +79,7 @@ static void render_background(const UiElement* el, UiRenderContext* ctx, Vec4 cl
         }
         
         // Infer mode from texture existence
-        if (el->spec->texture != 0) mode = UI_RENDER_MODE_IMAGE;
+        if (el->spec->style.texture != 0) mode = UI_RENDER_MODE_IMAGE;
         else mode = UI_RENDER_MODE_BOX;
     }
 
@@ -92,17 +92,17 @@ static void render_background(const UiElement* el, UiRenderContext* ctx, Vec4 cl
 
     // Apply Hover/Active tints
     if (el->is_active) {
-        if (el->spec->active_color.w > 0.0f) {
-            color = el->spec->active_color;
+        if (el->spec->style.active_color.w > 0.0f) {
+            color = el->spec->style.active_color;
         } else {
-            float tint = el->spec->active_tint > 0.0f ? el->spec->active_tint : 0.5f;
+            float tint = el->spec->style.active_tint > 0.0f ? el->spec->style.active_tint : 0.5f;
             color.x *= tint; color.y *= tint; color.z *= tint;
         }
     } else if (el->is_hovered) {
-        if (el->spec->hover_color.w > 0.0f) {
-            color = el->spec->hover_color;
+        if (el->spec->style.hover_color.w > 0.0f) {
+            color = el->spec->style.hover_color;
         } else {
-            float tint = el->spec->hover_tint > 0.0f ? el->spec->hover_tint : 1.2f;
+            float tint = el->spec->style.hover_tint > 0.0f ? el->spec->style.hover_tint : 1.2f;
             color.x *= tint; color.y *= tint; color.z *= tint;
         }
     } else if (is_input) {
@@ -154,15 +154,15 @@ static void render_background(const UiElement* el, UiRenderContext* ctx, Vec4 cl
             font_get_ui_rect_uv(ctx->font, &u0, &v0, &u1, &v1);
             Vec4 uv_rect = {u0, v0, u1 - u0, v1 - v0};
             
-            float tex_w = el->spec->tex_w > 0 ? el->spec->tex_w : 32.0f;
-            float tex_h = el->spec->tex_h > 0 ? el->spec->tex_h : 32.0f;
+            float tex_w = el->spec->style.tex_w > 0 ? el->spec->style.tex_w : 32.0f;
+            float tex_h = el->spec->style.tex_h > 0 ? el->spec->style.tex_h : 32.0f;
             
             // extra_params: borders (top, right, bottom, left)
             Vec4 borders = {
-                el->spec->border_t,
-                el->spec->border_r,
-                el->spec->border_b,
-                el->spec->border_l
+                el->spec->style.border_t,
+                el->spec->style.border_r,
+                el->spec->style.border_b,
+                el->spec->style.border_l
             };
             
             scene_push_quad_9slice(ctx->scene, 
@@ -183,8 +183,8 @@ static void render_background(const UiElement* el, UiRenderContext* ctx, Vec4 cl
                 (Vec3){el->screen_rect.x, el->screen_rect.y, z},
                 (Vec2){el->screen_rect.w, el->screen_rect.h},
                 color,
-                el->spec->corner_radius,
-                el->spec->border_t,
+                el->spec->style.corner_radius,
+                el->spec->style.border_t,
                 clip_vec
             );
             break;
@@ -208,10 +208,10 @@ static void render_content(const UiElement* el, UiRenderContext* ctx, Vec4 clip_
     if ((!text || text[0] == '\0') && !is_input) return;
 
     if (text) {
-        Vec3 pos = {el->screen_rect.x + el->spec->padding, el->screen_rect.y + el->spec->padding, z + RENDER_DEPTH_STEP_CONTENT};
+        Vec3 pos = {el->screen_rect.x + el->spec->layout.padding, el->screen_rect.y + el->spec->layout.padding, z + RENDER_DEPTH_STEP_CONTENT};
         
-        float txt_scale = el->spec->text_scale > 0.0f ? el->spec->text_scale : 0.5f;
-        Vec4 txt_color = el->spec->text_color.w > 0.0f ? el->spec->text_color : (Vec4){1.0f, 1.0f, 1.0f, 1.0f};
+        float txt_scale = el->spec->style.text_scale > 0.0f ? el->spec->style.text_scale : 0.5f;
+        Vec4 txt_color = el->spec->style.text_color.w > 0.0f ? el->spec->style.text_color : (Vec4){1.0f, 1.0f, 1.0f, 1.0f};
         
         scene_add_text_clipped(ctx->scene, ctx->font, text, pos, txt_scale, txt_color, clip_vec);
 
@@ -229,10 +229,10 @@ static void render_content(const UiElement* el, UiRenderContext* ctx, Vec4 clip_
             
             float text_width = font_measure_text(ctx->font, temp) * txt_scale; 
             
-            float cw = el->spec->caret_width > 0.0f ? el->spec->caret_width : 2.0f;
-            float ch = el->spec->caret_height > 0.0f ? el->spec->caret_height : 20.0f;
+            float cw = el->spec->style.caret_width > 0.0f ? el->spec->style.caret_width : 2.0f;
+            float ch = el->spec->style.caret_height > 0.0f ? el->spec->style.caret_height : 20.0f;
             
-            Vec4 cc = el->spec->caret_color.w > 0.0f ? el->spec->caret_color : (Vec4){1.0f, 1.0f, 1.0f, 1.0f};
+            Vec4 cc = el->spec->style.caret_color.w > 0.0f ? el->spec->style.caret_color : (Vec4){1.0f, 1.0f, 1.0f, 1.0f};
 
             scene_push_quad(ctx->scene, 
                 (Vec3){pos.x + text_width, pos.y, z + (RENDER_DEPTH_STEP_CONTENT * 2)}, 
@@ -268,7 +268,7 @@ static void process_node(const UiElement* el, UiRenderContext* ctx, Rect current
     if (el->flags & UI_FLAG_HIDDEN) return;
 
     // Check Overlay Logic
-    bool is_node_overlay = (el->spec->layer == UI_LAYER_OVERLAY);
+    bool is_node_overlay = (el->spec->layout.layer == UI_LAYER_OVERLAY);
     
     // If we are in the Normal pass, and encounter an Overlay node -> Defer it
     if (!is_overlay_pass && is_node_overlay) {

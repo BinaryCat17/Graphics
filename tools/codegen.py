@@ -190,6 +190,9 @@ def generate_code(enums, structs, headers, output_path):
             elif f_type in enums:
                 meta_kind = 'META_TYPE_ENUM'
                 type_name_str = f'"{f_type}"'
+            elif f_type in structs and not is_ptr:
+                meta_kind = 'META_TYPE_STRUCT'
+                type_name_str = f'"{f_type}"'
             elif is_ptr:
                 if field['ptr_count'] == 2:
                     meta_kind = 'META_TYPE_POINTER_ARRAY'

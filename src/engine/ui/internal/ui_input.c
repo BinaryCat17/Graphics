@@ -107,13 +107,13 @@ static void handle_scroll_event(UiInputContext* ctx, const InputEvent* event) {
             target->scroll_x += dx * UI_SCROLL_SPEED;
 
             // Clamp Y
-            float max_scroll_y = target->content_h - (target->rect.h - target->spec->padding * 2);
+            float max_scroll_y = target->content_h - (target->rect.h - target->spec->layout.padding * 2);
             if (max_scroll_y < 0) max_scroll_y = 0;
             if (target->scroll_y < 0) target->scroll_y = 0;
             if (target->scroll_y > max_scroll_y) target->scroll_y = max_scroll_y;
 
             // Clamp X
-            float max_scroll_x = target->content_w - (target->rect.w - target->spec->padding * 2);
+            float max_scroll_x = target->content_w - (target->rect.w - target->spec->layout.padding * 2);
             if (max_scroll_x < 0) max_scroll_x = 0;
             if (target->scroll_x < 0) target->scroll_x = 0;
             if (target->scroll_x > max_scroll_x) target->scroll_x = max_scroll_x;
@@ -271,12 +271,12 @@ static void handle_drag_logic(UiInputContext* ctx, const InputSystem* input) {
              ctx->active->scroll_y = ctx->drag_start_elem_y - dy;
              
              // Clamp
-             float max_scroll_y = ctx->active->content_h - (ctx->active->rect.h - ctx->active->spec->padding * 2);
+             float max_scroll_y = ctx->active->content_h - (ctx->active->rect.h - ctx->active->spec->layout.padding * 2);
              if (max_scroll_y < 0) max_scroll_y = 0;
              if (ctx->active->scroll_y < 0) ctx->active->scroll_y = 0;
              if (ctx->active->scroll_y > max_scroll_y) ctx->active->scroll_y = max_scroll_y;
 
-             float max_scroll_x = ctx->active->content_w - (ctx->active->rect.w - ctx->active->spec->padding * 2);
+             float max_scroll_x = ctx->active->content_w - (ctx->active->rect.w - ctx->active->spec->layout.padding * 2);
              if (max_scroll_x < 0) max_scroll_x = 0;
              if (ctx->active->scroll_x < 0) ctx->active->scroll_x = 0;
              if (ctx->active->scroll_x > max_scroll_x) ctx->active->scroll_x = max_scroll_x;

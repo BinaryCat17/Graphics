@@ -11,27 +11,7 @@
 
 // --- Helper Functions ---
 
-static UiNodeSpec* ui_node_spec_copy(UiAsset* asset, const UiNodeSpec* src) {
-    if (!src) return NULL;
-    UiNodeSpec* dst = ui_asset_push_node(asset);
-    memcpy(dst, src, sizeof(UiNodeSpec));
-    
-    // We share string pointers because they are all in the same Asset Arena
-    
-    // Deep copy children
-    if (src->child_count > 0) {
-        dst->children = (UiNodeSpec**)arena_alloc_zero(&asset->arena, src->child_count * sizeof(UiNodeSpec*));
-        for (size_t i = 0; i < src->child_count; ++i) {
-            dst->children[i] = ui_node_spec_copy(asset, src->children[i]);
-        }
-    }
-    
-    if (src->item_template) {
-        dst->item_template = ui_node_spec_copy(asset, src->item_template);
-    }
-    
-    return dst;
-}
+static UiKind parse_kind(const char* type_str, uint32_t* out_flags);
 
 static UiKind parse_kind(const char* type_str, uint32_t* out_flags) {
     *out_flags = UI_FLAG_NONE;
@@ -44,12 +24,84 @@ static UiKind parse_kind(const char* type_str, uint32_t* out_flags) {
     return UI_KIND_CONTAINER;
 }
 
+static SceneNodeSpec* ui_node_spec_copy(UiAsset* asset, const SceneNodeSpec* src) {
+    if (!src) return NULL;
+    SceneNodeSpec* dst = ui_asset_push_node(asset);
+    memcpy(dst, src, sizeof(SceneNodeSpec));
+    
+    // We share string pointers because they are all in the same Asset Arena
+    
+    // Deep copy children
+    if (src->child_count > 0) {
+        dst->children = (SceneNodeSpec**)arena_alloc_zero(&asset->arena, src->child_count * sizeof(SceneNodeSpec*));
+        for (size_t i = 0; i < src->child_count; ++i) {
+            dst->children[i] = ui_node_spec_copy(asset, src->children[i]);
+        }
+    }
+    
+    if (src->item_template) {
+        dst->item_template = ui_node_spec_copy(asset, src->item_template);
+    }
+    
+    return dst;
+}
+
+// --- Generic Recursive Parser for Structs ---
+
+static void parse_struct_fields(void* instance, const MetaStruct* meta, const ConfigNode* map, UiAsset* asset) {
+    if (!instance || !meta || !map || map->type != CONFIG_NODE_MAP) return;
+
+    for (size_t i = 0; i < map->pair_count; ++i) {
+        const char* key = map->pairs[i].key;
+        const ConfigNode* val = map->pairs[i].value;
+        if (!key || !val) continue;
+
+        const MetaField* field = meta_find_field(meta, key);
+        if (!field) {
+            LOG_WARN("UiParser: Unknown field '%s' in struct '%s'", key, meta->name);
+            continue;
+        }
+        
+        void* field_ptr = (char*)instance + field->offset;
+
+        if (field->type == META_TYPE_STRUCT) {
+             const MetaStruct* sub_meta = meta_get_struct(field->type_name);
+             if (sub_meta) {
+                 parse_struct_fields(field_ptr, sub_meta, val, asset);
+             }
+        } else if (val->type == CONFIG_NODE_SEQUENCE && (field->type >= META_TYPE_VEC2 && field->type <= META_TYPE_VEC4)) {
+             int vec_size = field->type - META_TYPE_VEC2 + 2;
+             float* f_ptr = (float*)field_ptr;
+             for (int k = 0; k < vec_size; ++k) {
+                 float v = 0.0f;
+                 if (k < (int)val->item_count && val->items[k]->scalar) {
+                     v = (float)atof(val->items[k]->scalar);
+                 } else if (k == 3) {
+                     v = 1.0f; 
+                 }
+                 f_ptr[k] = v;
+             }
+        } else if (field->type == META_TYPE_STRING) {
+             const char* s = val->scalar ? val->scalar : "";
+             char* str_copy = arena_push_string(&asset->arena, s);
+             *(char**)field_ptr = str_copy;
+        } else {
+             const char* s = val->scalar ? val->scalar : "";
+             if (!meta_set_from_string(instance, field, s)) {
+                 if (s[0] != '\0' && field->type == META_TYPE_ENUM) {
+                     LOG_WARN("UiParser: Unknown enum value '%s' for type '%s'", s, field->type_name);
+                 }
+             }
+        }
+    }
+}
+
 // --- Recursive Loader ---
 
-static UiNodeSpec* load_recursive(UiAsset* asset, const ConfigNode* node) {
+static SceneNodeSpec* load_recursive(UiAsset* asset, const ConfigNode* node) {
     if (!node || node->type != CONFIG_NODE_MAP) return NULL;
 
-    UiNodeSpec* spec = NULL;
+    SceneNodeSpec* spec = NULL;
 
     // 1. Determine Base (Template or Kind)
     const ConfigNode* type_node = config_node_map_get(node, "type");
@@ -57,11 +109,11 @@ static UiNodeSpec* load_recursive(UiAsset* asset, const ConfigNode* node) {
         if (strcmp(type_node->scalar, "instance") == 0) {
             const ConfigNode* inst_node = config_node_map_get(node, "instance");
             if (inst_node && inst_node->scalar) {
-                UiNodeSpec* template_spec = ui_asset_get_template(asset, inst_node->scalar);
+                SceneNodeSpec* template_spec = ui_asset_get_template(asset, inst_node->scalar);
                 if (template_spec) spec = ui_node_spec_copy(asset, template_spec);
             }
         } else {
-            UiNodeSpec* template_spec = ui_asset_get_template(asset, type_node->scalar);
+            SceneNodeSpec* template_spec = ui_asset_get_template(asset, type_node->scalar);
             if (template_spec) spec = ui_node_spec_copy(asset, template_spec);
         }
     }
@@ -69,14 +121,14 @@ static UiNodeSpec* load_recursive(UiAsset* asset, const ConfigNode* node) {
     if (!spec) {
         spec = ui_asset_push_node(asset);
         // Default values for new nodes
-        spec->width = -1.0f;
-        spec->height = -1.0f;
-        spec->color = (Vec4){1,1,1,1};
-        spec->text_color = (Vec4){1,1,1,1};
-        spec->caret_color = (Vec4){1,1,1,1};
+        spec->layout.width = -1.0f;
+        spec->layout.height = -1.0f;
+        spec->style.color = (Vec4){1,1,1,1};
+        spec->style.text_color = (Vec4){1,1,1,1};
+        spec->style.caret_color = (Vec4){1,1,1,1};
     }
 
-    const MetaStruct* meta = meta_get_struct("UiNodeSpec");
+    const MetaStruct* meta = meta_get_struct("SceneNodeSpec");
 
     // Iterate all pairs in the YAML map to apply overrides
     for (size_t i = 0; i < node->pair_count; ++i) {
@@ -91,8 +143,6 @@ static UiNodeSpec* load_recursive(UiAsset* asset, const ConfigNode* node) {
         }
 
         if (strcmp(key, "type") == 0) {
-             // If it's a template name, we already handled it. 
-             // If not, parse as kind.
              if (ui_asset_get_template(asset, val->scalar) == NULL) {
                  spec->kind = parse_kind(val->scalar, &spec->flags);
              }
@@ -104,17 +154,17 @@ static UiNodeSpec* load_recursive(UiAsset* asset, const ConfigNode* node) {
         if (strcmp(key, "children") == 0) {
             if (val->type == CONFIG_NODE_SEQUENCE) {
                 spec->child_count = val->item_count;
-                spec->children = (UiNodeSpec**)arena_alloc_zero(&asset->arena, spec->child_count * sizeof(UiNodeSpec*));
+                spec->children = (SceneNodeSpec**)arena_alloc_zero(&asset->arena, spec->child_count * sizeof(SceneNodeSpec*));
                 for (size_t k = 0; k < spec->child_count; ++k) {
                     spec->children[k] = load_recursive(asset, val->items[k]);
                 }
             }
             continue;
         }
-        // ... rest of overrides ...
+        
         if (strcmp(key, "item_template") == 0) {
             if (val->type == CONFIG_NODE_SCALAR) {
-                UiNodeSpec* t = ui_asset_get_template(asset, val->scalar);
+                SceneNodeSpec* t = ui_asset_get_template(asset, val->scalar);
                 if (t) spec->item_template = ui_node_spec_copy(asset, t);
                 else LOG_ERROR("UiParser: Template '%s' not found for item_template", val->scalar);
             } else {
@@ -122,18 +172,24 @@ static UiNodeSpec* load_recursive(UiAsset* asset, const ConfigNode* node) {
             }
             continue;
         }
-
         
         // --- Generic Reflection ---
         const MetaField* field = meta_find_field(meta, key);
-        // NOTE: Manual alias checking removed! YAML keys must match C struct fields now.
-        // e.g. "text" -> field "text", "bind_x" -> field "bind_x"
 
         if (field) {
-            // Handle Sequence for Vectors (e.g. color: [1, 0, 0, 1])
-            if (val->type == CONFIG_NODE_SEQUENCE && (field->type >= META_TYPE_VEC2 && field->type <= META_TYPE_VEC4)) {
-                int vec_size = field->type - META_TYPE_VEC2 + 2; // VEC2->2, VEC3->3, VEC4->4
-                float* data_ptr = (float*)meta_get_field_ptr(spec, field);
+            void* field_ptr = (char*)spec + field->offset;
+
+            // Handle Sub-Structs (layout, style, transform)
+            if (field->type == META_TYPE_STRUCT) {
+                 const MetaStruct* sub_meta = meta_get_struct(field->type_name);
+                 if (sub_meta) {
+                     parse_struct_fields(field_ptr, sub_meta, val, asset);
+                 }
+            }
+            // Handle Sequence for Vectors
+            else if (val->type == CONFIG_NODE_SEQUENCE && (field->type >= META_TYPE_VEC2 && field->type <= META_TYPE_VEC4)) {
+                int vec_size = field->type - META_TYPE_VEC2 + 2; 
+                float* data_ptr = (float*)field_ptr;
                 if (data_ptr) {
                     for (int k = 0; k < vec_size; ++k) {
                         float v = 0.0f;
@@ -161,15 +217,13 @@ static UiNodeSpec* load_recursive(UiAsset* asset, const ConfigNode* node) {
                      }
                  } else {
                      char* str_copy = arena_push_string(&asset->arena, s);
-                     char** field_ptr = (char**)meta_get_field_ptr(spec, field);
-                     if (field_ptr) *field_ptr = str_copy;
+                     *(char**)field_ptr = str_copy;
                  }
             } 
-            // Handle Scalars (Int, Float, Bool, Enum, StringId, Vec Hex)
+            // Handle Scalars
             else {
                  const char* s = val->scalar ? val->scalar : "";
                  if (!meta_set_from_string(spec, field, s)) {
-                     // Only warn if it's not empty string (sometimes empty strings happen)
                      if (s[0] != '\0' && field->type == META_TYPE_ENUM) {
                          LOG_WARN("UiParser: Unknown enum value '%s' for type '%s'", s, field->type_name);
                      }
@@ -180,7 +234,7 @@ static UiNodeSpec* load_recursive(UiAsset* asset, const ConfigNode* node) {
                  spec->provider_id = str_id(val->scalar);
              }
         } else {
-            LOG_WARN("UiParser: Unknown field '%s' in UiNodeSpec (Node ID:%u). Check indentation or spelling.", key, spec->id);
+            LOG_WARN("UiParser: Unknown field '%s' in SceneNodeSpec (Node ID:%u). Check indentation or spelling.", key, spec->id);
         }
     }
 
@@ -208,16 +262,16 @@ static ConfigNode* resolve_import(MemoryArena* scratch, const ConfigNode* node) 
 
 // --- Validation ---
 
-static void validate_node(UiNodeSpec* spec, const char* path) {
+static void validate_node(SceneNodeSpec* spec, const char* path) {
     if (!spec) return;
     
-    if (spec->layout == UI_LAYOUT_FLEX_COLUMN || spec->layout == UI_LAYOUT_FLEX_ROW) {
+    if (spec->layout.type == UI_LAYOUT_FLEX_COLUMN || spec->layout.type == UI_LAYOUT_FLEX_ROW) {
         if (spec->bind_x || spec->bind_y) {
             LOG_WARN("UiParser: Node ID:%u uses x/y bindings inside a Flex container. These will be ignored.", spec->id);
         }
     }
     
-    if (spec->layout == UI_LAYOUT_SPLIT_H || spec->layout == UI_LAYOUT_SPLIT_V) {
+    if (spec->layout.type == UI_LAYOUT_SPLIT_H || spec->layout.type == UI_LAYOUT_SPLIT_V) {
         if (spec->child_count != 2) {
             LOG_ERROR("UiParser: Split container ID:%u MUST have exactly 2 children (has %zu).", spec->id, spec->child_count);
         }
@@ -271,7 +325,7 @@ UiAsset* ui_parser_load_internal(const char* path) {
             
             ConfigNode* t_actual = resolve_import(&scratch, t_val);
             
-            UiNodeSpec* spec = load_recursive(asset, t_actual ? t_actual : t_val);
+            SceneNodeSpec* spec = load_recursive(asset, t_actual ? t_actual : t_val);
             if (spec) {
                 UiTemplate* t = (UiTemplate*)arena_alloc_zero(&asset->arena, sizeof(UiTemplate));
                 t->name = arena_push_string(&asset->arena, t_name);

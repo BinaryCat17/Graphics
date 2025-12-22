@@ -13,87 +13,117 @@
 // --- UI SPECIFICATION (The DNA) ---
 // Pure data. Allocated inside a UiAsset arena. Read-only at runtime.
 
-struct UiNodeSpec {
-    // 1. Identity & Behavior
-    StringId id;            // REFLECT
-    UiKind kind;            // REFLECT
-    UiLayoutStrategy layout;// REFLECT
+// Component: Transform (Shared with 3D)
+typedef struct SceneTransformSpec {
+    Vec3 local_position;    // REFLECT
+    Vec3 local_rotation;    // REFLECT
+    Vec3 local_scale;       // REFLECT
+} SceneTransformSpec;
+
+// Component: UI Layout
+typedef struct UiLayoutSpec {
+    UiLayoutStrategy type;  // REFLECT
     UiLayer layer;          // REFLECT
-    UiRenderMode render_mode; // REFLECT
-    uint32_t flags;         // REFLECT(UiFlags)
     
-    // 3. Styling (Reference to style sheet, not implemented yet)
+    // Flexbox / Manual Props
+    float width;            // REFLECT
+    float height;           // REFLECT
+    float padding;          // REFLECT
+    float spacing;          // REFLECT
+    float split_ratio;      // REFLECT
+    
+    // Legacy / Manual offsets (will be deprecated or mapped to transform)
+    float x;                // REFLECT
+    float y;                // REFLECT
+} UiLayoutSpec;
+
+// Component: UI Styling
+typedef struct UiStyleSpec {
+    UiRenderMode render_mode; // REFLECT
+    
+    // Colors
     Vec4 color;             // REFLECT
     Vec4 hover_color;       // REFLECT
     Vec4 active_color;      // REFLECT
+    Vec4 text_color;        // REFLECT
+    Vec4 caret_color;       // REFLECT
+    
+    // Modifiers
     float active_tint;      // REFLECT
     float hover_tint;       // REFLECT
-    Vec4 text_color;        // REFLECT
     float text_scale;       // REFLECT
-    Vec4 caret_color;       // REFLECT
     float caret_width;      // REFLECT
     float caret_height;     // REFLECT
     float animation_speed;  // REFLECT
     
-    // 9-Slice Sizing (if kind == UI_KIND_CONTAINER and texture is used)
+    // Geometry / Shape
     float border_l;         // REFLECT
     float border_t;         // REFLECT
     float border_r;         // REFLECT
     float border_b;         // REFLECT
     float corner_radius;    // REFLECT
+    
+    // Texture
     float tex_w;            // REFLECT
     float tex_h;            // REFLECT
     StringId texture;       // REFLECT
+} UiStyleSpec;
+
+struct SceneNodeSpec {
+    // 1. Identity
+    StringId id;            // REFLECT
+    UiKind kind;            // REFLECT
+    uint32_t flags;         // REFLECT(UiFlags)
     
-    // 4. Data Bindings (Sources)
+    // 2. Components
+    SceneTransformSpec transform; // REFLECT
+    UiLayoutSpec layout;          // REFLECT
+    UiStyleSpec style;            // REFLECT
+    
+    // 3. Data Bindings
     char* bind_text;        // REFLECT
     char* bind;             // REFLECT
     char* bind_visible;     // REFLECT
     char* collection;       // REFLECT
     char* template_selector;// REFLECT
     
-    // 4. Geometry Bindings (For CANVAS layout or manual overrides)
+    // Layout Overrides (Bindings)
     char* bind_x;           // REFLECT
     char* bind_y;           // REFLECT
     char* bind_w;           // REFLECT
     char* bind_h;           // REFLECT
 
-    // 5. Properties (Static defaults)
-    float x;                // REFLECT
-    float y;                // REFLECT
+    // 4. Content
     char* text;             // REFLECT
     char* text_source;      // REFLECT
-    float width;            // REFLECT
-    float height;           // REFLECT
-    float padding;          // REFLECT
-    float spacing;          // REFLECT
-    float split_ratio;      // REFLECT
 
-    // 6. Hierarchy
-    struct UiNodeSpec* item_template; // REFLECT
-    struct UiNodeSpec** children;     // REFLECT
+    // 5. Hierarchy
+    struct SceneNodeSpec* item_template; // REFLECT
+    struct SceneNodeSpec** children;     // REFLECT
     size_t child_count;               // REFLECT
     
-    // 7. Commands
+    // 6. Commands
     StringId on_click;      // REFLECT
     StringId on_change;     // REFLECT
     
-    // 8. Viewport
-    StringId provider_id;   // REFLECT (e.g., "GraphNetwork")
+    // 7. Misc
+    StringId provider_id;   // REFLECT
 };
 
 // --- UI ASSET (The Resource) ---
 // Owns the memory. Created by the Parser.
 
+typedef struct UiTemplate UiTemplate;
+
 struct UiTemplate {
     char* name;
-    UiNodeSpec* spec;
+    SceneNodeSpec* spec;
     struct UiTemplate* next;
 };
 
 struct UiAsset {
     MemoryArena arena;
-    UiNodeSpec* root;
+    SceneNodeSpec* root;
     UiTemplate* templates;
 };
 
@@ -102,7 +132,7 @@ struct UiAsset {
 // Managed by a UiInstance container.
 
 struct UiElement {
-    const UiNodeSpec* spec; // The DNA
+    const SceneNodeSpec* spec; // The DNA
     
     // Hierarchy
     struct UiElement* parent;
@@ -167,6 +197,6 @@ struct UiInstance {
 
 // --- Internal Helper Functions ---
 void ui_bind_read_string(void* data, const MetaField* field, char* out_buf, size_t buf_size);
-UiNodeSpec* ui_asset_push_node(UiAsset* asset);
+SceneNodeSpec* ui_asset_push_node(UiAsset* asset);
 
 #endif // UI_INTERNAL_H

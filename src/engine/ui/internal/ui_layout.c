@@ -13,12 +13,12 @@
 #define UI_INFINITY 10000.0f
 
 static float calculate_width(UiElement* el, float available_w, UiTextMeasureFunc measure_func, void* measure_data) {
-    const UiNodeSpec* spec = el->spec;
-    float w = spec->width;
+    const SceneNodeSpec* spec = el->spec;
+    float w = spec->layout.width;
     if (spec->bind_w) w = el->rect.w; // updated by ui_core
 
     if (w < 0) {
-        bool parent_is_row = (el->parent && el->parent->spec->layout == UI_LAYOUT_FLEX_ROW);
+        bool parent_is_row = (el->parent && el->parent->spec->layout.type == UI_LAYOUT_FLEX_ROW);
         
         if (parent_is_row || spec->kind == UI_KIND_TEXT || (el->flags & UI_FLAG_CLICKABLE)) {
              const char* text = el->cached_text;
@@ -26,9 +26,9 @@ static float calculate_width(UiElement* el, float available_w, UiTextMeasureFunc
 
              if (text && text[0] != '\0') {
                  if (measure_func) {
-                     w = measure_func(text, measure_data) + spec->padding * 2;
+                     w = measure_func(text, measure_data) + spec->layout.padding * 2;
                  } else {
-                     w = strlen(text) * UI_CHAR_WIDTH_EST + spec->padding * 2 + UI_CHAR_WIDTH_EST;
+                     w = strlen(text) * UI_CHAR_WIDTH_EST + spec->layout.padding * 2 + UI_CHAR_WIDTH_EST;
                  }
              } else {
                  w = UI_DEFAULT_WIDTH;
@@ -41,20 +41,20 @@ static float calculate_width(UiElement* el, float available_w, UiTextMeasureFunc
 }
 
 static float calculate_height(UiElement* el, float available_h) {
-    const UiNodeSpec* spec = el->spec;
-    float h = spec->height;
+    const SceneNodeSpec* spec = el->spec;
+    float h = spec->layout.height;
     if (spec->bind_h) h = el->rect.h;
 
     if (h < 0) {
-        if (el->child_count > 0 && spec->layout == UI_LAYOUT_FLEX_COLUMN) {
-            h = spec->padding * 2;
+        if (el->child_count > 0 && spec->layout.type == UI_LAYOUT_FLEX_COLUMN) {
+            h = spec->layout.padding * 2;
              for (UiElement* child = el->first_child; child; child = child->next_sibling) {
                 if (child->flags & UI_FLAG_HIDDEN) continue;
-                float child_h = child->spec->height;
+                float child_h = child->spec->layout.height;
                 if (child_h < 0) child_h = UI_DEFAULT_HEIGHT; 
-                h += child_h + spec->spacing;
+                h += child_h + spec->layout.spacing;
             }
-            if (el->child_count > 0) h -= spec->spacing;
+            if (el->child_count > 0) h -= spec->layout.spacing;
             
             if (available_h > 0 && available_h < UI_INFINITY && h < available_h) {
                 h = available_h;
@@ -72,12 +72,12 @@ static void layout_column(UiElement* el, float start_x, float start_y, float* ou
         if (child->flags & UI_FLAG_HIDDEN) continue;
         child->rect.x = start_x;
         child->rect.y = cursor_y;
-        cursor_y += child->rect.h + el->spec->spacing;
+        cursor_y += child->rect.h + el->spec->layout.spacing;
         
         float child_right = child->rect.x + child->rect.w;
         if (child_right > *out_max_x) *out_max_x = child_right;
     }
-    if (el->child_count > 0) cursor_y -= el->spec->spacing;
+    if (el->child_count > 0) cursor_y -= el->spec->layout.spacing;
     *out_max_y = cursor_y;
 }
 
@@ -87,12 +87,12 @@ static void layout_row(UiElement* el, float start_x, float start_y, float* out_m
         if (child->flags & UI_FLAG_HIDDEN) continue;
         child->rect.x = cursor_x;
         child->rect.y = start_y;
-        cursor_x += child->rect.w + el->spec->spacing;
+        cursor_x += child->rect.w + el->spec->layout.spacing;
         
         float child_bottom = child->rect.y + child->rect.h;
         if (child_bottom > *out_max_y) *out_max_y = child_bottom;
     }
-    if (el->child_count > 0) cursor_x -= el->spec->spacing;
+    if (el->child_count > 0) cursor_x -= el->spec->layout.spacing;
     *out_max_x = cursor_x;
 }
 
@@ -151,7 +151,7 @@ static void layout_recursive(UiElement* el, Rect available, uint64_t frame_numbe
         return;
     }
 
-    const UiNodeSpec* spec = el->spec;
+    const SceneNodeSpec* spec = el->spec;
 
     // 1. Self Size
     el->rect.w = calculate_width(el, available.w, measure_func, measure_data);
@@ -165,8 +165,8 @@ static void layout_recursive(UiElement* el, Rect available, uint64_t frame_numbe
 
     // 2. Prepare Children Layout
     Rect content = {
-        spec->padding, spec->padding,
-        el->rect.w - spec->padding * 2, el->rect.h - spec->padding * 2
+        spec->layout.padding, spec->layout.padding,
+        el->rect.w - spec->layout.padding * 2, el->rect.h - spec->layout.padding * 2
     };
     
     // Recurse First (Depth-first sizing)
@@ -174,12 +174,12 @@ static void layout_recursive(UiElement* el, Rect available, uint64_t frame_numbe
     for (UiElement* child = el->first_child; child; child = child->next_sibling) {
         Rect child_avail = { 0, 0, content.w, content.h };
         
-        if (spec->layout == UI_LAYOUT_SPLIT_H && el->child_count >= 2) {
-             float ratio = spec->split_ratio > 0 ? spec->split_ratio : 0.5f;
+        if (spec->layout.type == UI_LAYOUT_SPLIT_H && el->child_count >= 2) {
+             float ratio = spec->layout.split_ratio > 0 ? spec->layout.split_ratio : 0.5f;
              if (i == 0) child_avail.w = content.w * ratio;
              else child_avail.w = content.w * (1.0f - ratio);
-        } else if (spec->layout == UI_LAYOUT_SPLIT_V && el->child_count >= 2) {
-             float ratio = spec->split_ratio > 0 ? spec->split_ratio : 0.5f;
+        } else if (spec->layout.type == UI_LAYOUT_SPLIT_V && el->child_count >= 2) {
+             float ratio = spec->layout.split_ratio > 0 ? spec->layout.split_ratio : 0.5f;
              if (i == 0) child_avail.h = content.h * ratio;
              else child_avail.h = content.h * (1.0f - ratio);
         }
@@ -195,7 +195,7 @@ static void layout_recursive(UiElement* el, Rect available, uint64_t frame_numbe
     float max_x = start_x; // Use absolute max coordinate tracking
     float max_y = start_y;
     
-    switch (spec->layout) {
+    switch (spec->layout.type) {
         case UI_LAYOUT_FLEX_COLUMN:
             layout_column(el, start_x, start_y, &max_x, &max_y);
             // Convert absolute max back to content relative size
@@ -242,8 +242,8 @@ static void update_screen_rects(UiElement* el, float parent_x, float parent_y) {
 void ui_layout_root(UiElement* root, float window_w, float window_h, uint64_t frame_number, bool log_debug, UiTextMeasureFunc measure_func, void* measure_data) {
     if (!root) return;
     
-    if (root->spec->width < 0) root->rect.w = window_w;
-    if (root->spec->height < 0) root->rect.h = window_h;
+    if (root->spec->layout.width < 0) root->rect.w = window_w;
+    if (root->spec->layout.height < 0) root->rect.h = window_h;
     
     Rect initial_avail = {0, 0, window_w, window_h};
     layout_recursive(root, initial_avail, frame_number, log_debug, measure_func, measure_data);

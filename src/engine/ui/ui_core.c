@@ -37,18 +37,18 @@ UiAsset* ui_asset_create(size_t arena_size) {
     return asset;
 }
 
-void ui_asset_free(UiAsset* asset) {
+void ui_asset_destroy(UiAsset* asset) {
     if (!asset) return;
     arena_destroy(&asset->arena);
     free(asset);
 }
 
-UiNodeSpec* ui_asset_push_node(UiAsset* asset) {
+SceneNodeSpec* ui_asset_push_node(UiAsset* asset) {
     if (!asset) return NULL;
-    return (UiNodeSpec*)arena_alloc_zero(&asset->arena, sizeof(UiNodeSpec));
+    return (SceneNodeSpec*)arena_alloc_zero(&asset->arena, sizeof(SceneNodeSpec));
 }
 
-UiNodeSpec* ui_asset_get_template(UiAsset* asset, const char* name) {
+SceneNodeSpec* ui_asset_get_template(UiAsset* asset, const char* name) {
     if (!asset || !name) return NULL;
     UiTemplate* t = asset->templates;
     while (t) {
@@ -60,7 +60,7 @@ UiNodeSpec* ui_asset_get_template(UiAsset* asset, const char* name) {
     return NULL;
 }
 
-UiNodeSpec* ui_asset_get_root(const UiAsset* asset) {
+SceneNodeSpec* ui_asset_get_root(const UiAsset* asset) {
     return asset ? asset->root : NULL;
 }
 
@@ -95,7 +95,7 @@ UiInstance* ui_instance_create(UiAsset* assets, size_t size) {
     return instance;
 }
 
-void ui_instance_free(UiInstance* instance) {
+void ui_instance_destroy(UiInstance* instance) {
     if (!instance) return;
     if (instance->root) destroy_recursive(instance, instance->root);
     pool_destroy(instance->element_pool);
@@ -149,7 +149,7 @@ Rect ui_element_get_screen_rect(const UiElement* element) {
 
 // --- UiElement (Instance) ---
 
-static UiElement* element_alloc(UiInstance* instance, const UiNodeSpec* spec) {
+static UiElement* element_alloc(UiInstance* instance, const SceneNodeSpec* spec) {
     // Pool allocation guarantees zero-init
     UiElement* el = (UiElement*)pool_alloc(instance->element_pool);
     el->spec = spec;
@@ -273,7 +273,7 @@ void ui_element_rebuild_children(UiElement* el, UiInstance* instance) {
                  }
 
                  if (item_ptr) {
-                     const UiNodeSpec* child_spec = el->spec->item_template;
+                     const SceneNodeSpec* child_spec = el->spec->item_template;
 
                      // Conditional Template Selector
                      if (el->spec->template_selector && instance->assets) {
@@ -283,7 +283,7 @@ void ui_element_rebuild_children(UiElement* el, UiInstance* instance) {
                              const MetaEnum* e = meta_get_enum(sel_field->type_name);
                              const char* t_name = meta_enum_get_name(e, val);
                              if (t_name) {
-                                 UiNodeSpec* t = ui_asset_get_template(instance->assets, t_name);
+                                 SceneNodeSpec* t = ui_asset_get_template(instance->assets, t_name);
                                  if (t) child_spec = t;
                              }
                          }
@@ -299,16 +299,16 @@ void ui_element_rebuild_children(UiElement* el, UiInstance* instance) {
     }
 }
 
-UiElement* ui_element_create(UiInstance* instance, const UiNodeSpec* spec, void* data, const MetaStruct* meta) {
+UiElement* ui_element_create(UiInstance* instance, const SceneNodeSpec* spec, void* data, const MetaStruct* meta) {
     if (!instance || !spec) return NULL;
 
     UiElement* el = element_alloc(instance, spec);
     el->data_ptr = data;
     el->meta = meta;
-    el->render_color = spec->color;
+    el->render_color = spec->style.color;
     el->flags = spec->flags; // Init Flags
-    el->rect.x = spec->x;
-    el->rect.y = spec->y;
+    el->rect.x = spec->layout.x;
+    el->rect.y = spec->layout.y;
 
     // Resolve Commands
     if (spec->on_click) {
@@ -366,9 +366,9 @@ void ui_element_update(UiElement* element, float dt) {
     if (!element || !element->spec) return;
     
     // 0. Animation Interpolation
-    const UiNodeSpec* spec = element->spec;
+    const SceneNodeSpec* spec = element->spec;
     float target_t = element->is_hovered ? 1.0f : 0.0f;
-    float speed = spec->animation_speed > 0 ? spec->animation_speed : 10.0f; // Default speed
+    float speed = spec->style.animation_speed > 0 ? spec->style.animation_speed : 10.0f; // Default speed
     
     if (element->hover_t != target_t) {
         float diff = target_t - element->hover_t;
@@ -377,11 +377,11 @@ void ui_element_update(UiElement* element, float dt) {
         else element->hover_t += (diff > 0 ? 1.0f : -1.0f) * step;
         
         // Update Animated Color
-        if (spec->hover_color.w > 0 || spec->hover_color.x > 0 || spec->hover_color.y > 0 || spec->hover_color.z > 0) {
-            element->render_color.x = spec->color.x + (spec->hover_color.x - spec->color.x) * element->hover_t;
-            element->render_color.y = spec->color.y + (spec->hover_color.y - spec->color.y) * element->hover_t;
-            element->render_color.z = spec->color.z + (spec->hover_color.z - spec->color.z) * element->hover_t;
-            element->render_color.w = spec->color.w + (spec->hover_color.w - spec->color.w) * element->hover_t;
+        if (spec->style.hover_color.w > 0 || spec->style.hover_color.x > 0 || spec->style.hover_color.y > 0 || spec->style.hover_color.z > 0) {
+            element->render_color.x = spec->style.color.x + (spec->style.hover_color.x - spec->style.color.x) * element->hover_t;
+            element->render_color.y = spec->style.color.y + (spec->style.hover_color.y - spec->style.color.y) * element->hover_t;
+            element->render_color.z = spec->style.color.z + (spec->style.hover_color.z - spec->style.color.z) * element->hover_t;
+            element->render_color.w = spec->style.color.w + (spec->style.hover_color.w - spec->style.color.w) * element->hover_t;
         }
     }
 

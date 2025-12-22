@@ -6,21 +6,21 @@
 #include <stdlib.h>
 
 // --- Helper: Build Def Tree first ---
-static UiNodeSpec* create_node(UiAsset* asset, UiLayoutStrategy layout, float w, float h, const char* id) {
-    UiNodeSpec* spec = ui_asset_push_node(asset);
+static SceneNodeSpec* create_node(UiAsset* asset, UiLayoutStrategy layout, float w, float h, const char* id) {
+    SceneNodeSpec* spec = ui_asset_push_node(asset);
     if (!spec) return NULL;
-    spec->layout = layout;
-    spec->width = w;
-    spec->height = h;
+    spec->layout.type = layout;
+    spec->layout.width = w;
+    spec->layout.height = h;
     spec->id = str_id(id ? id : "node");
     return spec;
 }
 
-static void add_child_spec(UiAsset* asset, UiNodeSpec* parent, UiNodeSpec* child) {
+static void add_child_spec(UiAsset* asset, SceneNodeSpec* parent, SceneNodeSpec* child) {
     parent->child_count++;
-    UiNodeSpec** new_children = (UiNodeSpec**)arena_alloc(&asset->arena, parent->child_count * sizeof(UiNodeSpec*));
+    SceneNodeSpec** new_children = (SceneNodeSpec**)arena_alloc(&asset->arena, parent->child_count * sizeof(SceneNodeSpec*));
     if (parent->children) {
-        memcpy((void*)new_children, (const void*)parent->children, (parent->child_count - 1) * sizeof(UiNodeSpec*));
+        memcpy((void*)new_children, (const void*)parent->children, (parent->child_count - 1) * sizeof(SceneNodeSpec*));
     }
     new_children[parent->child_count - 1] = child;
     parent->children = new_children;
@@ -31,12 +31,12 @@ static void add_child_spec(UiAsset* asset, UiNodeSpec* parent, UiNodeSpec* child
 int test_column_layout(void) {
     UiAsset* asset = ui_asset_create(4096);
 
-    UiNodeSpec* root = create_node(asset, UI_LAYOUT_FLEX_COLUMN, 100.0f, 200.0f, "root");
-    root->spacing = 10.0f;
-    root->padding = 5.0f;
+    SceneNodeSpec* root = create_node(asset, UI_LAYOUT_FLEX_COLUMN, 100.0f, 200.0f, "root");
+    root->layout.spacing = 10.0f;
+    root->layout.padding = 5.0f;
     
-    UiNodeSpec* c1 = create_node(asset, UI_LAYOUT_FLEX_COLUMN, 50.0f, 50.0f, "c1");
-    UiNodeSpec* c2 = create_node(asset, UI_LAYOUT_FLEX_COLUMN, 50.0f, 50.0f, "c2");
+    SceneNodeSpec* c1 = create_node(asset, UI_LAYOUT_FLEX_COLUMN, 50.0f, 50.0f, "c1");
+    SceneNodeSpec* c2 = create_node(asset, UI_LAYOUT_FLEX_COLUMN, 50.0f, 50.0f, "c2");
     
     add_child_spec(asset, root, c1);
     add_child_spec(asset, root, c2);
@@ -59,8 +59,8 @@ int test_column_layout(void) {
     TEST_ASSERT_FLOAT_EQ(v2->rect.x, 5.0f, 0.1f);
     TEST_ASSERT_FLOAT_EQ(v2->rect.y, 65.0f, 0.1f);
 
-    ui_instance_free(instance);
-    ui_asset_free(asset);
+    ui_instance_destroy(instance);
+    ui_asset_destroy(asset);
     return 1;
 }
 

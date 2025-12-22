@@ -7,6 +7,34 @@
 
 Structural standardization (Phase 6) is largely complete, but critical limitations in the UI module were identified during the Phase 7 kickoff.
 
+### Phase 3: Compositional Scene Architecture (Architectural Pivot)
+**Objective:** Transition from a UI-centric generic node to a specialized component-based Scene Graph. This is critical for the "Math Engine" goal to support complex physical simulations and 3D hierarchies without polluting the UI logic.
+
+**3.0. YAML Migration (IMMEDIATE NEXT STEP)**
+*   [ ] **Migrate YAML Assets:** The C code now expects nested components (`layout`, `style`), but YAML files are still flat.
+    *   Action: Update all files in `assets/ui/**/*.yaml`.
+    *   Example: Move `width: 100` -> `layout: { width: 100 }`, `color: ...` -> `style: { color: ... }`.
+    *   Target files: `templates/node.yaml`, `layouts/editor_layout.yaml`, etc.
+
+**3.1. Data Structuring (Refactoring `UiNodeSpec`) - DONE ✅**
+*   [x] **Component Decomposition:** Break the flat `UiNodeSpec` struct into semantic sub-structs:
+    *   `SceneTransformSpec` (pos, rot, scale)
+    *   `UiLayoutSpec` (width, padding, flex props)
+    *   `UiStyleSpec` (colors, borders, effects)
+*   [x] **Codebase Migration:** Update `ui_parser.c`, `ui_layout.c`, and `ui_renderer.c` to access data via these sub-structs.
+*   [x] **Reflection Update:** `tools/codegen.py` and `ui_parser.c` now handle nested `META_TYPE_STRUCT` recursively.
+
+**3.2. The Unified Scene Graph (Runtime)**
+*   [ ] **Transform System:** Introduce `Mat4 local_matrix` and `Mat4 world_matrix` to the runtime node (formerly `UiElement`).
+*   [ ] **Scene Node Rename:** (Gradual) Alias `UiElement` to `SceneNode`.
+*   [ ] **Matrix Propagation:** Implement a pass to update World Matrices (`Parent * Local`) before layout/rendering.
+*   [ ] **Layout Integration:** Modify the UI Layout solver to output results into the `SceneTransformSpec` or `local_matrix`, bridging the gap between Flexbox (2D) and Scene (3D).
+
+**3.3. 3D Capability Expansion**
+*   [ ] **Mesh Component:** Add `SceneMeshSpec` (mesh asset id, material params) to the Node Spec.
+*   [ ] **Renderer Adaptation:** Update `ui_renderer_build_scene` (or create `scene_builder_build`) to check for `MeshSpec`. If present, emit 3D `SceneObject`s instead of UI Quads.
+*   [ ] **Binding V2:** Ensure data binding supports dot-notation for components (e.g., `bind: "transform.position.y"`).
+
 ### Phase 4.5: Code Hygiene & Refactoring (Follow-up)
 **Objective:** Address technical debt identified during the Viewport implementation to ensure the editor is maintainable and scalable.
 - [x] **Refactor: Explicit UI Render Modes:** Replace implicit rendering logic (Text/Texture/SDF guessing) with explicit `UiRenderMode` enum (`Box`, `Text`, `Image`, `Bezier`) in `UiNodeSpec`.
@@ -55,14 +83,6 @@ The codebase enforces strict Public/Internal API boundaries across all modules. 
 ---
 
 ## 🚀 Active Phases
-
-### Phase 3: Data-Driven Scene Architecture (IMMEDIATE PRIORITY)
-**Objective:** Transition the entire rendering pipeline (2D & 3D) to a fully declarative, data-driven architecture defined in YAML. Elimination of ad-hoc "immediate mode" rendering in high-level game code.
-- [ ] **Unified Scene Graph:** Extend `UiElement` concept to a generic `SceneNode` that supports both 2D (UI) and 3D (Mesh, Light, Camera) objects.
-- [ ] **YAML 3D Support:** Extend parser to support 3D transforms (`position`, `rotation`, `scale`) and 3D-specific components (`mesh`, `material`).
-- [ ] **Data Binding for 3D:** Implement binding of C data structures (arrays, fields) to 3D scene instances (e.g., spawning an army of `Enemy3D` templates from a `GameState` array).
-- [ ] **Module Registry:** Create a system to register custom renderers (e.g., "Oscilloscope", "ParticleSystem") that can be referenced by name in YAML, encapsulating their low-level drawing logic.
-- [ ] **World-Space UI:** Enable UI containers to exist within the 3D scene graph (Billboards, Surface UI).
 
 ### Phase 7: 3D Visualization & Compute (DEPENDS ON PHASE 3)
 **Objective:** Visualize mathematical functions and data in 3D space.

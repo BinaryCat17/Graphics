@@ -433,14 +433,14 @@ void math_editor_destroy(MathEditor* editor) {
     if (!editor) return;
     
     ui_input_destroy(editor->input_ctx);
-    ui_instance_free(editor->ui_instance);
+    ui_instance_destroy(editor->ui_instance);
     
     // Explicitly destroy graph resources (pool, ptrs)
     math_graph_destroy(editor->graph);
     
     arena_destroy(&editor->graph_arena);
     
-    if (editor->ui_asset) ui_asset_free(editor->ui_asset);
+    if (editor->ui_asset) ui_asset_destroy(editor->ui_asset);
 
     if (editor->selected_nodes) free((void*)editor->selected_nodes);
     if (editor->palette_items) {

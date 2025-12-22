@@ -10,7 +10,7 @@
 // Forward Declarations
 typedef struct MetaStruct MetaStruct;
 typedef struct MetaField MetaField;
-typedef struct UiNodeSpec UiNodeSpec; // From ui_assets.h
+typedef struct SceneNodeSpec SceneNodeSpec; // From ui_assets.h
 
 // --- CONSTANTS & FLAGS ---
 
@@ -79,12 +79,12 @@ typedef struct UiInstance UiInstance;
 void ui_system_init(void);
 void ui_system_shutdown(void);
 UiInstance* ui_instance_create(UiAsset* assets, size_t size);
-void ui_instance_free(UiInstance* instance);
+void ui_instance_destroy(UiInstance* instance);
 UiElement* ui_instance_get_root(const UiInstance* instance);
 void ui_instance_set_root(UiInstance* instance, UiElement* root);
 
 // Allocates element from instance arena.
-UiElement* ui_element_create(UiInstance* instance, const UiNodeSpec* spec, void* data, const MetaStruct* meta);
+UiElement* ui_element_create(UiInstance* instance, const SceneNodeSpec* spec, void* data, const MetaStruct* meta);
 
 // Rebuilds children (Static + Dynamic) for an existing element.
 void ui_element_rebuild_children(UiElement* element, UiInstance* instance);
