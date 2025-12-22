@@ -1,5 +1,5 @@
 #include "test_framework.h"
-#include "engine/ui/internal/ui_internal.h"
+#include "engine/scene_system/internal/ui_internal.h"
 #include "foundation/memory/arena.h"
 #include <stdio.h>
 #include <string.h>

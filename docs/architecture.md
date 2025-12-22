@@ -24,7 +24,7 @@ Zero-dependency utilities: Memory, Platform, Math, Logger, Config, Reflection.
 
 ### ⚙️ Engine (`src/engine/`)
 **"The Machine"**
-Systems for interactive applications: Core, Graphics, Scene, Text, UI, Assets.
+Systems for interactive applications: Core, Graphics, Scene, Text, Scene System (UI), Assets.
 
 ### 🧩 Features (`src/features/`)
 **"The Logic"**
@@ -42,10 +42,10 @@ To maintain long-term maintainability and prevent "spaghetti code," we rigidly s
 
 ### 📂 Directory Structure Pattern
 
-Every major module (e.g., `src/engine/ui`) must follow this exact layout:
+Every major module (e.g., `src/engine/scene_system`) must follow this exact layout:
 
 ```text
-src/engine/ui/
+src/engine/scene_system/
 ├── ui_core.h          # [PUBLIC] A public contract. External modules may include this.
 ├── ui_core.c          # [PRIVATE] Implementation of the public API.
 └── internal/          # [PRIVATE] Hidden from the rest of the codebase.
@@ -71,7 +71,7 @@ The project strictly enforces **C11 (ISO/IEC 9899:2011)**.
 
 #### 3. Public Headers (The Module Root)
 *   **Purpose:** Defines *what* the module does, not *how*.
-*   **Location:** Any `.h` file in the module's root directory (e.g., `src/engine/ui/*.h`).
+*   **Location:** Any `.h` file in the module's root directory (e.g., `src/engine/scene_system/*.h`).
 *   **Content:**
     *   **Opaque Handles:** Use `typedef struct MySystem MySystem;` instead of defining the struct. This prevents users from accessing internal state directly.
     *   **Enums/Flags:** Only those required for API arguments.
@@ -89,9 +89,9 @@ The project strictly enforces **C11 (ISO/IEC 9899:2011)**.
     *   **Exception:** White-box tests in `tests/` are allowed to include internal headers to verify complex logic.
 
 #### 3. Include Graph
-*   `src/app/main.c` -> `#include "engine/ui/ui_core.h"` (✅ OK)
-*   `src/app/main.c` -> `#include "engine/ui/internal/ui_layout.h"` (❌ **VIOLATION**)
-*   `src/engine/ui/ui_core.c` -> `#include "internal/ui_layout.h"` (✅ OK)
+*   `src/app/main.c` -> `#include "engine/scene_system/ui_core.h"` (✅ OK)
+*   `src/app/main.c` -> `#include "engine/scene_system/internal/ui_layout.h"` (❌ **VIOLATION**)
+*   `src/engine/scene_system/ui_core.c` -> `#include "internal/ui_layout.h"` (✅ OK)
 
 ---
 

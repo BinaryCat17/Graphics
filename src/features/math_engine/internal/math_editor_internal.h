@@ -1,10 +1,10 @@
 #ifndef MATH_EDITOR_INTERNAL_H
 #define MATH_EDITOR_INTERNAL_H
 
-#include "engine/ui/ui_core.h"
-#include "engine/ui/ui_assets.h"
-#include "engine/ui/ui_input.h"
-#include "engine/ui/ui_renderer.h"
+#include "engine/scene_system/ui_core.h"
+#include "engine/scene_system/ui_assets.h"
+#include "engine/scene_system/ui_input.h"
+#include "engine/scene_system/ui_renderer.h"
 #include "features/math_engine/math_graph.h"
 
 // --- Layout Constants ---
