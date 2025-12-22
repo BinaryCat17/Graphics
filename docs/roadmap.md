@@ -16,6 +16,14 @@ Structural standardization (Phase 6) is largely complete, but critical limitatio
 - [x] **Feature Migration:** Refactor `MathEditor` to implement `SceneObjectProvider` for Wires/Ports. The provider manually applies `screen_rect.x/y` offsets to its objects.
 - [x] **YAML Migration:** Update `manifest.yaml` to define the graph canvas as a `viewport` with `provider: GraphNetwork`.
 
+### Phase 4.5: Code Hygiene & Refactoring (Follow-up)
+**Objective:** Address technical debt identified during the Viewport implementation to ensure the editor is maintainable and scalable.
+- [ ] **Refactor: Scene Draw API:** Abstract low-level `SceneObject` creation into a high-level API (`scene_draw_curve`, `scene_draw_rect_sdf`, `scene_draw_circle`) to stop leaking shader details into Feature modules.
+- [ ] **Refactor: Split MathEditor:** Decompose `math_editor.c` into `math_editor_logic.c` (Input/State) and `math_editor_view.c` (Rendering Provider) to separate concerns.
+- [ ] **Refactor: Data-Driven Layout:** Extract hardcoded layout constants (`NODE_WIDTH`, `LAYER_OFFSET_...`) into a `MathEditorConfig` struct loaded from YAML to allow theming without recompilation.
+- [ ] **Refactor: Dynamic Provider Registry:** Replace the static `MAX_UI_PROVIDERS` array in `ui_renderer.c` with a dynamic structure (Map or List) to remove arbitrary limits.
+- [ ] **Refactor: Input State Machine:** Replace ad-hoc boolean flags in `math_editor_update` with a formal Finite State Machine (Idle, Dragging, Connecting) for robust input handling.
+
 ### Phase 5: Stability & Validation (Refinement)
 **Objective:** Resolve data-binding warnings and schema inconsistencies found during enhanced logging.
 - [x] **Fix: White Inspector:** Resolve the persistent white background issue (still visible in screenshots).

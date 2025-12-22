@@ -124,4 +124,10 @@ uint64_t scene_get_frame_number(const Scene* scene);
 // Do not free or persist this pointer across frames.
 const SceneObject* scene_get_all_objects(const Scene* scene, size_t* out_count);
 
+// --- High-Level Drawing API ---
+
+void scene_push_rect_sdf(Scene* scene, Vec3 pos, Vec2 size, Vec4 color, float radius, float border, Vec4 clip_rect);
+void scene_push_circle_sdf(Scene* scene, Vec3 center, float radius, Vec4 color, Vec4 clip_rect);
+void scene_push_curve(Scene* scene, Vec3 start, Vec3 end, float thickness, Vec4 color, Vec4 clip_rect);
+
 #endif // SCENE_H

@@ -455,46 +455,20 @@ static void math_editor_render_ports(MathEditor* editor, Scene* scene, Vec4 clip
             float x = view->x + clip_rect.x;
             float y = view->y + NODE_HEADER_HEIGHT + (k * NODE_PORT_SPACING) + clip_rect.y;
             
-            SceneObject port = {0};
-            port.id = (node->id << 8) | (k + 1); // Pseudo ID
-            port.layer = LAYER_UI_CONTENT; // Draw on top of background but below text? Or just content.
-            port.prim_type = SCENE_PRIM_QUAD;
-            port.position = (Vec3){x, y, base_z + LAYER_OFFSET_PORT};
-            port.scale = (Vec3){NODE_PORT_SIZE, NODE_PORT_SIZE, 1.0f};
-            port.color = (Vec4){0.5f, 0.5f, 0.5f, 1.0f}; // Grey
-            port.uv_rect = (Vec4){0.0f, 0.0f, 1.0f, 1.0f};
-            port.ui.clip_rect = clip_rect;
+            // Center of the port
+            Vec3 center = {x + NODE_PORT_SIZE * 0.5f, y + NODE_PORT_SIZE * 0.5f, base_z + LAYER_OFFSET_PORT};
             
-            // SDF Circle
-            port.ui.style_params.x = (float)SCENE_MODE_SDF_BOX; 
-            port.ui.style_params.y = 5.0f; // Radius (Half size)
-            port.ui.style_params.z = 1.0f; // Border thickness
-            
-            scene_add_object(scene, port);
+            scene_push_circle_sdf(scene, center, NODE_PORT_SIZE * 0.5f, (Vec4){0.5f, 0.5f, 0.5f, 1.0f}, clip_rect);
         }
 
-        // Render Output (All nodes have 1 output except OUTPUT node? Actually OUTPUT node consumes input.
-        // Value nodes have output. Math ops have output.
-        // Let's assume all nodes except OUTPUT have an output port on the right.
+        // Render Output
         if (node->type != MATH_NODE_OUTPUT) {
             float x = view->x + NODE_WIDTH + clip_rect.x;
             float y = view->y + NODE_HEADER_HEIGHT + clip_rect.y;
             
-            SceneObject port = {0};
-            port.id = (node->id << 8) | 0xFF; // Pseudo ID
-            port.layer = LAYER_UI_CONTENT;
-            port.prim_type = SCENE_PRIM_QUAD;
-            port.position = (Vec3){x, y, base_z + LAYER_OFFSET_PORT};
-            port.scale = (Vec3){NODE_PORT_SIZE, NODE_PORT_SIZE, 1.0f};
-            port.color = (Vec4){0.5f, 0.5f, 0.5f, 1.0f};
-            port.uv_rect = (Vec4){0.0f, 0.0f, 1.0f, 1.0f};
-            port.ui.clip_rect = clip_rect;
+            Vec3 center = {x + NODE_PORT_SIZE * 0.5f, y + NODE_PORT_SIZE * 0.5f, base_z + LAYER_OFFSET_PORT};
             
-            port.ui.style_params.x = (float)SCENE_MODE_SDF_BOX; 
-            port.ui.style_params.y = 5.0f; // Radius
-            port.ui.style_params.z = 1.0f; // Border
-            
-            scene_add_object(scene, port);
+            scene_push_circle_sdf(scene, center, NODE_PORT_SIZE * 0.5f, (Vec4){0.5f, 0.5f, 0.5f, 1.0f}, clip_rect);
         }
     }
 }
@@ -517,53 +491,19 @@ static void math_editor_render_connections(MathEditor* editor, Scene* scene, Vec
             MathNodeView* source_view = math_editor_find_view(editor, source_id);
             if (!source_view) continue;
 
-            // Calculate endpoints (Must match render_ports logic)
-            float start_x = source_view->x + NODE_WIDTH + clip_rect.x; 
-            float start_y = source_view->y + NODE_HEADER_HEIGHT + clip_rect.y; 
+            // Calculate endpoints (Must match render_ports logic, center of port)
+            // Note: Ports are drawn at (x,y) with size NODE_PORT_SIZE. Center is + size/2.
             
-            float end_x = target_view->x + clip_rect.x;
-            float end_y = target_view->y + NODE_HEADER_HEIGHT + (k * NODE_PORT_SPACING) + clip_rect.y;
+            float start_x = source_view->x + NODE_WIDTH + clip_rect.x + NODE_PORT_SIZE * 0.5f; 
+            float start_y = source_view->y + NODE_HEADER_HEIGHT + clip_rect.y + NODE_PORT_SIZE * 0.5f; 
             
-            // Bounding Box
-            float min_x = start_x < end_x ? start_x : end_x;
-            float max_x = start_x > end_x ? start_x : end_x;
-            float min_y = start_y < end_y ? start_y : end_y;
-            float max_y = start_y > end_y ? start_y : end_y;
+            float end_x = target_view->x + clip_rect.x + NODE_PORT_SIZE * 0.5f;
+            float end_y = target_view->y + NODE_HEADER_HEIGHT + (k * NODE_PORT_SPACING) + clip_rect.y + NODE_PORT_SIZE * 0.5f;
             
-            float padding = 50.0f;
-            min_x -= padding; min_y -= padding;
-            max_x += padding; max_y += padding;
+            Vec3 start = {start_x, start_y, base_z + LAYER_OFFSET_WIRE};
+            Vec3 end = {end_x, end_y, base_z + LAYER_OFFSET_WIRE};
             
-            float width = max_x - min_x;
-            float height = max_y - min_y;
-            
-            if (width < 1.0f) width = 1.0f;
-            if (height < 1.0f) height = 1.0f;
-
-            // Normalize Points to 0..1 relative to Quad
-            float u1 = (start_x - min_x) / width;
-            float v1 = (start_y - min_y) / height;
-            float u2 = (end_x - min_x) / width;
-            float v2 = (end_y - min_y) / height;
-
-            SceneObject wire = {0};
-            wire.id = (target_node->id << 16) | (source_id & 0xFFFF); 
-            wire.layer = LAYER_UI_BACKGROUND;
-            wire.prim_type = SCENE_PRIM_CURVE; 
-            wire.position = (Vec3){min_x + width*0.5f, min_y + height*0.5f, base_z + LAYER_OFFSET_WIRE};
-            wire.scale = (Vec3){width, height, 1.0f};
-            wire.color = (Vec4){0.8f, 0.8f, 0.8f, 1.0f}; 
-            
-            // Fix: Set UV Rect so shader receives correct UVs
-            wire.uv_rect = (Vec4){0.0f, 0.0f, 1.0f, 1.0f};
-            wire.ui.clip_rect = clip_rect;
-
-            wire.ui.style_params.y = 1.0f; // Curve Type
-            wire.ui.extra_params = (Vec4){u1, v1, u2, v2};
-            wire.ui.style_params.z = 3.0f / height; 
-            wire.ui.style_params.w = width / height; // AR
-            
-            scene_add_object(scene, wire);
+            scene_push_curve(scene, start, end, 3.0f, (Vec4){0.8f, 0.8f, 0.8f, 1.0f}, clip_rect);
         }
     }
 }
