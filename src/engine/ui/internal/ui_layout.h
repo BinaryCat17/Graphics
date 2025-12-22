@@ -10,6 +10,6 @@
 #include <stdint.h>
 #include <stdbool.h>
 
-void ui_layout_root(UiElement* root, float window_w, float window_h, uint64_t frame_number, bool log_debug, UiTextMeasureFunc measure_func, void* measure_data);
+void ui_layout_root(SceneNode* root, float window_w, float window_h, uint64_t frame_number, bool log_debug, UiTextMeasureFunc measure_func, void* measure_data);
 
 #endif // UI_LAYOUT_H

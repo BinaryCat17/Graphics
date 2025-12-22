@@ -74,6 +74,10 @@ bool meta_enum_get_value(const MetaEnum* meta_enum, const char* name_str, int* o
 // Helper to find enum name by value
 const char* meta_enum_get_name(const MetaEnum* meta_enum, int value);
 
+// Helper to find a field by dot-notation path (e.g. "transform.position.x")
+// Returns the final field and writes the total byte offset from the root instance to *out_offset.
+const MetaField* meta_find_field_by_path(const MetaStruct* root_meta, const char* path, size_t* out_offset);
+
 // Sets a field value parsing it from a string representation.
 // Returns true if parsing/setting was successful.
 bool meta_set_from_string(void* instance, const MetaField* field, const char* value_str);

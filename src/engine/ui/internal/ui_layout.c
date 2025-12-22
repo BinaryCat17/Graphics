@@ -12,10 +12,10 @@
 #define UI_CHAR_WIDTH_EST 10.0f
 #define UI_INFINITY 10000.0f
 
-static float calculate_width(UiElement* el, float available_w, UiTextMeasureFunc measure_func, void* measure_data) {
+static float calculate_width(SceneNode* el, float available_w, UiTextMeasureFunc measure_func, void* measure_data) {
     const SceneNodeSpec* spec = el->spec;
     float w = spec->layout.width;
-    if (spec->bind_w) w = el->rect.w; // updated by ui_core
+    if (scene_node_get_binding(el, BINDING_TARGET_LAYOUT_WIDTH)) w = el->rect.w; // updated by ui_core
 
     if (w < 0) {
         bool parent_is_row = (el->parent && el->parent->spec->layout.type == UI_LAYOUT_FLEX_ROW);
@@ -40,15 +40,15 @@ static float calculate_width(UiElement* el, float available_w, UiTextMeasureFunc
     return w;
 }
 
-static float calculate_height(UiElement* el, float available_h) {
+static float calculate_height(SceneNode* el, float available_h) {
     const SceneNodeSpec* spec = el->spec;
     float h = spec->layout.height;
-    if (spec->bind_h) h = el->rect.h;
+    if (scene_node_get_binding(el, BINDING_TARGET_LAYOUT_HEIGHT)) h = el->rect.h;
 
     if (h < 0) {
         if (el->child_count > 0 && spec->layout.type == UI_LAYOUT_FLEX_COLUMN) {
             h = spec->layout.padding * 2;
-             for (UiElement* child = el->first_child; child; child = child->next_sibling) {
+             for (SceneNode* child = el->first_child; child; child = child->next_sibling) {
                 if (child->flags & UI_FLAG_HIDDEN) continue;
                 float child_h = child->spec->layout.height;
                 if (child_h < 0) child_h = UI_DEFAULT_HEIGHT; 
@@ -66,9 +66,9 @@ static float calculate_height(UiElement* el, float available_h) {
     return h;
 }
 
-static void layout_column(UiElement* el, float start_x, float start_y, float* out_max_x, float* out_max_y) {
+static void layout_column(SceneNode* el, float start_x, float start_y, float* out_max_x, float* out_max_y) {
     float cursor_y = start_y;
-    for (UiElement* child = el->first_child; child; child = child->next_sibling) {
+    for (SceneNode* child = el->first_child; child; child = child->next_sibling) {
         if (child->flags & UI_FLAG_HIDDEN) continue;
         child->rect.x = start_x;
         child->rect.y = cursor_y;
@@ -81,9 +81,9 @@ static void layout_column(UiElement* el, float start_x, float start_y, float* ou
     *out_max_y = cursor_y;
 }
 
-static void layout_row(UiElement* el, float start_x, float start_y, float* out_max_x, float* out_max_y) {
+static void layout_row(SceneNode* el, float start_x, float start_y, float* out_max_x, float* out_max_y) {
     float cursor_x = start_x;
-    for (UiElement* child = el->first_child; child; child = child->next_sibling) {
+    for (SceneNode* child = el->first_child; child; child = child->next_sibling) {
         if (child->flags & UI_FLAG_HIDDEN) continue;
         child->rect.x = cursor_x;
         child->rect.y = start_y;
@@ -96,10 +96,10 @@ static void layout_row(UiElement* el, float start_x, float start_y, float* out_m
     *out_max_x = cursor_x;
 }
 
-static void layout_canvas(UiElement* el, float* out_max_x, float* out_max_y) {
+static void layout_canvas(SceneNode* el, float* out_max_x, float* out_max_y) {
     *out_max_x = 0;
     *out_max_y = 0;
-    for (UiElement* child = el->first_child; child; child = child->next_sibling) {
+    for (SceneNode* child = el->first_child; child; child = child->next_sibling) {
         if (el->flags & UI_FLAG_SCROLLABLE) {
             child->rect.x -= el->scroll_x;
             child->rect.y -= el->scroll_y;
@@ -116,11 +116,11 @@ static void layout_canvas(UiElement* el, float* out_max_x, float* out_max_y) {
     }
 }
 
-static void layout_split_h(UiElement* el, float start_x, float start_y) {
+static void layout_split_h(SceneNode* el, float start_x, float start_y) {
     if (el->child_count < 2) return;
-    UiElement* c1 = el->first_child;
+    SceneNode* c1 = el->first_child;
     if (!c1) return;
-    UiElement* c2 = c1->next_sibling;
+    SceneNode* c2 = c1->next_sibling;
     if (!c2) return;
     
     c1->rect.x = start_x;
@@ -129,11 +129,11 @@ static void layout_split_h(UiElement* el, float start_x, float start_y) {
     c2->rect.y = start_y;
 }
 
-static void layout_split_v(UiElement* el, float start_x, float start_y) {
+static void layout_split_v(SceneNode* el, float start_x, float start_y) {
     if (el->child_count < 2) return;
-    UiElement* c1 = el->first_child;
+    SceneNode* c1 = el->first_child;
     if (!c1) return;
-    UiElement* c2 = c1->next_sibling;
+    SceneNode* c2 = c1->next_sibling;
     if (!c2) return;
     
     c1->rect.x = start_x;
@@ -142,7 +142,7 @@ static void layout_split_v(UiElement* el, float start_x, float start_y) {
     c2->rect.y = start_y + c1->rect.h;
 }
 
-static void layout_recursive(UiElement* el, Rect available, uint64_t frame_number, bool log_debug, UiTextMeasureFunc measure_func, void* measure_data) {
+static void layout_recursive(SceneNode* el, Rect available, uint64_t frame_number, bool log_debug, UiTextMeasureFunc measure_func, void* measure_data) {
     if (!el || !el->spec) return;
     
     if (el->flags & UI_FLAG_HIDDEN) {
@@ -171,7 +171,7 @@ static void layout_recursive(UiElement* el, Rect available, uint64_t frame_numbe
     
     // Recurse First (Depth-first sizing)
     int i = 0;
-    for (UiElement* child = el->first_child; child; child = child->next_sibling) {
+    for (SceneNode* child = el->first_child; child; child = child->next_sibling) {
         Rect child_avail = { 0, 0, content.w, content.h };
         
         if (spec->layout.type == UI_LAYOUT_SPLIT_H && el->child_count >= 2) {
@@ -226,7 +226,7 @@ static void layout_recursive(UiElement* el, Rect available, uint64_t frame_numbe
     }
 }
 
-static void update_screen_rects(UiElement* el, float parent_x, float parent_y) {
+static void update_screen_rects(SceneNode* el, float parent_x, float parent_y) {
     if (!el) return;
     
     el->screen_rect.x = parent_x + el->rect.x;
@@ -234,12 +234,12 @@ static void update_screen_rects(UiElement* el, float parent_x, float parent_y) {
     el->screen_rect.w = el->rect.w;
     el->screen_rect.h = el->rect.h;
 
-    for (UiElement* child = el->first_child; child; child = child->next_sibling) {
+    for (SceneNode* child = el->first_child; child; child = child->next_sibling) {
         update_screen_rects(child, el->screen_rect.x, el->screen_rect.y);
     }
 }
 
-void ui_layout_root(UiElement* root, float window_w, float window_h, uint64_t frame_number, bool log_debug, UiTextMeasureFunc measure_func, void* measure_data) {
+void ui_layout_root(SceneNode* root, float window_w, float window_h, uint64_t frame_number, bool log_debug, UiTextMeasureFunc measure_func, void* measure_data) {
     if (!root) return;
     
     if (root->spec->layout.width < 0) root->rect.w = window_w;

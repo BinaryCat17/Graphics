@@ -54,7 +54,7 @@ typedef enum UiRenderMode {
     UI_RENDER_MODE_BEZIER       // Explicit Bezier
 } UiRenderMode; // REFLECT
 
-typedef struct UiElement UiElement;
+typedef struct SceneNode SceneNode;
 typedef struct Scene Scene;
 typedef struct MemoryArena MemoryArena;
 
@@ -63,47 +63,47 @@ typedef struct MemoryArena MemoryArena;
 typedef void (*SceneObjectProvider)(void* instance_data, Rect screen_rect, float z_depth, Scene* scene, MemoryArena* frame_arena);
 
 // Register a provider globally (e.g., "GraphNetwork" -> math_graph_view_provider)
-void ui_register_provider(const char* name, SceneObjectProvider callback);
+void scene_register_provider(const char* name, SceneObjectProvider callback);
 
-// --- UI INSTANCE (The Living Tree) ---
-// Created from a UiAsset + Data Context.
-// Managed by a UiInstance container.
+// --- SCENE TREE (The Living Tree) ---
+// Created from a SceneAsset + Data Context.
+// Managed by a SceneTree container.
 #include "foundation/math/coordinate_systems.h"
 
-typedef struct UiAsset UiAsset;
-typedef struct UiInstance UiInstance;
+typedef struct SceneAsset SceneAsset;
+typedef struct SceneTree SceneTree;
 
 // API for Instance
 // Create an instance to hold runtime state for a UI tree
 // Requires an Asset (templates) and a memory size for the frame arena
 void ui_system_init(void);
 void ui_system_shutdown(void);
-UiInstance* ui_instance_create(UiAsset* assets, size_t size);
-void ui_instance_destroy(UiInstance* instance);
-UiElement* ui_instance_get_root(const UiInstance* instance);
-void ui_instance_set_root(UiInstance* instance, UiElement* root);
+SceneTree* scene_tree_create(SceneAsset* assets, size_t size);
+void scene_tree_destroy(SceneTree* tree);
+SceneNode* scene_tree_get_root(const SceneTree* tree);
+void scene_tree_set_root(SceneTree* tree, SceneNode* root);
 
 // Allocates element from instance arena.
-UiElement* ui_element_create(UiInstance* instance, const SceneNodeSpec* spec, void* data, const MetaStruct* meta);
+SceneNode* scene_node_create(SceneTree* tree, const SceneNodeSpec* spec, void* data, const MetaStruct* meta);
 
 // Rebuilds children (Static + Dynamic) for an existing element.
-void ui_element_rebuild_children(UiElement* element, UiInstance* instance);
+void scene_node_rebuild_children(SceneNode* element, SceneTree* tree);
 
 // Manually add a child to an element (for dynamic editors)
-void ui_element_add_child(UiElement* parent, UiElement* child);
+void scene_node_add_child(SceneNode* parent, SceneNode* child);
 
 // Clear all children (destroys them)
-void ui_element_clear_children(UiElement* parent, UiInstance* instance);
+void scene_node_clear_children(SceneNode* parent, SceneTree* tree);
 
 // Core Loop
-void ui_element_update(UiElement* element, float dt); // Syncs data
+void scene_node_update(SceneNode* element, float dt); // Syncs data
 
 // --- Accessors ---
-StringId ui_element_get_id(const UiElement* element);
-UiElement* ui_element_find_by_id(UiElement* root, const char* id);
-void* ui_element_get_data(const UiElement* element);
-const MetaStruct* ui_element_get_meta(const UiElement* element);
-UiElement* ui_element_get_parent(const UiElement* element);
-Rect ui_element_get_screen_rect(const UiElement* element);
+StringId scene_node_get_id(const SceneNode* element);
+SceneNode* scene_node_find_by_id(SceneNode* root, const char* id);
+void* scene_node_get_data(const SceneNode* element);
+const MetaStruct* scene_node_get_meta(const SceneNode* element);
+SceneNode* scene_node_get_parent(const SceneNode* element);
+Rect scene_node_get_screen_rect(const SceneNode* element);
 
 #endif // UI_CORE_H

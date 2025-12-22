@@ -10,8 +10,8 @@ Structural standardization (Phase 6) is largely complete, but critical limitatio
 ### Phase 3: Compositional Scene Architecture (Architectural Pivot)
 **Objective:** Transition from a UI-centric generic node to a specialized component-based Scene Graph. This is critical for the "Math Engine" goal to support complex physical simulations and 3D hierarchies without polluting the UI logic.
 
-**3.0. YAML Migration (IMMEDIATE NEXT STEP)**
-*   [ ] **Migrate YAML Assets:** The C code now expects nested components (`layout`, `style`), but YAML files are still flat.
+**3.0. YAML Migration (IMMEDIATE NEXT STEP) - DONE ✅**
+*   [x] **Migrate YAML Assets:** The C code now expects nested components (`layout`, `style`), but YAML files are still flat.
     *   Action: Update all files in `assets/ui/**/*.yaml`.
     *   Example: Move `width: 100` -> `layout: { width: 100 }`, `color: ...` -> `style: { color: ... }`.
     *   Target files: `templates/node.yaml`, `layouts/editor_layout.yaml`, etc.
@@ -24,18 +24,30 @@ Structural standardization (Phase 6) is largely complete, but critical limitatio
 *   [x] **Codebase Migration:** Update `ui_parser.c`, `ui_layout.c`, and `ui_renderer.c` to access data via these sub-structs.
 *   [x] **Reflection Update:** `tools/codegen.py` and `ui_parser.c` now handle nested `META_TYPE_STRUCT` recursively.
 
-**3.2. The Unified Scene Graph (Runtime)**
-*   [ ] **Transform System:** Introduce `Mat4 local_matrix` and `Mat4 world_matrix` to the runtime node (formerly `UiElement`).
-*   [ ] **Scene Node Rename:** (Gradual) Alias `UiElement` to `SceneNode`.
-*   [ ] **Matrix Propagation:** Implement a pass to update World Matrices (`Parent * Local`) before layout/rendering.
-*   [ ] **Layout Integration:** Modify the UI Layout solver to output results into the `SceneTransformSpec` or `local_matrix`, bridging the gap between Flexbox (2D) and Scene (3D).
+**3.2. The Unified Scene Graph (Runtime) - DONE ✅**
+*   [x] **Transform System:** Introduce `Mat4 local_matrix` and `Mat4 world_matrix` to the runtime node (formerly `UiElement`).
+*   [x] **Scene Node Rename:** (Gradual) Alias `UiElement` to `SceneNode`. *Refactoring completed: struct renamed to SceneNode globally.*
+*   [x] **Matrix Propagation:** Implement a pass to update World Matrices (`Parent * Local`) before layout/rendering.
+*   [x] **Layout Integration:** Modify the UI Layout solver to output results into the `SceneTransformSpec` or `local_matrix`, bridging the gap between Flexbox (2D) and Scene (3D). *(Implemented in update loop)*
 
-**3.3. 3D Capability Expansion**
+**3.3. 3D Capability Expansion & Renaming**
+*   [x] **Refactor: Symbol Renaming:** Align terminology with the new architecture.
+    *   `UiAsset` -> `SceneAsset` (Container for SceneSpecs)
+    *   `UiInstance` -> `SceneTree` (Runtime container for SceneNodes)
+    *   `ui_element_*` -> `scene_node_*`
+    *   `ui_renderer_build_scene` -> `scene_builder_build`
+*   [ ] **Refactor: Module Renaming:** (Future) Move `src/engine/ui` -> `src/engine/scene_system`.
 *   [ ] **Mesh Component:** Add `SceneMeshSpec` (mesh asset id, material params) to the Node Spec.
-*   [ ] **Renderer Adaptation:** Update `ui_renderer_build_scene` (or create `scene_builder_build`) to check for `MeshSpec`. If present, emit 3D `SceneObject`s instead of UI Quads.
+*   [ ] **Renderer Adaptation:** Update `ui_renderer_build_scene` (rename to `scene_builder_build`) to check for `MeshSpec`. If present, emit 3D `SceneObject`s instead of UI Quads.
 *   [ ] **Binding V2 (Deep Cleanup):** Refactor the Data Binding system to support dot-notation/paths (e.g., `target: "transform.position.x"`).
+
     *   **Objective:** Remove legacy hardcoded binding fields (`bind_x`, `bind_y`, `bind_w`, `bind_h`, `bind_text`, `bind_visible`) from the root `SceneNodeSpec`.
     *   **Implementation:** The binding system should resolve targets recursively within components (`spec->layout.width`) rather than expecting them at the root.
+
+**4. 3D Interaction & Logic (New)**
+*   [ ] **Camera Component:** Implement `SceneCameraSpec` (FOV, type: Ortho/Perspective) to define viewports dynamically within the Scene Graph.
+*   [ ] **Input Raycasting:** Extend `ui_input.c` to support Ray-AABB/Ray-Sphere intersection for clicking 3D objects (replacing pure 2D `point_in_rect` for 3D nodes).
+*   [ ] **Layout/Transform Arbitration:** Define explicit rules: does Layout write to Transform? Does Transform override Layout? Implement flags (e.g., `SCENE_FLAG_IGNORE_LAYOUT`) to mix UI and 3D freely.
 
 ### Phase 4.5: Code Hygiene & Refactoring (Follow-up)
 **Objective:** Address technical debt identified during the Viewport implementation to ensure the editor is maintainable and scalable.

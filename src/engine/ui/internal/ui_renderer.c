@@ -17,23 +17,23 @@
 typedef struct {
     StringId id;
     SceneObjectProvider callback;
-} UiProviderEntry;
+} SceneProviderEntry;
 
-static UiProviderEntry s_providers[MAX_UI_PROVIDERS];
+static SceneProviderEntry s_providers[MAX_UI_PROVIDERS];
 static int s_provider_count = 0;
 
-void ui_register_provider(const char* name, SceneObjectProvider callback) {
+void scene_register_provider(const char* name, SceneObjectProvider callback) {
     if (s_provider_count >= MAX_UI_PROVIDERS) {
-        LOG_ERROR("UiRenderer: Max providers reached");
+        LOG_ERROR("SceneBuilder: Max providers reached");
         return;
     }
     s_providers[s_provider_count].id = str_id(name);
     s_providers[s_provider_count].callback = callback;
     s_provider_count++;
-    LOG_INFO("UiRenderer: Registered provider '%s'", name);
+    LOG_INFO("SceneBuilder: Registered provider '%s'", name);
 }
 
-static SceneObjectProvider ui_find_provider(StringId id) {
+static SceneObjectProvider scene_find_provider(StringId id) {
     for(int i=0; i<s_provider_count; ++i) {
         if (s_providers[i].id == id) return s_providers[i].callback;
     }
@@ -41,18 +41,18 @@ static SceneObjectProvider ui_find_provider(StringId id) {
 }
 
 typedef struct OverlayNode {
-    const UiElement* el;
+    const SceneNode* el;
     struct OverlayNode* next;
 } OverlayNode;
 
 // Internal Render Context to avoid passing too many args
-typedef struct UiRenderContext {
+typedef struct SceneBuilderContext {
     Scene* scene;
     const Font* font;
     MemoryArena* arena;
     OverlayNode* overlay_head;
     OverlayNode* overlay_tail;
-} UiRenderContext;
+} SceneBuilderContext;
 
 // Helper: Intersection
 static Rect rect_intersect(Rect a, Rect b) {
@@ -67,7 +67,7 @@ static Rect rect_intersect(Rect a, Rect b) {
     return (Rect){x1, y1, x2 - x1, y2 - y1};
 }
 
-static void render_background(const UiElement* el, UiRenderContext* ctx, Vec4 clip_vec, float z) {
+static void render_background(const SceneNode* el, SceneBuilderContext* ctx, Vec4 clip_vec, float z) {
     UiRenderMode mode = el->spec->style.render_mode;
     bool is_input = (el->flags & UI_FLAG_EDITABLE);
 
@@ -194,7 +194,7 @@ static void render_background(const UiElement* el, UiRenderContext* ctx, Vec4 cl
     }
 }
 
-static void render_content(const UiElement* el, UiRenderContext* ctx, Vec4 clip_vec, float z) {
+static void render_content(const SceneNode* el, SceneBuilderContext* ctx, Vec4 clip_vec, float z) {
     // Resolve Text (Use Cache)
     const char* text = el->cached_text;
     if (!text || text[0] == '\0') {
@@ -244,7 +244,7 @@ static void render_content(const UiElement* el, UiRenderContext* ctx, Vec4 clip_
     }
 }
 
-static void push_overlay(UiRenderContext* ctx, const UiElement* el) {
+static void push_overlay(SceneBuilderContext* ctx, const SceneNode* el) {
     if (!ctx || !ctx->arena) return;
     OverlayNode* node = arena_alloc_zero(ctx->arena, sizeof(OverlayNode));
     if (!node) return;
@@ -261,7 +261,7 @@ static void push_overlay(UiRenderContext* ctx, const UiElement* el) {
     }
 }
 
-static void process_node(const UiElement* el, UiRenderContext* ctx, Rect current_clip, float base_z, bool is_overlay_pass) {
+static void process_node(const SceneNode* el, SceneBuilderContext* ctx, Rect current_clip, float base_z, bool is_overlay_pass) {
     if (!el || !el->spec) return;
 
     // Skip hidden
@@ -298,7 +298,7 @@ static void process_node(const UiElement* el, UiRenderContext* ctx, Rect current
 
     // 2. Viewport Delegation
     if (el->spec->kind == UI_KIND_VIEWPORT && el->spec->provider_id) {
-         SceneObjectProvider cb = ui_find_provider(el->spec->provider_id);
+         SceneObjectProvider cb = scene_find_provider(el->spec->provider_id);
          if (cb) {
              // Invoke provider (e.g. Graph Editor) to inject scene objects
              // Z-Depth: slightly above background
@@ -310,17 +310,17 @@ static void process_node(const UiElement* el, UiRenderContext* ctx, Rect current
     render_content(el, ctx, clip_vec, base_z);
 
     // 4. Recurse
-    for (UiElement* child = el->first_child; child; child = child->next_sibling) {
+    for (SceneNode* child = el->first_child; child; child = child->next_sibling) {
         process_node(child, ctx, effective_clip, base_z + RENDER_DEPTH_STEP_UI, is_overlay_pass);
     }
 }
 
-void ui_renderer_build_scene(const UiElement* root, Scene* scene, const Assets* assets, MemoryArena* arena) {
+void scene_builder_build(const SceneNode* root, Scene* scene, const Assets* assets, MemoryArena* arena) {
     if (!root || !arena) return;
 
     Rect infinite_clip = {-10000.0f, -10000.0f, 20000.0f, 20000.0f};
     
-    UiRenderContext ctx = {0};
+    SceneBuilderContext ctx = {0};
     ctx.scene = scene;
     ctx.font = assets_get_font(assets);
     ctx.arena = arena;

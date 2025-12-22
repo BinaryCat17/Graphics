@@ -14,7 +14,7 @@
 
 // ... Helper Functions ...
 
-static void push_event(UiInputContext* ctx, UiEventType type, UiElement* target) {
+static void push_event(UiInputContext* ctx, UiEventType type, SceneNode* target) {
     if (ctx->event_count < UI_MAX_EVENTS) {
         ctx->events[ctx->event_count].type = type;
         ctx->events[ctx->event_count].target = target;
@@ -51,7 +51,7 @@ bool ui_input_pop_event(UiInputContext* ctx, UiEvent* out_event) {
 
 // --- Internal Logic Breakdown ---
 
-static UiElement* hit_test_recursive(UiElement* el, float x, float y) {
+static SceneNode* hit_test_recursive(SceneNode* el, float x, float y) {
     if (!el || !el->spec) return NULL;
     
     // Skip hidden or non-interactive (unless specifically handled)
@@ -66,8 +66,8 @@ static UiElement* hit_test_recursive(UiElement* el, float x, float y) {
     }
 
     // Check children first (reverse order for Z-sorting: last drawn is top)
-    for (UiElement* child = el->last_child; child; child = child->prev_sibling) {
-        UiElement* hit = hit_test_recursive(child, x, y);
+    for (SceneNode* child = el->last_child; child; child = child->prev_sibling) {
+        SceneNode* hit = hit_test_recursive(child, x, y);
         if (hit) return hit;
     }
 
@@ -80,8 +80,8 @@ static UiElement* hit_test_recursive(UiElement* el, float x, float y) {
     return NULL;
 }
 
-static void update_hover_state(UiInputContext* ctx, UiElement* root, const InputSystem* input) {
-    UiElement* prev_hovered = ctx->hovered;
+static void update_hover_state(UiInputContext* ctx, SceneNode* root, const InputSystem* input) {
+    SceneNode* prev_hovered = ctx->hovered;
     float mx = input_get_mouse_x(input);
     float my = input_get_mouse_y(input);
     
@@ -100,7 +100,7 @@ static void handle_scroll_event(UiInputContext* ctx, const InputEvent* event) {
     float dx = event->data.scroll.dx;
     float dy = event->data.scroll.dy;
 
-    UiElement* target = ctx->hovered;
+    SceneNode* target = ctx->hovered;
     while (target) {
         if (target->flags & UI_FLAG_SCROLLABLE) {
             target->scroll_y -= dy * UI_SCROLL_SPEED; 
@@ -144,11 +144,16 @@ static void handle_mouse_press_event(UiInputContext* ctx, const InputEvent* even
         } else if (ctx->active->flags & UI_FLAG_DRAGGABLE) {
              // Cache bound values
              if (ctx->active->data_ptr) {
-                 if (ctx->active->bind_x) {
-                     ctx->drag_start_elem_x = meta_get_float(ctx->active->data_ptr, ctx->active->bind_x);
+                 const SceneBinding* bind_x = scene_node_get_binding(ctx->active, BINDING_TARGET_LAYOUT_X);
+                 const SceneBinding* bind_y = scene_node_get_binding(ctx->active, BINDING_TARGET_LAYOUT_Y);
+                 
+                 if (bind_x) {
+                     void* ptr = (char*)ctx->active->data_ptr + bind_x->source_offset;
+                     if (bind_x->source_field->type == META_TYPE_FLOAT) ctx->drag_start_elem_x = *(float*)ptr;
                  }
-                 if (ctx->active->bind_y) {
-                     ctx->drag_start_elem_y = meta_get_float(ctx->active->data_ptr, ctx->active->bind_y);
+                 if (bind_y) {
+                     void* ptr = (char*)ctx->active->data_ptr + bind_y->source_offset;
+                     if (bind_y->source_field->type == META_TYPE_FLOAT) ctx->drag_start_elem_y = *(float*)ptr;
                  }
              }
         }
@@ -181,19 +186,23 @@ static void handle_mouse_press_event(UiInputContext* ctx, const InputEvent* even
 
 static void handle_char_event(UiInputContext* ctx, const InputEvent* event) {
     if (!ctx->focused) return;
-    UiElement* el = ctx->focused;
+    SceneNode* el = ctx->focused;
     if (!(el->flags & UI_FLAG_EDITABLE)) return;
 
     if (event->type == INPUT_EVENT_CHAR) {
          char buf[256] = {0};
-         if (el->data_ptr && el->bind_text) {
-             ui_bind_read_string(el->data_ptr, el->bind_text, buf, sizeof(buf));
+         const SceneBinding* bind_text = scene_node_get_binding(el, BINDING_TARGET_TEXT);
+         
+         if (el->data_ptr && bind_text) {
+             // Read current value
+             ui_bind_read_string(el->data_ptr, bind_text->source_field, buf, sizeof(buf));
              
              size_t len = strlen(buf);
              if (len < 255) {
                  buf[len] = (char)event->data.character.codepoint;
                  buf[len+1] = '\0';
-                 meta_set_from_string(el->data_ptr, el->bind_text, buf);
+                 
+                 scene_node_write_binding_string(el, BINDING_TARGET_TEXT, buf);
                  el->cursor_idx++;
                  
                  push_event(ctx, UI_EVENT_VALUE_CHANGE, el);
@@ -207,18 +216,20 @@ static void handle_char_event(UiInputContext* ctx, const InputEvent* event) {
 
 static void handle_key_event(UiInputContext* ctx, const InputEvent* event) {
     if (!ctx->focused) return;
-    UiElement* el = ctx->focused;
+    SceneNode* el = ctx->focused;
     if (!(el->flags & UI_FLAG_EDITABLE)) return;
 
     if (event->type == INPUT_EVENT_KEY_PRESSED || event->type == INPUT_EVENT_KEY_REPEAT) {
         if (event->data.key.key == INPUT_KEY_BACKSPACE) {
              char buf[256] = {0};
-             if (el->data_ptr && el->bind_text) {
-                 ui_bind_read_string(el->data_ptr, el->bind_text, buf, sizeof(buf));
+             const SceneBinding* bind_text = scene_node_get_binding(el, BINDING_TARGET_TEXT);
+             
+             if (el->data_ptr && bind_text) {
+                 ui_bind_read_string(el->data_ptr, bind_text->source_field, buf, sizeof(buf));
                  size_t len = strlen(buf);
                  if (len > 0) {
                      buf[len-1] = '\0';
-                     meta_set_from_string(el->data_ptr, el->bind_text, buf);
+                     scene_node_write_binding_string(el, BINDING_TARGET_TEXT, buf);
                      if (el->cursor_idx > 0) el->cursor_idx--;
                      
                      push_event(ctx, UI_EVENT_VALUE_CHANGE, el);
@@ -255,12 +266,12 @@ static void handle_drag_logic(UiInputContext* ctx, const InputSystem* input) {
         // Case A: Draggable Object (updates data model)
         if (ctx->active->flags & UI_FLAG_DRAGGABLE) {
             if (ctx->active->data_ptr) {
-                if (ctx->active->bind_x) {
-                    meta_set_float(ctx->active->data_ptr, ctx->active->bind_x, ctx->drag_start_elem_x + dx);
+                if (scene_node_get_binding(ctx->active, BINDING_TARGET_LAYOUT_X)) {
+                    scene_node_write_binding_float(ctx->active, BINDING_TARGET_LAYOUT_X, ctx->drag_start_elem_x + dx);
                     changed = true;
                 }
-                if (ctx->active->bind_y) {
-                    meta_set_float(ctx->active->data_ptr, ctx->active->bind_y, ctx->drag_start_elem_y + dy);
+                if (scene_node_get_binding(ctx->active, BINDING_TARGET_LAYOUT_Y)) {
+                    scene_node_write_binding_float(ctx->active, BINDING_TARGET_LAYOUT_Y, ctx->drag_start_elem_y + dy);
                     changed = true;
                 }
             }
@@ -316,7 +327,7 @@ static void handle_mouse_release_event(UiInputContext* ctx, const InputEvent* ev
 
 // --- Main Update Loop ---
 
-void ui_input_update(UiInputContext* ctx, UiElement* root, const InputSystem* input) {
+void ui_input_update(UiInputContext* ctx, SceneNode* root, const InputSystem* input) {
     if (!ctx || !root || !input) return;
 
     update_hover_state(ctx, root, input);

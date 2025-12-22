@@ -24,9 +24,9 @@ static UiKind parse_kind(const char* type_str, uint32_t* out_flags) {
     return UI_KIND_CONTAINER;
 }
 
-static SceneNodeSpec* ui_node_spec_copy(UiAsset* asset, const SceneNodeSpec* src) {
+static SceneNodeSpec* ui_node_spec_copy(SceneAsset* asset, const SceneNodeSpec* src) {
     if (!src) return NULL;
-    SceneNodeSpec* dst = ui_asset_push_node(asset);
+    SceneNodeSpec* dst = scene_asset_push_node(asset);
     memcpy(dst, src, sizeof(SceneNodeSpec));
     
     // We share string pointers because they are all in the same Asset Arena
@@ -48,7 +48,7 @@ static SceneNodeSpec* ui_node_spec_copy(UiAsset* asset, const SceneNodeSpec* src
 
 // --- Generic Recursive Parser for Structs ---
 
-static void parse_struct_fields(void* instance, const MetaStruct* meta, const ConfigNode* map, UiAsset* asset) {
+static void parse_struct_fields(void* instance, const MetaStruct* meta, const ConfigNode* map, SceneAsset* asset) {
     if (!instance || !meta || !map || map->type != CONFIG_NODE_MAP) return;
 
     for (size_t i = 0; i < map->pair_count; ++i) {
@@ -98,7 +98,7 @@ static void parse_struct_fields(void* instance, const MetaStruct* meta, const Co
 
 // --- Recursive Loader ---
 
-static SceneNodeSpec* load_recursive(UiAsset* asset, const ConfigNode* node) {
+static SceneNodeSpec* load_recursive(SceneAsset* asset, const ConfigNode* node) {
     if (!node || node->type != CONFIG_NODE_MAP) return NULL;
 
     SceneNodeSpec* spec = NULL;
@@ -109,17 +109,17 @@ static SceneNodeSpec* load_recursive(UiAsset* asset, const ConfigNode* node) {
         if (strcmp(type_node->scalar, "instance") == 0) {
             const ConfigNode* inst_node = config_node_map_get(node, "instance");
             if (inst_node && inst_node->scalar) {
-                SceneNodeSpec* template_spec = ui_asset_get_template(asset, inst_node->scalar);
+                SceneNodeSpec* template_spec = scene_asset_get_template(asset, inst_node->scalar);
                 if (template_spec) spec = ui_node_spec_copy(asset, template_spec);
             }
         } else {
-            SceneNodeSpec* template_spec = ui_asset_get_template(asset, type_node->scalar);
+            SceneNodeSpec* template_spec = scene_asset_get_template(asset, type_node->scalar);
             if (template_spec) spec = ui_node_spec_copy(asset, template_spec);
         }
     }
 
     if (!spec) {
-        spec = ui_asset_push_node(asset);
+        spec = scene_asset_push_node(asset);
         // Default values for new nodes
         spec->layout.width = -1.0f;
         spec->layout.height = -1.0f;
@@ -129,6 +129,17 @@ static SceneNodeSpec* load_recursive(UiAsset* asset, const ConfigNode* node) {
     }
 
     const MetaStruct* meta = meta_get_struct("SceneNodeSpec");
+    
+    // Temporary Binding Storage (Max 64 per node to be safe)
+    SceneBindingSpec temp_bindings[64];
+    size_t temp_binding_count = 0;
+    
+    // Copy inherited bindings if any (from template)
+    if (spec->binding_count > 0 && spec->bindings) {
+        for (size_t i = 0; i < spec->binding_count && temp_binding_count < 64; ++i) {
+            temp_bindings[temp_binding_count++] = spec->bindings[i];
+        }
+    }
 
     // Iterate all pairs in the YAML map to apply overrides
     for (size_t i = 0; i < node->pair_count; ++i) {
@@ -143,7 +154,7 @@ static SceneNodeSpec* load_recursive(UiAsset* asset, const ConfigNode* node) {
         }
 
         if (strcmp(key, "type") == 0) {
-             if (ui_asset_get_template(asset, val->scalar) == NULL) {
+             if (scene_asset_get_template(asset, val->scalar) == NULL) {
                  spec->kind = parse_kind(val->scalar, &spec->flags);
              }
              continue;
@@ -151,6 +162,70 @@ static SceneNodeSpec* load_recursive(UiAsset* asset, const ConfigNode* node) {
 
         if (strcmp(key, "instance") == 0) continue;
         
+        // --- Bindings V2 Parsing ---
+        if (strcmp(key, "bindings") == 0) {
+            if (val->type == CONFIG_NODE_SEQUENCE) {
+                for (size_t k = 0; k < val->item_count && temp_binding_count < 64; ++k) {
+                    ConfigNode* b_node = val->items[k];
+                    if (b_node->type == CONFIG_NODE_MAP) {
+                        const ConfigNode* t_node = config_node_map_get(b_node, "target");
+                        const ConfigNode* s_node = config_node_map_get(b_node, "source");
+                        if (t_node && s_node && t_node->scalar && s_node->scalar) {
+                             temp_bindings[temp_binding_count].target = arena_push_string(&asset->arena, t_node->scalar);
+                             temp_bindings[temp_binding_count].source = arena_push_string(&asset->arena, s_node->scalar);
+                             temp_binding_count++;
+                        }
+                    }
+                }
+            }
+            continue;
+        }
+        
+        // --- Legacy / Shorthand Binding Handling ---
+        if (strcmp(key, "bind") == 0 && val->scalar && temp_binding_count < 64) {
+             // "bind": "field" -> Maps to text by default (Legacy behavior)
+             temp_bindings[temp_binding_count].target = "text";
+             temp_bindings[temp_binding_count].source = arena_push_string(&asset->arena, val->scalar);
+             temp_binding_count++;
+             continue;
+        }
+        if (strcmp(key, "bind_text") == 0 && val->scalar && temp_binding_count < 64) {
+             temp_bindings[temp_binding_count].target = "text";
+             temp_bindings[temp_binding_count].source = arena_push_string(&asset->arena, val->scalar);
+             temp_binding_count++;
+             continue;
+        }
+        if (strcmp(key, "bind_visible") == 0 && val->scalar && temp_binding_count < 64) {
+             temp_bindings[temp_binding_count].target = "visible";
+             temp_bindings[temp_binding_count].source = arena_push_string(&asset->arena, val->scalar);
+             temp_binding_count++;
+             continue;
+        }
+        if (strcmp(key, "bind_x") == 0 && val->scalar && temp_binding_count < 64) {
+             temp_bindings[temp_binding_count].target = "layout.x";
+             temp_bindings[temp_binding_count].source = arena_push_string(&asset->arena, val->scalar);
+             temp_binding_count++;
+             continue;
+        }
+        if (strcmp(key, "bind_y") == 0 && val->scalar && temp_binding_count < 64) {
+             temp_bindings[temp_binding_count].target = "layout.y";
+             temp_bindings[temp_binding_count].source = arena_push_string(&asset->arena, val->scalar);
+             temp_binding_count++;
+             continue;
+        }
+        if (strcmp(key, "bind_w") == 0 && val->scalar && temp_binding_count < 64) {
+             temp_bindings[temp_binding_count].target = "layout.width";
+             temp_bindings[temp_binding_count].source = arena_push_string(&asset->arena, val->scalar);
+             temp_binding_count++;
+             continue;
+        }
+        if (strcmp(key, "bind_h") == 0 && val->scalar && temp_binding_count < 64) {
+             temp_bindings[temp_binding_count].target = "layout.height";
+             temp_bindings[temp_binding_count].source = arena_push_string(&asset->arena, val->scalar);
+             temp_binding_count++;
+             continue;
+        }
+
         if (strcmp(key, "children") == 0) {
             if (val->type == CONFIG_NODE_SEQUENCE) {
                 spec->child_count = val->item_count;
@@ -164,7 +239,7 @@ static SceneNodeSpec* load_recursive(UiAsset* asset, const ConfigNode* node) {
         
         if (strcmp(key, "item_template") == 0) {
             if (val->type == CONFIG_NODE_SCALAR) {
-                SceneNodeSpec* t = ui_asset_get_template(asset, val->scalar);
+                SceneNodeSpec* t = scene_asset_get_template(asset, val->scalar);
                 if (t) spec->item_template = ui_node_spec_copy(asset, t);
                 else LOG_ERROR("UiParser: Template '%s' not found for item_template", val->scalar);
             } else {
@@ -207,12 +282,14 @@ static SceneNodeSpec* load_recursive(UiAsset* asset, const ConfigNode* node) {
                  const char* s = val->scalar ? val->scalar : "";
                  
                  // Special handling for 'text' field to support Binding Syntax "{...}"
-                 if (strcmp(field->name, "text") == 0 && s[0] == '{') {
-                     // Reroute to bind_text
+                 if (strcmp(field->name, "text") == 0 && s[0] == '{' && temp_binding_count < 64) {
                      size_t len = strlen(s);
                      if (len > 2) {
                          char* buf = arena_push_string_n(&asset->arena, s + 1, len - 2);
-                         spec->bind_text = buf;
+                         // Convert to binding
+                         temp_bindings[temp_binding_count].target = "text";
+                         temp_bindings[temp_binding_count].source = buf;
+                         temp_binding_count++;
                          spec->text = NULL; 
                      }
                  } else {
@@ -236,6 +313,18 @@ static SceneNodeSpec* load_recursive(UiAsset* asset, const ConfigNode* node) {
         } else {
             LOG_WARN("UiParser: Unknown field '%s' in SceneNodeSpec (Node ID:%u). Check indentation or spelling.", key, spec->id);
         }
+    }
+
+    // Finalize Bindings
+    if (temp_binding_count > 0) {
+        spec->binding_count = temp_binding_count;
+        spec->bindings = (SceneBindingSpec*)arena_alloc_zero(&asset->arena, spec->binding_count * sizeof(SceneBindingSpec));
+        for (size_t k = 0; k < spec->binding_count; ++k) {
+            spec->bindings[k] = temp_bindings[k];
+        }
+    } else {
+        spec->binding_count = 0;
+        spec->bindings = NULL;
     }
 
     return spec;
@@ -265,12 +354,6 @@ static ConfigNode* resolve_import(MemoryArena* scratch, const ConfigNode* node) 
 static void validate_node(SceneNodeSpec* spec, const char* path) {
     if (!spec) return;
     
-    if (spec->layout.type == UI_LAYOUT_FLEX_COLUMN || spec->layout.type == UI_LAYOUT_FLEX_ROW) {
-        if (spec->bind_x || spec->bind_y) {
-            LOG_WARN("UiParser: Node ID:%u uses x/y bindings inside a Flex container. These will be ignored.", spec->id);
-        }
-    }
-    
     if (spec->layout.type == UI_LAYOUT_SPLIT_H || spec->layout.type == UI_LAYOUT_SPLIT_V) {
         if (spec->child_count != 2) {
             LOG_ERROR("UiParser: Split container ID:%u MUST have exactly 2 children (has %zu).", spec->id, spec->child_count);
@@ -282,7 +365,7 @@ static void validate_node(SceneNodeSpec* spec, const char* path) {
     }
 }
 
-UiAsset* ui_parser_load_internal(const char* path) {
+SceneAsset* scene_asset_load_internal(const char* path) {
     if (!path) return NULL;
 
     LOG_TRACE("UiParser: Loading UI definition from file: %s", path);
@@ -310,7 +393,7 @@ UiAsset* ui_parser_load_internal(const char* path) {
     }
 
     // Create Asset (Owner)
-    UiAsset* asset = ui_asset_create(64 * 1024);
+    SceneAsset* asset = scene_asset_create(64 * 1024);
     if (!asset) {
         arena_destroy(&scratch);
         return NULL;
@@ -327,7 +410,7 @@ UiAsset* ui_parser_load_internal(const char* path) {
             
             SceneNodeSpec* spec = load_recursive(asset, t_actual ? t_actual : t_val);
             if (spec) {
-                UiTemplate* t = (UiTemplate*)arena_alloc_zero(&asset->arena, sizeof(UiTemplate));
+                SceneTemplate* t = (SceneTemplate*)arena_alloc_zero(&asset->arena, sizeof(SceneTemplate));
                 t->name = arena_push_string(&asset->arena, t_name);
                 t->spec = spec;
                 t->next = asset->templates;

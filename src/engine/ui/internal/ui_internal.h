@@ -69,6 +69,12 @@ typedef struct UiStyleSpec {
     StringId texture;       // REFLECT
 } UiStyleSpec;
 
+// Binding V2
+typedef struct SceneBindingSpec {
+    char* target; // REFLECT ("text", "style.color", "transform.position.x")
+    char* source; // REFLECT ("my_data.value")
+} SceneBindingSpec;
+
 struct SceneNodeSpec {
     // 1. Identity
     StringId id;            // REFLECT
@@ -80,18 +86,13 @@ struct SceneNodeSpec {
     UiLayoutSpec layout;          // REFLECT
     UiStyleSpec style;            // REFLECT
     
-    // 3. Data Bindings
-    char* bind_text;        // REFLECT
-    char* bind;             // REFLECT
-    char* bind_visible;     // REFLECT
+    // 3. Data Bindings (V2)
+    struct SceneBindingSpec* bindings; // REFLECT
+    size_t binding_count;              // REFLECT
+    
+    // Legacy / Collections (To be refactored later, keeping for now as they are structural)
     char* collection;       // REFLECT
     char* template_selector;// REFLECT
-    
-    // Layout Overrides (Bindings)
-    char* bind_x;           // REFLECT
-    char* bind_y;           // REFLECT
-    char* bind_w;           // REFLECT
-    char* bind_h;           // REFLECT
 
     // 4. Content
     char* text;             // REFLECT
@@ -113,50 +114,81 @@ struct SceneNodeSpec {
 // --- UI ASSET (The Resource) ---
 // Owns the memory. Created by the Parser.
 
-typedef struct UiTemplate UiTemplate;
+typedef struct SceneTemplate SceneTemplate;
 
-struct UiTemplate {
+struct SceneTemplate {
     char* name;
     SceneNodeSpec* spec;
-    struct UiTemplate* next;
+    struct SceneTemplate* next;
 };
 
-struct UiAsset {
+struct SceneAsset {
     MemoryArena arena;
     SceneNodeSpec* root;
-    UiTemplate* templates;
+    SceneTemplate* templates;
 };
 
-// --- UI INSTANCE (The Living Tree) ---
-// Created from a UiAsset + Data Context.
-// Managed by a UiInstance container.
+// --- SCENE TREE (The Living Tree) ---
+// Created from a SceneAsset + Data Context.
+// Managed by a SceneTree container.
 
-struct UiElement {
+// Optimized Runtime Binding
+typedef enum SceneBindingTarget {
+    BINDING_TARGET_NONE = 0,
+    BINDING_TARGET_TEXT,
+    BINDING_TARGET_VISIBLE,
+    
+    // Layout
+    BINDING_TARGET_LAYOUT_X,
+    BINDING_TARGET_LAYOUT_Y,
+    BINDING_TARGET_LAYOUT_WIDTH,
+    BINDING_TARGET_LAYOUT_HEIGHT,
+    
+    // Style
+    BINDING_TARGET_STYLE_COLOR,
+    
+    // Transform
+    BINDING_TARGET_TRANSFORM_POS_X,
+    BINDING_TARGET_TRANSFORM_POS_Y,
+    BINDING_TARGET_TRANSFORM_POS_Z,
+    BINDING_TARGET_TRANSFORM_SCALE_X,
+    BINDING_TARGET_TRANSFORM_SCALE_Y,
+    BINDING_TARGET_TRANSFORM_SCALE_Z
+} SceneBindingTarget;
+
+typedef struct SceneBinding {
+    SceneBindingTarget target;
+    const struct MetaField* source_field;
+    size_t source_offset;
+} SceneBinding;
+
+struct SceneNode {
     const SceneNodeSpec* spec; // The DNA
     
     // Hierarchy
-    struct UiElement* parent;
-    struct UiElement* first_child;
-    struct UiElement* last_child;
-    struct UiElement* next_sibling;
-    struct UiElement* prev_sibling;
+    struct SceneNode* parent;
+    struct SceneNode* first_child;
+    struct SceneNode* last_child;
+    struct SceneNode* next_sibling;
+    struct SceneNode* prev_sibling;
     size_t child_count;
     
     // Data Context
     void* data_ptr;         // Pointer to C struct
     const struct MetaStruct* meta; // Type info
 
-    // Cached Bindings (Resolved at creation)
-    const struct MetaField* bind_text;
-    const struct MetaField* bind_visible;
-    const struct MetaField* bind_x;
-    const struct MetaField* bind_y;
-    const struct MetaField* bind_w;
-    const struct MetaField* bind_h;
+    // Bindings (V2)
+    SceneBinding* bindings;
+    size_t binding_count;
     
     // Commands (Resolved at creation)
     StringId on_click_cmd_id;
     StringId on_change_cmd_id;
+
+    // --- TRANSFORM SYSTEM (Phase 3) ---
+    Mat4 local_matrix;    // T * R * S
+    Mat4 world_matrix;    // ParentWorld * Local
+    bool is_dirty;        // If true, recalculate world_matrix
     
     // State
     uint32_t flags;       // Runtime flags (copy of spec->flags)
@@ -188,15 +220,20 @@ struct UiElement {
 };
 
 
-struct UiInstance {
+struct SceneTree {
     MemoryArena arena;
     MemoryPool* element_pool;
-    UiElement* root;
-    UiAsset* assets;
+    SceneNode* root;
+    SceneAsset* assets;
 };
 
 // --- Internal Helper Functions ---
 void ui_bind_read_string(void* data, const MetaField* field, char* out_buf, size_t buf_size);
-SceneNodeSpec* ui_asset_push_node(UiAsset* asset);
+SceneNodeSpec* scene_asset_push_node(SceneAsset* asset);
+
+// Binding V2 Helpers
+const SceneBinding* scene_node_get_binding(const SceneNode* node, SceneBindingTarget target);
+void scene_node_write_binding_float(SceneNode* node, SceneBindingTarget target, float value);
+void scene_node_write_binding_string(SceneNode* node, SceneBindingTarget target, const char* value);
 
 #endif // UI_INTERNAL_H

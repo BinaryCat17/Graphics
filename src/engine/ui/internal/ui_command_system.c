@@ -57,7 +57,7 @@ void ui_command_register(const char* name, UiCommandCallback callback, void* use
     LOG_DEBUG("CommandSystem: Registered command '%s' (Hash: %u)", name, id);
 }
 
-void ui_command_execute_id(StringId id, UiElement* target) {
+void ui_command_execute_id(StringId id, SceneNode* target) {
     if (id == 0) return;
     
     for (int i = 0; i < g_command_count; ++i) {

@@ -23,10 +23,10 @@ void ui_system_shutdown(void) {
     ui_command_shutdown();
 }
 
-// --- UiAsset (Memory Owner) ---
+// --- SceneAsset (Memory Owner) ---
 
-UiAsset* ui_asset_create(size_t arena_size) {
-    UiAsset* asset = (UiAsset*)calloc(1, sizeof(UiAsset));
+SceneAsset* scene_asset_create(size_t arena_size) {
+    SceneAsset* asset = (SceneAsset*)calloc(1, sizeof(SceneAsset));
     if (!asset) return NULL;
     
     if (!arena_init(&asset->arena, arena_size)) {
@@ -37,20 +37,20 @@ UiAsset* ui_asset_create(size_t arena_size) {
     return asset;
 }
 
-void ui_asset_destroy(UiAsset* asset) {
+void scene_asset_destroy(SceneAsset* asset) {
     if (!asset) return;
     arena_destroy(&asset->arena);
     free(asset);
 }
 
-SceneNodeSpec* ui_asset_push_node(UiAsset* asset) {
+SceneNodeSpec* scene_asset_push_node(SceneAsset* asset) {
     if (!asset) return NULL;
     return (SceneNodeSpec*)arena_alloc_zero(&asset->arena, sizeof(SceneNodeSpec));
 }
 
-SceneNodeSpec* ui_asset_get_template(UiAsset* asset, const char* name) {
+SceneNodeSpec* scene_asset_get_template(SceneAsset* asset, const char* name) {
     if (!asset || !name) return NULL;
-    UiTemplate* t = asset->templates;
+    SceneTemplate* t = asset->templates;
     while (t) {
         if (t->name && strcmp(t->name, name) == 0) {
             return t->spec;
@@ -60,104 +60,106 @@ SceneNodeSpec* ui_asset_get_template(UiAsset* asset, const char* name) {
     return NULL;
 }
 
-SceneNodeSpec* ui_asset_get_root(const UiAsset* asset) {
+SceneNodeSpec* scene_asset_get_root(const SceneAsset* asset) {
     return asset ? asset->root : NULL;
 }
 
-// --- UiInstance (Memory Owner for Runtime) ---
+// --- SceneTree (Memory Owner for Runtime) ---
 
-static void destroy_recursive(UiInstance* instance, UiElement* el) {
+static void destroy_recursive(SceneTree* tree, SceneNode* el) {
     if (!el) return;
     
     // Destroy children first
-    UiElement* child = el->first_child;
+    SceneNode* child = el->first_child;
     while (child) {
-        UiElement* next = child->next_sibling;
-        destroy_recursive(instance, child);
+        SceneNode* next = child->next_sibling;
+        destroy_recursive(tree, child);
         child = next;
     }
     
-    pool_free(instance->element_pool, el);
+    pool_free(tree->element_pool, el);
 }
 
-UiInstance* ui_instance_create(UiAsset* assets, size_t size) {
-    UiInstance* instance = (UiInstance*)calloc(1, sizeof(UiInstance));
-    if (!instance) return NULL;
+SceneTree* scene_tree_create(SceneAsset* assets, size_t size) {
+    SceneTree* tree = (SceneTree*)calloc(1, sizeof(SceneTree));
+    if (!tree) return NULL;
     
-    if (!arena_init(&instance->arena, size)) {
-        free(instance);
+    if (!arena_init(&tree->arena, size)) {
+        free(tree);
         return NULL;
     }
     
-    instance->assets = assets;
-    instance->element_pool = pool_create(sizeof(UiElement), 256);
-    instance->root = NULL;
-    return instance;
+    tree->assets = assets;
+    tree->element_pool = pool_create(sizeof(SceneNode), 256);
+    tree->root = NULL;
+    return tree;
 }
 
-void ui_instance_destroy(UiInstance* instance) {
-    if (!instance) return;
-    if (instance->root) destroy_recursive(instance, instance->root);
-    pool_destroy(instance->element_pool);
-    arena_destroy(&instance->arena);
-    free(instance);
+void scene_tree_destroy(SceneTree* tree) {
+    if (!tree) return;
+    if (tree->root) destroy_recursive(tree, tree->root);
+    pool_destroy(tree->element_pool);
+    arena_destroy(&tree->arena);
+    free(tree);
 }
 
-UiElement* ui_instance_get_root(const UiInstance* instance) {
-    return instance ? instance->root : NULL;
+SceneNode* scene_tree_get_root(const SceneTree* tree) {
+    return tree ? tree->root : NULL;
 }
 
-void ui_instance_set_root(UiInstance* instance, UiElement* root) {
-    if (instance) instance->root = root;
+void scene_tree_set_root(SceneTree* tree, SceneNode* root) {
+    if (tree) tree->root = root;
 }
+
+// ... Accessors ...
 
 // --- Accessors ---
 
-StringId ui_element_get_id(const UiElement* element) {
+StringId scene_node_get_id(const SceneNode* element) {
     if (element && element->spec) return element->spec->id;
     return 0;
 }
 
-UiElement* ui_element_find_by_id(UiElement* root, const char* id) {
+SceneNode* scene_node_find_by_id(SceneNode* root, const char* id) {
     if (!root || !root->spec || !id) return NULL;
     StringId target = str_id(id);
     if (root->spec->id == target) return root;
     
-    for (UiElement* child = root->first_child; child; child = child->next_sibling) {
-        UiElement* found = ui_element_find_by_id(child, id);
+    for (SceneNode* child = root->first_child; child; child = child->next_sibling) {
+        SceneNode* found = scene_node_find_by_id(child, id);
         if (found) return found;
     }
     return NULL;
 }
 
-void* ui_element_get_data(const UiElement* element) {
+void* scene_node_get_data(const SceneNode* element) {
     return element ? element->data_ptr : NULL;
 }
 
-const MetaStruct* ui_element_get_meta(const UiElement* element) {
+const MetaStruct* scene_node_get_meta(const SceneNode* element) {
     return element ? element->meta : NULL;
 }
 
-UiElement* ui_element_get_parent(const UiElement* element) {
+SceneNode* scene_node_get_parent(const SceneNode* element) {
     return element ? element->parent : NULL;
 }
 
-Rect ui_element_get_screen_rect(const UiElement* element) {
+Rect scene_node_get_screen_rect(const SceneNode* element) {
     if (element) return element->screen_rect;
     return (Rect){0};
 }
 
-// --- UiElement (Instance) ---
+// --- SceneNode (Instance) ---
 
-static UiElement* element_alloc(UiInstance* instance, const SceneNodeSpec* spec) {
+static SceneNode* element_alloc(SceneTree* tree, const SceneNodeSpec* spec) {
     // Pool allocation guarantees zero-init
-    UiElement* el = (UiElement*)pool_alloc(instance->element_pool);
+    SceneNode* el = (SceneNode*)pool_alloc(tree->element_pool);
     el->spec = spec;
     return el;
 }
 
 // Helper: Append child to linked list
-void ui_element_add_child(UiElement* parent, UiElement* child) {
+void scene_node_add_child(SceneNode* parent, SceneNode* child) {
     if (!parent || !child) return;
     
     child->parent = parent;
@@ -173,13 +175,13 @@ void ui_element_add_child(UiElement* parent, UiElement* child) {
     parent->child_count++;
 }
 
-void ui_element_clear_children(UiElement* parent, UiInstance* instance) {
-    if (!parent || !instance) return;
+void scene_node_clear_children(SceneNode* parent, SceneTree* tree) {
+    if (!parent || !tree) return;
     
-    UiElement* curr = parent->first_child;
+    SceneNode* curr = parent->first_child;
     while (curr) {
-        UiElement* next = curr->next_sibling;
-        destroy_recursive(instance, curr);
+        SceneNode* next = curr->next_sibling;
+        destroy_recursive(tree, curr);
         curr = next;
     }
     parent->first_child = NULL;
@@ -188,6 +190,97 @@ void ui_element_clear_children(UiElement* parent, UiInstance* instance) {
 }
 
 #include "foundation/logger/logger.h"
+
+// --- Helper: Binding Target Resolution ---
+
+static SceneBindingTarget ui_resolve_target_enum(const char* target) {
+    if (!target) return BINDING_TARGET_NONE;
+    if (strcmp(target, "text") == 0) return BINDING_TARGET_TEXT;
+    if (strcmp(target, "visible") == 0) return BINDING_TARGET_VISIBLE;
+    
+    // Layout
+    if (strcmp(target, "layout.x") == 0) return BINDING_TARGET_LAYOUT_X;
+    if (strcmp(target, "layout.y") == 0) return BINDING_TARGET_LAYOUT_Y;
+    if (strcmp(target, "layout.width") == 0) return BINDING_TARGET_LAYOUT_WIDTH;
+    if (strcmp(target, "layout.height") == 0) return BINDING_TARGET_LAYOUT_HEIGHT;
+    
+    // Style
+    if (strcmp(target, "style.color") == 0) return BINDING_TARGET_STYLE_COLOR;
+    
+    // Transform
+    if (strcmp(target, "transform.position.x") == 0) return BINDING_TARGET_TRANSFORM_POS_X;
+    if (strcmp(target, "transform.position.y") == 0) return BINDING_TARGET_TRANSFORM_POS_Y;
+    if (strcmp(target, "transform.position.z") == 0) return BINDING_TARGET_TRANSFORM_POS_Z;
+    
+    // Legacy support (mapped by parser but safe to keep)
+    if (strcmp(target, "x") == 0) return BINDING_TARGET_LAYOUT_X;
+    if (strcmp(target, "y") == 0) return BINDING_TARGET_LAYOUT_Y;
+    if (strcmp(target, "w") == 0) return BINDING_TARGET_LAYOUT_WIDTH;
+    if (strcmp(target, "h") == 0) return BINDING_TARGET_LAYOUT_HEIGHT;
+
+    return BINDING_TARGET_NONE;
+}
+
+static void ui_apply_binding_value(SceneNode* el, SceneBinding* b) {
+    void* ptr = (char*)el->data_ptr + b->source_offset;
+    const MetaField* f = b->source_field;
+    
+    switch (b->target) {
+        case BINDING_TARGET_TEXT: {
+            // Re-use existing helper but need to adapt args
+            // ui_bind_read_string expects (instance, field). 
+            // We have direct ptr. Construct a dummy call or refactor helper.
+            // Let's do direct read here for speed.
+            char buf[128];
+            buf[0] = '\0';
+            
+            if (f->type == META_TYPE_STRING) {
+                char* s = *(char**)ptr;
+                if (s) strncpy(buf, s, 127);
+            } else if (f->type == META_TYPE_STRING_ARRAY) {
+                strncpy(buf, (char*)ptr, 127);
+            } else if (f->type == META_TYPE_FLOAT) {
+                snprintf(buf, 128, "%.2f", *(float*)ptr);
+            } else if (f->type == META_TYPE_INT) {
+                snprintf(buf, 128, "%d", *(int*)ptr);
+            } else if (f->type == META_TYPE_BOOL) {
+                snprintf(buf, 128, "%s", (*(bool*)ptr) ? "true" : "false");
+            }
+            
+            // Update cache
+            if (strncmp(el->cached_text, buf, 128) != 0) {
+                strncpy(el->cached_text, buf, 127);
+                el->cached_text[127] = '\0';
+            }
+            break;
+        }
+        case BINDING_TARGET_VISIBLE: {
+            bool vis = false;
+            if (f->type == META_TYPE_BOOL) vis = *(bool*)ptr;
+            else if (f->type == META_TYPE_INT) vis = (*(int*)ptr) != 0;
+            
+            if (vis) el->flags &= ~UI_FLAG_HIDDEN;
+            else el->flags |= UI_FLAG_HIDDEN;
+            break;
+        }
+        case BINDING_TARGET_LAYOUT_X:
+            if (f->type == META_TYPE_FLOAT) el->rect.x = *(float*)ptr;
+            break;
+        case BINDING_TARGET_LAYOUT_Y:
+            if (f->type == META_TYPE_FLOAT) el->rect.y = *(float*)ptr;
+            break;
+        case BINDING_TARGET_LAYOUT_WIDTH:
+            if (f->type == META_TYPE_FLOAT) el->rect.w = *(float*)ptr;
+            break;
+        case BINDING_TARGET_LAYOUT_HEIGHT:
+            if (f->type == META_TYPE_FLOAT) el->rect.h = *(float*)ptr;
+            break;
+        case BINDING_TARGET_STYLE_COLOR:
+            if (f->type == META_TYPE_VEC4) el->render_color = *(Vec4*)ptr;
+            break;
+        default: break;
+    }
+}
 
 // --- Helper: Collection Resolution ---
 
@@ -218,11 +311,11 @@ static int ui_resolve_count(void* data, const MetaStruct* meta, const char* fiel
     return 0;
 }
 
-void ui_element_rebuild_children(UiElement* el, UiInstance* instance) {
-    if (!el || !instance || !el->spec) return;
+void scene_node_rebuild_children(SceneNode* el, SceneTree* tree) {
+    if (!el || !tree || !el->spec) return;
     
     // 1. Clear existing
-    ui_element_clear_children(el, instance);
+    scene_node_clear_children(el, tree);
 
     // 2. Resolve Dynamic Count
     size_t static_count = el->spec->child_count;
@@ -243,9 +336,9 @@ void ui_element_rebuild_children(UiElement* el, UiInstance* instance) {
     
     // 3. Create Static Children
     for (size_t i = 0; i < static_count; ++i) {
-        UiElement* child = ui_element_create(instance, el->spec->children[i], el->data_ptr, el->meta);
+        SceneNode* child = scene_node_create(tree, el->spec->children[i], el->data_ptr, el->meta);
         if (child) {
-            ui_element_add_child(el, child);
+            scene_node_add_child(el, child);
         }
     }
     
@@ -276,22 +369,22 @@ void ui_element_rebuild_children(UiElement* el, UiInstance* instance) {
                      const SceneNodeSpec* child_spec = el->spec->item_template;
 
                      // Conditional Template Selector
-                     if (el->spec->template_selector && instance->assets) {
+                     if (el->spec->template_selector && tree->assets) {
                          const MetaField* sel_field = meta_find_field(item_meta, el->spec->template_selector);
                          if (sel_field && sel_field->type == META_TYPE_ENUM) {
                              int val = meta_get_int(item_ptr, sel_field);
                              const MetaEnum* e = meta_get_enum(sel_field->type_name);
                              const char* t_name = meta_enum_get_name(e, val);
                              if (t_name) {
-                                 SceneNodeSpec* t = ui_asset_get_template(instance->assets, t_name);
+                                 SceneNodeSpec* t = scene_asset_get_template(tree->assets, t_name);
                                  if (t) child_spec = t;
                              }
                          }
                      }
 
-                     UiElement* child = ui_element_create(instance, child_spec, item_ptr, item_meta);
+                     SceneNode* child = scene_node_create(tree, child_spec, item_ptr, item_meta);
                      if (child) {
-                        ui_element_add_child(el, child);
+                        scene_node_add_child(el, child);
                      }
                  }
              }
@@ -299,10 +392,42 @@ void ui_element_rebuild_children(UiElement* el, UiInstance* instance) {
     }
 }
 
-UiElement* ui_element_create(UiInstance* instance, const SceneNodeSpec* spec, void* data, const MetaStruct* meta) {
-    if (!instance || !spec) return NULL;
+const SceneBinding* scene_node_get_binding(const SceneNode* node, SceneBindingTarget target) {
+    if (!node || !node->bindings) return NULL;
+    for (size_t i = 0; i < node->binding_count; ++i) {
+        if (node->bindings[i].target == target) return &node->bindings[i];
+    }
+    return NULL;
+}
 
-    UiElement* el = element_alloc(instance, spec);
+void scene_node_write_binding_float(SceneNode* node, SceneBindingTarget target, float value) {
+    const SceneBinding* b = scene_node_get_binding(node, target);
+    if (b && b->source_field && node->data_ptr) {
+        void* ptr = (char*)node->data_ptr + b->source_offset;
+        if (b->source_field->type == META_TYPE_FLOAT) {
+            *(float*)ptr = value;
+        } else if (b->source_field->type == META_TYPE_INT) {
+            *(int*)ptr = (int)value;
+        }
+    }
+}
+
+void scene_node_write_binding_string(SceneNode* node, SceneBindingTarget target, const char* value) {
+    const SceneBinding* b = scene_node_get_binding(node, target);
+    if (b && b->source_field && node->data_ptr) {
+        // Calculate the base instance pointer for this field
+        // source_offset = accumulated_offset_to_field
+        // field->offset = offset_within_parent_struct
+        // parent_struct = source_offset - field->offset
+        void* parent = (char*)node->data_ptr + (b->source_offset - b->source_field->offset);
+        meta_set_string(parent, b->source_field, value);
+    }
+}
+
+SceneNode* scene_node_create(SceneTree* tree, const SceneNodeSpec* spec, void* data, const MetaStruct* meta) {
+    if (!tree || !spec) return NULL;
+
+    SceneNode* el = element_alloc(tree, spec);
     el->data_ptr = data;
     el->meta = meta;
     el->render_color = spec->style.color;
@@ -318,53 +443,78 @@ UiElement* ui_element_create(UiInstance* instance, const SceneNodeSpec* spec, vo
         el->on_change_cmd_id = spec->on_change;
     }
 
-    // Cache Bindings
-    if (meta) {
-#define RESOLVE_BINDING(name_suffix) \
-        if (spec->bind_##name_suffix) { \
-            el->bind_##name_suffix = meta_find_field(meta, spec->bind_##name_suffix); \
-            if (!el->bind_##name_suffix) { \
-                LOG_ERROR("UiCore: Failed to bind '%s: %s' on Node ID:%u. Field not found in struct '%s'", \
-                          #name_suffix, spec->bind_##name_suffix, spec->id, meta->name); \
-            } \
+    // Cache Bindings (V2)
+    if (meta && spec->binding_count > 0) {
+        el->bindings = (SceneBinding*)arena_alloc_zero(&tree->arena, spec->binding_count * sizeof(SceneBinding));
+        el->binding_count = spec->binding_count;
+        
+        for (size_t i = 0; i < spec->binding_count; ++i) {
+             SceneBindingSpec* b_spec = &spec->bindings[i];
+             size_t total_offset = 0;
+             const MetaField* f = meta_find_field_by_path(meta, b_spec->source, &total_offset);
+             
+             if (f) {
+                 el->bindings[i].source_field = f;
+                 el->bindings[i].source_offset = total_offset;
+                 el->bindings[i].target = ui_resolve_target_enum(b_spec->target);
+                 
+                 // Warn if target invalid
+                 if (el->bindings[i].target == BINDING_TARGET_NONE) {
+                      LOG_WARN("UiCore: Invalid binding target '%s' on Node ID:%u", b_spec->target, spec->id);
+                 }
+             } else {
+                 LOG_ERROR("UiCore: Failed to resolve binding source '%s' (Node ID:%u)", b_spec->source, spec->id);
+             }
         }
-
-        RESOLVE_BINDING(text);
-
-        // Fallback for generic 'bind' property (common in templates)
-        if (!el->bind_text && spec->bind) {
-            el->bind_text = meta_find_field(meta, spec->bind);
-            if (!el->bind_text) {
-                LOG_ERROR("UiCore: Failed to bind 'bind: %s' on Node ID:%u. Field not found in struct '%s'", 
-                          spec->bind, spec->id, meta->name);
-            }
-        }
-
-        if (!el->bind_text && spec->text_source) {
-            el->bind_text = meta_find_field(meta, spec->text_source);
-            if (!el->bind_text) {
-                LOG_ERROR("UiCore: Failed to bind 'text_source: %s' on Node ID:%u. Field not found in struct '%s'", 
-                          spec->text_source, spec->id, meta->name);
-            }
-        }
-
-        RESOLVE_BINDING(visible);
-        RESOLVE_BINDING(x);
-        RESOLVE_BINDING(y);
-        RESOLVE_BINDING(w);
-        RESOLVE_BINDING(h);
-#undef RESOLVE_BINDING
     }
 
     // Populate Children
-    ui_element_rebuild_children(el, instance);
+    scene_node_rebuild_children(el, tree);
     
     return el;
 }
 
-void ui_element_update(UiElement* element, float dt) {
+void scene_node_update(SceneNode* element, float dt) {
     if (!element || !element->spec) return;
     
+    // --- 3.2: Unified Scene Graph Matrix Update ---
+    // 1. Build Local Matrix: T(Layout) * T(Local) * R(Local) * S(Local)
+    // Note: Layout translation (rect.x, rect.y) is added to Local Translation
+    
+    const SceneTransformSpec* trans = &element->spec->transform;
+    
+    // Scale
+    Vec3 scale = { 
+        trans->local_scale.x == 0 ? 1.0f : trans->local_scale.x, 
+        trans->local_scale.y == 0 ? 1.0f : trans->local_scale.y, 
+        trans->local_scale.z == 0 ? 1.0f : trans->local_scale.z 
+    };
+    Mat4 mat_s = mat4_scale(scale);
+    
+    // Rotation
+    EulerAngles euler = { trans->local_rotation.x, trans->local_rotation.y, trans->local_rotation.z };
+    Mat4 mat_r = mat4_rotation_euler(euler);
+    
+    // Translation (Layout + Local)
+    // Layout provides X/Y (2D), Local provides X/Y/Z (3D) offset
+    Vec3 translation = {
+        element->rect.x + trans->local_position.x,
+        element->rect.y + trans->local_position.y,
+        trans->local_position.z
+    };
+    Mat4 mat_t = mat4_translation(translation);
+    
+    // Local = T * R * S
+    Mat4 mat_rs = mat4_multiply(&mat_r, &mat_s);
+    element->local_matrix = mat4_multiply(&mat_t, &mat_rs);
+    
+    // 2. Build World Matrix
+    if (element->parent) {
+        element->world_matrix = mat4_multiply(&element->parent->world_matrix, &element->local_matrix);
+    } else {
+        element->world_matrix = element->local_matrix;
+    }
+
     // 0. Animation Interpolation
     const SceneNodeSpec* spec = element->spec;
     float target_t = element->is_hovered ? 1.0f : 0.0f;
@@ -385,49 +535,22 @@ void ui_element_update(UiElement* element, float dt) {
         }
     }
 
-    // 1. Resolve Text Binding (Cached)
-    if (element->bind_text && element->data_ptr) {
-        char new_text[128] = {0};
-        ui_bind_read_string(element->data_ptr, element->bind_text, new_text, sizeof(new_text));
-        
-        if (strncmp(element->cached_text, new_text, 128) != 0) {
-            strncpy(element->cached_text, new_text, 128 - 1); // safe copy
-            element->cached_text[127] = '\0';
+    // 1. Apply Bindings (V2)
+    if (element->data_ptr && element->bindings) {
+        for (size_t i = 0; i < element->binding_count; ++i) {
+             ui_apply_binding_value(element, &element->bindings[i]);
         }
     } else if (element->spec->text) {
-        // Init cache from static text if empty (first run or if static text is used without binding)
-        // Optimization: Check if match first
+        // Fallback: Static Text
         if (strncmp(element->cached_text, element->spec->text, 128) != 0) {
             strncpy(element->cached_text, element->spec->text, 128 - 1);
             element->cached_text[127] = '\0';
         }
     }
-    
-    // 2. Resolve Geometry Bindings (X/Y)
-    if (element->data_ptr) {
-#define SYNC_GEO(bind_ptr, rect_field) \
-        if (element->bind_ptr) { \
-            float val = meta_get_float(element->data_ptr, element->bind_ptr); \
-            if (element->rect.rect_field != val) element->rect.rect_field = val; \
-        }
-
-        SYNC_GEO(bind_x, x);
-        SYNC_GEO(bind_y, y);
-        SYNC_GEO(bind_w, w);
-        SYNC_GEO(bind_h, h);
-#undef SYNC_GEO
-
-        // 3. Resolve Visibility
-        if (element->bind_visible) {
-             bool visible = meta_get_bool(element->data_ptr, element->bind_visible);
-             if (visible) element->flags &= ~UI_FLAG_HIDDEN;
-             else element->flags |= UI_FLAG_HIDDEN;
-        }
-    }
 
     // Recurse Linked List
-    for (UiElement* child = element->first_child; child; child = child->next_sibling) {
-        ui_element_update(child, dt);
+    for (SceneNode* child = element->first_child; child; child = child->next_sibling) {
+        scene_node_update(child, dt);
     }
 }
 
@@ -451,19 +574,19 @@ void ui_bind_read_string(void* data, const MetaField* field, char* out_buf, size
 
 // --- High-Level Pipeline API ---
 
-void ui_instance_layout(UiInstance* instance, float window_w, float window_h, uint64_t frame_number, UiTextMeasureFunc measure_func, void* measure_data) {
+void scene_tree_layout(SceneTree* instance, float window_w, float window_h, uint64_t frame_number, UiTextMeasureFunc measure_func, void* measure_data) {
     if (!instance || !instance->root) return;
     // Log debug info only for specific frames or conditions if needed. Currently false.
     ui_layout_root(instance->root, window_w, window_h, frame_number, false, measure_func, measure_data);
 }
 
-void ui_instance_render(UiInstance* instance, Scene* scene, const Assets* assets, MemoryArena* arena) {
+void scene_tree_render(SceneTree* instance, Scene* scene, const Assets* assets, MemoryArena* arena) {
     if (!instance || !instance->root || !scene || !assets || !arena) return;
-    ui_renderer_build_scene(instance->root, scene, assets, arena);
+    scene_builder_build(instance->root, scene, assets, arena);
 }
 
 // --- Public Subsystem API ---
 
-UiAsset* ui_parser_load_from_file(const char* path) {
-    return ui_parser_load_internal(path);
+SceneAsset* scene_asset_load_from_file(const char* path) {
+    return scene_asset_load_internal(path);
 }

@@ -71,15 +71,15 @@ UI_COMMAND(cmd_add_node, MathEditor) {
 
     // Try to extract type from PaletteItem data bound to the UI element
     if (target) {
-        void* data = ui_element_get_data(target);
-        const MetaStruct* meta = ui_element_get_meta(target);
+        void* data = scene_node_get_data(target);
+        const MetaStruct* meta = scene_node_get_meta(target);
         
         // If the button itself doesn't have data, check parent
         if (!data) {
-             UiElement* p = ui_element_get_parent(target);
+             SceneNode* p = scene_node_get_parent(target);
              if(p) {
-                 data = ui_element_get_data(p);
-                 meta = ui_element_get_meta(p);
+                 data = scene_node_get_data(p);
+                 meta = scene_node_get_meta(p);
              }
         }
 
@@ -288,7 +288,7 @@ MathEditor* math_editor_create(Engine* engine) {
     // 4. Load UI Asset
     const char* ui_path = engine_get_config(engine)->ui_path; // Use config path
     if (ui_path) {
-        editor->ui_asset = ui_parser_load_from_file(ui_path);
+        editor->ui_asset = scene_asset_load_from_file(ui_path);
         if (!editor->ui_asset) {
              LOG_ERROR("Failed to load UI asset: %s", ui_path);
         }
@@ -296,7 +296,7 @@ MathEditor* math_editor_create(Engine* engine) {
         editor->ui_asset = NULL;
     }
 
-    editor->ui_instance = ui_instance_create(editor->ui_asset, 1024 * 1024); // 1MB for UI Elements
+    editor->ui_instance = scene_tree_create(editor->ui_asset, 1024 * 1024); // 1MB for UI Elements
 
     if (editor->ui_asset) {
             // NOTE: We now bind MathEditor, not MathGraph!
@@ -306,8 +306,8 @@ MathEditor* math_editor_create(Engine* engine) {
             }
             
             // Build Static UI from Asset into Instance
-            UiElement* root = ui_element_create(editor->ui_instance, ui_asset_get_root(editor->ui_asset), editor, editor_meta);
-            ui_instance_set_root(editor->ui_instance, root);
+            SceneNode* root = scene_node_create(editor->ui_instance, scene_asset_get_root(editor->ui_asset), editor, editor_meta);
+            scene_tree_set_root(editor->ui_instance, root);
             
             // Initial Select
             if (editor->node_views_count > 0) {
@@ -336,7 +336,7 @@ void math_editor_render(MathEditor* editor, Scene* scene, const struct Assets* a
     if (!editor || !scene || !editor->ui_instance) return;
 
     // Delegate entire rendering to UI system.
-    ui_instance_render(editor->ui_instance, scene, assets, arena);
+    scene_tree_render(editor->ui_instance, scene, assets, arena);
 }
 
 void math_editor_update(MathEditor* editor, Engine* engine) {
@@ -355,12 +355,12 @@ void math_editor_update(MathEditor* editor, Engine* engine) {
          }
     }
 
-    UiElement* root = ui_instance_get_root(editor->ui_instance);
+    SceneNode* root = scene_tree_get_root(editor->ui_instance);
 
     // UI Update Loop
     if (root) {
         // Animation / Logic Update
-        ui_element_update(root, engine_get_dt(engine));
+        scene_node_update(root, engine_get_dt(engine));
         
         // Input Handling
         ui_input_update(editor->input_ctx, root, engine_get_input_system(engine));
@@ -381,11 +381,11 @@ void math_editor_update(MathEditor* editor, Engine* engine) {
                     break;
                 case UI_EVENT_CLICK: {
                     // Selection Logic
-                    UiElement* hit = evt.target;
+                    SceneNode* hit = evt.target;
                     while (hit) {
                         // Check for MathNodeView
-                        void* data = ui_element_get_data(hit);
-                        const MetaStruct* meta = ui_element_get_meta(hit);
+                        void* data = scene_node_get_data(hit);
+                        const MetaStruct* meta = scene_node_get_meta(hit);
 
                         if (data && meta && strcmp(meta->name, "MathNodeView") == 0) {
                             MathNodeView* v = (MathNodeView*)data;
@@ -394,7 +394,7 @@ void math_editor_update(MathEditor* editor, Engine* engine) {
                             LOG_INFO("Selected Node: %d", v->node_id);
                             break;
                         }
-                        hit = ui_element_get_parent(hit);
+                        hit = scene_node_get_parent(hit);
                     }
                 } break;
                 default: break;
@@ -409,7 +409,7 @@ void math_editor_update(MathEditor* editor, Engine* engine) {
         
         // Layout
         PlatformWindowSize size = platform_get_framebuffer_size(engine_get_window(engine));
-        ui_instance_layout(editor->ui_instance, (float)size.width, (float)size.height, render_system_get_frame_count(engine_get_render_system(engine)), text_measure_wrapper, (void*)assets_get_font(engine_get_assets(engine)));
+        scene_tree_layout(editor->ui_instance, (float)size.width, (float)size.height, render_system_get_frame_count(engine_get_render_system(engine)), text_measure_wrapper, (void*)assets_get_font(engine_get_assets(engine)));
     }
 
     // Graph Evaluation (Naive interpretation on CPU for debugging/node values)
@@ -433,14 +433,14 @@ void math_editor_destroy(MathEditor* editor) {
     if (!editor) return;
     
     ui_input_destroy(editor->input_ctx);
-    ui_instance_destroy(editor->ui_instance);
+    scene_tree_destroy(editor->ui_instance);
     
     // Explicitly destroy graph resources (pool, ptrs)
     math_graph_destroy(editor->graph);
     
     arena_destroy(&editor->graph_arena);
     
-    if (editor->ui_asset) ui_asset_destroy(editor->ui_asset);
+    if (editor->ui_asset) scene_asset_destroy(editor->ui_asset);
 
     if (editor->selected_nodes) free((void*)editor->selected_nodes);
     if (editor->palette_items) {

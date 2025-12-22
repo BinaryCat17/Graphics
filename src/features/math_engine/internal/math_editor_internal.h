@@ -81,8 +81,8 @@ typedef struct MathEditor {
     MemoryArena graph_arena;
     
     // UI State
-    UiAsset* ui_asset;
-    UiInstance* ui_instance; // Manages UI Element memory
+    SceneAsset* ui_asset;
+    SceneTree* ui_instance; // Manages UI Element memory
     UiInputContext* input_ctx;
     
     // ViewModel Data

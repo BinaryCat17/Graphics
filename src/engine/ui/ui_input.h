@@ -5,7 +5,7 @@
 #include "foundation/string/string_id.h"
 
 // Forward Declarations
-typedef struct UiElement UiElement;
+typedef struct SceneNode SceneNode;
 typedef struct InputSystem InputSystem;
 
 typedef enum UiEventType {
@@ -18,11 +18,11 @@ typedef enum UiEventType {
 
 typedef struct UiEvent {
     UiEventType type;
-    UiElement* target;
+    SceneNode* target;
 } UiEvent;
 
 // --- Command System ---
-typedef void (*UiCommandCallback)(void* user_data, UiElement* target);
+typedef void (*UiCommandCallback)(void* user_data, SceneNode* target);
 
 #if defined(__GNUC__) || defined(__clang__)
 #define UI_UNUSED __attribute__((unused))
@@ -36,16 +36,16 @@ typedef void (*UiCommandCallback)(void* user_data, UiElement* target);
  * Usage:
  * UI_COMMAND(MyCommandName, MyContextType) {
  *     // 'ctx' is (MyContextType*)
- *     // 'target' is (UiElement*)
+ *     // 'target' is (SceneNode*)
  *     my_context_do_something(ctx);
  * }
  */
 #define UI_COMMAND(CmdName, ContextType) \
-    static void CmdName##_impl(ContextType* ctx UI_UNUSED, UiElement* target UI_UNUSED); /* NOLINT(bugprone-macro-parentheses) */ \
-    static void CmdName(void* user_data, UiElement* target) { \
+    static void CmdName##_impl(ContextType* ctx UI_UNUSED, SceneNode* target UI_UNUSED); /* NOLINT(bugprone-macro-parentheses) */ \
+    static void CmdName(void* user_data, SceneNode* target) { \
         CmdName##_impl((ContextType*)user_data, target); \
     } \
-    static void CmdName##_impl(ContextType* ctx UI_UNUSED, UiElement* target UI_UNUSED) // NOLINT(bugprone-macro-parentheses)
+    static void CmdName##_impl(ContextType* ctx UI_UNUSED, SceneNode* target UI_UNUSED) // NOLINT(bugprone-macro-parentheses)
 
 /**
  * @brief Macro to register a typesafe UI command.
@@ -57,7 +57,7 @@ typedef void (*UiCommandCallback)(void* user_data, UiElement* target);
     ui_command_register((NameStr), (CmdFunc), (void*)(ContextPtr))
 
 void ui_command_register(const char* name, UiCommandCallback callback, void* user_data);
-void ui_command_execute_id(StringId id, UiElement* target);
+void ui_command_execute_id(StringId id, SceneNode* target);
 
 // --- Input System ---
 typedef struct UiInputContext UiInputContext;
@@ -65,7 +65,7 @@ typedef struct UiInputContext UiInputContext;
 UiInputContext* ui_input_create(void);
 void ui_input_destroy(UiInputContext* ctx);
 void ui_input_init(UiInputContext* ctx);
-void ui_input_update(UiInputContext* ctx, UiElement* root, const InputSystem* input);
+void ui_input_update(UiInputContext* ctx, SceneNode* root, const InputSystem* input);
 bool ui_input_pop_event(UiInputContext* ctx, UiEvent* out_event);
 
 #endif // UI_INPUT_H

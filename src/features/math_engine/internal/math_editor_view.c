@@ -80,16 +80,16 @@ void math_editor_sync_view_data(MathEditor* editor) {
 // --- UI Sync ---
 
 void math_editor_refresh_graph_view(MathEditor* editor) {
-    UiElement* root = ui_instance_get_root(editor->ui_instance);
+    SceneNode* root = scene_tree_get_root(editor->ui_instance);
     if (!root) return;
     
     // Sync data before rebuild
     math_editor_sync_view_data(editor);
 
-    UiElement* canvas = ui_element_find_by_id(root, "canvas_area");
+    SceneNode* canvas = scene_node_find_by_id(root, "canvas_area");
     if (canvas) {
         // Declarative Refresh
-        ui_element_rebuild_children(canvas, editor->ui_instance);
+        scene_node_rebuild_children(canvas, editor->ui_instance);
     }
 }
 
@@ -110,11 +110,11 @@ void math_editor_update_selection(MathEditor* editor) {
     editor->no_selection = !editor->has_selection;
 
     // 2. Trigger UI Rebuild for Inspector
-    UiElement* root = ui_instance_get_root(editor->ui_instance);
+    SceneNode* root = scene_tree_get_root(editor->ui_instance);
     if (root) {
-        UiElement* inspector = ui_element_find_by_id(root, "inspector_area");
+        SceneNode* inspector = scene_node_find_by_id(root, "inspector_area");
         if (inspector) {
-             ui_element_rebuild_children(inspector, editor->ui_instance);
+             scene_node_rebuild_children(inspector, editor->ui_instance);
         }
     }
 }

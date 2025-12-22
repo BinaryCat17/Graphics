@@ -6,8 +6,8 @@
 #include <stdlib.h>
 
 // --- Helper: Build Def Tree first ---
-static SceneNodeSpec* create_node(UiAsset* asset, UiLayoutStrategy layout, float w, float h, const char* id) {
-    SceneNodeSpec* spec = ui_asset_push_node(asset);
+static SceneNodeSpec* create_node(SceneAsset* asset, UiLayoutStrategy layout, float w, float h, const char* id) {
+    SceneNodeSpec* spec = scene_asset_push_node(asset);
     if (!spec) return NULL;
     spec->layout.type = layout;
     spec->layout.width = w;
@@ -16,7 +16,7 @@ static SceneNodeSpec* create_node(UiAsset* asset, UiLayoutStrategy layout, float
     return spec;
 }
 
-static void add_child_spec(UiAsset* asset, SceneNodeSpec* parent, SceneNodeSpec* child) {
+static void add_child_spec(SceneAsset* asset, SceneNodeSpec* parent, SceneNodeSpec* child) {
     parent->child_count++;
     SceneNodeSpec** new_children = (SceneNodeSpec**)arena_alloc(&asset->arena, parent->child_count * sizeof(SceneNodeSpec*));
     if (parent->children) {
@@ -29,7 +29,7 @@ static void add_child_spec(UiAsset* asset, SceneNodeSpec* parent, SceneNodeSpec*
 // --- TESTS ---
 
 int test_column_layout(void) {
-    UiAsset* asset = ui_asset_create(4096);
+    SceneAsset* asset = scene_asset_create(4096);
 
     SceneNodeSpec* root = create_node(asset, UI_LAYOUT_FLEX_COLUMN, 100.0f, 200.0f, "root");
     root->layout.spacing = 10.0f;
@@ -41,17 +41,17 @@ int test_column_layout(void) {
     add_child_spec(asset, root, c1);
     add_child_spec(asset, root, c2);
     
-    UiInstance* instance = ui_instance_create(asset, 4096);
+    SceneTree* instance = scene_tree_create(asset, 4096);
 
-    UiElement* el = ui_element_create(instance, root, NULL, NULL);
+    SceneNode* el = scene_node_create(instance, root, NULL, NULL);
     instance->root = el;
-    ui_instance_layout(instance, 800, 600, 0, NULL, NULL);
+    scene_tree_layout(instance, 800, 600, 0, NULL, NULL);
 
     TEST_ASSERT_FLOAT_EQ(el->rect.w, 100.0f, 0.1f);
     TEST_ASSERT_FLOAT_EQ(el->rect.h, 200.0f, 0.1f);
 
-    UiElement* v1 = el->first_child;
-    UiElement* v2 = el->first_child->next_sibling;
+    SceneNode* v1 = el->first_child;
+    SceneNode* v2 = el->first_child->next_sibling;
 
     TEST_ASSERT_FLOAT_EQ(v1->rect.x, 5.0f, 0.1f);
     TEST_ASSERT_FLOAT_EQ(v1->rect.y, 5.0f, 0.1f);
@@ -59,8 +59,8 @@ int test_column_layout(void) {
     TEST_ASSERT_FLOAT_EQ(v2->rect.x, 5.0f, 0.1f);
     TEST_ASSERT_FLOAT_EQ(v2->rect.y, 65.0f, 0.1f);
 
-    ui_instance_destroy(instance);
-    ui_asset_destroy(asset);
+    scene_tree_destroy(instance);
+    scene_asset_destroy(asset);
     return 1;
 }
 

@@ -147,6 +147,41 @@ const char* meta_enum_get_name(const MetaEnum* meta_enum, int value) {
     return NULL;
 }
 
+const MetaField* meta_find_field_by_path(const MetaStruct* root_meta, const char* path, size_t* out_offset) {
+    if (!root_meta || !path || !out_offset) return NULL;
+    
+    *out_offset = 0;
+    const MetaStruct* current_meta = root_meta;
+    const MetaField* current_field = NULL;
+    
+    char buffer[256];
+    strncpy(buffer, path, 255);
+    buffer[255] = '\0';
+    
+    char* token = strtok(buffer, ".");
+    while (token) {
+        if (!current_meta) return NULL; // Cannot traverse into non-struct
+        
+        current_field = meta_find_field(current_meta, token);
+        if (!current_field) return NULL;
+        
+        *out_offset += current_field->offset;
+        
+        // Prepare for next iteration
+        token = strtok(NULL, ".");
+        if (token) {
+            // Must be a struct to continue
+            if (current_field->type == META_TYPE_STRUCT) {
+                current_meta = meta_get_struct(current_field->type_name);
+            } else {
+                return NULL; // Path continues but type is not struct
+            }
+        }
+    }
+    
+    return current_field;
+}
+
 bool meta_set_from_string(void* instance, const MetaField* field, const char* value_str) {
     if (!instance || !field || !value_str) return false;
 

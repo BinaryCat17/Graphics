@@ -6,17 +6,17 @@
 #include "foundation/string/string_id.h"
 
 // Forward Declarations
-typedef struct UiAsset UiAsset;
+typedef struct SceneAsset SceneAsset;
 typedef struct SceneNodeSpec SceneNodeSpec;
 
-UiAsset* ui_asset_create(size_t arena_size);
-void ui_asset_destroy(UiAsset* asset);
+SceneAsset* scene_asset_create(size_t arena_size);
+void scene_asset_destroy(SceneAsset* asset);
 
 // Access
-SceneNodeSpec* ui_asset_get_template(UiAsset* asset, const char* name);
-SceneNodeSpec* ui_asset_get_root(const UiAsset* asset);
+SceneNodeSpec* scene_asset_get_template(SceneAsset* asset, const char* name);
+SceneNodeSpec* scene_asset_get_root(const SceneAsset* asset);
 
 // --- Parser API ---
-UiAsset* ui_parser_load_from_file(const char* path);
+SceneAsset* scene_asset_load_from_file(const char* path);
 
 #endif // UI_ASSETS_H

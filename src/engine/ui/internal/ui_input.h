@@ -9,9 +9,9 @@
 
 struct UiInputContext {
     // Current Frame State
-    UiElement* hovered;      // Element currently under mouse
-    UiElement* active;       // Element being pressed (mouse down)
-    UiElement* focused;      // Element with keyboard focus
+    SceneNode* hovered;      // Element currently under mouse
+    SceneNode* active;       // Element being pressed (mouse down)
+    SceneNode* focused;      // Element with keyboard focus
 
     // Dragging State
     bool is_dragging;
