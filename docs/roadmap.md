@@ -39,8 +39,7 @@ Structural standardization (Phase 6) is largely complete, but critical limitatio
 *   [ ] **Refactor: Module Renaming:** (Future) Move `src/engine/ui` -> `src/engine/scene_system`.
 *   [ ] **Mesh Component:** Add `SceneMeshSpec` (mesh asset id, material params) to the Node Spec.
 *   [ ] **Renderer Adaptation:** Update `ui_renderer_build_scene` (rename to `scene_builder_build`) to check for `MeshSpec`. If present, emit 3D `SceneObject`s instead of UI Quads.
-*   [ ] **Binding V2 (Deep Cleanup):** Refactor the Data Binding system to support dot-notation/paths (e.g., `target: "transform.position.x"`).
-
+*   [x] **Binding V2 (Deep Cleanup):** Refactor the Data Binding system to support dot-notation/paths (e.g., `target: "transform.position.x"`).
     *   **Objective:** Remove legacy hardcoded binding fields (`bind_x`, `bind_y`, `bind_w`, `bind_h`, `bind_text`, `bind_visible`) from the root `SceneNodeSpec`.
     *   **Implementation:** The binding system should resolve targets recursively within components (`spec->layout.width`) rather than expecting them at the root.
 
