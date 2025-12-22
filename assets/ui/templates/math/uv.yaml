@@ -1,9 +1,11 @@
 type: container
-layout: flex_column
-spacing: 5
+layout:
+  type: flex_column
+  spacing: 5
 children:
   - type: instance
     instance: InspectorTitle
   - type: text
     text: "UV Coordinates"
-    color: "#888888"
+    style:
+      color: "#888888"

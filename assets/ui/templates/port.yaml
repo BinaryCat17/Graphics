@@ -1,11 +1,14 @@
 type: container
-width: 10
-height: 25
+layout:
+  width: 10
+  height: 25
 children:
   - type: container
-    render_mode: box
-    width: 10
-    height: 10
-    corner_radius: 5
-    color: "#888888"
-    y: 7.5
+    layout:
+      width: 10
+      height: 10
+      y: 7.5
+    style:
+      render_mode: box
+      corner_radius: 5
+      color: "#888888"

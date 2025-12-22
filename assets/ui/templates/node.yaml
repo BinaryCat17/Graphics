@@ -1,44 +1,56 @@
 type: container
-layout: row
+layout:
+  type: row
+  width: -1 # Auto width? implied? Layout struct has default? C parser sets -1 defaults.
+  # The original file didn't have width/height, relying on defaults.
 flags: "clickable | draggable"
+# Bindings stay at root
 bind_x: "x"
 bind_y: "y"
-color: "#00000000" # Transparent wrapper
+style:
+  color: "#00000000" # Transparent wrapper
+
 children:
   # Input Ports (Left)
   - type: container
-    layout: column
-    width: 10
+    layout:
+      type: column
+      width: 10
+      y: 32 # Header offset (Migrated from padding-top)
     collection: "input_ports"
     item_template: "GraphPort"
-    padding:
-      top: 32 # Header offset
 
   # Main Body
   - type: container
-    layout: column
-    width: 150
-    # height: auto (implied)
-    color: "#333333"
-    padding: 5
+    layout:
+      type: column
+      width: 150
+      padding: 5
+    style:
+      color: "#333333"
+    
     children:
       - type: container
-        render_mode: box
-        height: 25
-        color: "#444444"
-        padding: 5
+        layout:
+          height: 25
+          padding: 5
+        style:
+          render_mode: box
+          color: "#444444"
+        
         children:
           - type: text
             bind: "name"
-            color: "#FFFFFF"
+            style:
+              color: "#FFFFFF"
       - type: instance
         instance: "ValueRow"
 
   # Output Ports (Right)
   - type: container
-    layout: column
-    width: 10
+    layout:
+      type: column
+      width: 10
+      y: 32 # Header offset
     collection: "output_ports"
     item_template: "GraphPort"
-    padding:
-      top: 32 # Header offset

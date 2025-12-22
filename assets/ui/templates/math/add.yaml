@@ -1,9 +1,11 @@
 type: container
-layout: flex_column
-spacing: 5
+layout:
+  type: flex_column
+  spacing: 5
 children:
   - type: instance
     instance: InspectorTitle
   - type: text
     bind_text: "cached_output"
-    color: "#888888"
+    style:
+      color: "#888888"

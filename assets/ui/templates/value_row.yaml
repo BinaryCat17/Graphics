@@ -1,4 +1,6 @@
 type: text
 bind: "value"
-height: 20
-color: "#CCCCCC"
+layout:
+  height: 20
+style:
+  color: "#CCCCCC"

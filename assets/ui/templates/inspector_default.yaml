@@ -1,9 +1,12 @@
 type: container
-layout: flex_column
-color: "#26262B"
+layout:
+  type: flex_column
+style:
+  color: "#26262B"
 children:
   - type: instance
     instance: InspectorTitle
   - type: text
     text: "Select a node"
-    color: "#666666"
+    style:
+      color: "#666666"

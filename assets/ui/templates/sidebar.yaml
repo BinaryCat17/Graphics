@@ -1,67 +1,83 @@
 type: container
 id: left_panel
-layout: flex_column
-width: 250
-height: -1
-color: "#333338"
-padding: 10
-spacing: 5
+layout:
+  type: flex_column
+  width: 250
+  height: -1
+  padding: 10
+  spacing: 5
+style:
+  color: "#333338"
 
 children:
   - type: text
     text: "Graph Editor"
-    height: 30
-    color: "#FFFFFF"
+    layout:
+      height: 30
+    style:
+      color: "#FFFFFF"
 
   - type: container
-    layout: flex_column
+    layout:
+      type: flex_column
+      height: 300
+      spacing: 5
+      padding: 5
     flags: scrollable
-    height: 300
-    spacing: 5
-    padding: 5
     collection: "palette_items"
     item_template: "PaletteItem"
 
   - type: container
-    layout: flex_row
-    height: 40
-    spacing: 5
+    layout:
+      type: flex_row
+      height: 40
+      spacing: 5
     children:
         - type: container
           flags: clickable | focusable
           text: "Clear"
-          padding: 15
-          height: 30
-          corner_radius: 8
-          color: "#663333"
+          layout:
+            padding: 15
+            height: 30
+          style:
+            corner_radius: 8
+            color: "#663333"
           on_click: "Graph.Clear"
 
   - type: text
     text: "Properties"
-    height: 20
-    color: "#CCCCCC"
+    layout:
+      height: 20
+    style:
+      color: "#CCCCCC"
     
   - type: container
-    layout: flex_column
-    height: -1
-    padding: 20
+    layout:
+      type: flex_column
+      height: -1
+      padding: 20
     bind_visible: "no_selection"
-    color: "#26262B"
+    style:
+      color: "#26262B"
     children:
       - type: text
         text: "Select a node to"
-        color: "#666666"
+        style:
+          color: "#666666"
       - type: text
         text: "edit properties"
-        color: "#666666"
+        style:
+          color: "#666666"
 
   - type: container
     id: inspector_area
-    layout: flex_column
-    height: -1 # Fill rest
-    corner_radius: 4
-    color: "#26262B"
-    padding: 5
+    layout:
+      type: flex_column
+      height: -1 # Fill rest
+      padding: 5
+    style:
+      corner_radius: 4
+      color: "#26262B"
     bind_visible: "has_selection"
     collection: "selected_nodes"
     template_selector: "type"

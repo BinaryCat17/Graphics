@@ -1,12 +1,16 @@
 type: container
-layout: row
-height: 25
+layout:
+  type: row
+  height: 25
 children:
   - type: text
     text: "Value:"
-    width: 60
-    color: "#AAAAAA"
+    layout:
+      width: 60
+    style:
+      color: "#AAAAAA"
   - type: text
     bind: "value"
-    color: "#00FF00"
+    style:
+      color: "#00FF00"
     on_change: "Graph.Recompile"
