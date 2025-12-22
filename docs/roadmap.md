@@ -56,7 +56,15 @@ The codebase enforces strict Public/Internal API boundaries across all modules. 
 
 ## 🚀 Active Phases
 
-### Phase 7: 3D Visualization & Compute (IMMEDIATE PRIORITY)
+### Phase 3: Data-Driven Scene Architecture (IMMEDIATE PRIORITY)
+**Objective:** Transition the entire rendering pipeline (2D & 3D) to a fully declarative, data-driven architecture defined in YAML. Elimination of ad-hoc "immediate mode" rendering in high-level game code.
+- [ ] **Unified Scene Graph:** Extend `UiElement` concept to a generic `SceneNode` that supports both 2D (UI) and 3D (Mesh, Light, Camera) objects.
+- [ ] **YAML 3D Support:** Extend parser to support 3D transforms (`position`, `rotation`, `scale`) and 3D-specific components (`mesh`, `material`).
+- [ ] **Data Binding for 3D:** Implement binding of C data structures (arrays, fields) to 3D scene instances (e.g., spawning an army of `Enemy3D` templates from a `GameState` array).
+- [ ] **Module Registry:** Create a system to register custom renderers (e.g., "Oscilloscope", "ParticleSystem") that can be referenced by name in YAML, encapsulating their low-level drawing logic.
+- [ ] **World-Space UI:** Enable UI containers to exist within the 3D scene graph (Billboards, Surface UI).
+
+### Phase 7: 3D Visualization & Compute (DEPENDS ON PHASE 3)
 **Objective:** Visualize mathematical functions and data in 3D space.
 - [ ] **Procedural Geometry:** Generate meshes from math functions (e.g., $z=f(x,y)$) using Compute Shaders.
 - [ ] **Arcball Camera:** Implement an orbit camera for inspecting 3D surfaces.
