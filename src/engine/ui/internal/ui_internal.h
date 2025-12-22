@@ -19,6 +19,7 @@ struct UiNodeSpec {
     UiKind kind;            // REFLECT
     UiLayoutStrategy layout;// REFLECT
     UiLayer layer;          // REFLECT
+    UiRenderMode render_mode; // REFLECT
     uint32_t flags;         // REFLECT(UiFlags)
     
     // 3. Styling (Reference to style sheet, not implemented yet)

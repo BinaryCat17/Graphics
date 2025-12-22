@@ -4,6 +4,8 @@ templates:
     import: "assets/ui/templates/value_row.yaml"
   GraphNode:
     import: "assets/ui/templates/node.yaml"
+  GraphWire:
+    import: "assets/ui/templates/math/wire.yaml"
   InspectorTitle:
     import: "assets/ui/templates/inspector_title.yaml"
   InspectorField:

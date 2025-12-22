@@ -1,0 +1,10 @@
+kind: Container
+render_mode: Bezier # 1
+layout: Canvas
+layer: Normal
+flags: [ Clickable ]
+color: "0xFF888888"
+# Note: Position/Size are ignored by Bezier renderer logic or overwritten by layout, 
+# but we need to ensure the element exists.
+width: 100
+height: 100

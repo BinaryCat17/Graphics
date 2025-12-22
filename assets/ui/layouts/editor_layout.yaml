@@ -21,10 +21,28 @@ children:
     width: -1 # Fill rest
     height: -1
     color: "#00000000"
-    collection: "node_views"
-    item_template: "GraphNode"
     
     children:
+        # Wires (Back)
+        - type: container 
+          id: wires_layer
+          width: 100%
+          height: 100%
+          color: "#00000000"
+          layout: canvas
+          collection: "wires"
+          item_template: "GraphWire"
+
+        # Nodes (Front)
+        - type: container 
+          id: nodes_layer
+          width: 100%
+          height: 100%
+          color: "#00000000"
+          layout: canvas
+          collection: "node_views"
+          item_template: "GraphNode"
+
         - type: text
           text: "Canvas Area (Drag nodes here)"
           x: 20

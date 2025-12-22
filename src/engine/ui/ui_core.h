@@ -46,6 +46,14 @@ typedef enum UiLayer {
     UI_LAYER_OVERLAY  // Renders last, ignores parent clipping (popups)
 } UiLayer; // REFLECT
 
+typedef enum UiRenderMode {
+    UI_RENDER_MODE_DEFAULT = 0, // Inferred (current behavior)
+    UI_RENDER_MODE_BOX,         // SDF Rounded Box
+    UI_RENDER_MODE_TEXT,        // Text only (no background)
+    UI_RENDER_MODE_IMAGE,       // Textured Quad / 9-Slice
+    UI_RENDER_MODE_BEZIER       // Explicit Bezier
+} UiRenderMode; // REFLECT
+
 typedef struct UiElement UiElement;
 typedef struct Scene Scene;
 typedef struct MemoryArena MemoryArena;

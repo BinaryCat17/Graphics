@@ -177,11 +177,14 @@ Unlike traditional engines that maintain separate render pipelines for UI (2D) a
 ### 🖥️ UI
 *   **Layout Engine:** A recursive, single-pass solver inspired by Flexbox. Supports `Column`, `Row`, `Canvas`, and `Split` layouts.
 *   **Input Handling:** Implements **Event Bubbling**. Input events (click, drag) start at the root and drill down to leaf nodes (hit testing), then bubble up for handling.
-*   **Rendering:** Generates `SceneObject`s with specific modes (9-Slice, SDF, Textured).
+*   **Rendering:** Generates `SceneObject`s with specific modes (9-Slice, SDF, Textured). Supports explicit `UiRenderMode` (e.g., `BEZIER`) for custom visualization.
 *   **Template-Instance Model:**
     *   **Spec (`UiNodeSpec`):** Immutable "DNA" loaded from YAML. Lives in `UiAsset`.
     *   **Element (`UiElement`):** Live runtime object created from a Spec. Lives in `UiInstance`.
     *   **Usage:** Logic calls `ui_element_create(instance, spec)` to spawn dynamic UI (like Graph Nodes) from static templates.
+*   **Data Binding & Collections:**
+    *   UI Containers can bind to array collections (e.g., `collection: "wires"`).
+    *   This is used to render Graph connections as interactive UI elements (Bezier curves) rather than raw immediate-mode geometry.
 *   **Orthogonal Typing:**
     *   **Primitives:** Only `Container` (Rect) and `Text` exist as fundamental Kinds.
     *   **Behavior:** Defined via Flags (`Clickable`, `Editable`, `Draggable`).

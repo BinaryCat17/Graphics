@@ -8,6 +8,7 @@
 #include "engine/text/font.h" 
 #include "engine/assets/assets.h"
 #include "foundation/memory/arena.h"
+#include "foundation/meta/reflection.h"
 #include <string.h> 
 
 // --- Provider Registry ---
@@ -67,8 +68,23 @@ static Rect rect_intersect(Rect a, Rect b) {
 }
 
 static void render_background(const UiElement* el, UiRenderContext* ctx, Vec4 clip_vec, float z) {
+    UiRenderMode mode = el->spec->render_mode;
     bool is_input = (el->flags & UI_FLAG_EDITABLE);
-    if (el->spec->kind != UI_KIND_CONTAINER && !is_input) return;
+
+    // Default / Compatibility Logic resolution
+    if (mode == UI_RENDER_MODE_DEFAULT) {
+        // By default, TEXT kind (non-input) has no background
+        if (el->spec->kind == UI_KIND_TEXT && !is_input) {
+             return; 
+        }
+        
+        // Infer mode from texture existence
+        if (el->spec->texture != 0) mode = UI_RENDER_MODE_IMAGE;
+        else mode = UI_RENDER_MODE_BOX;
+    }
+
+    // Explicit Text mode means no background
+    if (mode == UI_RENDER_MODE_TEXT) return;
 
     // Resolve base color
     Vec4 color = el->render_color;
@@ -94,43 +110,87 @@ static void render_background(const UiElement* el, UiRenderContext* ctx, Vec4 cl
          color.x *= 1.1f; color.y *= 1.1f; color.z *= 1.1f;
     }
 
-    if ((el->spec->texture != 0)) {
-        // Use 9-Slice or Textured Quad
-        float u0, v0, u1, v1;
-        font_get_ui_rect_uv(ctx->font, &u0, &v0, &u1, &v1);
-        Vec4 uv_rect = {u0, v0, u1 - u0, v1 - v0};
+    // Render based on Resolved Mode
+    switch (mode) {
+        case UI_RENDER_MODE_BEZIER: {
+            Vec2 start = {el->screen_rect.x, el->screen_rect.y};
+            Vec2 end = {el->screen_rect.x + el->screen_rect.w, el->screen_rect.y + el->screen_rect.h};
+            float thickness = 2.0f;
+            
+            // Try to read from data binding if available
+            if (el->data_ptr && el->meta) {
+                const MetaField* f_start = meta_find_field(el->meta, "start");
+                const MetaField* f_end = meta_find_field(el->meta, "end");
+                const MetaField* f_thick = meta_find_field(el->meta, "thickness");
+                
+                if (f_start && f_start->type == META_TYPE_VEC2) {
+                    float* v = (float*)meta_get_field_ptr(el->data_ptr, f_start);
+                    // Convert Local -> Screen
+                    start = (Vec2){el->screen_rect.x + v[0], el->screen_rect.y + v[1]};
+                }
+                if (f_end && f_end->type == META_TYPE_VEC2) {
+                    float* v = (float*)meta_get_field_ptr(el->data_ptr, f_end);
+                    // Convert Local -> Screen
+                    end = (Vec2){el->screen_rect.x + v[0], el->screen_rect.y + v[1]};
+                }
+                if (f_thick && f_thick->type == META_TYPE_FLOAT) {
+                    thickness = *(float*)meta_get_field_ptr(el->data_ptr, f_thick);
+                }
+            }
+            
+            scene_push_curve(ctx->scene, 
+                (Vec3){start.x, start.y, z}, 
+                (Vec3){end.x, end.y, z}, 
+                thickness, 
+                color, 
+                clip_vec
+            );
+            break;
+        }
+
+        case UI_RENDER_MODE_IMAGE: {
+            // Use 9-Slice or Textured Quad
+            float u0, v0, u1, v1;
+            font_get_ui_rect_uv(ctx->font, &u0, &v0, &u1, &v1);
+            Vec4 uv_rect = {u0, v0, u1 - u0, v1 - v0};
+            
+            float tex_w = el->spec->tex_w > 0 ? el->spec->tex_w : 32.0f;
+            float tex_h = el->spec->tex_h > 0 ? el->spec->tex_h : 32.0f;
+            
+            // extra_params: borders (top, right, bottom, left)
+            Vec4 borders = {
+                el->spec->border_t,
+                el->spec->border_r,
+                el->spec->border_b,
+                el->spec->border_l
+            };
+            
+            scene_push_quad_9slice(ctx->scene, 
+                (Vec3){el->screen_rect.x, el->screen_rect.y, z}, 
+                (Vec2){el->screen_rect.w, el->screen_rect.h}, 
+                color, 
+                uv_rect, 
+                (Vec2){tex_w, tex_h}, 
+                borders, 
+                clip_vec
+            );
+            break;
+        }
+
+        case UI_RENDER_MODE_BOX: {
+            // SDF Rounded Box
+            scene_push_rect_sdf(ctx->scene,
+                (Vec3){el->screen_rect.x, el->screen_rect.y, z},
+                (Vec2){el->screen_rect.w, el->screen_rect.h},
+                color,
+                el->spec->corner_radius,
+                el->spec->border_t,
+                clip_vec
+            );
+            break;
+        }
         
-        float tex_w = el->spec->tex_w > 0 ? el->spec->tex_w : 32.0f;
-        float tex_h = el->spec->tex_h > 0 ? el->spec->tex_h : 32.0f;
-        
-        // extra_params: borders (top, right, bottom, left)
-        Vec4 borders = {
-            el->spec->border_t,
-            el->spec->border_r,
-            el->spec->border_b,
-            el->spec->border_l
-        };
-        
-        scene_push_quad_9slice(ctx->scene, 
-            (Vec3){el->screen_rect.x, el->screen_rect.y, z}, 
-            (Vec2){el->screen_rect.w, el->screen_rect.h}, 
-            color, 
-            uv_rect, 
-            (Vec2){tex_w, tex_h}, 
-            borders, 
-            clip_vec
-        );
-        
-    } else {
-        // SDF Rounded Box (Mode 4)
-        scene_push_rect_sdf(ctx->scene,
-            (Vec3){el->screen_rect.x, el->screen_rect.y, z},
-            (Vec2){el->screen_rect.w, el->screen_rect.h},
-            color,
-            el->spec->corner_radius,
-            el->spec->border_t,
-            clip_vec
-        );
+        default: break;
     }
 }
 

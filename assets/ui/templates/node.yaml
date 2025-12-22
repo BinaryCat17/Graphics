@@ -9,6 +9,7 @@ color: "#333333"
 padding: 5
 children:
   - type: container
+    render_mode: box
     height: 25
     color: "#444444"
     padding: 5

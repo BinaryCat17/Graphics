@@ -7,7 +7,13 @@
 #include "engine/ui/ui_renderer.h"
 #include "features/math_engine/math_graph.h"
 
-// ViewModel for a Node in the Editor
+// --- Layout Constants ---
+#define NODE_WIDTH          150.0f
+#define NODE_HEADER_HEIGHT  32.0f
+#define NODE_PORT_SPACING   25.0f
+#define NODE_PORT_SIZE      10.0f
+
+// --- ViewModel for a Node in the Editor
 typedef struct MathNodeView {
     MathNodeId node_id;     // REFLECT
     float x;                // REFLECT
@@ -17,6 +23,13 @@ typedef struct MathNodeView {
     char name[32];          // REFLECT
     float value;            // REFLECT (Input/Output preview)
 } MathNodeView;
+
+typedef struct MathWireView {
+    Vec2 start;            // REFLECT
+    Vec2 end;              // REFLECT
+    Vec4 color;            // REFLECT
+    float thickness;       // REFLECT
+} MathWireView;
 
 // --- Serialization DTOs (Strict Separation) ---
 
@@ -67,6 +80,10 @@ typedef struct MathEditor {
     MathNodeView* node_views;   // REFLECT
     uint32_t node_views_count;  // REFLECT
     uint32_t node_view_cap;
+
+    MathWireView* wires;        // REFLECT
+    uint32_t wires_count;       // REFLECT
+    uint32_t wires_cap;
 
     // Palette Data
     MathNodePaletteItem** palette_items; // REFLECT
