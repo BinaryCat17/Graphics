@@ -1,5 +1,5 @@
-#include "scene.h"
-#include "internal/scene_tree_internal.h"
+#include "../scene.h"
+#include "scene_tree_internal.h"
 #include "foundation/memory/arena.h"
 #include "foundation/memory/pool.h"
 #include "foundation/math/coordinate_systems.h"
@@ -7,16 +7,6 @@
 
 #include <stdlib.h>
 #include <string.h>
-
-// --- Lifecycle ---
-
-void scene_system_init(void) {
-    // Core system init (if any)
-}
-
-void scene_system_shutdown(void) {
-    // Core system shutdown (if any)
-}
 
 // --- Scene Asset ---
 

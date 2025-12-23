@@ -50,6 +50,44 @@ static SceneNodeSpec* ui_node_spec_copy(SceneAsset* asset, const SceneNodeSpec* 
 
 // --- Generic Recursive Parser for Structs ---
 
+static void parse_struct_fields(void* instance, const MetaStruct* meta, const ConfigNode* map, SceneAsset* asset);
+
+static void parse_field_value(void* instance, const MetaField* field, const ConfigNode* val, SceneAsset* asset) {
+    if (!instance || !field || !val) return;
+    
+    void* field_ptr = (char*)instance + field->offset;
+
+    if (field->type == META_TYPE_STRUCT) {
+         const MetaStruct* sub_meta = meta_get_struct(field->type_name);
+         if (sub_meta) {
+             parse_struct_fields(field_ptr, sub_meta, val, asset);
+         }
+    } else if (val->type == CONFIG_NODE_SEQUENCE && (field->type >= META_TYPE_VEC2 && field->type <= META_TYPE_VEC4)) {
+         int vec_size = field->type - META_TYPE_VEC2 + 2;
+         float* f_ptr = (float*)field_ptr;
+         for (int k = 0; k < vec_size; ++k) {
+             float v = 0.0f;
+             if (k < (int)val->item_count && val->items[k]->scalar) {
+                 v = (float)atof(val->items[k]->scalar);
+             } else if (k == 3) {
+                 v = 1.0f; 
+             }
+             f_ptr[k] = v;
+         }
+    } else if (field->type == META_TYPE_STRING) {
+         const char* s = val->scalar ? val->scalar : "";
+         char* str_copy = arena_push_string(&asset->arena, s);
+         *(char**)field_ptr = str_copy;
+    } else {
+         const char* s = val->scalar ? val->scalar : "";
+         if (!meta_set_from_string(instance, field, s)) {
+             if (s[0] != '\0' && field->type == META_TYPE_ENUM) {
+                 LOG_WARN("UiParser: Unknown enum value '%s' for type '%s'", s, field->type_name);
+             }
+         }
+    }
+}
+
 static void parse_struct_fields(void* instance, const MetaStruct* meta, const ConfigNode* map, SceneAsset* asset) {
     if (!instance || !meta || !map || map->type != CONFIG_NODE_MAP) return;
 
@@ -64,85 +102,11 @@ static void parse_struct_fields(void* instance, const MetaStruct* meta, const Co
             continue;
         }
         
-        void* field_ptr = (char*)instance + field->offset;
-
-        if (field->type == META_TYPE_STRUCT) {
-             const MetaStruct* sub_meta = meta_get_struct(field->type_name);
-             if (sub_meta) {
-                 parse_struct_fields(field_ptr, sub_meta, val, asset);
-             }
-        } else if (val->type == CONFIG_NODE_SEQUENCE && (field->type >= META_TYPE_VEC2 && field->type <= META_TYPE_VEC4)) {
-             int vec_size = field->type - META_TYPE_VEC2 + 2;
-             float* f_ptr = (float*)field_ptr;
-             for (int k = 0; k < vec_size; ++k) {
-                 float v = 0.0f;
-                 if (k < (int)val->item_count && val->items[k]->scalar) {
-                     v = (float)atof(val->items[k]->scalar);
-                 } else if (k == 3) {
-                     v = 1.0f; 
-                 }
-                 f_ptr[k] = v;
-             }
-        } else if (field->type == META_TYPE_STRING) {
-             const char* s = val->scalar ? val->scalar : "";
-             char* str_copy = arena_push_string(&asset->arena, s);
-             *(char**)field_ptr = str_copy;
-        } else {
-             const char* s = val->scalar ? val->scalar : "";
-             if (!meta_set_from_string(instance, field, s)) {
-                 if (s[0] != '\0' && field->type == META_TYPE_ENUM) {
-                     LOG_WARN("UiParser: Unknown enum value '%s' for type '%s'", s, field->type_name);
-                 }
-             }
-        }
+        parse_field_value(instance, field, val, asset);
     }
 }
 
-static void parse_flags_smart(SceneNodeSpec* spec, const char* flags_str) {
-    if (!spec || !flags_str) return;
 
-    const char* ptr = flags_str;
-    while (*ptr) {
-        // Skip delimiters
-        while (*ptr && (*ptr == ' ' || *ptr == '|' || *ptr == ',' || *ptr == '[' || *ptr == ']')) ptr++;
-        if (!*ptr) break;
-
-        // Find end of token
-        const char* start = ptr;
-        while (*ptr && *ptr != ' ' && *ptr != '|' && *ptr != ',' && *ptr != '[' && *ptr != ']') ptr++;
-        
-        size_t len = ptr - start;
-        char token[64];
-        if (len < 64) {
-            strncpy(token, start, len);
-            token[len] = '\0';
-        } else {
-            continue; // Too long, skip
-        }
-
-        int val = 0;
-        
-        // Try Scene Flags
-        if (meta_enum_get_value(meta_get_enum("SceneFlags"), token, &val)) {
-            spec->flags |= (uint32_t)val;
-            continue;
-        }
-
-        // Try Interaction Flags
-        if (meta_enum_get_value(meta_get_enum("SceneInteractionFlags"), token, &val)) {
-            spec->interaction_flags |= (uint32_t)val;
-            continue;
-        }
-
-        // Try UI Flags
-        if (meta_enum_get_value(meta_get_enum("UiFlags"), token, &val)) {
-            spec->ui_flags |= (uint32_t)val;
-            continue;
-        }
-        
-        LOG_WARN("UiParser: Unknown flag '%s' (Node ID:%u)", token, spec->id);
-    }
-}
 
 // --- Recursive Loader ---
 
@@ -210,13 +174,7 @@ static SceneNodeSpec* load_recursive(SceneAsset* asset, const ConfigNode* node) 
 
         if (strcmp(key, "instance") == 0) continue;
 
-        // --- Custom Flag Parser ---
-        if (strcmp(key, "flags") == 0) {
-            if (val->scalar) {
-                parse_flags_smart(spec, val->scalar);
-            }
-            continue;
-        }
+
         
         // --- Bindings V2 Parsing ---
         if (strcmp(key, "bindings") == 0) {
@@ -265,60 +223,22 @@ static SceneNodeSpec* load_recursive(SceneAsset* asset, const ConfigNode* node) 
         const MetaField* field = meta_find_field(meta, key);
 
         if (field) {
-            void* field_ptr = (char*)spec + field->offset;
+            // Special handling for 'text' field to support Binding Syntax "{...}"
+            if (strcmp(key, "text") == 0 && val->scalar && val->scalar[0] == '{' && temp_binding_count < 64) {
+                 size_t len = strlen(val->scalar);
+                 if (len > 2) {
+                     char* buf = arena_push_string_n(&asset->arena, val->scalar + 1, len - 2);
+                     // Convert to binding
+                     temp_bindings[temp_binding_count].target = "text";
+                     temp_bindings[temp_binding_count].source = buf;
+                     temp_binding_count++;
+                     spec->text = NULL; 
+                     continue;
+                 }
+            }
 
-            // Handle Sub-Structs (layout, style, transform)
-            if (field->type == META_TYPE_STRUCT) {
-                 const MetaStruct* sub_meta = meta_get_struct(field->type_name);
-                 if (sub_meta) {
-                     parse_struct_fields(field_ptr, sub_meta, val, asset);
-                 }
-            }
-            // Handle Sequence for Vectors
-            else if (val->type == CONFIG_NODE_SEQUENCE && (field->type >= META_TYPE_VEC2 && field->type <= META_TYPE_VEC4)) {
-                int vec_size = field->type - META_TYPE_VEC2 + 2; 
-                float* data_ptr = (float*)field_ptr;
-                if (data_ptr) {
-                    for (int k = 0; k < vec_size; ++k) {
-                        float v = 0.0f;
-                        if (k < (int)val->item_count && val->items[k]->scalar) {
-                            v = (float)atof(val->items[k]->scalar);
-                        } else if (k == 3) {
-                            v = 1.0f; // Alpha defaults to 1.0
-                        }
-                        data_ptr[k] = v;
-                    }
-                }
-            }
-            // Handle Strings
-            else if (field->type == META_TYPE_STRING) {
-                 const char* s = val->scalar ? val->scalar : "";
-                 
-                 // Special handling for 'text' field to support Binding Syntax "{...}"
-                 if (strcmp(field->name, "text") == 0 && s[0] == '{' && temp_binding_count < 64) {
-                     size_t len = strlen(s);
-                     if (len > 2) {
-                         char* buf = arena_push_string_n(&asset->arena, s + 1, len - 2);
-                         // Convert to binding
-                         temp_bindings[temp_binding_count].target = "text";
-                         temp_bindings[temp_binding_count].source = buf;
-                         temp_binding_count++;
-                         spec->text = NULL; 
-                     }
-                 } else {
-                     char* str_copy = arena_push_string(&asset->arena, s);
-                     *(char**)field_ptr = str_copy;
-                 }
-            } 
-            // Handle Scalars
-            else {
-                 const char* s = val->scalar ? val->scalar : "";
-                 if (!meta_set_from_string(spec, field, s)) {
-                     if (s[0] != '\0' && field->type == META_TYPE_ENUM) {
-                         LOG_WARN("UiParser: Unknown enum value '%s' for type '%s'", s, field->type_name);
-                     }
-                 }
-            }
+            parse_field_value(spec, field, val, asset);
+
         } else if (strcmp(key, "provider") == 0) {
              if (val->scalar) {
                  spec->provider_id = str_id(val->scalar);

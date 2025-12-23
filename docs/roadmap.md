@@ -54,22 +54,15 @@ Structural standardization (Phase 6) is largely complete, but critical limitatio
 - [x] **Refactor: Move Parser:** Migrate `ui_parser.c` from `src/engine/ui` to `src/engine/scene/loader`. The Scene Core must be able to load itself without UI dependencies.
 - [x] **Refactor: Unify Bindings:** Rename `UiBinding` (runtime) to `SceneBinding` and move it to `src/engine/scene`. Allow any SceneNode property to be bound, not just UI fields.
 - [x] **Refactor: Flag Consolidation:** Review `UiFlags` vs `SceneNodeFlags`. Ensure `SceneNode` has a unified flag system where UI-specific flags use reserved bits or a dedicated subsystem mask.
-- [ ] **Cleanup:** Remove legacy `UiAsset` stubs if they are fully replaced by `SceneAsset`.
+- [x] **Cleanup:** Remove legacy `UiAsset` stubs if they are fully replaced by `SceneAsset`.
 
 ### Phase 3.6: Architecture Hardening (Cleanup)
 **Objective:** Solidify the foundation after the "Great Merge" of UI and Scene systems. Remove "construction debris" and ensure the engine is truly 3D-ready, not just a UI engine wrapper.
 - [x] **Refactor: Loader Decoupling:** Remove UI-specific hardcoding from `scene_loader.c`.
     *   [x] Remove legacy bindings support (`bind_x`, `bind_y`) in favor of the generic `bindings` array.
-    *   [ ] Remove default UI values (layout/style) from the parser; let the `UiSystem` apply defaults.
+    *   [x] Remove `parse_flags_smart` and enforce strict reflection-based flag parsing.
+    *   [x] Unify structure parsing logic (`parse_struct_fields`) with recursive loader to eliminate duplication.
 - [x] **Optimization: Asset Caching:** Implement a global `SceneAssetCache` (Path -> Asset*) to prevent re-parsing the same YAML templates (e.g., ports, nodes) multiple times.
-- [x] **Refactor: Data-Driven Node Kinds:** Replace hardcoded string checks (`strcmp("text")`) in the parser with a reflection-based or hash-based lookup for `SceneNodeKind`.
-- [ ] **Refactor: Flag Segregation:** Split `SceneNodeFlags` into generic Scene flags and logic-specific flags to avoid "God Enums".
-    *   `SceneFlags`: Core state (`HIDDEN`, `DIRTY`).
-    *   `InteractionFlags`: Shared inputs (`CLICKABLE`, `FOCUSABLE`).
-    *   `TypeFlags`: Context-dependent flags based on Node Kind (e.g., `SCROLLABLE` for Containers, `CAST_SHADOWS` for Meshes).
-- [x] **Refactor: MathEditor Separation:** Strict separation of Logic vs View.
-    *   `MathGraph`: Pure logic, knows nothing about Scene/UI.
-    *   `MathGraphView`: Listens to Graph events and manages `SceneNode`s.
 
 ### Phase 3.7: Interaction Architecture (New)
 **Objective:** Replace the primitive 2D input system with a robust 3D-aware event architecture. Eliminate "stringly-typed" logic limitations.
@@ -87,18 +80,19 @@ Structural standardization (Phase 6) is largely complete, but critical limitatio
     *   Formalize the observer pattern between `MathGraph` (Logic) and `MathGraphView` (UI).
     *   Eliminate ad-hoc polling in `update()` loops.
 
-### Phase 3.8: Modular Consistency & Hygiene (New)
+### Phase 3.8: Modular Consistency & Hygiene (New) - DONE ✅
 **Objective:** Clean up the file structure to strictly separate Public API (root) from Implementation (internal). Eliminate "dangling" source files in module roots.
-- [ ] **3.8.1: Scene Module Hygiene:**
-    *   Move `scene_tree.c` -> `internal/scene_graph.c`.
-    *   Move `scene.c` logic -> `internal/scene_core.c`.
-    *   Create a clean `scene_system.c` in the root that acts as the Facade/Entry point.
-- [ ] **3.8.2: UI Module Hygiene:**
-    *   Refactor `ui_core.c` to be a pure coordinator.
-    *   Move `ui_layout.c`, `ui_renderer.c`, `ui_input.c` deeply into `internal/` (already partially done, but needs strict enforcement).
-- [ ] **3.8.3: Header/Source Parity:**
-    *   Enforce rule: Root directory contains ONLY public headers and the main module implementation file.
-    *   Verify that including `module.h` does not leak internal symbols.
+- [x] **3.8.1: Scene Module Hygiene:**
+    *   [x] Create `scene_system.c` as the root Facade.
+    *   [x] Move `scene_tree.c` -> `internal/scene_graph.c` (Tree & Node Logic).
+    *   [x] Move `scene.c` (Lifecycle) -> `internal/scene_lifecycle.c`.
+    *   [x] Extract Drawing Helpers -> `internal/scene_builder.c` (Included in scene_lifecycle).
+- [x] **3.8.2: UI Module Hygiene:**
+    *   [x] Refactor `ui_core.c` to be a pure coordinator.
+    *   [x] Move `ui_layout.c`, `ui_renderer.c`, `ui_input.c` deeply into `internal/` (already partially done, but needs strict enforcement).
+- [x] **3.8.3: Header/Source Parity:**
+    *   [x] Enforce rule: Root directory contains ONLY public headers and the main module implementation file.
+    *   [x] Verify that including `module.h` does not leak internal symbols.
 
 **4. 3D Interaction & Logic (New)**
 *   [ ] **Camera Component:** Implement `SceneCameraSpec` (FOV, type: Ortho/Perspective) to define viewports dynamically within the Scene Graph.

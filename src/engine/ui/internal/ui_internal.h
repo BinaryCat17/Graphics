@@ -25,4 +25,9 @@ typedef struct UiBinding {
 // Helper function needed by ui_input
 void ui_bind_read_string(void* data, const struct MetaField* field, char* out_buf, size_t buf_size);
 
+// --- Internal Binding API ---
+UiBindingTarget ui_resolve_target_enum(const char* target);
+void ui_apply_binding_value(SceneNode* el, UiBinding* b);
+int ui_resolve_count(void* data, const struct MetaStruct* meta, const char* field_name);
+
 #endif // UI_INTERNAL_H

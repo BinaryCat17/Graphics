@@ -1,5 +1,5 @@
-#include "render_packet.h"
-#include "internal/render_packet_internal.h"
+#include "../render_packet.h"
+#include "render_packet_internal.h"
 #include "foundation/memory/arena.h"
 #include <stdlib.h>
 #include <string.h>
