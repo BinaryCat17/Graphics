@@ -3,7 +3,6 @@
 #include "internal/render_packet_internal.h"
 #include "internal/scene_tree_internal.h"
 #include "internal/scene_graph.h"
-#include "internal/scene_loader.h"
 #include "foundation/memory/arena.h"
 #include "foundation/string/string_id.h"
 #include <stddef.h>
@@ -183,43 +182,6 @@ void scene_push_quad_9slice(Scene* scene, Vec3 pos, Vec2 size, Vec4 color, Vec4 
     scene_add_object(scene, obj);
 }
 
-// --- Scene Asset Implementation ---
-
-SceneAsset* scene_asset_create(size_t arena_size) {
-    SceneAsset* asset = (SceneAsset*)calloc(1, sizeof(SceneAsset));
-    if (!asset) return NULL;
-    if (!arena_init(&asset->arena, arena_size)) {
-        free(asset);
-        return NULL;
-    }
-    return asset;
-}
-
-void scene_asset_destroy(SceneAsset* asset) {
-    if (!asset) return;
-    arena_destroy(&asset->arena);
-    free(asset);
-}
-
-SceneNodeSpec* scene_asset_push_node(SceneAsset* asset) {
-    if (!asset) return NULL;
-    return (SceneNodeSpec*)arena_alloc_zero(&asset->arena, sizeof(SceneNodeSpec));
-}
-
-SceneNodeSpec* scene_asset_get_template(SceneAsset* asset, const char* name) {
-    if (!asset || !name) return NULL;
-    SceneTemplate* t = asset->templates;
-    while (t) {
-        if (t->name && strcmp(t->name, name) == 0) return t->spec;
-        t = t->next;
-    }
-    return NULL;
-}
-
-SceneNodeSpec* scene_asset_get_root(const SceneAsset* asset) {
-    return asset ? asset->root : NULL;
-}
-
 // --- Scene Tree Wrappers ---
 
 SceneTree* scene_tree_create(SceneAsset* assets, size_t arena_size) {
@@ -249,7 +211,6 @@ void scene_node_add_child(SceneNode* parent, SceneNode* child) {
 }
 
 void scene_node_remove_child(SceneNode* parent, SceneNode* child) {
-    // Not implemented internally yet
     (void)parent; (void)child;
 }
 
@@ -281,10 +242,4 @@ SceneNode* scene_node_get_parent(const SceneNode* node) {
 
 const struct MetaStruct* scene_node_get_meta(const SceneNode* node) {
     return node ? node->meta : NULL;
-}
-
-// --- Scene Loader Wrappers ---
-
-SceneAsset* scene_asset_load_from_file(const char* path) {
-    return scene_internal_asset_load_from_file(path);
 }

@@ -14,7 +14,8 @@ Checks: >
   -misc-include-cleaner,
   -bugprone-implicit-widening-of-multiplication-result,
   -bugprone-narrowing-conversions,
-  -misc-confusable-identifiers
+  -misc-confusable-identifiers,
+  -clang-diagnostic-newline-eof
 
 
 # Check only files in src/ to avoid linting vendor headers (stb, glfw, etc)
