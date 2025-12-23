@@ -11,23 +11,9 @@
 #include "foundation/string/string_id.h"
 #include "foundation/math/coordinate_systems.h"
 
+#include "ui_binding.h"
+
 // Note: UiLayoutSpec and UiStyleSpec are now in scene_tree_internal.h
 // Note: UiNodeSpec and UiBindingSpec have been merged into SceneNodeSpec (scene_tree_internal.h)
-
-// --- RUNTIME STATE ---
-
-typedef struct UiBinding {
-    UiBindingTarget target;
-    const struct MetaField* source_field;
-    size_t source_offset;
-} UiBinding;
-
-// Helper function needed by ui_input
-void ui_bind_read_string(void* data, const struct MetaField* field, char* out_buf, size_t buf_size);
-
-// --- Internal Binding API ---
-UiBindingTarget ui_resolve_target_enum(const char* target);
-void ui_apply_binding_value(SceneNode* el, UiBinding* b);
-int ui_resolve_count(void* data, const struct MetaStruct* meta, const char* field_name);
 
 #endif // UI_INTERNAL_H

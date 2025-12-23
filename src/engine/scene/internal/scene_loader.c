@@ -1,5 +1,6 @@
 #include "scene_tree_internal.h"
 #include "../scene.h"
+#include "scene_loader.h"
 #include "foundation/config/simple_yaml.h"
 #include "foundation/logger/logger.h"
 #include "foundation/memory/arena.h"
@@ -298,7 +299,7 @@ static void validate_node(SceneNodeSpec* spec, const char* path) {
     }
 }
 
-SceneAsset* scene_asset_load_from_file(const char* path) {
+SceneAsset* scene_internal_asset_load_from_file(const char* path) {
     if (!path) return NULL;
 
     LOG_TRACE("UiParser: Loading UI definition from file: %s", path);
