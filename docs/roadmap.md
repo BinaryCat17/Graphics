@@ -66,6 +66,10 @@ Structural standardization (Phase 6) is largely complete, but critical limitatio
 - [ ] **Feature: 3D Input (Raycasting):** Replace 2D `point_in_rect` hit-testing with Ray-AABB/Plane intersection.
     *   Support clicking on nodes rotated via `world_matrix`.
     *   Ensure events bubble correctly up the 3D hierarchy.
+- [ ] **Refactor: Flag Segregation:** Split `SceneNodeFlags` into generic Scene flags and logic-specific flags to avoid "God Enums".
+    *   `SceneFlags`: Core state (`HIDDEN`, `DIRTY`).
+    *   `InteractionFlags`: Shared inputs (`CLICKABLE`, `FOCUSABLE`).
+    *   `TypeFlags`: Context-dependent flags based on Node Kind (e.g., `SCROLLABLE` for Containers, `CAST_SHADOWS` for Meshes).
 - [ ] **Refactor: MathEditor Separation:** Strict separation of Logic vs View.
     *   `MathGraph`: Pure logic, knows nothing about Scene/UI.
     *   `MathGraphView`: Listens to Graph events and manages `SceneNode`s.
