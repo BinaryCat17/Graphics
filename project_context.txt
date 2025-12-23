@@ -1,11 +1,11 @@
-PROJECT STRUCTURE (Respecting .gitignore):
-==========================================
+PROJECT ROOT: C:\Users\smirn\source\repos\Graphics
+PROJECT STRUCTURE:
+==================
 
 [.vscode]
   ├── settings.json
 
 [ROOT]
-  ├── CMakeCache.txt
   ├── CMakeLists.txt
   ├── CMakePresets.json
 
@@ -222,114 +222,12 @@ PROJECT STRUCTURE (Respecting .gitignore):
 
 
 FILE CONTENTS:
-==========================================
+==================
 
 
-==================================================
-FILE START: tools/smart_packer.py
-==================================================
-﻿import os
-import subprocess
-
-# Настройки
-OUTPUT_FILE = "project_context.txt"
-# Оставляем только текстовые файлы, полезные для анализа кода
-ALLOWED_EXTENSIONS = {
-    '.c', '.h', '.cpp', '.hpp', '.cc',          # C/C++
-    '.py', '.sh', '.bat', 'Makefile', 'CMakeLists.txt',  # Скрипты сборки
-    '.md', '.txt', '.json', '.xml', '.yaml', '.yml'      # Доки и конфиги
-}
-
-def get_git_files():
-    """Получает список файлов с учетом .gitignore через команду git"""
-    try:
-        # --cached: индексированные файлы
-        # --others: новые файлы (untracked)
-        # --exclude-standard: применить правила .gitignore
-        result = subprocess.run(
-            ['git', 'ls-files', '--cached', '--others', '--exclude-standard'],
-            capture_output=True, text=True, encoding='utf-8'
-        )
-        if result.returncode != 0:
-            print("Внимание: Это не git-репозиторий или git не найден. Использую обычный обход.")
-            return None
-        
-        files = result.stdout.splitlines()
-        # Фильтруем по расширениям
-        return [f for f in files if any(f.endswith(ext) or f.split('/')[-1] in ALLOWED_EXTENSIONS for ext in ALLOWED_EXTENSIONS)]
-    except Exception as e:
-        print(f"Ошибка при вызове git: {e}")
-        return None
-
-def fallback_walk():
-    """Запасной вариант, если git не сработал"""
-    file_list = []
-    for root, dirs, files in os.walk("."):
-        if '.git' in dirs: dirs.remove('.git') # Игнорируем папку .git
-        
-        for file in files:
-            if any(file.endswith(ext) or file in ALLOWED_EXTENSIONS for ext in ALLOWED_EXTENSIONS):
-                full_path = os.path.join(root, file)
-                # Убираем ./ в начале для красоты
-                file_list.append(os.path.relpath(full_path, ".").replace("\\", "/"))
-    return file_list
-
-def generate_tree_string(file_list):
-    """Строит визуальное дерево файлов из списка путей"""
-    tree_str = "PROJECT STRUCTURE (Respecting .gitignore):\n==========================================\n"
-    # Просто сортируем список для понятности, полноценное дерево рисовать текстом сложно без вложенных циклов,
-    # но отсортированный список путей отлично читается моделью.
-    last_dir = ""
-    for filepath in sorted(file_list):
-        current_dir = os.path.dirname(filepath)
-        if current_dir != last_dir:
-            tree_str += f"\n[{current_dir if current_dir else 'ROOT'}]\n"
-            last_dir = current_dir
-        filename = os.path.basename(filepath)
-        tree_str += f"  ├── {filename}\n"
-    return tree_str
-
-def create_dump():
-    print("Сбор списка файлов с учетом .gitignore...")
-    files = get_git_files()
-    
-    if files is None:
-        files = fallback_walk()
-        
-    print(f"Найдено файлов: {len(files)}")
-    
-    with open(OUTPUT_FILE, 'w', encoding='utf-8') as outfile:
-        # 1. Записываем структуру
-        outfile.write(generate_tree_string(files))
-        outfile.write("\n\nFILE CONTENTS:\n==========================================\n")
-        
-        # 2. Записываем содержимое
-        for filepath in files:
-            if not os.path.exists(filepath): continue
-            
-            # Заголовок для каждого файла, чтобы я (Gemini) четко видел границы
-            header = f"\n\n{'='*50}\nFILE START: {filepath}\n{'='*50}\n"
-            outfile.write(header)
-            
-            try:
-                with open(filepath, 'r', encoding='utf-8', errors='replace') as f:
-                    content = f.read()
-                    if not content.strip():
-                        outfile.write("(File is empty)")
-                    else:
-                        outfile.write(content)
-            except Exception as e:
-                outfile.write(f"Error reading file: {e}")
-
-    print(f"Готово! Файл создан: {OUTPUT_FILE}")
-    print("Теперь просто перетащите этот файл в чат.")
-
-if __name__ == "__main__":
-    create_dump()
-
-==================================================
+============================================================
 FILE START: .vscode/settings.json
-==================================================
+============================================================
 {
     "cmake.debugConfig": {
         "args": [
@@ -340,393 +238,9 @@ FILE START: .vscode/settings.json
     }
 }
 
-==================================================
-FILE START: CMakeCache.txt
-==================================================
-# This is the CMakeCache file.
-# For build in directory: /mnt/c/Users/smirn/source/repos/Graphics
-# It was generated by CMake: /usr/bin/cmake
-# You can edit this file to change values found and used by cmake.
-# If you do not want to change any of the values, simply exit the editor.
-# If you do want to change a value, simply edit, save, and exit the editor.
-# The syntax for the file is as follows:
-# KEY:TYPE=VALUE
-# KEY is the name of a variable in the cache.
-# TYPE is a hint to GUIs for the type of VALUE, DO NOT EDIT TYPE!.
-# VALUE is the current value for the KEY.
-
-########################
-# EXTERNAL cache entries
-########################
-
-//Path to a program.
-CMAKE_ADDR2LINE:FILEPATH=/usr/bin/addr2line
-
-//Path to a program.
-CMAKE_AR:FILEPATH=/usr/bin/ar
-
-//Choose the type of build, options are: None Debug Release RelWithDebInfo
-// MinSizeRel ...
-CMAKE_BUILD_TYPE:STRING=
-
-//Enable/Disable color output during build.
-CMAKE_COLOR_MAKEFILE:BOOL=ON
-
-//CXX compiler
-CMAKE_CXX_COMPILER:FILEPATH=/usr/bin/c++
-
-//A wrapper around 'ar' adding the appropriate '--plugin' option
-// for the GCC compiler
-CMAKE_CXX_COMPILER_AR:FILEPATH=/usr/bin/gcc-ar-9
-
-//A wrapper around 'ranlib' adding the appropriate '--plugin' option
-// for the GCC compiler
-CMAKE_CXX_COMPILER_RANLIB:FILEPATH=/usr/bin/gcc-ranlib-9
-
-//Flags used by the CXX compiler during all build types.
-CMAKE_CXX_FLAGS:STRING=
-
-//Flags used by the CXX compiler during DEBUG builds.
-CMAKE_CXX_FLAGS_DEBUG:STRING=-g
-
-//Flags used by the CXX compiler during MINSIZEREL builds.
-CMAKE_CXX_FLAGS_MINSIZEREL:STRING=-Os -DNDEBUG
-
-//Flags used by the CXX compiler during RELEASE builds.
-CMAKE_CXX_FLAGS_RELEASE:STRING=-O3 -DNDEBUG
-
-//Flags used by the CXX compiler during RELWITHDEBINFO builds.
-CMAKE_CXX_FLAGS_RELWITHDEBINFO:STRING=-O2 -g -DNDEBUG
-
-//C compiler
-CMAKE_C_COMPILER:FILEPATH=/usr/bin/cc
-
-//A wrapper around 'ar' adding the appropriate '--plugin' option
-// for the GCC compiler
-CMAKE_C_COMPILER_AR:FILEPATH=/usr/bin/gcc-ar-9
-
-//A wrapper around 'ranlib' adding the appropriate '--plugin' option
-// for the GCC compiler
-CMAKE_C_COMPILER_RANLIB:FILEPATH=/usr/bin/gcc-ranlib-9
-
-//Flags used by the C compiler during all build types.
-CMAKE_C_FLAGS:STRING=
-
-//Flags used by the C compiler during DEBUG builds.
-CMAKE_C_FLAGS_DEBUG:STRING=-g
-
-//Flags used by the C compiler during MINSIZEREL builds.
-CMAKE_C_FLAGS_MINSIZEREL:STRING=-Os -DNDEBUG
-
-//Flags used by the C compiler during RELEASE builds.
-CMAKE_C_FLAGS_RELEASE:STRING=-O3 -DNDEBUG
-
-//Flags used by the C compiler during RELWITHDEBINFO builds.
-CMAKE_C_FLAGS_RELWITHDEBINFO:STRING=-O2 -g -DNDEBUG
-
-//Path to a program.
-CMAKE_DLLTOOL:FILEPATH=CMAKE_DLLTOOL-NOTFOUND
-
-//Flags used by the linker during all build types.
-CMAKE_EXE_LINKER_FLAGS:STRING=
-
-//Flags used by the linker during DEBUG builds.
-CMAKE_EXE_LINKER_FLAGS_DEBUG:STRING=
-
-//Flags used by the linker during MINSIZEREL builds.
-CMAKE_EXE_LINKER_FLAGS_MINSIZEREL:STRING=
-
-//Flags used by the linker during RELEASE builds.
-CMAKE_EXE_LINKER_FLAGS_RELEASE:STRING=
-
-//Flags used by the linker during RELWITHDEBINFO builds.
-CMAKE_EXE_LINKER_FLAGS_RELWITHDEBINFO:STRING=
-
-//Enable/Disable output of compile commands during generation.
-CMAKE_EXPORT_COMPILE_COMMANDS:BOOL=OFF
-
-//Install path prefix, prepended onto install directories.
-CMAKE_INSTALL_PREFIX:PATH=/usr/local
-
-//Path to a program.
-CMAKE_LINKER:FILEPATH=/usr/bin/ld
-
-//Path to a program.
-CMAKE_MAKE_PROGRAM:FILEPATH=/usr/bin/make
-
-//Flags used by the linker during the creation of modules during
-// all build types.
-CMAKE_MODULE_LINKER_FLAGS:STRING=
-
-//Flags used by the linker during the creation of modules during
-// DEBUG builds.
-CMAKE_MODULE_LINKER_FLAGS_DEBUG:STRING=
-
-//Flags used by the linker during the creation of modules during
-// MINSIZEREL builds.
-CMAKE_MODULE_LINKER_FLAGS_MINSIZEREL:STRING=
-
-//Flags used by the linker during the creation of modules during
-// RELEASE builds.
-CMAKE_MODULE_LINKER_FLAGS_RELEASE:STRING=
-
-//Flags used by the linker during the creation of modules during
-// RELWITHDEBINFO builds.
-CMAKE_MODULE_LINKER_FLAGS_RELWITHDEBINFO:STRING=
-
-//Path to a program.
-CMAKE_NM:FILEPATH=/usr/bin/nm
-
-//Path to a program.
-CMAKE_OBJCOPY:FILEPATH=/usr/bin/objcopy
-
-//Path to a program.
-CMAKE_OBJDUMP:FILEPATH=/usr/bin/objdump
-
-//Value Computed by CMake
-CMAKE_PROJECT_DESCRIPTION:STATIC=
-
-//Value Computed by CMake
-CMAKE_PROJECT_HOMEPAGE_URL:STATIC=
-
-//Value Computed by CMake
-CMAKE_PROJECT_NAME:STATIC=Graphics
-
-//Path to a program.
-CMAKE_RANLIB:FILEPATH=/usr/bin/ranlib
-
-//Path to a program.
-CMAKE_READELF:FILEPATH=/usr/bin/readelf
-
-//Flags used by the linker during the creation of shared libraries
-// during all build types.
-CMAKE_SHARED_LINKER_FLAGS:STRING=
-
-//Flags used by the linker during the creation of shared libraries
-// during DEBUG builds.
-CMAKE_SHARED_LINKER_FLAGS_DEBUG:STRING=
-
-//Flags used by the linker during the creation of shared libraries
-// during MINSIZEREL builds.
-CMAKE_SHARED_LINKER_FLAGS_MINSIZEREL:STRING=
-
-//Flags used by the linker during the creation of shared libraries
-// during RELEASE builds.
-CMAKE_SHARED_LINKER_FLAGS_RELEASE:STRING=
-
-//Flags used by the linker during the creation of shared libraries
-// during RELWITHDEBINFO builds.
-CMAKE_SHARED_LINKER_FLAGS_RELWITHDEBINFO:STRING=
-
-//If set, runtime paths are not added when installing shared libraries,
-// but are added when building.
-CMAKE_SKIP_INSTALL_RPATH:BOOL=NO
-
-//If set, runtime paths are not added when using shared libraries.
-CMAKE_SKIP_RPATH:BOOL=NO
-
-//Flags used by the linker during the creation of static libraries
-// during all build types.
-CMAKE_STATIC_LINKER_FLAGS:STRING=
-
-//Flags used by the linker during the creation of static libraries
-// during DEBUG builds.
-CMAKE_STATIC_LINKER_FLAGS_DEBUG:STRING=
-
-//Flags used by the linker during the creation of static libraries
-// during MINSIZEREL builds.
-CMAKE_STATIC_LINKER_FLAGS_MINSIZEREL:STRING=
-
-//Flags used by the linker during the creation of static libraries
-// during RELEASE builds.
-CMAKE_STATIC_LINKER_FLAGS_RELEASE:STRING=
-
-//Flags used by the linker during the creation of static libraries
-// during RELWITHDEBINFO builds.
-CMAKE_STATIC_LINKER_FLAGS_RELWITHDEBINFO:STRING=
-
-//Path to a program.
-CMAKE_STRIP:FILEPATH=/usr/bin/strip
-
-//If this value is on, makefiles will be generated without the
-// .SILENT directive, and all commands will be echoed to the console
-// during the make.  This is useful for debugging only. With Visual
-// Studio IDE projects all commands are done without /nologo.
-CMAKE_VERBOSE_MAKEFILE:BOOL=FALSE
-
-//Value Computed by CMake
-Graphics_BINARY_DIR:STATIC=/mnt/c/Users/smirn/source/repos/Graphics
-
-//Value Computed by CMake
-Graphics_SOURCE_DIR:STATIC=/mnt/c/Users/smirn/source/repos/Graphics
-
-//The directory containing a CMake configuration file for Stb.
-Stb_DIR:PATH=Stb_DIR-NOTFOUND
-
-
-########################
-# INTERNAL cache entries
-########################
-
-//ADVANCED property for variable: CMAKE_ADDR2LINE
-CMAKE_ADDR2LINE-ADVANCED:INTERNAL=1
-//ADVANCED property for variable: CMAKE_AR
-CMAKE_AR-ADVANCED:INTERNAL=1
-//This is the directory where this CMakeCache.txt was created
-CMAKE_CACHEFILE_DIR:INTERNAL=/mnt/c/Users/smirn/source/repos/Graphics
-//Major version of cmake used to create the current loaded cache
-CMAKE_CACHE_MAJOR_VERSION:INTERNAL=3
-//Minor version of cmake used to create the current loaded cache
-CMAKE_CACHE_MINOR_VERSION:INTERNAL=16
-//Patch version of cmake used to create the current loaded cache
-CMAKE_CACHE_PATCH_VERSION:INTERNAL=3
-//ADVANCED property for variable: CMAKE_COLOR_MAKEFILE
-CMAKE_COLOR_MAKEFILE-ADVANCED:INTERNAL=1
-//Path to CMake executable.
-CMAKE_COMMAND:INTERNAL=/usr/bin/cmake
-//Path to cpack program executable.
-CMAKE_CPACK_COMMAND:INTERNAL=/usr/bin/cpack
-//Path to ctest program executable.
-CMAKE_CTEST_COMMAND:INTERNAL=/usr/bin/ctest
-//ADVANCED property for variable: CMAKE_CXX_COMPILER
-CMAKE_CXX_COMPILER-ADVANCED:INTERNAL=1
-//ADVANCED property for variable: CMAKE_CXX_COMPILER_AR
-CMAKE_CXX_COMPILER_AR-ADVANCED:INTERNAL=1
-//ADVANCED property for variable: CMAKE_CXX_COMPILER_RANLIB
-CMAKE_CXX_COMPILER_RANLIB-ADVANCED:INTERNAL=1
-//ADVANCED property for variable: CMAKE_CXX_FLAGS
-CMAKE_CXX_FLAGS-ADVANCED:INTERNAL=1
-//ADVANCED property for variable: CMAKE_CXX_FLAGS_DEBUG
-CMAKE_CXX_FLAGS_DEBUG-ADVANCED:INTERNAL=1
-//ADVANCED property for variable: CMAKE_CXX_FLAGS_MINSIZEREL
-CMAKE_CXX_FLAGS_MINSIZEREL-ADVANCED:INTERNAL=1
-//ADVANCED property for variable: CMAKE_CXX_FLAGS_RELEASE
-CMAKE_CXX_FLAGS_RELEASE-ADVANCED:INTERNAL=1
-//ADVANCED property for variable: CMAKE_CXX_FLAGS_RELWITHDEBINFO
-CMAKE_CXX_FLAGS_RELWITHDEBINFO-ADVANCED:INTERNAL=1
-//ADVANCED property for variable: CMAKE_C_COMPILER
-CMAKE_C_COMPILER-ADVANCED:INTERNAL=1
-//ADVANCED property for variable: CMAKE_C_COMPILER_AR
-CMAKE_C_COMPILER_AR-ADVANCED:INTERNAL=1
-//ADVANCED property for variable: CMAKE_C_COMPILER_RANLIB
-CMAKE_C_COMPILER_RANLIB-ADVANCED:INTERNAL=1
-//ADVANCED property for variable: CMAKE_C_FLAGS
-CMAKE_C_FLAGS-ADVANCED:INTERNAL=1
-//ADVANCED property for variable: CMAKE_C_FLAGS_DEBUG
-CMAKE_C_FLAGS_DEBUG-ADVANCED:INTERNAL=1
-//ADVANCED property for variable: CMAKE_C_FLAGS_MINSIZEREL
-CMAKE_C_FLAGS_MINSIZEREL-ADVANCED:INTERNAL=1
-//ADVANCED property for variable: CMAKE_C_FLAGS_RELEASE
-CMAKE_C_FLAGS_RELEASE-ADVANCED:INTERNAL=1
-//ADVANCED property for variable: CMAKE_C_FLAGS_RELWITHDEBINFO
-CMAKE_C_FLAGS_RELWITHDEBINFO-ADVANCED:INTERNAL=1
-//ADVANCED property for variable: CMAKE_DLLTOOL
-CMAKE_DLLTOOL-ADVANCED:INTERNAL=1
-//Executable file format
-CMAKE_EXECUTABLE_FORMAT:INTERNAL=ELF
-//ADVANCED property for variable: CMAKE_EXE_LINKER_FLAGS
-CMAKE_EXE_LINKER_FLAGS-ADVANCED:INTERNAL=1
-//ADVANCED property for variable: CMAKE_EXE_LINKER_FLAGS_DEBUG
-CMAKE_EXE_LINKER_FLAGS_DEBUG-ADVANCED:INTERNAL=1
-//ADVANCED property for variable: CMAKE_EXE_LINKER_FLAGS_MINSIZEREL
-CMAKE_EXE_LINKER_FLAGS_MINSIZEREL-ADVANCED:INTERNAL=1
-//ADVANCED property for variable: CMAKE_EXE_LINKER_FLAGS_RELEASE
-CMAKE_EXE_LINKER_FLAGS_RELEASE-ADVANCED:INTERNAL=1
-//ADVANCED property for variable: CMAKE_EXE_LINKER_FLAGS_RELWITHDEBINFO
-CMAKE_EXE_LINKER_FLAGS_RELWITHDEBINFO-ADVANCED:INTERNAL=1
-//ADVANCED property for variable: CMAKE_EXPORT_COMPILE_COMMANDS
-CMAKE_EXPORT_COMPILE_COMMANDS-ADVANCED:INTERNAL=1
-//Name of external makefile project generator.
-CMAKE_EXTRA_GENERATOR:INTERNAL=
-//Name of generator.
-CMAKE_GENERATOR:INTERNAL=Unix Makefiles
-//Generator instance identifier.
-CMAKE_GENERATOR_INSTANCE:INTERNAL=
-//Name of generator platform.
-CMAKE_GENERATOR_PLATFORM:INTERNAL=
-//Name of generator toolset.
-CMAKE_GENERATOR_TOOLSET:INTERNAL=
-//Test CMAKE_HAVE_LIBC_PTHREAD
-CMAKE_HAVE_LIBC_PTHREAD:INTERNAL=
-//Have library pthreads
-CMAKE_HAVE_PTHREADS_CREATE:INTERNAL=
-//Have library pthread
-CMAKE_HAVE_PTHREAD_CREATE:INTERNAL=1
-//Have include pthread.h
-CMAKE_HAVE_PTHREAD_H:INTERNAL=1
-//Source directory with the top level CMakeLists.txt file for this
-// project
-CMAKE_HOME_DIRECTORY:INTERNAL=/mnt/c/Users/smirn/source/repos/Graphics
-//Install .so files without execute permission.
-CMAKE_INSTALL_SO_NO_EXE:INTERNAL=1
-//ADVANCED property for variable: CMAKE_LINKER
-CMAKE_LINKER-ADVANCED:INTERNAL=1
-//ADVANCED property for variable: CMAKE_MAKE_PROGRAM
-CMAKE_MAKE_PROGRAM-ADVANCED:INTERNAL=1
-//ADVANCED property for variable: CMAKE_MODULE_LINKER_FLAGS
-CMAKE_MODULE_LINKER_FLAGS-ADVANCED:INTERNAL=1
-//ADVANCED property for variable: CMAKE_MODULE_LINKER_FLAGS_DEBUG
-CMAKE_MODULE_LINKER_FLAGS_DEBUG-ADVANCED:INTERNAL=1
-//ADVANCED property for variable: CMAKE_MODULE_LINKER_FLAGS_MINSIZEREL
-CMAKE_MODULE_LINKER_FLAGS_MINSIZEREL-ADVANCED:INTERNAL=1
-//ADVANCED property for variable: CMAKE_MODULE_LINKER_FLAGS_RELEASE
-CMAKE_MODULE_LINKER_FLAGS_RELEASE-ADVANCED:INTERNAL=1
-//ADVANCED property for variable: CMAKE_MODULE_LINKER_FLAGS_RELWITHDEBINFO
-CMAKE_MODULE_LINKER_FLAGS_RELWITHDEBINFO-ADVANCED:INTERNAL=1
-//ADVANCED property for variable: CMAKE_NM
-CMAKE_NM-ADVANCED:INTERNAL=1
-//number of local generators
-CMAKE_NUMBER_OF_MAKEFILES:INTERNAL=1
-//ADVANCED property for variable: CMAKE_OBJCOPY
-CMAKE_OBJCOPY-ADVANCED:INTERNAL=1
-//ADVANCED property for variable: CMAKE_OBJDUMP
-CMAKE_OBJDUMP-ADVANCED:INTERNAL=1
-//Platform information initialized
-CMAKE_PLATFORM_INFO_INITIALIZED:INTERNAL=1
-//ADVANCED property for variable: CMAKE_RANLIB
-CMAKE_RANLIB-ADVANCED:INTERNAL=1
-//ADVANCED property for variable: CMAKE_READELF
-CMAKE_READELF-ADVANCED:INTERNAL=1
-//Path to CMake installation.
-CMAKE_ROOT:INTERNAL=/usr/share/cmake-3.16
-//ADVANCED property for variable: CMAKE_SHARED_LINKER_FLAGS
-CMAKE_SHARED_LINKER_FLAGS-ADVANCED:INTERNAL=1
-//ADVANCED property for variable: CMAKE_SHARED_LINKER_FLAGS_DEBUG
-CMAKE_SHARED_LINKER_FLAGS_DEBUG-ADVANCED:INTERNAL=1
-//ADVANCED property for variable: CMAKE_SHARED_LINKER_FLAGS_MINSIZEREL
-CMAKE_SHARED_LINKER_FLAGS_MINSIZEREL-ADVANCED:INTERNAL=1
-//ADVANCED property for variable: CMAKE_SHARED_LINKER_FLAGS_RELEASE
-CMAKE_SHARED_LINKER_FLAGS_RELEASE-ADVANCED:INTERNAL=1
-//ADVANCED property for variable: CMAKE_SHARED_LINKER_FLAGS_RELWITHDEBINFO
-CMAKE_SHARED_LINKER_FLAGS_RELWITHDEBINFO-ADVANCED:INTERNAL=1
-//ADVANCED property for variable: CMAKE_SKIP_INSTALL_RPATH
-CMAKE_SKIP_INSTALL_RPATH-ADVANCED:INTERNAL=1
-//ADVANCED property for variable: CMAKE_SKIP_RPATH
-CMAKE_SKIP_RPATH-ADVANCED:INTERNAL=1
-//ADVANCED property for variable: CMAKE_STATIC_LINKER_FLAGS
-CMAKE_STATIC_LINKER_FLAGS-ADVANCED:INTERNAL=1
-//ADVANCED property for variable: CMAKE_STATIC_LINKER_FLAGS_DEBUG
-CMAKE_STATIC_LINKER_FLAGS_DEBUG-ADVANCED:INTERNAL=1
-//ADVANCED property for variable: CMAKE_STATIC_LINKER_FLAGS_MINSIZEREL
-CMAKE_STATIC_LINKER_FLAGS_MINSIZEREL-ADVANCED:INTERNAL=1
-//ADVANCED property for variable: CMAKE_STATIC_LINKER_FLAGS_RELEASE
-CMAKE_STATIC_LINKER_FLAGS_RELEASE-ADVANCED:INTERNAL=1
-//ADVANCED property for variable: CMAKE_STATIC_LINKER_FLAGS_RELWITHDEBINFO
-CMAKE_STATIC_LINKER_FLAGS_RELWITHDEBINFO-ADVANCED:INTERNAL=1
-//ADVANCED property for variable: CMAKE_STRIP
-CMAKE_STRIP-ADVANCED:INTERNAL=1
-//uname command
-CMAKE_UNAME:INTERNAL=/usr/bin/uname
-//ADVANCED property for variable: CMAKE_VERBOSE_MAKEFILE
-CMAKE_VERBOSE_MAKEFILE-ADVANCED:INTERNAL=1
-//Details about finding Threads
-FIND_PACKAGE_MESSAGE_DETAILS_Threads:INTERNAL=[TRUE][v()]
-
-
-
-==================================================
+============================================================
 FILE START: CMakeLists.txt
-==================================================
+============================================================
 cmake_minimum_required (VERSION 3.10)
 
 project ("Graphics" LANGUAGES C)
@@ -997,9 +511,9 @@ target_include_directories(config_tests PRIVATE src ${Stb_INCLUDE_DIR})
 target_link_libraries(config_tests PRIVATE foundation_config foundation_string foundation_logger foundation_math foundation_memory)
 add_test(NAME config_tests COMMAND config_tests)
 
-==================================================
+============================================================
 FILE START: CMakePresets.json
-==================================================
+============================================================
 {
     "version": 8,
     "configurePresets": [
@@ -1032,9 +546,9 @@ FILE START: CMakePresets.json
     ]
 }
 
-==================================================
+============================================================
 FILE START: assets/ui/default_graph.yaml
-==================================================
+============================================================
 nodes:
   - logic:
       type: MATH_NODE_UV
@@ -1065,9 +579,9 @@ nodes:
       y: 175
       name: "Sin"
 
-==================================================
+============================================================
 FILE START: assets/ui/layouts/editor_layout.yaml
-==================================================
+============================================================
 type: container
 id: root
 layout:
@@ -1129,9 +643,9 @@ children:
           style:
             color: "#888888"
 
-==================================================
+============================================================
 FILE START: assets/ui/manifest.yaml
-==================================================
+============================================================
 templates:
   # Core Templates
   ValueRow:
@@ -1173,9 +687,9 @@ templates:
 
 import: "assets/ui/layouts/editor_layout.yaml"
 
-==================================================
+============================================================
 FILE START: assets/ui/palette_config.yaml
-==================================================
+============================================================
 items:
   - label: "Number"
     type: "MATH_NODE_VALUE"
@@ -1199,9 +713,9 @@ items:
     type: "MATH_NODE_TIME"
 
 
-==================================================
+============================================================
 FILE START: assets/ui/templates/inspector_default.yaml
-==================================================
+============================================================
 type: container
 layout:
   type: flex_column
@@ -1216,9 +730,9 @@ children:
       color: "#666666"
 
 
-==================================================
+============================================================
 FILE START: assets/ui/templates/inspector_field.yaml
-==================================================
+============================================================
 type: container
 layout:
   type: row
@@ -1238,9 +752,9 @@ children:
       color: "#00FF00"
     on_change: "Graph.Recompile"
 
-==================================================
+============================================================
 FILE START: assets/ui/templates/inspector_title.yaml
-==================================================
+============================================================
 type: text
 bindings:
   - target: "text"
@@ -1253,9 +767,9 @@ style:
   animation_speed: 10
 flags: "clickable"
 
-==================================================
+============================================================
 FILE START: assets/ui/templates/math/add.yaml
-==================================================
+============================================================
 type: container
 layout:
   type: flex_column
@@ -1271,9 +785,9 @@ children:
       color: "#888888"
 
 
-==================================================
+============================================================
 FILE START: assets/ui/templates/math/mul.yaml
-==================================================
+============================================================
 type: container
 layout:
   type: flex_column
@@ -1289,9 +803,9 @@ children:
       color: "#888888"
 
 
-==================================================
+============================================================
 FILE START: assets/ui/templates/math/sin.yaml
-==================================================
+============================================================
 type: container
 layout:
   type: flex_column
@@ -1307,9 +821,9 @@ children:
       color: "#888888"
 
 
-==================================================
+============================================================
 FILE START: assets/ui/templates/math/sub.yaml
-==================================================
+============================================================
 type: container
 layout:
   type: flex_column
@@ -1325,9 +839,9 @@ children:
       color: "#888888"
 
 
-==================================================
+============================================================
 FILE START: assets/ui/templates/math/uv.yaml
-==================================================
+============================================================
 type: container
 layout:
   type: flex_column
@@ -1341,9 +855,9 @@ children:
       color: "#888888"
 
 
-==================================================
+============================================================
 FILE START: assets/ui/templates/math/value.yaml
-==================================================
+============================================================
 type: container
 layout:
   type: flex_column
@@ -1355,9 +869,9 @@ children:
     instance: InspectorField
 
 
-==================================================
+============================================================
 FILE START: assets/ui/templates/math/wire.yaml
-==================================================
+============================================================
 kind: Container
 layout:
   type: Canvas
@@ -1369,9 +883,9 @@ style:
   color: "0xFF888888"
 flags: [ Clickable ]
 
-==================================================
+============================================================
 FILE START: assets/ui/templates/node.yaml
-==================================================
+============================================================
 type: container
 layout:
   type: row
@@ -1435,9 +949,9 @@ children:
     item_template: "GraphPort"
 
 
-==================================================
+============================================================
 FILE START: assets/ui/templates/palette_item.yaml
-==================================================
+============================================================
 type: container
 flags: clickable | focusable
 id: palette_item
@@ -1459,9 +973,9 @@ children:
       color: "#FFFFFF"
 
 
-==================================================
+============================================================
 FILE START: assets/ui/templates/port.yaml
-==================================================
+============================================================
 type: container
 layout:
   width: 10
@@ -1477,9 +991,9 @@ children:
       corner_radius: 5
       color: "#888888"
 
-==================================================
+============================================================
 FILE START: assets/ui/templates/sidebar.yaml
-==================================================
+============================================================
 type: container
 id: left_panel
 layout:
@@ -1570,9 +1084,9 @@ children:
     item_template: "DefaultNodeInspector"
 
 
-==================================================
+============================================================
 FILE START: assets/ui/templates/value_row.yaml
-==================================================
+============================================================
 type: text
 bindings:
   - target: "text"
@@ -1582,9 +1096,9 @@ layout:
 style:
   color: "#CCCCCC"
 
-==================================================
+============================================================
 FILE START: docs/architecture.md
-==================================================
+============================================================
 # The Architecture Guide
 
 **Version:** 0.7.1 (Standardized)
@@ -1791,9 +1305,9 @@ Unlike traditional engines that maintain separate render pipelines for UI (2D) a
 *   **Isolation:** Fully decoupled from the main engine. Can be used headless.
 
 
-==================================================
+============================================================
 FILE START: docs/roadmap.md
-==================================================
+============================================================
 # Project Roadmap
 
 **Current Focus:** Phase 7 - 3D Visualization & Compute
@@ -1964,9 +1478,9 @@ The codebase enforces strict Public/Internal API boundaries across all modules. 
 *   **Shader Hot-Reloading:** Allow editing shaders at runtime without restarting.
 *   **API Documentation:** Setup Doxygen or a similar tool to generate up-to-date API documentation from public headers.
 
-==================================================
+============================================================
 FILE START: src/app/main.c
-==================================================
+============================================================
 #include "engine/core/engine.h"
 #include "foundation/logger/logger.h"
 #include "features/math_engine/math_editor.h"
@@ -2056,9 +1570,9 @@ int main(int argc, char** argv) {
 }
 
 
-==================================================
+============================================================
 FILE START: src/engine/assets/assets.c
-==================================================
+============================================================
 #include "engine/assets/assets.h"
 #include "engine/assets/internal/assets_internal.h"
 #include "engine/graphics/primitives.h"
@@ -2225,9 +1739,9 @@ const Font* assets_get_font(const Assets* assets) {
 }
 
 
-==================================================
+============================================================
 FILE START: src/engine/assets/assets.h
-==================================================
+============================================================
 #ifndef ASSETS_SYSTEM_H
 #define ASSETS_SYSTEM_H
 
@@ -2264,9 +1778,9 @@ const Font* assets_get_font(const Assets* assets);
 #endif // ASSETS_SYSTEM_H
 
 
-==================================================
+============================================================
 FILE START: src/engine/assets/internal/assets_internal.h
-==================================================
+============================================================
 #ifndef ASSETS_INTERNAL_H
 #define ASSETS_INTERNAL_H
 
@@ -2301,9 +1815,9 @@ struct Assets {
 #endif // ASSETS_INTERNAL_H
 
 
-==================================================
+============================================================
 FILE START: src/engine/core/engine.c
-==================================================
+============================================================
 #include "engine/core/engine.h"
 #include "foundation/logger/logger.h"
 #include "foundation/platform/platform.h"
@@ -2588,9 +2102,9 @@ bool engine_get_show_compute(const Engine* engine) {
 }
 
 
-==================================================
+============================================================
 FILE START: src/engine/core/engine.h
-==================================================
+============================================================
 #ifndef ENGINE_H
 #define ENGINE_H
 
@@ -2644,9 +2158,9 @@ bool engine_get_show_compute(const Engine* engine);
 #endif // ENGINE_H
 
 
-==================================================
+============================================================
 FILE START: src/engine/graphics/internal/render_frame_packet.h
-==================================================
+============================================================
 #ifndef RENDER_FRAME_PACKET_H
 #define RENDER_FRAME_PACKET_H
 
@@ -2667,9 +2181,9 @@ struct RenderFramePacket {
 #endif // RENDER_FRAME_PACKET_H
 
 
-==================================================
+============================================================
 FILE START: src/engine/graphics/internal/renderer_backend.c
-==================================================
+============================================================
 #include "engine/graphics/internal/renderer_backend.h"
 #include <string.h>
 #include <stdlib.h>
@@ -2700,9 +2214,9 @@ RendererBackend* renderer_backend_default(void) {
 }
 
 
-==================================================
+============================================================
 FILE START: src/engine/graphics/internal/renderer_backend.h
-==================================================
+============================================================
 #ifndef RENDERER_BACKEND_H
 #define RENDERER_BACKEND_H
 
@@ -2785,9 +2299,9 @@ RendererBackend* renderer_backend_default(void);
 #endif // RENDERER_BACKEND_H
 
 
-==================================================
+============================================================
 FILE START: src/engine/graphics/internal/vulkan/vk_context.c
-==================================================
+============================================================
 #include "vk_context.h"
 #include "vk_utils.h"
 #include "foundation/logger/logger.h"
@@ -2921,9 +2435,9 @@ void vk_recreate_instance_and_surface(VulkanRendererState* state) {
 }
 
 
-==================================================
+============================================================
 FILE START: src/engine/graphics/internal/vulkan/vk_context.h
-==================================================
+============================================================
 #ifndef VK_CONTEXT_H
 #define VK_CONTEXT_H
 
@@ -2936,9 +2450,9 @@ void vk_recreate_instance_and_surface(VulkanRendererState* state);
 #endif // VK_CONTEXT_H
 
 
-==================================================
+============================================================
 FILE START: src/engine/graphics/internal/vulkan/vk_pipeline.c
-==================================================
+============================================================
 #include "vk_pipeline.h"
 #include "vk_utils.h"
 #include "foundation/logger/logger.h"
@@ -3169,9 +2683,9 @@ void vk_create_pipeline(VulkanRendererState* state) {
 }
 
 
-==================================================
+============================================================
 FILE START: src/engine/graphics/internal/vulkan/vk_pipeline.h
-==================================================
+============================================================
 #ifndef VK_PIPELINE_H
 #define VK_PIPELINE_H
 
@@ -3185,9 +2699,9 @@ VkResult vk_create_compute_pipeline_shader(VulkanRendererState* state, const uin
 #endif // VK_PIPELINE_H
 
 
-==================================================
+============================================================
 FILE START: src/engine/graphics/internal/vulkan/vk_resources.c
-==================================================
+============================================================
 #include "vk_resources.h"
 #include "vk_swapchain.h"
 #include "vk_utils.h"
@@ -3502,9 +3016,9 @@ void vk_destroy_device_resources(VulkanRendererState* state) {
 }
 
 
-==================================================
+============================================================
 FILE START: src/engine/graphics/internal/vulkan/vk_resources.h
-==================================================
+============================================================
 #ifndef VK_RESOURCES_H
 #define VK_RESOURCES_H
 
@@ -3521,9 +3035,9 @@ void vk_destroy_device_resources(VulkanRendererState* state);
 #endif // VK_RESOURCES_H
 
 
-==================================================
+============================================================
 FILE START: src/engine/graphics/internal/vulkan/vk_swapchain.c
-==================================================
+============================================================
 #include "vk_swapchain.h"
 #include "vk_utils.h"
 #include "foundation/logger/logger.h"
@@ -3905,9 +3419,9 @@ void vk_cleanup_swapchain(VulkanRendererState* state, bool keep_swapchain_handle
 }
 
 
-==================================================
+============================================================
 FILE START: src/engine/graphics/internal/vulkan/vk_swapchain.h
-==================================================
+============================================================
 #ifndef VK_SWAPCHAIN_H
 #define VK_SWAPCHAIN_H
 
@@ -3923,9 +3437,9 @@ void vk_cleanup_swapchain(VulkanRendererState* state, bool keep_swapchain_handle
 #endif // VK_SWAPCHAIN_H
 
 
-==================================================
+============================================================
 FILE START: src/engine/graphics/internal/vulkan/vk_types.h
-==================================================
+============================================================
 #ifndef VK_TYPES_H
 #define VK_TYPES_H
 
@@ -4065,9 +3579,9 @@ typedef struct VulkanRendererState {
 #endif // VK_TYPES_H
 
 
-==================================================
+============================================================
 FILE START: src/engine/graphics/internal/vulkan/vk_utils.c
-==================================================
+============================================================
 #include "engine/graphics/internal/vulkan/vk_utils.h"
 #include "foundation/logger/logger.h"
 #include <stdio.h>
@@ -4138,9 +3652,9 @@ uint32_t* read_file_bin_u32(const char* filename, size_t* out_size) {
 }
 
 
-==================================================
+============================================================
 FILE START: src/engine/graphics/internal/vulkan/vk_utils.h
-==================================================
+============================================================
 #ifndef VK_UTILS_H
 #define VK_UTILS_H
 
@@ -4163,9 +3677,9 @@ uint32_t* read_file_bin_u32(const char* filename, size_t* out_size);
 #endif // VK_UTILS_H
 
 
-==================================================
+============================================================
 FILE START: src/engine/graphics/internal/vulkan/vulkan_renderer.c
-==================================================
+============================================================
 #include "engine/graphics/internal/vulkan/vulkan_renderer.h"
 #include "engine/scene/render_packet.h"
 
@@ -4914,9 +4428,9 @@ RendererBackend* vulkan_renderer_backend(void) {
 }
 
 
-==================================================
+============================================================
 FILE START: src/engine/graphics/internal/vulkan/vulkan_renderer.h
-==================================================
+============================================================
 #ifndef VULKAN_RENDERER_H
 #define VULKAN_RENDERER_H
 
@@ -4927,9 +4441,9 @@ RendererBackend* vulkan_renderer_backend(void);
 #endif // VULKAN_RENDERER_H
 
 
-==================================================
+============================================================
 FILE START: src/engine/graphics/layer_constants.h
-==================================================
+============================================================
 #ifndef LAYER_CONSTANTS_H
 #define LAYER_CONSTANTS_H
 
@@ -4964,9 +4478,9 @@ FILE START: src/engine/graphics/layer_constants.h
 #endif // LAYER_CONSTANTS_H
 
 
-==================================================
+============================================================
 FILE START: src/engine/graphics/primitives.h
-==================================================
+============================================================
 #ifndef PRIMITIVES_H
 #define PRIMITIVES_H
 
@@ -4992,9 +4506,9 @@ static const unsigned int PRIM_QUAD_INDICES[] = {
 #endif // PRIMITIVES_H
 
 
-==================================================
+============================================================
 FILE START: src/engine/graphics/render_system.c
-==================================================
+============================================================
 #include "engine/graphics/render_system.h"
 #include "engine/assets/assets.h"
 #include "engine/graphics/internal/render_frame_packet.h"
@@ -5293,9 +4807,9 @@ bool render_system_is_ready(RenderSystem* sys) { return sys ? sys->renderer_read
 void render_system_set_show_compute(RenderSystem* sys, bool show) { if(sys) sys->show_compute_result = show; }
 
 
-==================================================
+============================================================
 FILE START: src/engine/graphics/render_system.h
-==================================================
+============================================================
 #ifndef RENDER_SYSTEM_H
 #define RENDER_SYSTEM_H
 
@@ -5358,9 +4872,9 @@ void render_system_set_show_compute(RenderSystem* sys, bool show);
 #endif // RENDER_SYSTEM_H
 
 
-==================================================
+============================================================
 FILE START: src/engine/input/input.c
-==================================================
+============================================================
 #include "engine/input/input.h"
 #include "engine/input/internal/input_internal.h"
 #include "foundation/platform/platform.h"
@@ -5644,9 +5158,9 @@ const InputEvent* input_get_event(const InputSystem* sys, int index) {
 }
 
 
-==================================================
+============================================================
 FILE START: src/engine/input/input.h
-==================================================
+============================================================
 #ifndef ENGINE_INPUT_H
 #define ENGINE_INPUT_H
 
@@ -5890,9 +5404,9 @@ const InputEvent* input_get_event(const InputSystem* sys, int index);
 #endif // ENGINE_INPUT_H
 
 
-==================================================
+============================================================
 FILE START: src/engine/input/internal/input_internal.h
-==================================================
+============================================================
 #ifndef ENGINE_INPUT_INTERNAL_H
 #define ENGINE_INPUT_INTERNAL_H
 
@@ -5940,9 +5454,9 @@ struct InputSystem {
 #endif // ENGINE_INPUT_INTERNAL_H
 
 
-==================================================
+============================================================
 FILE START: src/engine/scene/internal/render_packet_internal.h
-==================================================
+============================================================
 #ifndef RENDER_PACKET_INTERNAL_H
 #define RENDER_PACKET_INTERNAL_H
 
@@ -5969,9 +5483,9 @@ struct Scene {
 #endif // RENDER_PACKET_INTERNAL_H
 
 
-==================================================
+============================================================
 FILE START: src/engine/scene/internal/scene_graph.c
-==================================================
+============================================================
 #include "../scene.h"
 #include "scene_graph.h"
 #include "foundation/memory/arena.h"
@@ -6126,9 +5640,9 @@ SceneNode* scene_internal_node_find_by_id(SceneNode* root, const char* id) {
 }
 
 
-==================================================
+============================================================
 FILE START: src/engine/scene/internal/scene_graph.h
-==================================================
+============================================================
 #ifndef SCENE_GRAPH_H
 #define SCENE_GRAPH_H
 
@@ -6148,9 +5662,9 @@ SceneNode* scene_internal_node_find_by_id(SceneNode* root, const char* id);
 #endif // SCENE_GRAPH_H
 
 
-==================================================
+============================================================
 FILE START: src/engine/scene/internal/scene_loader.c
-==================================================
+============================================================
 #include "scene_tree_internal.h"
 #include "../scene.h"
 #include "scene_loader.h"
@@ -6517,9 +6031,9 @@ SceneAsset* scene_internal_asset_load_from_file(const char* path) {
 }
 
 
-==================================================
+============================================================
 FILE START: src/engine/scene/internal/scene_loader.h
-==================================================
+============================================================
 #ifndef SCENE_LOADER_H
 #define SCENE_LOADER_H
 
@@ -6530,9 +6044,9 @@ SceneAsset* scene_internal_asset_load_from_file(const char* path);
 #endif // SCENE_LOADER_H
 
 
-==================================================
+============================================================
 FILE START: src/engine/scene/internal/scene_tree_internal.h
-==================================================
+============================================================
 #ifndef SCENE_TREE_INTERNAL_H
 #define SCENE_TREE_INTERNAL_H
 
@@ -6718,9 +6232,9 @@ struct SceneAsset {
 #endif // SCENE_TREE_INTERNAL_H
 
 
-==================================================
+============================================================
 FILE START: src/engine/scene/render_packet.h
-==================================================
+============================================================
 #ifndef RENDER_PACKET_H
 #define RENDER_PACKET_H
 
@@ -6861,9 +6375,9 @@ void scene_push_quad_9slice(Scene* scene, Vec3 pos, Vec2 size, Vec4 color, Vec4 
 #endif // RENDER_PACKET_H
 
 
-==================================================
+============================================================
 FILE START: src/engine/scene/scene.c
-==================================================
+============================================================
 #include "scene.h"
 #include "render_packet.h"
 #include "internal/render_packet_internal.h"
@@ -7110,9 +6624,9 @@ const struct MetaStruct* scene_node_get_meta(const SceneNode* node) {
     return node ? node->meta : NULL;
 }
 
-==================================================
+============================================================
 FILE START: src/engine/scene/scene.h
-==================================================
+============================================================
 #ifndef SCENE_H
 #define SCENE_H
 
@@ -7158,9 +6672,9 @@ const struct MetaStruct* scene_node_get_meta(const SceneNode* node);
 
 #endif // SCENE_H
 
-==================================================
+============================================================
 FILE START: src/engine/scene/scene_asset.c
-==================================================
+============================================================
 #include "scene_asset.h"
 #include "internal/scene_tree_internal.h"
 #include "internal/scene_loader.h"
@@ -7208,9 +6722,9 @@ SceneNodeSpec* scene_asset_get_root(const SceneAsset* asset) {
 }
 
 
-==================================================
+============================================================
 FILE START: src/engine/scene/scene_asset.h
-==================================================
+============================================================
 #ifndef SCENE_ASSET_H
 #define SCENE_ASSET_H
 
@@ -7287,9 +6801,9 @@ SceneNodeSpec* scene_asset_get_root(const SceneAsset* asset);
 #endif // SCENE_ASSET_H
 
 
-==================================================
+============================================================
 FILE START: src/engine/text/font.c
-==================================================
+============================================================
 #include "font.h"
 #include "internal/font_internal.h"
 #include "stb_truetype.h"
@@ -7519,9 +7033,9 @@ void font_get_ui_rect_uv(const Font* font, float* u0, float* v0, float* u1, floa
 }
 
 
-==================================================
+============================================================
 FILE START: src/engine/text/font.h
-==================================================
+============================================================
 #ifndef FONT_H
 #define FONT_H
 
@@ -7552,9 +7066,9 @@ void font_get_ui_rect_uv(const Font* font, float* u0, float* v0, float* u1, floa
 #endif // FONT_H
 
 
-==================================================
+============================================================
 FILE START: src/engine/text/internal/font_internal.h
-==================================================
+============================================================
 #ifndef FONT_INTERNAL_H
 #define FONT_INTERNAL_H
 
@@ -7594,16 +7108,16 @@ bool font_get_glyph(const Font* font, uint32_t codepoint, Glyph* out_glyph);
 #endif // FONT_INTERNAL_H
 
 
-==================================================
+============================================================
 FILE START: src/engine/text/internal/stb_impl.c
-==================================================
+============================================================
 #define STB_TRUETYPE_IMPLEMENTATION
 #include "stb_truetype.h"
 
 
-==================================================
+============================================================
 FILE START: src/engine/text/text_renderer.c
-==================================================
+============================================================
 #include "text_renderer.h"
 #include "engine/scene/render_packet.h"
 #include "engine/text/font.h"
@@ -7684,9 +7198,9 @@ void scene_add_text(Scene* scene, const Font* font, const char* text, Vec3 pos, 
 }
 
 
-==================================================
+============================================================
 FILE START: src/engine/text/text_renderer.h
-==================================================
+============================================================
 #ifndef TEXT_RENDERER_H
 #define TEXT_RENDERER_H
 
@@ -7702,9 +7216,9 @@ void scene_add_text_clipped(Scene* scene, const Font* font, const char* text, Ve
 #endif // TEXT_RENDERER_H
 
 
-==================================================
+============================================================
 FILE START: src/engine/ui/internal/ui_binding.c
-==================================================
+============================================================
 #include "../ui_core.h"
 #include "ui_internal.h"
 #include "foundation/meta/reflection.h"
@@ -7899,9 +7413,9 @@ void ui_node_write_binding_string(SceneNode* node, UiBindingTarget target, const
 }
 
 
-==================================================
+============================================================
 FILE START: src/engine/ui/internal/ui_binding.h
-==================================================
+============================================================
 #ifndef UI_BINDING_H
 #define UI_BINDING_H
 
@@ -7926,9 +7440,9 @@ int ui_resolve_count(void* data, const struct MetaStruct* meta, const char* fiel
 #endif // UI_BINDING_H
 
 
-==================================================
+============================================================
 FILE START: src/engine/ui/internal/ui_command_system.c
-==================================================
+============================================================
 #include "ui_command_system.h"
 #include "../ui_input.h"
 #include "foundation/logger/logger.h"
@@ -8005,9 +7519,9 @@ void ui_command_execute_id(StringId id, SceneNode* target) {
 }
 
 
-==================================================
+============================================================
 FILE START: src/engine/ui/internal/ui_command_system.h
-==================================================
+============================================================
 #ifndef UI_COMMAND_SYSTEM_H
 #define UI_COMMAND_SYSTEM_H
 
@@ -8024,9 +7538,9 @@ void ui_command_shutdown(void);
 #endif // UI_COMMAND_SYSTEM_H
 
 
-==================================================
+============================================================
 FILE START: src/engine/ui/internal/ui_input.c
-==================================================
+============================================================
 #include "ui_input.h"
 #include "ui_command_system.h"
 #include "ui_internal.h"
@@ -8386,9 +7900,9 @@ void ui_input_update(UiInputContext* ctx, SceneNode* root, const InputSystem* in
 }
 
 
-==================================================
+============================================================
 FILE START: src/engine/ui/internal/ui_input.h
-==================================================
+============================================================
 #ifndef UI_INPUT_INTERNAL_H
 #define UI_INPUT_INTERNAL_H
 
@@ -8422,9 +7936,9 @@ struct UiInputContext {
 #endif // UI_INPUT_INTERNAL_H
 
 
-==================================================
+============================================================
 FILE START: src/engine/ui/internal/ui_internal.h
-==================================================
+============================================================
 #ifndef UI_INTERNAL_H
 #define UI_INTERNAL_H
 
@@ -8446,9 +7960,9 @@ FILE START: src/engine/ui/internal/ui_internal.h
 #endif // UI_INTERNAL_H
 
 
-==================================================
+============================================================
 FILE START: src/engine/ui/internal/ui_layout.c
-==================================================
+============================================================
 #include "ui_layout.h"
 #include "../ui_core.h"
 #include "ui_internal.h"
@@ -8705,9 +8219,9 @@ void ui_layout_root(SceneNode* root, float window_w, float window_h, uint64_t fr
 }
 
 
-==================================================
+============================================================
 FILE START: src/engine/ui/internal/ui_layout.h
-==================================================
+============================================================
 #ifndef UI_LAYOUT_H
 #define UI_LAYOUT_H
 
@@ -8725,9 +8239,9 @@ void ui_layout_root(SceneNode* root, float window_w, float window_h, uint64_t fr
 #endif // UI_LAYOUT_H
 
 
-==================================================
+============================================================
 FILE START: src/engine/ui/internal/ui_renderer.c
-==================================================
+============================================================
 #include "ui_renderer.h"
 #include "../ui_core.h"
 #include "ui_internal.h"
@@ -9097,9 +8611,9 @@ void scene_tree_render(SceneTree* instance, Scene* scene, const Assets* assets, 
 }
 
 
-==================================================
+============================================================
 FILE START: src/engine/ui/internal/ui_renderer.h
-==================================================
+============================================================
 #ifndef UI_RENDERER_INTERNAL_H
 #define UI_RENDERER_INTERNAL_H
 
@@ -9120,9 +8634,9 @@ void scene_builder_build(const SceneNode* root, Scene* scene, const Assets* asse
 #endif // UI_RENDERER_INTERNAL_H
 
 
-==================================================
+============================================================
 FILE START: src/engine/ui/ui_core.c
-==================================================
+============================================================
 #include "ui_core.h"
 #include "ui_renderer.h"
 #include "ui_input.h"
@@ -9242,9 +8756,9 @@ Rect ui_node_get_screen_rect(const SceneNode* node) {
 }
 
 
-==================================================
+============================================================
 FILE START: src/engine/ui/ui_core.h
-==================================================
+============================================================
 #ifndef UI_CORE_H
 #define UI_CORE_H
 
@@ -9308,9 +8822,9 @@ void ui_node_write_binding_string(SceneNode* node, UiBindingTarget target, const
 #endif // UI_CORE_H
 
 
-==================================================
+============================================================
 FILE START: src/engine/ui/ui_input.h
-==================================================
+============================================================
 #ifndef UI_INPUT_H
 #define UI_INPUT_H
 
@@ -9384,9 +8898,9 @@ bool ui_input_pop_event(UiInputContext* ctx, UiEvent* out_event);
 #endif // UI_INPUT_H
 
 
-==================================================
+============================================================
 FILE START: src/engine/ui/ui_renderer.h
-==================================================
+============================================================
 #ifndef UI_RENDERER_H
 #define UI_RENDERER_H
 
@@ -9417,9 +8931,9 @@ void scene_register_provider(const char* name, SceneObjectProvider callback);
 #endif // UI_RENDERER_H
 
 
-==================================================
+============================================================
 FILE START: src/features/math_engine/internal/emitters/glsl_emitter.c
-==================================================
+============================================================
 #include "glsl_emitter.h"
 #include "foundation/memory/arena.h"
 #include <stdio.h>
@@ -9584,9 +9098,9 @@ char* ir_to_glsl(const ShaderIR* ir, TranspilerMode mode) {
 }
 
 
-==================================================
+============================================================
 FILE START: src/features/math_engine/internal/emitters/glsl_emitter.h
-==================================================
+============================================================
 #ifndef GLSL_EMITTER_H
 #define GLSL_EMITTER_H
 
@@ -9600,9 +9114,9 @@ char* ir_to_glsl(const ShaderIR* ir, TranspilerMode mode);
 #endif // GLSL_EMITTER_H
 
 
-==================================================
+============================================================
 FILE START: src/features/math_engine/internal/math_editor_internal.h
-==================================================
+============================================================
 #ifndef MATH_EDITOR_INTERNAL_H
 #define MATH_EDITOR_INTERNAL_H
 
@@ -9725,9 +9239,9 @@ typedef struct MathEditor {
 #endif // MATH_EDITOR_INTERNAL_H
 
 
-==================================================
+============================================================
 FILE START: src/features/math_engine/internal/math_editor_view.c
-==================================================
+============================================================
 #include "math_editor_view.h"
 #include "math_editor_internal.h"
 #include "math_graph_internal.h"
@@ -9895,9 +9409,9 @@ void math_editor_sync_wires(MathEditor* editor) {
 }
 
 
-==================================================
+============================================================
 FILE START: src/features/math_engine/internal/math_editor_view.h
-==================================================
+============================================================
 #ifndef MATH_EDITOR_VIEW_H
 #define MATH_EDITOR_VIEW_H
 
@@ -9924,9 +9438,9 @@ void math_editor_update_selection(MathEditor* editor);
 #endif // MATH_EDITOR_VIEW_H
 
 
-==================================================
+============================================================
 FILE START: src/features/math_engine/internal/math_graph_internal.h
-==================================================
+============================================================
 #ifndef MATH_GRAPH_INTERNAL_H
 #define MATH_GRAPH_INTERNAL_H
 
@@ -9972,9 +9486,9 @@ MathNode* math_graph_get_node(MathGraph* graph, MathNodeId id);
 #endif // MATH_GRAPH_INTERNAL_H
 
 
-==================================================
+============================================================
 FILE START: src/features/math_engine/internal/shader_ir.h
-==================================================
+============================================================
 #ifndef SHADER_IR_H
 #define SHADER_IR_H
 
@@ -10021,9 +9535,9 @@ typedef struct ShaderIR {
 #endif // SHADER_IR_H
 
 
-==================================================
+============================================================
 FILE START: src/features/math_engine/internal/transpiler.c
-==================================================
+============================================================
 #include "transpiler.h"
 #include "math_graph_internal.h"
 #include "shader_ir.h"
@@ -10194,9 +9708,9 @@ char* math_graph_transpile(const MathGraph* graph, TranspilerMode mode, ShaderTa
 }
 
 
-==================================================
+============================================================
 FILE START: src/features/math_engine/internal/transpiler.h
-==================================================
+============================================================
 #ifndef TRANSPILER_H
 #define TRANSPILER_H
 
@@ -10221,9 +9735,9 @@ char* math_graph_transpile(const MathGraph* graph, TranspilerMode mode, ShaderTa
 #endif // TRANSPILER_H
 
 
-==================================================
+============================================================
 FILE START: src/features/math_engine/math_editor.c
-==================================================
+============================================================
 #include "math_editor.h"
 #include "engine/core/engine.h"
 #include "internal/math_editor_internal.h"
@@ -10699,9 +10213,9 @@ void math_editor_destroy(MathEditor* editor) {
 }
 
 
-==================================================
+============================================================
 FILE START: src/features/math_engine/math_editor.h
-==================================================
+============================================================
 #ifndef MATH_EDITOR_H
 #define MATH_EDITOR_H
 
@@ -10731,9 +10245,9 @@ void math_editor_destroy(MathEditor* editor);
 #endif // MATH_EDITOR_H
 
 
-==================================================
+============================================================
 FILE START: src/features/math_engine/math_graph.c
-==================================================
+============================================================
 #include "math_graph.h"
 #include "internal/math_graph_internal.h"
 #include "foundation/memory/pool.h"
@@ -10957,9 +10471,9 @@ float math_graph_evaluate(MathGraph* graph, MathNodeId id) {
 }
 
 
-==================================================
+============================================================
 FILE START: src/features/math_engine/math_graph.h
-==================================================
+============================================================
 #ifndef MATH_GRAPH_H
 #define MATH_GRAPH_H
 
@@ -11029,9 +10543,9 @@ float math_graph_evaluate(MathGraph* graph, MathNodeId id);
 #endif // MATH_GRAPH_H
 
 
-==================================================
+============================================================
 FILE START: src/foundation/config/config_system.c
-==================================================
+============================================================
 #include "config_system.h"
 #include "foundation/string/string_id.h"
 #include "simple_yaml.h"
@@ -11433,9 +10947,9 @@ bool config_load_struct(const ConfigNode* node, const MetaStruct* meta, void* in
 }
 
 
-==================================================
+============================================================
 FILE START: src/foundation/config/config_system.h
-==================================================
+============================================================
 #ifndef CONFIG_SYSTEM_H
 #define CONFIG_SYSTEM_H
 
@@ -11490,9 +11004,9 @@ bool config_load_struct_array(const ConfigNode* node, const MetaStruct* meta, vo
 #endif // CONFIG_SYSTEM_H
 
 
-==================================================
+============================================================
 FILE START: src/foundation/config/config_types.c
-==================================================
+============================================================
 #include "config_types.h"
 #include <string.h>
 
@@ -11512,9 +11026,9 @@ void config_node_free(ConfigNode *node)
 }
 
 
-==================================================
+============================================================
 FILE START: src/foundation/config/config_types.h
-==================================================
+============================================================
 #ifndef CONFIG_TYPES_H
 #define CONFIG_TYPES_H
 
@@ -11563,9 +11077,9 @@ void config_node_free(ConfigNode *node);
 #endif // CONFIG_TYPES_H
 
 
-==================================================
+============================================================
 FILE START: src/foundation/config/simple_yaml.c
-==================================================
+============================================================
 #include "simple_yaml.h"
 #include "foundation/platform/platform.h"
 #include "foundation/memory/arena.h"
@@ -11828,9 +11342,9 @@ int simple_yaml_parse(MemoryArena* arena, const char *text, ConfigNode **out_roo
 }
 
 
-==================================================
+============================================================
 FILE START: src/foundation/config/simple_yaml.h
-==================================================
+============================================================
 #ifndef SIMPLE_YAML_H
 #define SIMPLE_YAML_H
 
@@ -11842,9 +11356,9 @@ int simple_yaml_parse(MemoryArena* arena, const char *text, ConfigNode **out_roo
 #endif // SIMPLE_YAML_H
 
 
-==================================================
+============================================================
 FILE START: src/foundation/image/image.c
-==================================================
+============================================================
 #include "image.h"
 #include "foundation/logger/logger.h"
 
@@ -11876,9 +11390,9 @@ void image_swizzle_bgra_to_rgba(uint8_t* data, int pixel_count) {
 }
 
 
-==================================================
+============================================================
 FILE START: src/foundation/image/image.h
-==================================================
+============================================================
 #ifndef FOUNDATION_IMAGE_H
 #define FOUNDATION_IMAGE_H
 
@@ -11909,9 +11423,9 @@ void image_swizzle_bgra_to_rgba(uint8_t* data, int pixel_count);
 #endif // FOUNDATION_IMAGE_H
 
 
-==================================================
+============================================================
 FILE START: src/foundation/logger/logger.c
-==================================================
+============================================================
 #if !defined(_WIN32) && !defined(_POSIX_C_SOURCE)
 #define _POSIX_C_SOURCE 200809L // NOLINT: For localtime_r on Linux
 #endif
@@ -12140,9 +11654,9 @@ void logger_log(LogLevel level, const char* file, int line, const char* fmt, ...
 }
 
 
-==================================================
+============================================================
 FILE START: src/foundation/logger/logger.h
-==================================================
+============================================================
 #ifndef LOGGER_H
 #define LOGGER_H
 
@@ -12181,9 +11695,9 @@ void logger_log(LogLevel level, const char* file, int line, const char* fmt, ...
 #endif // LOGGER_H
 
 
-==================================================
+============================================================
 FILE START: src/foundation/math/coordinate_systems.c
-==================================================
+============================================================
 #include "coordinate_systems.h"
 
 #include <math.h>
@@ -12386,9 +11900,9 @@ Vec3 coordinate_clip_to_world(const Projection3D *projection, Vec3 clip)
 }
 
 
-==================================================
+============================================================
 FILE START: src/foundation/math/coordinate_systems.h
-==================================================
+============================================================
 #ifndef COORDINATE_SYSTEMS_H
 #define COORDINATE_SYSTEMS_H
 
@@ -12472,9 +11986,9 @@ Vec3 coordinate_clip_to_world(const Projection3D *projection, Vec3 clip);
 #endif // COORDINATE_SYSTEMS_H
 
 
-==================================================
+============================================================
 FILE START: src/foundation/math/math_types.c
-==================================================
+============================================================
 #include "math_types.h"
 #include <math.h>
 
@@ -12674,9 +12188,9 @@ Vec3 mat4_transform_direction(const Mat4 *m, Vec3 v)
 }
 
 
-==================================================
+============================================================
 FILE START: src/foundation/math/math_types.h
-==================================================
+============================================================
 #ifndef MATH_TYPES_H
 #define MATH_TYPES_H
 
@@ -12749,9 +12263,9 @@ Quat quat_normalize(Quat q);
 #endif // MATH_TYPES_H
 
 
-==================================================
+============================================================
 FILE START: src/foundation/memory/arena.c
-==================================================
+============================================================
 #include "foundation/memory/arena.h"
 #include <stdlib.h>
 #include <stdint.h>
@@ -12910,9 +12424,9 @@ char* arena_printf(MemoryArena* arena, const char* fmt, ...) {
 }
 
 
-==================================================
+============================================================
 FILE START: src/foundation/memory/arena.h
-==================================================
+============================================================
 #ifndef ARENA_H
 #define ARENA_H
 
@@ -12953,9 +12467,9 @@ char* arena_printf(MemoryArena* arena, const char* fmt, ...);
 #endif // ARENA_H
 
 
-==================================================
+============================================================
 FILE START: src/foundation/memory/pool.c
-==================================================
+============================================================
 #include "pool.h"
 #include <stdlib.h>
 #include <stdint.h>
@@ -13104,9 +12618,9 @@ void pool_clear(MemoryPool* pool) {
 }
 
 
-==================================================
+============================================================
 FILE START: src/foundation/memory/pool.h
-==================================================
+============================================================
 #ifndef MEMORY_POOL_H
 #define MEMORY_POOL_H
 
@@ -13146,9 +12660,9 @@ void pool_clear(MemoryPool* pool);
 #endif // MEMORY_POOL_H
 
 
-==================================================
+============================================================
 FILE START: src/foundation/meta/reflection.c
-==================================================
+============================================================
 #include "reflection.h"
 #include "foundation/string/string_id.h"
 #include "foundation/math/math_types.h"
@@ -13433,9 +12947,9 @@ bool meta_set_from_string(void* instance, const MetaField* field, const char* va
 }
 
 
-==================================================
+============================================================
 FILE START: src/foundation/meta/reflection.h
-==================================================
+============================================================
 #ifndef FOUNDATION_META_REFLECTION_H
 #define FOUNDATION_META_REFLECTION_H
 
@@ -13523,9 +13037,9 @@ bool meta_set_from_string(void* instance, const MetaField* field, const char* va
 #endif // FOUNDATION_META_REFLECTION_H
 
 
-==================================================
+============================================================
 FILE START: src/foundation/platform/fs.c
-==================================================
+============================================================
 #include "foundation/platform/fs.h"
 #include "foundation/platform/platform.h"
 #include "foundation/memory/arena.h"
@@ -13788,9 +13302,9 @@ void* fs_read_bin(MemoryArena* arena, const char* path, size_t* out_size) {
 }
 
 
-==================================================
+============================================================
 FILE START: src/foundation/platform/fs.h
-==================================================
+============================================================
 #ifndef PLATFORM_FS_H
 #define PLATFORM_FS_H
 
@@ -13821,9 +13335,9 @@ void* fs_read_bin(MemoryArena* arena, const char* path, size_t* out_size);
 #endif // PLATFORM_FS_H
 
 
-==================================================
+============================================================
 FILE START: src/foundation/platform/glfw_platform.c
-==================================================
+============================================================
 #include "platform.h"
 #include "foundation/logger/logger.h"
 #include <stdio.h>
@@ -14060,9 +13574,9 @@ void platform_destroy_surface(void* instance, void* allocator, PlatformSurface* 
 }
 
 
-==================================================
+============================================================
 FILE START: src/foundation/platform/platform.h
-==================================================
+============================================================
 #ifndef PLATFORM_H
 #define PLATFORM_H
 
@@ -14156,9 +13670,9 @@ FILE* platform_fopen(const char* filename, const char* mode);
 #endif // PLATFORM_H
 
 
-==================================================
+============================================================
 FILE START: src/foundation/string/string_id.c
-==================================================
+============================================================
 #include "string_id.h"
 
 #define FNV1A_OFFSET_32 2166136261u
@@ -14255,9 +13769,9 @@ StringId str_id(const char* str) {
 }
 
 
-==================================================
+============================================================
 FILE START: src/foundation/string/string_id.h
-==================================================
+============================================================
 #ifndef STRING_ID_H
 #define STRING_ID_H
 
@@ -14280,9 +13794,9 @@ const char* str_id_lookup(StringId id);
 #endif // STRING_ID_H
 
 
-==================================================
+============================================================
 FILE START: src/foundation/thread/thread.c
-==================================================
+============================================================
 #if !defined(_WIN32) && !defined(_POSIX_C_SOURCE)
 #define _POSIX_C_SOURCE 200809L // NOLINT(bugprone-reserved-identifier)
 #endif
@@ -14515,9 +14029,9 @@ FILE START: src/foundation/thread/thread.c
 
 
 
-==================================================
+============================================================
 FILE START: src/foundation/thread/thread.h
-==================================================
+============================================================
 #ifndef THREAD_H
 #define THREAD_H
 
@@ -14592,9 +14106,9 @@ unsigned int thread_hardware_concurrency(void);
 #endif // THREAD_H
 
 
-==================================================
+============================================================
 FILE START: tests/config_tests.c
-==================================================
+============================================================
 #include "test_framework.h"
 #include "foundation/config/config_system.h"
 #include "foundation/config/simple_yaml.h"
@@ -14769,9 +14283,9 @@ int main(void) {
 }
 
 
-==================================================
+============================================================
 FILE START: tests/memory_tests.c
-==================================================
+============================================================
 #include "test_framework.h"
 #include "foundation/memory/arena.h"
 #include <string.h>
@@ -14872,9 +14386,9 @@ int main(void) {
 }
 
 
-==================================================
+============================================================
 FILE START: tests/string_tests.c
-==================================================
+============================================================
 #include "test_framework.h"
 #include "foundation/string/string_id.h"
 #include <string.h>
@@ -14919,9 +14433,9 @@ int main(void) {
 }
 
 
-==================================================
+============================================================
 FILE START: tests/test_framework.h
-==================================================
+============================================================
 #ifndef TEST_FRAMEWORK_H
 #define TEST_FRAMEWORK_H
 
@@ -15013,9 +14527,9 @@ static int g_tests_failed = 0;
 #endif // TEST_FRAMEWORK_H
 
 
-==================================================
+============================================================
 FILE START: tests/transform_tests.c
-==================================================
+============================================================
 #include <math.h>
 #include <stdio.h>
 
@@ -15092,9 +14606,9 @@ int main(void) {
 }
 
 
-==================================================
+============================================================
 FILE START: tests/transpiler_tests.c
-==================================================
+============================================================
 #include "test_framework.h"
 #include "features/math_engine/math_graph.h"
 #include "features/math_engine/internal/transpiler.h"
@@ -15163,9 +14677,9 @@ int main(void) {
 }
 
 
-==================================================
+============================================================
 FILE START: tests/ui_tests.c
-==================================================
+============================================================
 #include "test_framework.h"
 #include "engine/ui/internal/ui_internal.h"
 #include "foundation/memory/arena.h"
@@ -15245,9 +14759,9 @@ int main(void) {
 }
 
 
-==================================================
+============================================================
 FILE START: tools/build_shaders.py
-==================================================
+============================================================
 import os
 import subprocess
 import sys
@@ -15335,9 +14849,9 @@ if __name__ == "__main__":
     main()
 
 
-==================================================
+============================================================
 FILE START: tools/codegen.py
-==================================================
+============================================================
 import os
 import re
 import sys
@@ -15626,9 +15140,150 @@ if __name__ == '__main__':
     print("Done.")
 
 
-==================================================
+============================================================
+FILE START: tools/smart_packer.py
+============================================================
+﻿import os
+import subprocess
+import hashlib
+
+# --- НАСТРОЙКИ ---
+OUTPUT_FILE = "project_context.txt"
+
+# Игнорируем эти файлы/папки даже если их вернул git
+BLACKLIST_FILES = {'CMakeCache.txt', 'project_context.txt', 'package-lock.json', '.DS_Store'}
+BLACKLIST_DIRS = {'CMakeFiles', '.git', 'build', 'dist', '__pycache__'}
+
+# Разрешенные расширения (код и доки)
+ALLOWED_EXTENSIONS = {
+    '.c', '.h', '.cpp', '.hpp', '.cc', '.hh',   # C/C++
+    '.py', '.sh', '.bat', '.ps1',               # Скрипты
+    'Makefile', 'CMakeLists.txt', 'Dockerfile', # Сборка
+    '.md', '.txt', '.json', '.yaml', '.yml',    # Конфиги/Доки
+    '.qml', '.js'                               # UI
+}
+
+def get_file_hash(filepath):
+    """Считает хеш файла, чтобы найти полные дубликаты по содержимому"""
+    hasher = hashlib.md5()
+    try:
+        with open(filepath, 'rb') as f:
+            buf = f.read(65536)
+            while len(buf) > 0:
+                hasher.update(buf)
+                buf = f.read(65536)
+        return hasher.hexdigest()
+    except:
+        return None
+
+def is_allowed(filename):
+    if filename in BLACKLIST_FILES: return False
+    # Разрешаем точные совпадения (Makefile) или по расширению
+    return filename in ALLOWED_EXTENSIONS or \
+           any(filename.endswith(ext) for ext in ALLOWED_EXTENSIONS if ext.startswith('.'))
+
+def get_git_files(root_path):
+    """Получает список файлов через git ls-files"""
+    try:
+        # Запускаем git из корня проекта
+        result = subprocess.run(
+            ['git', 'ls-files', '--cached', '--others', '--exclude-standard'],
+            cwd=root_path,
+            capture_output=True, text=True, encoding='utf-8'
+        )
+        if result.returncode != 0: return None
+        return result.stdout.splitlines()
+    except:
+        return None
+
+def create_dump():
+    # Определяем корень проекта (родительская папка, если скрипт в tools/)
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    # Если скрипт в tools, поднимаемся на уровень выше. Если в корне - остаемся.
+    project_root = os.path.dirname(script_dir) if os.path.basename(script_dir) == 'tools' else script_dir
+    
+    if os.getcwd() != project_root:
+        print(f"Меняем рабочую папку на: {project_root}")
+        os.chdir(project_root)
+
+    print(f"Анализируем проект: {project_root}")
+    
+    # 1. Получаем файлы (Git или обычный скан)
+    raw_files = get_git_files(project_root)
+    if raw_files is None:
+        print("Git не найден, сканируем папку вручную...")
+        raw_files = []
+        for root, dirs, files in os.walk("."):
+            dirs[:] = [d for d in dirs if d not in BLACKLIST_DIRS]
+            for file in files:
+                raw_files.append(os.path.join(root, file))
+
+    # 2. УМНАЯ ФИЛЬТРАЦИЯ (Deduplication)
+    unique_paths = {} # {canonical_path: original_relative_path}
+    seen_hashes = set()
+    
+    print("Обработка файлов...")
+    for rel_path in raw_files:
+        filename = os.path.basename(rel_path)
+        
+        # Проверка 1: Черный список и расширения
+        if not is_allowed(filename): continue
+        if any(d in rel_path.split(os.sep) for d in BLACKLIST_DIRS): continue
+
+        # Проверка 2: Канонический путь (Abs + LowerCase)
+        full_path = os.path.abspath(rel_path)
+        canonical = os.path.normcase(full_path) # c:\proj\file.c == C:\Proj\File.c
+        
+        if canonical in unique_paths:
+            continue # Уже есть этот путь
+            
+        # Проверка 3: Хеш содержимого (на случай симлинков или копий)
+        # file_hash = get_file_hash(full_path)
+        # if file_hash and file_hash in seen_hashes:
+        #    print(f"  -> Пропуск дубликата по содержимому: {rel_path}")
+        #    continue
+        # seen_hashes.add(file_hash)
+
+        unique_paths[canonical] = rel_path
+
+    # Сортируем для красоты
+    sorted_files = sorted(unique_paths.values())
+    print(f"Найдено уникальных полезных файлов: {len(sorted_files)}")
+
+    # 3. ЗАПИСЬ
+    with open(OUTPUT_FILE, 'w', encoding='utf-8') as outfile:
+        # ДЕРЕВО
+        outfile.write(f"PROJECT ROOT: {project_root}\n")
+        outfile.write("PROJECT STRUCTURE:\n==================\n")
+        last_dir = ""
+        for f in sorted_files:
+            current_dir = os.path.dirname(f)
+            if current_dir != last_dir:
+                outfile.write(f"\n[{current_dir if current_dir else 'ROOT'}]\n")
+                last_dir = current_dir
+            outfile.write(f"  ├── {os.path.basename(f)}\n")
+
+        outfile.write("\n\nFILE CONTENTS:\n==================\n")
+
+        # КОНТЕНТ
+        for f in sorted_files:
+            if not os.path.exists(f): continue
+            
+            outfile.write(f"\n\n{'='*60}\nFILE START: {f}\n{'='*60}\n")
+            try:
+                with open(f, 'r', encoding='utf-8', errors='replace') as source:
+                    outfile.write(source.read())
+            except Exception as e:
+                outfile.write(f"Error reading file: {e}")
+
+    print(f"Готово! Файл {OUTPUT_FILE} создан в корне проекта.")
+
+if __name__ == "__main__":
+    create_dump()
+
+============================================================
 FILE START: vcpkg-configuration.json
-==================================================
+============================================================
 {
   "default-registry": {
     "kind": "git",
@@ -15645,9 +15300,9 @@ FILE START: vcpkg-configuration.json
 }
 
 
-==================================================
+============================================================
 FILE START: vcpkg.json
-==================================================
+============================================================
 {
   "dependencies": [
     "glfw3",
