@@ -1,5 +1,5 @@
-#include "ui_parser.h"
-#include "ui_internal.h"
+#include "scene_tree_internal.h"
+#include "../scene.h"
 #include "foundation/config/simple_yaml.h"
 #include "foundation/logger/logger.h"
 #include "foundation/memory/arena.h"
@@ -11,17 +11,17 @@
 
 // --- Helper Functions ---
 
-static UiKind parse_kind(const char* type_str, uint32_t* out_flags);
+static SceneNodeKind parse_kind(const char* type_str, uint32_t* out_flags);
 
-static UiKind parse_kind(const char* type_str, uint32_t* out_flags) {
-    *out_flags = UI_FLAG_NONE;
-    if (!type_str) return UI_KIND_CONTAINER;
+static SceneNodeKind parse_kind(const char* type_str, uint32_t* out_flags) {
+    *out_flags = SCENE_NODE_NONE;
+    if (!type_str) return SCENE_NODE_KIND_CONTAINER;
 
-    if (strcmp(type_str, "text") == 0) return UI_KIND_TEXT;
-    if (strcmp(type_str, "viewport") == 0) return UI_KIND_VIEWPORT;
+    if (strcmp(type_str, "text") == 0) return SCENE_NODE_KIND_TEXT;
+    if (strcmp(type_str, "viewport") == 0) return SCENE_NODE_KIND_VIEWPORT;
     
     // Default to container for everything else (including 'container')
-    return UI_KIND_CONTAINER;
+    return SCENE_NODE_KIND_CONTAINER;
 }
 
 static SceneNodeSpec* ui_node_spec_copy(SceneAsset* asset, const SceneNodeSpec* src) {
@@ -354,7 +354,7 @@ static ConfigNode* resolve_import(MemoryArena* scratch, const ConfigNode* node) 
 static void validate_node(SceneNodeSpec* spec, const char* path) {
     if (!spec) return;
     
-    if (spec->layout.type == UI_LAYOUT_SPLIT_H || spec->layout.type == UI_LAYOUT_SPLIT_V) {
+    if (spec->layout.type == SCENE_LAYOUT_SPLIT_H || spec->layout.type == SCENE_LAYOUT_SPLIT_V) {
         if (spec->child_count != 2) {
             LOG_ERROR("UiParser: Split container ID:%u MUST have exactly 2 children (has %zu).", spec->id, spec->child_count);
         }
@@ -365,7 +365,7 @@ static void validate_node(SceneNodeSpec* spec, const char* path) {
     }
 }
 
-SceneAsset* scene_asset_load_internal(const char* path) {
+SceneAsset* scene_asset_load_from_file(const char* path) {
     if (!path) return NULL;
 
     LOG_TRACE("UiParser: Loading UI definition from file: %s", path);

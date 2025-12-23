@@ -6,7 +6,7 @@
 #include <stdlib.h>
 
 // --- Helper: Build Def Tree first ---
-static SceneNodeSpec* create_node(SceneAsset* asset, UiLayoutStrategy layout, float w, float h, const char* id) {
+static SceneNodeSpec* create_node(SceneAsset* asset, SceneLayoutStrategy layout, float w, float h, const char* id) {
     SceneNodeSpec* spec = scene_asset_push_node(asset);
     if (!spec) return NULL;
     spec->layout.type = layout;
@@ -31,12 +31,12 @@ static void add_child_spec(SceneAsset* asset, SceneNodeSpec* parent, SceneNodeSp
 int test_column_layout(void) {
     SceneAsset* asset = scene_asset_create(4096);
 
-    SceneNodeSpec* root = create_node(asset, UI_LAYOUT_FLEX_COLUMN, 100.0f, 200.0f, "root");
+    SceneNodeSpec* root = create_node(asset, SCENE_LAYOUT_FLEX_COLUMN, 100.0f, 200.0f, "root");
     root->layout.spacing = 10.0f;
     root->layout.padding = 5.0f;
     
-    SceneNodeSpec* c1 = create_node(asset, UI_LAYOUT_FLEX_COLUMN, 50.0f, 50.0f, "c1");
-    SceneNodeSpec* c2 = create_node(asset, UI_LAYOUT_FLEX_COLUMN, 50.0f, 50.0f, "c2");
+    SceneNodeSpec* c1 = create_node(asset, SCENE_LAYOUT_FLEX_COLUMN, 50.0f, 50.0f, "c1");
+    SceneNodeSpec* c2 = create_node(asset, SCENE_LAYOUT_FLEX_COLUMN, 50.0f, 50.0f, "c2");
     
     add_child_spec(asset, root, c1);
     add_child_spec(asset, root, c2);

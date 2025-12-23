@@ -2,7 +2,6 @@
 #define UI_INTERNAL_H
 
 #include "../ui_core.h"
-#include "../ui_assets.h"
 #include "../ui_input.h"
 #include "../ui_renderer.h"
 #include "engine/scene/scene.h"
@@ -13,36 +12,7 @@
 #include "foundation/math/coordinate_systems.h"
 
 // Note: UiLayoutSpec and UiStyleSpec are now in scene_tree_internal.h
-
-typedef struct UiBindingSpec {
-    char* target; // REFLECT
-    char* source; // REFLECT
-} UiBindingSpec;
-
-// This will be stored in SceneNodeSpec->system_spec
-typedef struct UiNodeSpec {
-    UiKind kind;            // REFLECT
-    uint32_t ui_flags;      // REFLECT(UiFlags)
-    
-    UiLayoutSpec layout;    // REFLECT
-    UiStyleSpec style;      // REFLECT
-    
-    UiBindingSpec* bindings;// REFLECT
-    size_t binding_count;   // REFLECT
-    
-    char* collection;       // REFLECT
-    char* template_selector;// REFLECT
-
-    char* text;             // REFLECT
-    char* text_source;      // REFLECT
-
-    SceneNodeSpec* item_template; // REFLECT
-    
-    StringId on_click;      // REFLECT
-    StringId on_change;     // REFLECT
-    
-    StringId provider_id;   // REFLECT
-} UiNodeSpec;
+// Note: UiNodeSpec and UiBindingSpec have been merged into SceneNodeSpec (scene_tree_internal.h)
 
 // --- RUNTIME STATE ---
 

@@ -1,23 +1,25 @@
 #include "ui_core.h"
+#include "ui_renderer.h"
+#include "ui_input.h"
 #include "internal/ui_internal.h"
-#include "internal/ui_layout.h"
-#include "internal/ui_renderer.h"
-#include "internal/ui_parser.h"
 #include "internal/ui_command_system.h"
-#include "foundation/meta/reflection.h"
+#include "internal/ui_layout.h"
+#include "foundation/logger/logger.h"
 #include "foundation/memory/arena.h"
 #include "foundation/memory/pool.h"
-#include "foundation/logger/logger.h"
-
-#include <stdlib.h>
+#include "foundation/meta/reflection.h"
+#include "engine/scene/scene.h"
+#include "engine/scene/internal/scene_tree_internal.h"
 #include <string.h>
 #include <stdio.h>
 #include <math.h>
 
-// --- System Lifecycle ---
+static bool s_ui_initialized = false;
 
 void ui_system_init(void) {
-    ui_command_init();
+    if (s_ui_initialized) return;
+    s_ui_initialized = true;
+    LOG_INFO("UI System Initialized");
 }
 
 void ui_system_shutdown(void) {
@@ -88,8 +90,8 @@ static void ui_apply_binding_value(SceneNode* el, UiBinding* b) {
             if (f->type == META_TYPE_BOOL) vis = *(bool*)ptr;
             else if (f->type == META_TYPE_INT) vis = (*(int*)ptr) != 0;
             
-            if (vis) el->flags &= ~UI_FLAG_HIDDEN;
-            else el->flags |= UI_FLAG_HIDDEN;
+            if (vis) el->flags &= ~SCENE_NODE_HIDDEN;
+            else el->flags |= SCENE_NODE_HIDDEN;
             break;
         }
         case BINDING_TARGET_LAYOUT_X:
@@ -257,10 +259,6 @@ void ui_node_update(SceneNode* element, float dt) {
     }
 }
 
-SceneAsset* scene_asset_load_from_file(const char* path) {
-    return scene_asset_load_internal(path);
-}
-
 void ui_system_layout(SceneTree* tree, float window_w, float window_h, uint64_t frame_number, UiTextMeasureFunc measure_func, void* measure_data) {
     if (!tree || !tree->root) return;
     ui_layout_root(tree->root, window_w, window_h, frame_number, false, measure_func, measure_data);
@@ -268,7 +266,7 @@ void ui_system_layout(SceneTree* tree, float window_w, float window_h, uint64_t 
 
 void ui_system_render(SceneTree* tree, struct Scene* scene, const struct Assets* assets, struct MemoryArena* arena) {
     if (!tree || !tree->root) return;
-    scene_builder_build(tree->root, scene, assets, arena);
+    scene_tree_render(tree, scene, assets, arena);
 }
 
 Rect ui_node_get_screen_rect(const SceneNode* node) {

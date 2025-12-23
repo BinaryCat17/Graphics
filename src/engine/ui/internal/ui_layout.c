@@ -18,9 +18,9 @@ static float calculate_width(SceneNode* el, float available_w, UiTextMeasureFunc
     if (ui_node_get_binding(el, BINDING_TARGET_LAYOUT_WIDTH)) w = el->rect.w; // updated by ui_core
 
     if (w < 0) {
-        bool parent_is_row = (el->parent && el->parent->spec->layout.type == UI_LAYOUT_FLEX_ROW);
+        bool parent_is_row = (el->parent && el->parent->spec->layout.type == SCENE_LAYOUT_FLEX_ROW);
         
-        if (parent_is_row || spec->kind == UI_KIND_TEXT || (el->flags & UI_FLAG_CLICKABLE)) {
+        if (parent_is_row || spec->kind == SCENE_NODE_KIND_TEXT || (el->flags & SCENE_NODE_CLICKABLE)) {
              const char* text = el->cached_text;
              if (!text || text[0] == '\0') text = spec->text;
 
@@ -46,10 +46,10 @@ static float calculate_height(SceneNode* el, float available_h) {
     if (ui_node_get_binding(el, BINDING_TARGET_LAYOUT_HEIGHT)) h = el->rect.h;
 
     if (h < 0) {
-        if (el->child_count > 0 && spec->layout.type == UI_LAYOUT_FLEX_COLUMN) {
+        if (el->child_count > 0 && spec->layout.type == SCENE_LAYOUT_FLEX_COLUMN) {
             h = spec->layout.padding * 2;
              for (SceneNode* child = el->first_child; child; child = child->next_sibling) {
-                if (child->flags & UI_FLAG_HIDDEN) continue;
+                if (child->flags & SCENE_NODE_HIDDEN) continue;
                 float child_h = child->spec->layout.height;
                 if (child_h < 0) child_h = UI_DEFAULT_HEIGHT; 
                 h += child_h + spec->layout.spacing;
@@ -69,7 +69,7 @@ static float calculate_height(SceneNode* el, float available_h) {
 static void layout_column(SceneNode* el, float start_x, float start_y, float* out_max_x, float* out_max_y) {
     float cursor_y = start_y;
     for (SceneNode* child = el->first_child; child; child = child->next_sibling) {
-        if (child->flags & UI_FLAG_HIDDEN) continue;
+        if (child->flags & SCENE_NODE_HIDDEN) continue;
         child->rect.x = start_x;
         child->rect.y = cursor_y;
         cursor_y += child->rect.h + el->spec->layout.spacing;
@@ -84,7 +84,7 @@ static void layout_column(SceneNode* el, float start_x, float start_y, float* ou
 static void layout_row(SceneNode* el, float start_x, float start_y, float* out_max_x, float* out_max_y) {
     float cursor_x = start_x;
     for (SceneNode* child = el->first_child; child; child = child->next_sibling) {
-        if (child->flags & UI_FLAG_HIDDEN) continue;
+        if (child->flags & SCENE_NODE_HIDDEN) continue;
         child->rect.x = cursor_x;
         child->rect.y = start_y;
         cursor_x += child->rect.w + el->spec->layout.spacing;
@@ -100,14 +100,14 @@ static void layout_canvas(SceneNode* el, float* out_max_x, float* out_max_y) {
     *out_max_x = 0;
     *out_max_y = 0;
     for (SceneNode* child = el->first_child; child; child = child->next_sibling) {
-        if (el->flags & UI_FLAG_SCROLLABLE) {
+        if (el->flags & SCENE_NODE_SCROLLABLE) {
             child->rect.x -= el->scroll_x;
             child->rect.y -= el->scroll_y;
         }
         
         // Calculate content bounds (using logical coordinates, reverting scroll)
-        float logical_x = child->rect.x + (el->flags & UI_FLAG_SCROLLABLE ? el->scroll_x : 0);
-        float logical_y = child->rect.y + (el->flags & UI_FLAG_SCROLLABLE ? el->scroll_y : 0);
+        float logical_x = child->rect.x + (el->flags & SCENE_NODE_SCROLLABLE ? el->scroll_x : 0);
+        float logical_y = child->rect.y + (el->flags & SCENE_NODE_SCROLLABLE ? el->scroll_y : 0);
         float right = logical_x + child->rect.w;
         float bottom = logical_y + child->rect.h;
         
@@ -145,7 +145,7 @@ static void layout_split_v(SceneNode* el, float start_x, float start_y) {
 static void layout_recursive(SceneNode* el, Rect available, uint64_t frame_number, bool log_debug, UiTextMeasureFunc measure_func, void* measure_data) {
     if (!el || !el->spec) return;
     
-    if (el->flags & UI_FLAG_HIDDEN) {
+    if (el->flags & SCENE_NODE_HIDDEN) {
         el->rect.w = 0;
         el->rect.h = 0;
         return;
@@ -174,11 +174,11 @@ static void layout_recursive(SceneNode* el, Rect available, uint64_t frame_numbe
     for (SceneNode* child = el->first_child; child; child = child->next_sibling) {
         Rect child_avail = { 0, 0, content.w, content.h };
         
-        if (spec->layout.type == UI_LAYOUT_SPLIT_H && el->child_count >= 2) {
+        if (spec->layout.type == SCENE_LAYOUT_SPLIT_H && el->child_count >= 2) {
              float ratio = spec->layout.split_ratio > 0 ? spec->layout.split_ratio : 0.5f;
              if (i == 0) child_avail.w = content.w * ratio;
              else child_avail.w = content.w * (1.0f - ratio);
-        } else if (spec->layout.type == UI_LAYOUT_SPLIT_V && el->child_count >= 2) {
+        } else if (spec->layout.type == SCENE_LAYOUT_SPLIT_V && el->child_count >= 2) {
              float ratio = spec->layout.split_ratio > 0 ? spec->layout.split_ratio : 0.5f;
              if (i == 0) child_avail.h = content.h * ratio;
              else child_avail.h = content.h * (1.0f - ratio);
@@ -196,28 +196,28 @@ static void layout_recursive(SceneNode* el, Rect available, uint64_t frame_numbe
     float max_y = start_y;
     
     switch (spec->layout.type) {
-        case UI_LAYOUT_FLEX_COLUMN:
+        case SCENE_LAYOUT_FLEX_COLUMN:
             layout_column(el, start_x, start_y, &max_x, &max_y);
             // Convert absolute max back to content relative size
             el->content_w = max_x - start_x;
             el->content_h = max_y - start_y;
             break;
-        case UI_LAYOUT_FLEX_ROW:
+        case SCENE_LAYOUT_FLEX_ROW:
             layout_row(el, start_x, start_y, &max_x, &max_y);
             el->content_w = max_x - start_x;
             el->content_h = max_y - start_y;
             break;
-        case UI_LAYOUT_CANVAS:
+        case SCENE_LAYOUT_CANVAS:
             layout_canvas(el, &max_x, &max_y);
             el->content_w = max_x;
             el->content_h = max_y;
             break;
-        case UI_LAYOUT_SPLIT_H:
+        case SCENE_LAYOUT_SPLIT_H:
             layout_split_h(el, start_x, start_y);
             el->content_w = el->rect.w;
             el->content_h = el->rect.h;
             break;
-        case UI_LAYOUT_SPLIT_V:
+        case SCENE_LAYOUT_SPLIT_V:
             layout_split_v(el, start_x, start_y);
             el->content_w = el->rect.w;
             el->content_h = el->rect.h;

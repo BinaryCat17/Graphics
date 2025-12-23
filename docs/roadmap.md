@@ -49,6 +49,13 @@ Structural standardization (Phase 6) is largely complete, but critical limitatio
 *   [x] **Refactor: UI Resurrection:** Re-create `src/engine/ui` as a System that operates *on* `SceneNode`s. It handles Layout, Styling, and Input Bubbling.
 *   [x] **Cleanup:** Dissolve `src/engine/scene_system`, distributing its contents between `scene` (core) and `ui` (system).
 
+### Phase 3.5: The Great Merge (Scene & UI Unification)
+**Objective:** Finalize the decoupling of the Scene System from the UI Module, moving core functionality (Parsing, Bindings) into the Scene Engine.
+- [x] **Refactor: Move Parser:** Migrate `ui_parser.c` from `src/engine/ui` to `src/engine/scene/loader`. The Scene Core must be able to load itself without UI dependencies.
+- [x] **Refactor: Unify Bindings:** Rename `UiBinding` (runtime) to `SceneBinding` and move it to `src/engine/scene`. Allow any SceneNode property to be bound, not just UI fields.
+- [x] **Refactor: Flag Consolidation:** Review `UiFlags` vs `SceneNodeFlags`. Ensure `SceneNode` has a unified flag system where UI-specific flags use reserved bits or a dedicated subsystem mask.
+- [x] **Cleanup:** Remove legacy `UiAsset` stubs if they are fully replaced by `SceneAsset`.
+
 **4. 3D Interaction & Logic (New)**
 *   [ ] **Camera Component:** Implement `SceneCameraSpec` (FOV, type: Ortho/Perspective) to define viewports dynamically within the Scene Graph.
 *   [ ] **Input Raycasting:** Extend `ui_input.c` to support Ray-AABB/Ray-Sphere intersection for clicking 3D objects (replacing pure 2D `point_in_rect` for 3D nodes).

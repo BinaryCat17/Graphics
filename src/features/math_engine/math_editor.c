@@ -21,7 +21,6 @@
 
 #include "engine/ui/ui_core.h"
 #include "engine/ui/ui_input.h"
-#include "engine/ui/ui_assets.h"
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>

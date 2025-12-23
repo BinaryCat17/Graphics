@@ -2,7 +2,6 @@
 #define MATH_EDITOR_INTERNAL_H
 
 #include "engine/ui/ui_core.h"
-#include "engine/ui/ui_assets.h"
 #include "engine/ui/ui_input.h"
 #include "engine/ui/ui_renderer.h"
 #include "features/math_engine/math_graph.h"

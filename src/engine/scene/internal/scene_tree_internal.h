@@ -16,8 +16,8 @@ typedef struct SceneTransformSpec {
 
 // Component: UI Layout (Shared with 2D)
 typedef struct UiLayoutSpec {
-    int type;               // REFLECT (UiLayoutStrategy)
-    int layer;              // REFLECT (UiLayer)
+    int type;               // REFLECT (SceneLayoutStrategy)
+    int layer;              // REFLECT (SceneLayer)
     float width;            // REFLECT
     float height;           // REFLECT
     float padding;          // REFLECT
@@ -29,7 +29,7 @@ typedef struct UiLayoutSpec {
 
 // Component: UI Styling
 typedef struct UiStyleSpec {
-    int render_mode;        // REFLECT (UiRenderMode)
+    int render_mode;        // REFLECT (SceneRenderMode)
     Vec4 color;             // REFLECT
     Vec4 hover_color;       // REFLECT
     Vec4 active_color;      // REFLECT
@@ -68,8 +68,8 @@ typedef struct SceneBindingSpec {
 struct SceneNodeSpec {
     // 1. Identity
     StringId id;            // REFLECT
-    int kind;               // REFLECT (UiKind)
-    uint32_t flags;         // REFLECT (UiFlags/SceneNodeFlags)
+    int kind;               // REFLECT (SceneNodeKind)
+    uint32_t flags;         // REFLECT (SceneNodeFlags)
     
     // 2. Components (Fat Spec for now to support parser)
     SceneTransformSpec transform; // REFLECT

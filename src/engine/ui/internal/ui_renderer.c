@@ -69,23 +69,23 @@ static Rect rect_intersect(Rect a, Rect b) {
 }
 
 static void render_background(const SceneNode* el, SceneBuilderContext* ctx, Vec4 clip_vec, float z) {
-    UiRenderMode mode = el->spec->style.render_mode;
-    bool is_input = (el->flags & UI_FLAG_EDITABLE);
+    SceneRenderMode mode = el->spec->style.render_mode;
+    bool is_input = (el->flags & SCENE_NODE_EDITABLE);
 
     // Default / Compatibility Logic resolution
-    if (mode == UI_RENDER_MODE_DEFAULT) {
+    if (mode == SCENE_RENDER_MODE_DEFAULT) {
         // By default, TEXT kind (non-input) has no background
-        if (el->spec->kind == UI_KIND_TEXT && !is_input) {
+        if (el->spec->kind == SCENE_NODE_KIND_TEXT && !is_input) {
              return; 
         }
         
         // Infer mode from texture existence
-        if (el->spec->style.texture != 0) mode = UI_RENDER_MODE_IMAGE;
-        else mode = UI_RENDER_MODE_BOX;
+        if (el->spec->style.texture != 0) mode = SCENE_RENDER_MODE_IMAGE;
+        else mode = SCENE_RENDER_MODE_BOX;
     }
 
     // Explicit Text mode means no background
-    if (mode == UI_RENDER_MODE_TEXT) return;
+    if (mode == SCENE_RENDER_MODE_TEXT) return;
 
     // Resolve base color
     Vec4 color = el->render_color;
@@ -113,7 +113,7 @@ static void render_background(const SceneNode* el, SceneBuilderContext* ctx, Vec
 
     // Render based on Resolved Mode
     switch (mode) {
-        case UI_RENDER_MODE_BEZIER: {
+        case SCENE_RENDER_MODE_BEZIER: {
             Vec2 start = {el->screen_rect.x, el->screen_rect.y};
             Vec2 end = {el->screen_rect.x + el->screen_rect.w, el->screen_rect.y + el->screen_rect.h};
             float thickness = 2.0f;
@@ -149,7 +149,7 @@ static void render_background(const SceneNode* el, SceneBuilderContext* ctx, Vec
             break;
         }
 
-        case UI_RENDER_MODE_IMAGE: {
+        case SCENE_RENDER_MODE_IMAGE: {
             // Use 9-Slice or Textured Quad
             float u0, v0, u1, v1;
             font_get_ui_rect_uv(ctx->font, &u0, &v0, &u1, &v1);
@@ -178,7 +178,7 @@ static void render_background(const SceneNode* el, SceneBuilderContext* ctx, Vec
             break;
         }
 
-        case UI_RENDER_MODE_BOX: {
+        case SCENE_RENDER_MODE_BOX: {
             // SDF Rounded Box
             scene_push_rect_sdf(ctx->scene,
                 (Vec3){el->screen_rect.x, el->screen_rect.y, z},
@@ -202,7 +202,7 @@ static void render_content(const SceneNode* el, SceneBuilderContext* ctx, Vec4 c
         text = el->spec->text;
     }
     
-    bool is_input = (el->flags & UI_FLAG_EDITABLE);
+    bool is_input = (el->flags & SCENE_NODE_EDITABLE);
     if (is_input && !text) text = "";
 
     // Skip if nothing to draw
@@ -266,10 +266,10 @@ static void process_node(const SceneNode* el, SceneBuilderContext* ctx, Rect cur
     if (!el || !el->spec) return;
 
     // Skip hidden
-    if (el->flags & UI_FLAG_HIDDEN) return;
+    if (el->flags & SCENE_NODE_HIDDEN) return;
 
     // Check Overlay Logic
-    bool is_node_overlay = (el->spec->layout.layer == UI_LAYER_OVERLAY);
+    bool is_node_overlay = (el->spec->layout.layer == SCENE_LAYER_OVERLAY);
     
     // If we are in the Normal pass, and encounter an Overlay node -> Defer it
     if (!is_overlay_pass && is_node_overlay) {
@@ -288,7 +288,7 @@ static void process_node(const SceneNode* el, SceneBuilderContext* ctx, Rect cur
     }
     
     // Apply Standard Clipping
-    if (el->flags & UI_FLAG_CLIPPED) {
+    if (el->flags & SCENE_NODE_CLIPPED) {
         effective_clip = rect_intersect(effective_clip, el->screen_rect);
     }
     
@@ -325,7 +325,7 @@ static void process_node(const SceneNode* el, SceneBuilderContext* ctx, Rect cur
     }
 
     // 2. Viewport Delegation
-    if (el->spec->kind == UI_KIND_VIEWPORT && el->spec->provider_id) {
+    if (el->spec->kind == SCENE_NODE_KIND_VIEWPORT && el->spec->provider_id) {
          SceneObjectProvider cb = scene_find_provider(el->spec->provider_id);
          if (cb) {
              // Invoke provider (e.g. Graph Editor) to inject scene objects
@@ -343,8 +343,9 @@ static void process_node(const SceneNode* el, SceneBuilderContext* ctx, Rect cur
     }
 }
 
-void scene_builder_build(const SceneNode* root, Scene* scene, const Assets* assets, MemoryArena* arena) {
-    if (!root || !arena) return;
+void scene_tree_render(SceneTree* instance, Scene* scene, const Assets* assets, MemoryArena* arena) {
+    if (!instance || !instance->root || !arena) return;
+    const SceneNode* root = instance->root;
 
     Rect infinite_clip = {-10000.0f, -10000.0f, 20000.0f, 20000.0f};
     

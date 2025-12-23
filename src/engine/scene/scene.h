@@ -21,13 +21,48 @@ typedef enum SceneNodeFlags {
     SCENE_NODE_HIDDEN      = 1 << 0,
     SCENE_NODE_DIRTY       = 1 << 1, // Transform needs update
     // Systems can use upper bits for their own flags
+    SCENE_NODE_CLICKABLE   = 1 << 2,
+    SCENE_NODE_DRAGGABLE   = 1 << 3,
+    SCENE_NODE_SCROLLABLE  = 1 << 4,
+    SCENE_NODE_FOCUSABLE   = 1 << 5,
+    SCENE_NODE_CLIPPED     = 1 << 6,
+    SCENE_NODE_EDITABLE    = 1 << 7,
+    
     SCENE_NODE_SYSTEM_BIT  = 1 << 8
 } SceneNodeFlags;
+
+typedef enum SceneNodeKind {
+    SCENE_NODE_KIND_CONTAINER,
+    SCENE_NODE_KIND_TEXT,
+    SCENE_NODE_KIND_VIEWPORT
+} SceneNodeKind; // REFLECT
+
+typedef enum SceneLayoutStrategy {
+    SCENE_LAYOUT_FLEX_COLUMN,
+    SCENE_LAYOUT_FLEX_ROW,
+    SCENE_LAYOUT_CANVAS,
+    SCENE_LAYOUT_SPLIT_H,
+    SCENE_LAYOUT_SPLIT_V
+} SceneLayoutStrategy; // REFLECT
+
+typedef enum SceneLayer {
+    SCENE_LAYER_NORMAL = 0,
+    SCENE_LAYER_OVERLAY
+} SceneLayer; // REFLECT
+
+typedef enum SceneRenderMode {
+    SCENE_RENDER_MODE_DEFAULT = 0,
+    SCENE_RENDER_MODE_BOX,
+    SCENE_RENDER_MODE_TEXT,
+    SCENE_RENDER_MODE_IMAGE,
+    SCENE_RENDER_MODE_BEZIER
+} SceneRenderMode; // REFLECT
 
 // --- SCENE ASSET (The DNA) ---
 
 SceneAsset* scene_asset_create(size_t arena_size);
 void scene_asset_destroy(SceneAsset* asset);
+SceneAsset* scene_asset_load_from_file(const char* path);
 
 SceneNodeSpec* scene_asset_push_node(SceneAsset* asset);
 SceneNodeSpec* scene_asset_get_template(SceneAsset* asset, const char* name);

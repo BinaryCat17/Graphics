@@ -10,44 +10,6 @@
 
 // --- UI CONSTANTS & FLAGS ---
 
-typedef enum UiLayoutStrategy {
-    UI_LAYOUT_FLEX_COLUMN,
-    UI_LAYOUT_FLEX_ROW,
-    UI_LAYOUT_CANVAS,
-    UI_LAYOUT_SPLIT_H,
-    UI_LAYOUT_SPLIT_V
-} UiLayoutStrategy; // REFLECT
-
-typedef enum UiFlags {
-    UI_FLAG_NONE        = 0,
-    UI_FLAG_CLICKABLE   = 1 << 0,
-    UI_FLAG_DRAGGABLE   = 1 << 1,
-    UI_FLAG_SCROLLABLE  = 1 << 2,
-    UI_FLAG_FOCUSABLE   = 1 << 3,
-    UI_FLAG_HIDDEN      = 1 << 4,
-    UI_FLAG_CLIPPED     = 1 << 5,
-    UI_FLAG_EDITABLE    = 1 << 6
-} UiFlags; // REFLECT
-
-typedef enum UiKind {
-    UI_KIND_CONTAINER,
-    UI_KIND_TEXT,
-    UI_KIND_VIEWPORT
-} UiKind; // REFLECT
-
-typedef enum UiLayer {
-    UI_LAYER_NORMAL = 0,
-    UI_LAYER_OVERLAY
-} UiLayer; // REFLECT
-
-typedef enum UiRenderMode {
-    UI_RENDER_MODE_DEFAULT = 0,
-    UI_RENDER_MODE_BOX,
-    UI_RENDER_MODE_TEXT,
-    UI_RENDER_MODE_IMAGE,
-    UI_RENDER_MODE_BEZIER
-} UiRenderMode; // REFLECT
-
 typedef enum UiBindingTarget {
     BINDING_TARGET_NONE = 0,
     BINDING_TARGET_TEXT,
