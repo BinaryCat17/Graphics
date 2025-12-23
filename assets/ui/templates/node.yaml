@@ -5,8 +5,11 @@ layout:
   # The original file didn't have width/height, relying on defaults.
 flags: "clickable | draggable"
 # Bindings stay at root
-bind_x: "x"
-bind_y: "y"
+bindings:
+  - target: "layout.x"
+    source: "x"
+  - target: "layout.y"
+    source: "y"
 style:
   color: "#00000000" # Transparent wrapper
 
@@ -40,7 +43,9 @@ children:
         
         children:
           - type: text
-            bind: "name"
+            bindings:
+              - target: "text"
+                source: "name"
             style:
               color: "#FFFFFF"
       - type: instance

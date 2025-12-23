@@ -56,7 +56,9 @@ children:
       type: flex_column
       height: -1
       padding: 20
-    bind_visible: "no_selection"
+    bindings:
+      - target: "visible"
+        source: "no_selection"
     style:
       color: "#26262B"
     children:
@@ -78,7 +80,9 @@ children:
     style:
       corner_radius: 4
       color: "#26262B"
-    bind_visible: "has_selection"
+    bindings:
+      - target: "visible"
+        source: "has_selection"
     collection: "selected_nodes"
     template_selector: "type"
     item_template: "DefaultNodeInspector"

@@ -181,50 +181,7 @@ static SceneNodeSpec* load_recursive(SceneAsset* asset, const ConfigNode* node) 
             continue;
         }
         
-        // --- Legacy / Shorthand Binding Handling ---
-        if (strcmp(key, "bind") == 0 && val->scalar && temp_binding_count < 64) {
-             // "bind": "field" -> Maps to text by default (Legacy behavior)
-             temp_bindings[temp_binding_count].target = "text";
-             temp_bindings[temp_binding_count].source = arena_push_string(&asset->arena, val->scalar);
-             temp_binding_count++;
-             continue;
-        }
-        if (strcmp(key, "bind_text") == 0 && val->scalar && temp_binding_count < 64) {
-             temp_bindings[temp_binding_count].target = "text";
-             temp_bindings[temp_binding_count].source = arena_push_string(&asset->arena, val->scalar);
-             temp_binding_count++;
-             continue;
-        }
-        if (strcmp(key, "bind_visible") == 0 && val->scalar && temp_binding_count < 64) {
-             temp_bindings[temp_binding_count].target = "visible";
-             temp_bindings[temp_binding_count].source = arena_push_string(&asset->arena, val->scalar);
-             temp_binding_count++;
-             continue;
-        }
-        if (strcmp(key, "bind_x") == 0 && val->scalar && temp_binding_count < 64) {
-             temp_bindings[temp_binding_count].target = "layout.x";
-             temp_bindings[temp_binding_count].source = arena_push_string(&asset->arena, val->scalar);
-             temp_binding_count++;
-             continue;
-        }
-        if (strcmp(key, "bind_y") == 0 && val->scalar && temp_binding_count < 64) {
-             temp_bindings[temp_binding_count].target = "layout.y";
-             temp_bindings[temp_binding_count].source = arena_push_string(&asset->arena, val->scalar);
-             temp_binding_count++;
-             continue;
-        }
-        if (strcmp(key, "bind_w") == 0 && val->scalar && temp_binding_count < 64) {
-             temp_bindings[temp_binding_count].target = "layout.width";
-             temp_bindings[temp_binding_count].source = arena_push_string(&asset->arena, val->scalar);
-             temp_binding_count++;
-             continue;
-        }
-        if (strcmp(key, "bind_h") == 0 && val->scalar && temp_binding_count < 64) {
-             temp_bindings[temp_binding_count].target = "layout.height";
-             temp_bindings[temp_binding_count].source = arena_push_string(&asset->arena, val->scalar);
-             temp_binding_count++;
-             continue;
-        }
+        // --- Legacy / Shorthand Binding Handling (REMOVED) ---
 
         if (strcmp(key, "children") == 0) {
             if (val->type == CONFIG_NODE_SEQUENCE) {

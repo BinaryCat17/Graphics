@@ -10,7 +10,9 @@ children:
     style:
       color: "#AAAAAA"
   - type: text
-    bind: "value"
+    bindings:
+      - target: "text"
+        source: "value"
     style:
       color: "#00FF00"
     on_change: "Graph.Recompile"

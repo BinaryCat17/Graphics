@@ -6,6 +6,8 @@ children:
   - type: instance
     instance: InspectorTitle
   - type: text
-    bind_text: "cached_output"
+    bindings:
+      - target: "text"
+        source: "cached_output"
     style:
       color: "#888888"

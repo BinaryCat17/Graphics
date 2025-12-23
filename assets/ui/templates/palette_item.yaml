@@ -1,7 +1,6 @@
 type: container
 flags: clickable | focusable
 id: palette_item
-text_source: "label"
 layout:
   width: -1
   height: 30
@@ -11,3 +10,10 @@ style:
   hover_color: "#6D6D7F"
   corner_radius: 6
 on_click: "Graph.AddNode"
+children:
+  - type: text
+    bindings:
+      - target: "text"
+        source: "label"
+    style:
+      color: "#FFFFFF"

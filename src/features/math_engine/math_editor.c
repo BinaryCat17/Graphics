@@ -289,11 +289,24 @@ MathEditor* math_editor_create(Engine* engine) {
     editor->input_ctx = ui_input_create();
 
     // 4. Load UI Asset
-    const char* ui_path = engine_get_config(engine)->ui_path; // Use config path
-    if (ui_path) {
-        editor->ui_asset = scene_asset_load_from_file(ui_path);
+    const char* ui_path_raw = engine_get_config(engine)->ui_path; 
+    const char* assets_root = assets_get_root_dir(engine_get_assets(engine));
+    
+    // Normalize path: if it starts with "assets/", strip it to get relative path for the Asset System
+    const char* ui_rel_path = ui_path_raw;
+    if (ui_path_raw && assets_root) {
+        size_t root_len = strlen(assets_root);
+        if (strncmp(ui_path_raw, assets_root, root_len) == 0) {
+            if (ui_path_raw[root_len] == '/' || ui_path_raw[root_len] == '\\') {
+                ui_rel_path = ui_path_raw + root_len + 1;
+            }
+        }
+    }
+
+    if (ui_rel_path) {
+        editor->ui_asset = assets_load_scene(engine_get_assets(engine), ui_rel_path);
         if (!editor->ui_asset) {
-             LOG_ERROR("Failed to load UI asset: %s", ui_path);
+             LOG_ERROR("Failed to load UI asset: %s (Raw: %s)", ui_rel_path, ui_path_raw);
         }
     } else {
         editor->ui_asset = NULL;

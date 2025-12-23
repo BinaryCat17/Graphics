@@ -94,6 +94,41 @@ bool assets_init_internal(Assets* out_assets, const char* assets_dir) {
     return true;
 }
 
+SceneAsset* assets_load_scene(Assets* assets, const char* relative_path) {
+    if (!assets || !relative_path) return NULL;
+
+    StringId id = str_id(relative_path);
+
+    // 1. Check Cache
+    for (size_t i = 0; i < assets->cached_scene_count; ++i) {
+        if (assets->cached_scenes[i].path_id == id) {
+            return assets->cached_scenes[i].asset;
+        }
+    }
+
+    // 2. Load
+    char full_path[512];
+    snprintf(full_path, sizeof(full_path), "%s/%s", assets->root_dir, relative_path);
+
+    SceneAsset* asset = scene_asset_load_from_file(full_path);
+    
+    // 3. Cache
+    if (asset) {
+        if (assets->cached_scene_count < MAX_CACHED_SCENES) {
+            assets->cached_scenes[assets->cached_scene_count].path_id = id;
+            assets->cached_scenes[assets->cached_scene_count].asset = asset;
+            assets->cached_scene_count++;
+            LOG_TRACE("Assets: Cached scene '%s' (Total: %zu)", relative_path, assets->cached_scene_count);
+        } else {
+            LOG_WARN("Assets: Cache full, scene '%s' not cached.", relative_path);
+        }
+    } else {
+        LOG_ERROR("Assets: Failed to load scene '%s' (Full path: %s)", relative_path, full_path);
+    }
+
+    return asset;
+}
+
 Assets* assets_create(const char* assets_dir) {
     Assets* assets = (Assets*)calloc(1, sizeof(Assets));
     if (!assets) return NULL;

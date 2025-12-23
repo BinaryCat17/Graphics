@@ -1,5 +1,7 @@
 type: text
-bind: "value"
+bindings:
+  - target: "text"
+    source: "value"
 layout:
   height: 20
 style:

@@ -17,6 +17,11 @@ typedef struct AssetData {
 Assets* assets_create(const char* assets_dir);
 void assets_destroy(Assets* assets);
 
+// Scene Loading (Cached)
+// Path is relative to assets root (e.g. "ui/node.yaml")
+typedef struct SceneAsset SceneAsset;
+SceneAsset* assets_load_scene(Assets* assets, const char* relative_path);
+
 // I/O
 AssetData assets_load_file(const Assets* assets, const char* relative_path);
 void assets_free_file(AssetData* data);
