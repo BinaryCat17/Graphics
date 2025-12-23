@@ -62,17 +62,43 @@ Structural standardization (Phase 6) is largely complete, but critical limitatio
     *   [x] Remove legacy bindings support (`bind_x`, `bind_y`) in favor of the generic `bindings` array.
     *   [ ] Remove default UI values (layout/style) from the parser; let the `UiSystem` apply defaults.
 - [x] **Optimization: Asset Caching:** Implement a global `SceneAssetCache` (Path -> Asset*) to prevent re-parsing the same YAML templates (e.g., ports, nodes) multiple times.
-- [ ] **Refactor: Data-Driven Node Kinds:** Replace hardcoded string checks (`strcmp("text")`) in the parser with a reflection-based or hash-based lookup for `SceneNodeKind`.
-- [ ] **Feature: 3D Input (Raycasting):** Replace 2D `point_in_rect` hit-testing with Ray-AABB/Plane intersection.
-    *   Support clicking on nodes rotated via `world_matrix`.
-    *   Ensure events bubble correctly up the 3D hierarchy.
+- [x] **Refactor: Data-Driven Node Kinds:** Replace hardcoded string checks (`strcmp("text")`) in the parser with a reflection-based or hash-based lookup for `SceneNodeKind`.
 - [ ] **Refactor: Flag Segregation:** Split `SceneNodeFlags` into generic Scene flags and logic-specific flags to avoid "God Enums".
     *   `SceneFlags`: Core state (`HIDDEN`, `DIRTY`).
     *   `InteractionFlags`: Shared inputs (`CLICKABLE`, `FOCUSABLE`).
     *   `TypeFlags`: Context-dependent flags based on Node Kind (e.g., `SCROLLABLE` for Containers, `CAST_SHADOWS` for Meshes).
-- [ ] **Refactor: MathEditor Separation:** Strict separation of Logic vs View.
+- [x] **Refactor: MathEditor Separation:** Strict separation of Logic vs View.
     *   `MathGraph`: Pure logic, knows nothing about Scene/UI.
     *   `MathGraphView`: Listens to Graph events and manages `SceneNode`s.
+
+### Phase 3.7: Interaction Architecture (New)
+**Objective:** Replace the primitive 2D input system with a robust 3D-aware event architecture. Eliminate "stringly-typed" logic limitations.
+- [ ] **3.7.1: Ray-Cast Input System:**
+    *   Replace `point_in_rect` with a `SceneRaycaster`.
+    *   Implement OBB (Oriented Bounding Box) intersection using `world_matrix` inverse.
+    *   Support Layer masking (Block input to World when UI is hovered).
+- [ ] **3.7.2: Typed Event Payloads:**
+    *   Refactor `UiEvent` to support generic payloads (Variant/Union) instead of just String IDs.
+    *   Allow passing data directly from UI to Logic (e.g., `Graph.AddNode(type=ADD, pos={100,100})`).
+- [ ] **3.7.3: Focus & Modal Manager:**
+    *   Implement a `FocusStack` to handle overlapping windows and popups.
+    *   Handle "Click Outside" events automatically for closing modals.
+- [ ] **3.7.4: Signal-Slot Data Flow:**
+    *   Formalize the observer pattern between `MathGraph` (Logic) and `MathGraphView` (UI).
+    *   Eliminate ad-hoc polling in `update()` loops.
+
+### Phase 3.8: Modular Consistency & Hygiene (New)
+**Objective:** Clean up the file structure to strictly separate Public API (root) from Implementation (internal). Eliminate "dangling" source files in module roots.
+- [ ] **3.8.1: Scene Module Hygiene:**
+    *   Move `scene_tree.c` -> `internal/scene_graph.c`.
+    *   Move `scene.c` logic -> `internal/scene_core.c`.
+    *   Create a clean `scene_system.c` in the root that acts as the Facade/Entry point.
+- [ ] **3.8.2: UI Module Hygiene:**
+    *   Refactor `ui_core.c` to be a pure coordinator.
+    *   Move `ui_layout.c`, `ui_renderer.c`, `ui_input.c` deeply into `internal/` (already partially done, but needs strict enforcement).
+- [ ] **3.8.3: Header/Source Parity:**
+    *   Enforce rule: Root directory contains ONLY public headers and the main module implementation file.
+    *   Verify that including `module.h` does not leak internal symbols.
 
 **4. 3D Interaction & Logic (New)**
 *   [ ] **Camera Component:** Implement `SceneCameraSpec` (FOV, type: Ortho/Perspective) to define viewports dynamically within the Scene Graph.

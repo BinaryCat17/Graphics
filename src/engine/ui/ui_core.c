@@ -90,8 +90,8 @@ static void ui_apply_binding_value(SceneNode* el, UiBinding* b) {
             if (f->type == META_TYPE_BOOL) vis = *(bool*)ptr;
             else if (f->type == META_TYPE_INT) vis = (*(int*)ptr) != 0;
             
-            if (vis) el->flags &= ~SCENE_NODE_HIDDEN;
-            else el->flags |= SCENE_NODE_HIDDEN;
+            if (vis) el->flags &= ~SCENE_FLAG_HIDDEN;
+            else el->flags |= SCENE_FLAG_HIDDEN;
             break;
         }
         case BINDING_TARGET_LAYOUT_X:

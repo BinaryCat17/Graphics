@@ -16,20 +16,28 @@ typedef struct MetaStruct MetaStruct;
 
 // --- CORE TYPES ---
 
-typedef enum SceneNodeFlags {
-    SCENE_NODE_NONE        = 0,
-    SCENE_NODE_HIDDEN      = 1 << 0,
-    SCENE_NODE_DIRTY       = 1 << 1, // Transform needs update
-    // Systems can use upper bits for their own flags
-    SCENE_NODE_CLICKABLE   = 1 << 2,
-    SCENE_NODE_DRAGGABLE   = 1 << 3,
-    SCENE_NODE_SCROLLABLE  = 1 << 4,
-    SCENE_NODE_FOCUSABLE   = 1 << 5,
-    SCENE_NODE_CLIPPED     = 1 << 6,
-    SCENE_NODE_EDITABLE    = 1 << 7,
+typedef enum SceneFlags {
+    SCENE_FLAG_NONE        = 0,
+    SCENE_FLAG_HIDDEN      = 1 << 0,
+    SCENE_FLAG_DIRTY       = 1 << 1, // Transform needs update
+    SCENE_FLAG_CLIPPED     = 1 << 2,
     
-    SCENE_NODE_SYSTEM_BIT  = 1 << 8
-} SceneNodeFlags;
+    SCENE_FLAG_SYSTEM_BIT  = 1 << 8
+} SceneFlags; // REFLECT
+
+typedef enum SceneInteractionFlags {
+    SCENE_INTERACTION_NONE       = 0,
+    SCENE_INTERACTION_CLICKABLE  = 1 << 0,
+    SCENE_INTERACTION_DRAGGABLE  = 1 << 1,
+    SCENE_INTERACTION_FOCUSABLE  = 1 << 3,
+    SCENE_INTERACTION_HOVERABLE  = 1 << 4
+} SceneInteractionFlags; // REFLECT
+
+typedef enum UiFlags {
+    UI_FLAG_NONE       = 0,
+    UI_FLAG_SCROLLABLE = 1 << 0,
+    UI_FLAG_EDITABLE   = 1 << 1
+} UiFlags; // REFLECT
 
 typedef enum SceneNodeKind {
     SCENE_NODE_KIND_CONTAINER,

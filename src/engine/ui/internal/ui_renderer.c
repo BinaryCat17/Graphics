@@ -69,8 +69,8 @@ static Rect rect_intersect(Rect a, Rect b) {
 }
 
 static void render_background(const SceneNode* el, SceneBuilderContext* ctx, Vec4 clip_vec, float z) {
-    SceneRenderMode mode = el->spec->style.render_mode;
-    bool is_input = (el->flags & SCENE_NODE_EDITABLE);
+    bool is_input = (el->ui_flags & UI_FLAG_EDITABLE);
+    int mode = el->spec->style.render_mode;
 
     // Default / Compatibility Logic resolution
     if (mode == SCENE_RENDER_MODE_DEFAULT) {
@@ -202,8 +202,7 @@ static void render_content(const SceneNode* el, SceneBuilderContext* ctx, Vec4 c
         text = el->spec->text;
     }
     
-    bool is_input = (el->flags & SCENE_NODE_EDITABLE);
-    if (is_input && !text) text = "";
+                bool is_input = (el->ui_flags & UI_FLAG_EDITABLE);    if (is_input && !text) text = "";
 
     // Skip if nothing to draw
     if ((!text || text[0] == '\0') && !is_input) return;
@@ -266,7 +265,7 @@ static void process_node(const SceneNode* el, SceneBuilderContext* ctx, Rect cur
     if (!el || !el->spec) return;
 
     // Skip hidden
-    if (el->flags & SCENE_NODE_HIDDEN) return;
+    if (el->flags & SCENE_FLAG_HIDDEN) return;
 
     // Check Overlay Logic
     bool is_node_overlay = (el->spec->layout.layer == SCENE_LAYER_OVERLAY);
@@ -288,7 +287,8 @@ static void process_node(const SceneNode* el, SceneBuilderContext* ctx, Rect cur
     }
     
     // Apply Standard Clipping
-    if (el->flags & SCENE_NODE_CLIPPED) {
+    // 2. Clip
+    if (el->flags & SCENE_FLAG_CLIPPED) {
         effective_clip = rect_intersect(effective_clip, el->screen_rect);
     }
     

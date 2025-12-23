@@ -55,10 +55,10 @@ static SceneNode* hit_test_recursive(SceneNode* el, float x, float y) {
     if (!el || !el->spec) return NULL;
     
     // Skip hidden or non-interactive (unless specifically handled)
-    if (el->flags & SCENE_NODE_HIDDEN) return NULL;
+    if (el->flags & SCENE_FLAG_HIDDEN) return NULL;
     
-    // Check clip rect if clipped
-    if ((el->flags & SCENE_NODE_CLIPPED)) {
+    // Check clipping
+    if ((el->flags & SCENE_FLAG_CLIPPED)) {
         if (x < el->screen_rect.x || x > el->screen_rect.x + el->screen_rect.w ||
             y < el->screen_rect.y || y > el->screen_rect.y + el->screen_rect.h) {
             return NULL;
@@ -102,7 +102,8 @@ static void handle_scroll_event(UiInputContext* ctx, const InputEvent* event) {
 
     SceneNode* target = ctx->hovered;
     while (target) {
-        if (target->flags & SCENE_NODE_SCROLLABLE) {
+    // 3. Scroll
+    if (target->ui_flags & UI_FLAG_SCROLLABLE) {
             target->scroll_y -= dy * UI_SCROLL_SPEED; 
             target->scroll_x += dx * UI_SCROLL_SPEED;
 
@@ -138,10 +139,10 @@ static void handle_mouse_press_event(UiInputContext* ctx, const InputEvent* even
         ctx->drag_start_mouse_y = my;
         
         // Cache start values for potential drag
-        if (ctx->active->flags & SCENE_NODE_SCROLLABLE) {
+        if (ctx->active->ui_flags & UI_FLAG_SCROLLABLE) {
              ctx->drag_start_elem_x = ctx->active->scroll_x;
              ctx->drag_start_elem_y = ctx->active->scroll_y;
-        } else if (ctx->active->flags & SCENE_NODE_DRAGGABLE) {
+        } else if (ctx->active->interaction_flags & SCENE_INTERACTION_DRAGGABLE) {
              // Cache bound values
              if (ctx->active->data_ptr) {
                  const UiBinding* bind_x = ui_node_get_binding(ctx->active, BINDING_TARGET_LAYOUT_X);
@@ -159,7 +160,7 @@ static void handle_mouse_press_event(UiInputContext* ctx, const InputEvent* even
         }
 
         // Handle Focus
-        if (ctx->hovered->flags & SCENE_NODE_FOCUSABLE) {
+        if (ctx->hovered && (ctx->hovered->interaction_flags & SCENE_INTERACTION_FOCUSABLE)) {
             if (ctx->focused && ctx->focused != ctx->hovered) {
                 ctx->focused->is_focused = false;
             }
@@ -187,7 +188,7 @@ static void handle_mouse_press_event(UiInputContext* ctx, const InputEvent* even
 static void handle_char_event(UiInputContext* ctx, const InputEvent* event) {
     if (!ctx->focused) return;
     SceneNode* el = ctx->focused;
-    if (!(el->flags & SCENE_NODE_EDITABLE)) return;
+    if (!(el->ui_flags & UI_FLAG_EDITABLE)) return;
 
     if (event->type == INPUT_EVENT_CHAR) {
          char buf[256] = {0};
@@ -217,7 +218,7 @@ static void handle_char_event(UiInputContext* ctx, const InputEvent* event) {
 static void handle_key_event(UiInputContext* ctx, const InputEvent* event) {
     if (!ctx->focused) return;
     SceneNode* el = ctx->focused;
-    if (!(el->flags & SCENE_NODE_EDITABLE)) return;
+    if (!(el->ui_flags & UI_FLAG_EDITABLE)) return;
 
     if (event->type == INPUT_EVENT_KEY_PRESSED || event->type == INPUT_EVENT_KEY_REPEAT) {
         if (event->data.key.key == INPUT_KEY_BACKSPACE) {
@@ -264,7 +265,7 @@ static void handle_drag_logic(UiInputContext* ctx, const InputSystem* input) {
         bool changed = false;
 
         // Case A: Draggable Object (updates data model)
-        if (ctx->active->flags & SCENE_NODE_DRAGGABLE) {
+        if (ctx->active->interaction_flags & SCENE_INTERACTION_DRAGGABLE) {
             if (ctx->active->data_ptr) {
                 if (ui_node_get_binding(ctx->active, BINDING_TARGET_LAYOUT_X)) {
                     ui_node_write_binding_float(ctx->active, BINDING_TARGET_LAYOUT_X, ctx->drag_start_elem_x + dx);
@@ -277,7 +278,7 @@ static void handle_drag_logic(UiInputContext* ctx, const InputSystem* input) {
             }
         }
         // Case B: Scrollable (internal state)
-        else if (ctx->active->flags & SCENE_NODE_SCROLLABLE) {
+        else if (ctx->active->ui_flags & UI_FLAG_SCROLLABLE) {
              ctx->active->scroll_x = ctx->drag_start_elem_x - dx;
              ctx->active->scroll_y = ctx->drag_start_elem_y - dy;
              

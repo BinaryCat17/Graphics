@@ -20,7 +20,10 @@ static float calculate_width(SceneNode* el, float available_w, UiTextMeasureFunc
     if (w < 0) {
         bool parent_is_row = (el->parent && el->parent->spec->layout.type == SCENE_LAYOUT_FLEX_ROW);
         
-        if (parent_is_row || spec->kind == SCENE_NODE_KIND_TEXT || (el->flags & SCENE_NODE_CLICKABLE)) {
+    // If size is Auto, we need to calculate content size
+    // For text, it's the glyph bounds. For container, it's the sum of children.
+    // Hack: If container is CLICKABLE, treat it as having content even if empty? No.
+    if (parent_is_row || spec->kind == SCENE_NODE_KIND_TEXT || (el->interaction_flags & SCENE_INTERACTION_CLICKABLE)) {
              const char* text = el->cached_text;
              if (!text || text[0] == '\0') text = spec->text;
 
@@ -49,7 +52,7 @@ static float calculate_height(SceneNode* el, float available_h) {
         if (el->child_count > 0 && spec->layout.type == SCENE_LAYOUT_FLEX_COLUMN) {
             h = spec->layout.padding * 2;
              for (SceneNode* child = el->first_child; child; child = child->next_sibling) {
-                if (child->flags & SCENE_NODE_HIDDEN) continue;
+                if (child->flags & SCENE_FLAG_HIDDEN) continue;
                 float child_h = child->spec->layout.height;
                 if (child_h < 0) child_h = UI_DEFAULT_HEIGHT; 
                 h += child_h + spec->layout.spacing;
@@ -69,7 +72,7 @@ static float calculate_height(SceneNode* el, float available_h) {
 static void layout_column(SceneNode* el, float start_x, float start_y, float* out_max_x, float* out_max_y) {
     float cursor_y = start_y;
     for (SceneNode* child = el->first_child; child; child = child->next_sibling) {
-        if (child->flags & SCENE_NODE_HIDDEN) continue;
+        if (child->flags & SCENE_FLAG_HIDDEN) continue;
         child->rect.x = start_x;
         child->rect.y = cursor_y;
         cursor_y += child->rect.h + el->spec->layout.spacing;
@@ -84,7 +87,7 @@ static void layout_column(SceneNode* el, float start_x, float start_y, float* ou
 static void layout_row(SceneNode* el, float start_x, float start_y, float* out_max_x, float* out_max_y) {
     float cursor_x = start_x;
     for (SceneNode* child = el->first_child; child; child = child->next_sibling) {
-        if (child->flags & SCENE_NODE_HIDDEN) continue;
+        if (child->flags & SCENE_FLAG_HIDDEN) continue;
         child->rect.x = cursor_x;
         child->rect.y = start_y;
         cursor_x += child->rect.w + el->spec->layout.spacing;
@@ -100,14 +103,15 @@ static void layout_canvas(SceneNode* el, float* out_max_x, float* out_max_y) {
     *out_max_x = 0;
     *out_max_y = 0;
     for (SceneNode* child = el->first_child; child; child = child->next_sibling) {
-        if (el->flags & SCENE_NODE_SCROLLABLE) {
+    // 4. Handle Overflow / Scroll
+    if (el->ui_flags & UI_FLAG_SCROLLABLE) {
             child->rect.x -= el->scroll_x;
             child->rect.y -= el->scroll_y;
         }
         
         // Calculate content bounds (using logical coordinates, reverting scroll)
-        float logical_x = child->rect.x + (el->flags & SCENE_NODE_SCROLLABLE ? el->scroll_x : 0);
-        float logical_y = child->rect.y + (el->flags & SCENE_NODE_SCROLLABLE ? el->scroll_y : 0);
+        float logical_x = child->rect.x + (el->ui_flags & UI_FLAG_SCROLLABLE ? el->scroll_x : 0);
+        float logical_y = child->rect.y + (el->ui_flags & UI_FLAG_SCROLLABLE ? el->scroll_y : 0);
         float right = logical_x + child->rect.w;
         float bottom = logical_y + child->rect.h;
         
@@ -145,10 +149,9 @@ static void layout_split_v(SceneNode* el, float start_x, float start_y) {
 static void layout_recursive(SceneNode* el, Rect available, uint64_t frame_number, bool log_debug, UiTextMeasureFunc measure_func, void* measure_data) {
     if (!el || !el->spec) return;
     
-    if (el->flags & SCENE_NODE_HIDDEN) {
+    if (el->flags & SCENE_FLAG_HIDDEN) {
         el->rect.w = 0;
         el->rect.h = 0;
-        return;
     }
 
     const SceneNodeSpec* spec = el->spec;

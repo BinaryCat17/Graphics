@@ -145,7 +145,7 @@ void scene_node_add_child(SceneNode* parent, SceneNode* child) {
     parent->last_child = child;
     parent->child_count++;
     
-    child->flags |= SCENE_NODE_DIRTY;
+    child->flags |= SCENE_FLAG_DIRTY;
 }
 
 void scene_node_clear_children(SceneNode* parent, SceneTree* tree) {

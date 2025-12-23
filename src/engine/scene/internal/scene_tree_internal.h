@@ -69,7 +69,9 @@ struct SceneNodeSpec {
     // 1. Identity
     StringId id;            // REFLECT
     int kind;               // REFLECT (SceneNodeKind)
-    uint32_t flags;         // REFLECT (SceneNodeFlags)
+    uint32_t flags;         // REFLECT (SceneFlags)
+    uint32_t interaction_flags; // REFLECT (SceneInteractionFlags)
+    uint32_t ui_flags;      // REFLECT (UiFlags)
     
     // 2. Components (Fat Spec for now to support parser)
     SceneTransformSpec transform; // REFLECT
@@ -150,7 +152,9 @@ struct SceneNode {
     char cached_text[128];
 
     // State
-    uint32_t flags;       // Runtime flags
+    uint32_t flags;             // Runtime flags (SceneFlags)
+    uint32_t interaction_flags; // Runtime flags (SceneInteractionFlags)
+    uint32_t ui_flags;          // Runtime flags (UiFlags)
 };
 
 // --- SCENE TREE ---

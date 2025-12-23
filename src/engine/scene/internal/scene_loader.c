@@ -98,6 +98,52 @@ static void parse_struct_fields(void* instance, const MetaStruct* meta, const Co
     }
 }
 
+static void parse_flags_smart(SceneNodeSpec* spec, const char* flags_str) {
+    if (!spec || !flags_str) return;
+
+    const char* ptr = flags_str;
+    while (*ptr) {
+        // Skip delimiters
+        while (*ptr && (*ptr == ' ' || *ptr == '|' || *ptr == ',' || *ptr == '[' || *ptr == ']')) ptr++;
+        if (!*ptr) break;
+
+        // Find end of token
+        const char* start = ptr;
+        while (*ptr && *ptr != ' ' && *ptr != '|' && *ptr != ',' && *ptr != '[' && *ptr != ']') ptr++;
+        
+        size_t len = ptr - start;
+        char token[64];
+        if (len < 64) {
+            strncpy(token, start, len);
+            token[len] = '\0';
+        } else {
+            continue; // Too long, skip
+        }
+
+        int val = 0;
+        
+        // Try Scene Flags
+        if (meta_enum_get_value(meta_get_enum("SceneFlags"), token, &val)) {
+            spec->flags |= (uint32_t)val;
+            continue;
+        }
+
+        // Try Interaction Flags
+        if (meta_enum_get_value(meta_get_enum("SceneInteractionFlags"), token, &val)) {
+            spec->interaction_flags |= (uint32_t)val;
+            continue;
+        }
+
+        // Try UI Flags
+        if (meta_enum_get_value(meta_get_enum("UiFlags"), token, &val)) {
+            spec->ui_flags |= (uint32_t)val;
+            continue;
+        }
+        
+        LOG_WARN("UiParser: Unknown flag '%s' (Node ID:%u)", token, spec->id);
+    }
+}
+
 // --- Recursive Loader ---
 
 static SceneNodeSpec* load_recursive(SceneAsset* asset, const ConfigNode* node) {
@@ -163,6 +209,14 @@ static SceneNodeSpec* load_recursive(SceneAsset* asset, const ConfigNode* node) 
         }
 
         if (strcmp(key, "instance") == 0) continue;
+
+        // --- Custom Flag Parser ---
+        if (strcmp(key, "flags") == 0) {
+            if (val->scalar) {
+                parse_flags_smart(spec, val->scalar);
+            }
+            continue;
+        }
         
         // --- Bindings V2 Parsing ---
         if (strcmp(key, "bindings") == 0) {
