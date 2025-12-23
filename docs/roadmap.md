@@ -54,7 +54,21 @@ Structural standardization (Phase 6) is largely complete, but critical limitatio
 - [x] **Refactor: Move Parser:** Migrate `ui_parser.c` from `src/engine/ui` to `src/engine/scene/loader`. The Scene Core must be able to load itself without UI dependencies.
 - [x] **Refactor: Unify Bindings:** Rename `UiBinding` (runtime) to `SceneBinding` and move it to `src/engine/scene`. Allow any SceneNode property to be bound, not just UI fields.
 - [x] **Refactor: Flag Consolidation:** Review `UiFlags` vs `SceneNodeFlags`. Ensure `SceneNode` has a unified flag system where UI-specific flags use reserved bits or a dedicated subsystem mask.
-- [x] **Cleanup:** Remove legacy `UiAsset` stubs if they are fully replaced by `SceneAsset`.
+- [ ] **Cleanup:** Remove legacy `UiAsset` stubs if they are fully replaced by `SceneAsset`.
+
+### Phase 3.6: Architecture Hardening (Cleanup)
+**Objective:** Solidify the foundation after the "Great Merge" of UI and Scene systems. Remove "construction debris" and ensure the engine is truly 3D-ready, not just a UI engine wrapper.
+- [ ] **Refactor: Loader Decoupling:** Remove UI-specific hardcoding from `scene_loader.c`.
+    *   Remove legacy bindings support (`bind_x`, `bind_y`) in favor of the generic `bindings` array.
+    *   Remove default UI values (layout/style) from the parser; let the `UiSystem` apply defaults.
+- [ ] **Optimization: Asset Caching:** Implement a global `SceneAssetCache` (Path -> Asset*) to prevent re-parsing the same YAML templates (e.g., ports, nodes) multiple times.
+- [ ] **Refactor: Data-Driven Node Kinds:** Replace hardcoded string checks (`strcmp("text")`) in the parser with a reflection-based or hash-based lookup for `SceneNodeKind`.
+- [ ] **Feature: 3D Input (Raycasting):** Replace 2D `point_in_rect` hit-testing with Ray-AABB/Plane intersection.
+    *   Support clicking on nodes rotated via `world_matrix`.
+    *   Ensure events bubble correctly up the 3D hierarchy.
+- [ ] **Refactor: MathEditor Separation:** Strict separation of Logic vs View.
+    *   `MathGraph`: Pure logic, knows nothing about Scene/UI.
+    *   `MathGraphView`: Listens to Graph events and manages `SceneNode`s.
 
 **4. 3D Interaction & Logic (New)**
 *   [ ] **Camera Component:** Implement `SceneCameraSpec` (FOV, type: Ortho/Perspective) to define viewports dynamically within the Scene Graph.
