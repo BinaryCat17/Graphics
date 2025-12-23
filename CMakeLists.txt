@@ -129,7 +129,7 @@ target_link_libraries(foundation_config PUBLIC foundation_platform foundation_lo
 
 # Scene
 add_library(engine_scene STATIC 
-    "src/engine/scene/scene_system.c"
+    "src/engine/scene/scene.c"
     "src/engine/scene/internal/scene_graph.c"
     "src/engine/scene/internal/scene_loader.c"
 )
