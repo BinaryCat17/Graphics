@@ -8,16 +8,16 @@
 // --- View Model Management ---
 
 MathNodeView* math_editor_add_view(MathEditor* editor, MathNodeId id, float x, float y) {
-    if (editor->node_views_count >= editor->node_view_cap) {
-        uint32_t new_cap = editor->node_view_cap ? editor->node_view_cap * 2 : 16;
+    if (editor->view->node_views_count >= editor->view->node_view_cap) {
+        uint32_t new_cap = editor->view->node_view_cap ? editor->view->node_view_cap * 2 : 16;
         MathNodeView* new_arr = arena_alloc_zero(&editor->graph_arena, new_cap * sizeof(MathNodeView));
-        if (editor->node_views) {
-            memcpy(new_arr, editor->node_views, editor->node_views_count * sizeof(MathNodeView));
+        if (editor->view->node_views) {
+            memcpy(new_arr, editor->view->node_views, editor->view->node_views_count * sizeof(MathNodeView));
         }
-        editor->node_views = new_arr;
-        editor->node_view_cap = new_cap;
+        editor->view->node_views = new_arr;
+        editor->view->node_view_cap = new_cap;
     }
-    MathNodeView* view = &editor->node_views[editor->node_views_count++];
+    MathNodeView* view = &editor->view->node_views[editor->view->node_views_count++];
     view->node_id = id;
     view->x = x;
     view->y = y;
@@ -25,9 +25,9 @@ MathNodeView* math_editor_add_view(MathEditor* editor, MathNodeId id, float x, f
 }
 
 MathNodeView* math_editor_find_view(MathEditor* editor, MathNodeId id) {
-    for(uint32_t i=0; i<editor->node_views_count; ++i) {
-        if (editor->node_views[i].node_id == id) {
-            return &editor->node_views[i];
+    for(uint32_t i=0; i<editor->view->node_views_count; ++i) {
+        if (editor->view->node_views[i].node_id == id) {
+            return &editor->view->node_views[i];
         }
     }
     return NULL;
@@ -50,8 +50,8 @@ static int get_node_input_count(MathNodeType type) {
 }
 
 void math_editor_sync_view_data(MathEditor* editor) {
-    for(uint32_t i=0; i<editor->node_views_count; ++i) {
-        MathNodeView* view = &editor->node_views[i];
+    for(uint32_t i=0; i<editor->view->node_views_count; ++i) {
+        MathNodeView* view = &editor->view->node_views[i];
         // Use internal accessor (visible via math_graph_internal.h)
         MathNode* node = math_graph_get_node(editor->graph, view->node_id);
         if(node) {
@@ -80,7 +80,7 @@ void math_editor_sync_view_data(MathEditor* editor) {
 // --- UI Sync ---
 
 void math_editor_refresh_graph_view(MathEditor* editor) {
-    SceneNode* root = scene_tree_get_root(editor->ui_instance);
+    SceneNode* root = scene_tree_get_root(editor->view->ui_instance);
     if (!root) return;
     
     // Sync data before rebuild
@@ -89,7 +89,7 @@ void math_editor_refresh_graph_view(MathEditor* editor) {
     SceneNode* canvas = scene_node_find_by_id(root, "canvas_area");
     if (canvas) {
         // Declarative Refresh
-        ui_node_rebuild_children(canvas, editor->ui_instance);
+        ui_node_rebuild_children(canvas, editor->view->ui_instance);
     }
 }
 
@@ -97,24 +97,24 @@ void math_editor_update_selection(MathEditor* editor) {
     if (!editor) return;
 
     // 1. Update ViewModel (Selection Array)
-    editor->selected_nodes_count = 0;
-    if (editor->selected_node_id != MATH_NODE_INVALID_ID) {
-        MathNode* node = math_graph_get_node(editor->graph, editor->selected_node_id);
+    editor->view->selected_nodes_count = 0;
+    if (editor->view->selected_node_id != MATH_NODE_INVALID_ID) {
+        MathNode* node = math_graph_get_node(editor->graph, editor->view->selected_node_id);
         if (node) {
-            editor->selected_nodes[0] = node;
-            editor->selected_nodes_count = 1;
+            editor->view->selected_nodes[0] = node;
+            editor->view->selected_nodes_count = 1;
         }
     }
     
-    editor->has_selection = (editor->selected_nodes_count > 0);
-    editor->no_selection = !editor->has_selection;
+    editor->view->has_selection = (editor->view->selected_nodes_count > 0);
+    editor->view->no_selection = !editor->view->has_selection;
 
     // 2. Trigger UI Rebuild for Inspector
-    SceneNode* root = scene_tree_get_root(editor->ui_instance);
+    SceneNode* root = scene_tree_get_root(editor->view->ui_instance);
     if (root) {
         SceneNode* inspector = scene_node_find_by_id(root, "inspector_area");
         if (inspector) {
-             ui_node_rebuild_children(inspector, editor->ui_instance);
+             ui_node_rebuild_children(inspector, editor->view->ui_instance);
         }
     }
 }
@@ -126,9 +126,9 @@ void math_editor_update_selection(MathEditor* editor) {
 #define LAYER_OFFSET_PORT    0.020f
 
 void math_editor_sync_wires(MathEditor* editor) {
-    if (!editor || !editor->wires) return;
+    if (!editor || !editor->view->wires) return;
 
-    editor->wires_count = 0;
+    editor->view->wires_count = 0;
 
     for (uint32_t i = 0; i < editor->graph->node_count; ++i) {
         MathNode* target_node = math_graph_get_node(editor->graph, i);
@@ -144,9 +144,9 @@ void math_editor_sync_wires(MathEditor* editor) {
             MathNodeView* source_view = math_editor_find_view(editor, source_id);
             if (!source_view) continue;
 
-            if (editor->wires_count >= editor->wires_cap) break;
+            if (editor->view->wires_count >= editor->view->wires_cap) break;
 
-            MathWireView* wire = &editor->wires[editor->wires_count++];
+            MathWireView* wire = &editor->view->wires[editor->view->wires_count++];
             
             // Output Port is usually on the right side of the node
             float start_x = source_view->x + NODE_WIDTH + NODE_PORT_SIZE * 0.5f;

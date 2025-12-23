@@ -58,7 +58,7 @@ children:
       padding: 20
     bindings:
       - target: "visible"
-        source: "no_selection"
+        source: "view.no_selection"
     style:
       color: "#26262B"
     children:
@@ -82,7 +82,7 @@ children:
       color: "#26262B"
     bindings:
       - target: "visible"
-        source: "has_selection"
-    collection: "selected_nodes"
+        source: "view.has_selection"
+    collection: "view.selected_nodes"
     template_selector: "type"
     item_template: "DefaultNodeInspector"

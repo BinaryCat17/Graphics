@@ -11,16 +11,18 @@
 
 // --- Helper Functions ---
 
-static SceneNodeKind parse_kind(const char* type_str, uint32_t* out_flags);
+static SceneNodeKind parse_kind(const char* type_str);
 
-static SceneNodeKind parse_kind(const char* type_str, uint32_t* out_flags) {
-    *out_flags = SCENE_NODE_NONE;
+static SceneNodeKind parse_kind(const char* type_str) {
     if (!type_str) return SCENE_NODE_KIND_CONTAINER;
 
-    if (strcmp(type_str, "text") == 0) return SCENE_NODE_KIND_TEXT;
-    if (strcmp(type_str, "viewport") == 0) return SCENE_NODE_KIND_VIEWPORT;
+    const MetaEnum* kind_enum = meta_get_enum("SceneNodeKind");
+    int val = 0;
+    if (kind_enum && meta_enum_get_value(kind_enum, type_str, &val)) {
+        return (SceneNodeKind)val;
+    }
     
-    // Default to container for everything else (including 'container')
+    // Default to container for everything else
     return SCENE_NODE_KIND_CONTAINER;
 }
 
@@ -155,7 +157,7 @@ static SceneNodeSpec* load_recursive(SceneAsset* asset, const ConfigNode* node) 
 
         if (strcmp(key, "type") == 0) {
              if (scene_asset_get_template(asset, val->scalar) == NULL) {
-                 spec->kind = parse_kind(val->scalar, &spec->flags);
+                 spec->kind = parse_kind(val->scalar);
              }
              continue;
         }

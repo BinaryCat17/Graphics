@@ -74,18 +74,9 @@ typedef struct MathNodePaletteItem {
     int type;               // REFLECT (MathNodeType)
 } MathNodePaletteItem;
 
-// The State of the Graph Editor Feature
-typedef struct MathEditor {
-    MathGraph* graph;
-    MemoryArena graph_arena;
-    
-    // UI State
-    SceneAsset* ui_asset;
-    SceneTree* ui_instance; // Manages UI Element memory
-    UiInputContext* input_ctx;
-    
+// --- Graph View (The "V" in MVC) ---
+typedef struct MathGraphView {
     // ViewModel Data
-    // We store views in a parallel array/pool. For simplicity, dynamic array in arena.
     MathNodeView* node_views;   // REFLECT
     uint32_t node_views_count;  // REFLECT
     uint32_t node_view_cap;
@@ -93,16 +84,15 @@ typedef struct MathEditor {
     MathWireView* wires;        // REFLECT
     uint32_t wires_count;       // REFLECT
     uint32_t wires_cap;
-
-    // Palette Data
-    MathNodePaletteItem** palette_items; // REFLECT
-    size_t palette_items_count;          // REFLECT
+    
+    // UI State (Owned by View)
+    SceneAsset* ui_asset;
+    SceneTree* ui_instance; // Manages UI Element memory
+    UiInputContext* input_ctx;
 
     // Selection
     MathNodeId selected_node_id;
-    bool selection_dirty; 
-    bool graph_dirty;
-    uint32_t current_pipeline; // Vulkan Compute Pipeline ID
+    bool selection_dirty;
 
     // UI Binding for Inspector (Polymorphic List of 0 or 1 item)
     MathNode** selected_nodes;   // REFLECT
@@ -110,6 +100,21 @@ typedef struct MathEditor {
     
     bool has_selection;          // REFLECT (helper for UI visibility)
     bool no_selection;           // REFLECT (helper for UI visibility)
+} MathGraphView;
+
+// The State of the Graph Editor Feature (The "C" in MVC)
+typedef struct MathEditor {
+    MathGraph* graph;
+    MemoryArena graph_arena;
+    
+    MathGraphView* view; // REFLECT
+    
+    // Palette Data (Logic/Toolbox)
+    MathNodePaletteItem** palette_items; // REFLECT
+    size_t palette_items_count;          // REFLECT
+
+    bool graph_dirty;
+    uint32_t current_pipeline; // Vulkan Compute Pipeline ID
 } MathEditor;
 
 #endif // MATH_EDITOR_INTERNAL_H

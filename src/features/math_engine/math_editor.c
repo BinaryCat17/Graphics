@@ -108,11 +108,11 @@ UI_COMMAND(cmd_clear_graph, MathEditor) {
     // 2. Clear View
     // We don't free node_views memory, just reset count. 
     // The memory will be reused.
-    ctx->node_views_count = 0;
+    ctx->view->node_views_count = 0;
     
     // 3. Clear Selection
-    ctx->selected_node_id = MATH_NODE_INVALID_ID;
-    ctx->selection_dirty = true; // Trigger inspector clear
+    ctx->view->selected_node_id = MATH_NODE_INVALID_ID;
+    ctx->view->selection_dirty = true; // Trigger inspector clear
     
     // 4. Trigger UI Refresh
     math_editor_refresh_graph_view(ctx);
@@ -250,25 +250,28 @@ MathEditor* math_editor_create(Engine* engine) {
     MathEditor* editor = (MathEditor*)calloc(1, sizeof(MathEditor));
     if (!editor) return NULL;
 
-    // Allocate selection array (Capacity 1 for now)
-    editor->selected_nodes = (MathNode**)calloc(1, sizeof(MathNode*));
-
     // 1. Init Memory
     arena_init(&editor->graph_arena, 1024 * 1024); // 1MB for Graph Data
     // Use factory function (Heap alloc via Arena)
     editor->graph = math_graph_create(&editor->graph_arena);
+
+    // Init View
+    editor->view = arena_alloc_zero(&editor->graph_arena, sizeof(MathGraphView));
+    
+    // Allocate selection array (Capacity 1 for now)
+    editor->view->selected_nodes = (MathNode**)calloc(1, sizeof(MathNode*));
     
     // Wires Buffer
-    editor->wires_cap = 1024;
-    editor->wires = arena_alloc_zero(&editor->graph_arena, editor->wires_cap * sizeof(MathWireView));
+    editor->view->wires_cap = 1024;
+    editor->view->wires = arena_alloc_zero(&editor->graph_arena, editor->view->wires_cap * sizeof(MathWireView));
 
-    editor->node_views = NULL;
-    editor->node_views_count = 0;
-    editor->node_view_cap = 0;
+    editor->view->node_views = NULL;
+    editor->view->node_views_count = 0;
+    editor->view->node_view_cap = 0;
     
-    editor->selected_node_id = MATH_NODE_INVALID_ID;
-    editor->has_selection = false;
-    editor->no_selection = true;
+    editor->view->selected_node_id = MATH_NODE_INVALID_ID;
+    editor->view->has_selection = false;
+    editor->view->no_selection = true;
     
     // 2. Setup Default Data
     math_editor_load_graph(editor, "assets/ui/default_graph.yaml");
@@ -286,7 +289,7 @@ MathEditor* math_editor_create(Engine* engine) {
     
     // ui_register_provider("GraphNetwork", math_graph_view_provider); // Removed: All UI is declarative now
 
-    editor->input_ctx = ui_input_create();
+    editor->view->input_ctx = ui_input_create();
 
     // 4. Load UI Asset
     const char* ui_path_raw = engine_get_config(engine)->ui_path; 
@@ -304,17 +307,17 @@ MathEditor* math_editor_create(Engine* engine) {
     }
 
     if (ui_rel_path) {
-        editor->ui_asset = assets_load_scene(engine_get_assets(engine), ui_rel_path);
-        if (!editor->ui_asset) {
+        editor->view->ui_asset = assets_load_scene(engine_get_assets(engine), ui_rel_path);
+        if (!editor->view->ui_asset) {
              LOG_ERROR("Failed to load UI asset: %s (Raw: %s)", ui_rel_path, ui_path_raw);
         }
     } else {
-        editor->ui_asset = NULL;
+        editor->view->ui_asset = NULL;
     }
 
-    editor->ui_instance = scene_tree_create(editor->ui_asset, 1024 * 1024); // 1MB for UI Elements
+    editor->view->ui_instance = scene_tree_create(editor->view->ui_asset, 1024 * 1024); // 1MB for UI Elements
 
-    if (editor->ui_asset) {
+    if (editor->view->ui_asset) {
             // NOTE: We now bind MathEditor, not MathGraph!
             const MetaStruct* editor_meta = meta_get_struct("MathEditor");
             if (!editor_meta) {
@@ -322,12 +325,12 @@ MathEditor* math_editor_create(Engine* engine) {
             }
             
             // Build Static UI from Asset into Instance
-            SceneNode* root = ui_node_create(editor->ui_instance, scene_asset_get_root(editor->ui_asset), editor, editor_meta);
-            scene_tree_set_root(editor->ui_instance, root);
+            SceneNode* root = ui_node_create(editor->view->ui_instance, scene_asset_get_root(editor->view->ui_asset), editor, editor_meta);
+            scene_tree_set_root(editor->view->ui_instance, root);
             
             // Initial Select
-            if (editor->node_views_count > 0) {
-                editor->selected_node_id = editor->node_views[0].node_id;
+            if (editor->view->node_views_count > 0) {
+                editor->view->selected_node_id = editor->view->node_views[0].node_id;
                 math_editor_update_selection(editor);
             }
     }
@@ -349,10 +352,10 @@ MathEditor* math_editor_create(Engine* engine) {
 #include "engine/scene/render_packet.h"
 
 void math_editor_render(MathEditor* editor, Scene* scene, const struct Assets* assets, MemoryArena* arena) {
-    if (!editor || !scene || !editor->ui_instance) return;
+    if (!editor || !scene || !editor->view->ui_instance) return;
 
     // Delegate entire rendering to UI system.
-    ui_system_render(editor->ui_instance, scene, assets, arena);
+    ui_system_render(editor->view->ui_instance, scene, assets, arena);
 }
 
 void math_editor_update(MathEditor* editor, Engine* engine) {
@@ -371,7 +374,7 @@ void math_editor_update(MathEditor* editor, Engine* engine) {
          }
     }
 
-    SceneNode* root = scene_tree_get_root(editor->ui_instance);
+    SceneNode* root = scene_tree_get_root(editor->view->ui_instance);
 
     // UI Update Loop
     if (root) {
@@ -379,14 +382,14 @@ void math_editor_update(MathEditor* editor, Engine* engine) {
         ui_node_update(root, engine_get_dt(engine));
         
         // Input Handling
-        ui_input_update(editor->input_ctx, root, engine_get_input_system(engine));
+        ui_input_update(editor->view->input_ctx, root, engine_get_input_system(engine));
         
         // Sync Wires AFTER input (so they attach to new node positions)
         math_editor_sync_wires(editor);
         
         // Process Events
         UiEvent evt;
-        while (ui_input_pop_event(editor->input_ctx, &evt)) {
+        while (ui_input_pop_event(editor->view->input_ctx, &evt)) {
             switch (evt.type) {
                 case UI_EVENT_VALUE_CHANGE:
                 case UI_EVENT_DRAG_END:
@@ -405,8 +408,8 @@ void math_editor_update(MathEditor* editor, Engine* engine) {
 
                         if (data && meta && strcmp(meta->name, "MathNodeView") == 0) {
                             MathNodeView* v = (MathNodeView*)data;
-                            editor->selected_node_id = v->node_id;
-                            editor->selection_dirty = true;
+                            editor->view->selected_node_id = v->node_id;
+                            editor->view->selection_dirty = true;
                             LOG_INFO("Selected Node: %d", v->node_id);
                             break;
                         }
@@ -418,18 +421,18 @@ void math_editor_update(MathEditor* editor, Engine* engine) {
         }
         
         // Lazy Inspector Rebuild
-        if (editor->selection_dirty) {
+        if (editor->view->selection_dirty) {
             math_editor_update_selection(editor);
-            editor->selection_dirty = false;
+            editor->view->selection_dirty = false;
         }
         
         // Layout
         PlatformWindowSize size = platform_get_framebuffer_size(engine_get_window(engine));
-        ui_system_layout(editor->ui_instance, (float)size.width, (float)size.height, render_system_get_frame_count(engine_get_render_system(engine)), text_measure_wrapper, (void*)assets_get_font(engine_get_assets(engine)));
+        ui_system_layout(editor->view->ui_instance, (float)size.width, (float)size.height, render_system_get_frame_count(engine_get_render_system(engine)), text_measure_wrapper, (void*)assets_get_font(engine_get_assets(engine)));
     }
 
     // Graph Evaluation (Naive interpretation on CPU for debugging/node values)
-    if (editor->graph && (editor->graph_dirty || editor->selection_dirty)) { 
+    if (editor->graph && (editor->graph_dirty || editor->view->selection_dirty)) { 
         for (uint32_t i = 0; i < editor->graph->node_count; ++i) { 
             const MathNode* n = math_graph_get_node(editor->graph, i);
             if (n && n->type != MATH_NODE_NONE) {
@@ -448,17 +451,18 @@ void math_editor_update(MathEditor* editor, Engine* engine) {
 void math_editor_destroy(MathEditor* editor) {
     if (!editor) return;
     
-    ui_input_destroy(editor->input_ctx);
-    scene_tree_destroy(editor->ui_instance);
+    if (editor->view) {
+        ui_input_destroy(editor->view->input_ctx);
+        scene_tree_destroy(editor->view->ui_instance);
+        if (editor->view->ui_asset) scene_asset_destroy(editor->view->ui_asset);
+        if (editor->view->selected_nodes) free((void*)editor->view->selected_nodes);
+    }
     
     // Explicitly destroy graph resources (pool, ptrs)
     math_graph_destroy(editor->graph);
     
     arena_destroy(&editor->graph_arena);
     
-    if (editor->ui_asset) scene_asset_destroy(editor->ui_asset);
-
-    if (editor->selected_nodes) free((void*)editor->selected_nodes);
     if (editor->palette_items) {
         // Items are in arena, but array pointer might be arena or heap? 
         // config_load_struct_array uses arena. So no free needed for palette_items if arena is destroyed.
