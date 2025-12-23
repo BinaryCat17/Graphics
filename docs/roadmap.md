@@ -1,10 +1,3 @@
----
-
-### 📅 Обновленный `docs/roadmap.md`
-
-Я разбил план на фазы, чтобы переход был плавным. Самая важная сейчас — **Phase 1**.
-
-```markdown
 # Project Roadmap: Evolution to v1.0
 
 **Current Status:** Architectural Refactoring (Transition to v0.9)
