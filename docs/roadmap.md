@@ -58,10 +58,10 @@ Structural standardization (Phase 6) is largely complete, but critical limitatio
 
 ### Phase 3.6: Architecture Hardening (Cleanup)
 **Objective:** Solidify the foundation after the "Great Merge" of UI and Scene systems. Remove "construction debris" and ensure the engine is truly 3D-ready, not just a UI engine wrapper.
-- [ ] **Refactor: Loader Decoupling:** Remove UI-specific hardcoding from `scene_loader.c`.
-    *   Remove legacy bindings support (`bind_x`, `bind_y`) in favor of the generic `bindings` array.
-    *   Remove default UI values (layout/style) from the parser; let the `UiSystem` apply defaults.
-- [ ] **Optimization: Asset Caching:** Implement a global `SceneAssetCache` (Path -> Asset*) to prevent re-parsing the same YAML templates (e.g., ports, nodes) multiple times.
+- [x] **Refactor: Loader Decoupling:** Remove UI-specific hardcoding from `scene_loader.c`.
+    *   [x] Remove legacy bindings support (`bind_x`, `bind_y`) in favor of the generic `bindings` array.
+    *   [ ] Remove default UI values (layout/style) from the parser; let the `UiSystem` apply defaults.
+- [x] **Optimization: Asset Caching:** Implement a global `SceneAssetCache` (Path -> Asset*) to prevent re-parsing the same YAML templates (e.g., ports, nodes) multiple times.
 - [ ] **Refactor: Data-Driven Node Kinds:** Replace hardcoded string checks (`strcmp("text")`) in the parser with a reflection-based or hash-based lookup for `SceneNodeKind`.
 - [ ] **Feature: 3D Input (Raycasting):** Replace 2D `point_in_rect` hit-testing with Ray-AABB/Plane intersection.
     *   Support clicking on nodes rotated via `world_matrix`.
