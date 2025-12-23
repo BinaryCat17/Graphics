@@ -1,78 +1,66 @@
-# Architecture Guide
+# Architecture Overview
 
-**Version:** 0.8.0
-**Philosophy:** Data-Oriented, C11, Zero-Allocation Loop.
-
----
-
-## 1. The "Layered Cake" Structure
-The engine enforces a strict unidirectional dependency flow (Downwards only).
-
-1.  **🧱 Foundation** (`src/foundation`):
-    * *Role:* Zero-dependency bedrock.
-    * **Memory:** `MemoryArena` (linear) & `MemoryPool` (fixed-block). No `malloc` in hot paths.
-    * **Meta:** Reflection system (`codegen.py`) for UI binding and serialization.
-    * **Platform:** OS abstractions (Window, Input, FS, Threading).
-
-2.  **⚙️ Engine** (`src/engine`):
-    * *Role:* Core systems for interactive applications.
-    * **Core:** Main loop, specialized allocators.
-    * **Scene:** Unified world representation (UI + 3D).
-    * **Graphics:** Stateless Vulkan backend consuming `RenderFramePacket`.
-    * **UI:** Layout engine (Flexbox-like) and Event Bubbling.
-    * **Input:** Action mapping and event queue.
-
-3.  **🧩 Features** (`src/features`):
-    * *Role:* Reusable domain-specific logic.
-    * **Math Engine:** Node graph editor, Shader IR generation, Transpiler.
-
-4.  **🚀 App** (`src/app`):
-    * *Role:* Entry point. Orchestrates Engine and Features.
+**Philosophy:** Data-Oriented Design (DOD) | C11 | Zero-Allocation Loop
+**Target:** High-Performance Interactive Tools & Visualization
 
 ---
 
-## 2. Interface Standards (Public vs Internal)
+## 1. Core Philosophy
+The engine ignores traditional OOP hierarchies. Instead, it focuses on **Data Transformations**.
+*   **Data > Objects:** We process homogenous arrays of data, not individual objects.
+*   **Frame Transient:** Most memory used in a frame is valid *only* for that frame. We use linear allocators (Arenas) that reset continuously.
+*   **Separation of Concerns:** The Logic Layer (Scene Graph) knows nothing about the GPU. The Render Layer (Backend) knows nothing about game logic.
+
+## 2. Global Data Flow (The Pipeline)
+The engine executes a strict unidirectional pipeline every frame:
+
+```text
+[INPUT] -> [LOGIC UPDATE] -> [EXTRACTION] -> [BACKEND RENDER]
+```
+
+### Phase A: Logic Update (CPU)
+*   **Input Processing:** Raw OS events are converted into logical Actions.
+*   **Graph Evaluation:** The Math Engine processes the node graph to update values.
+*   **Scene Hierarchy:** The Logical Scene (Tree) is updated. Local and World transforms are recalculated here.
+*   **Output:** A dirty Scene Tree and updated application state.
+
+### Phase B: Extraction (The Bridge)
+This is the synchronization point.
+The engine traverses the Logical Scene and "extracts" visual data into a RenderPacket.
+*   **Culling:** Invisible objects are discarded.
+*   **Sorting & Binning:** Objects are sorted by material/depth and placed into specific "Buckets" (e.g., UI, Opaque 3D, Transparent).
+*   **Output:** An immutable RenderFramePacket stored in temporary memory.
+
+### Phase C: Backend Render (GPU)
+The Backend consumes the RenderFramePacket.
+It is stateless: it builds command buffers from scratch every frame based only on the packet.
+It executes distinct Render Passes (Compute -> Shadow -> World -> UI).
+
+## 3. System Architecture
+🧱 Foundation Layer
+Zero-dependency utilities.
+*   **Memory:** Arena (Linear) and Pool (Chunked) allocators.
+*   **Meta:** Reflection system for serialization and UI binding.
+*   **Platform:** OS abstraction (Window, Files, Threads).
+
+⚙️ Engine Layer
+*   **Scene System:** A unified logical hierarchy. To the user, a UI Button and a 3D Cube are just Nodes.
+*   **UI System:** Layout engine and event bubbling. It operates on the Scene Tree.
+*   **Render System:** Manages the Extraction phase and hands data to the Backend.
+
+🧩 Feature Layer
+Math Engine: Domain-specific logic. It compiles node graphs into Bytecode or Shaders. It runs asynchronously to avoid stalling the UI.
+
+## 4. Key Concepts
+The "Unified" Logical Scene
+To the developer, there is only one world. You can attach a UI Label to a 3D Cube. The hierarchy handles coordinate transformations automatically. The separation into 2D/3D only happens strictly during the Extraction phase.
+
+Asynchronous Compute
+Heavy operations (Shader compilation, Geometry generation) are offloaded to a Job System. The main loop never blocks waiting for these. Placeholders are rendered until results are ready.
+
+## 5. Interface Standards (Public vs Internal)
 We strictly separate API from Implementation to prevent spaghetti code.
 
-* **Root (`module.h`):** Defines *what* the module does. Opaque handles (`typedef struct X X;`).
-* **Internal (`internal/module_internal.h`):** Defines *how* it works. Full struct definitions.
-* **Rule:** External code includes `module.h`. Implementation includes `internal/*.h`.
-
----
-
-## 3. Subsystems Deep Dive
-
-### 🎬 The Unified Scene
-Everything is a `SceneObject`. We do not have separate 2D and 3D renderers.
-* **Storage:** Single linear `MemoryArena` reset every frame.
-* **Polymorphism:** `SceneObject` uses an anonymous `union` to store data for UI (rects) or 3D (meshes).
-* **Benefit:** Unified sorting, culling, and resource management.
-
-### 🖼️ Graphics & Render Packet
-Decoupled Logic from Rendering using **Double Buffering**.
-1.  **Logic Step:** Builds a `Scene` in Arena A.
-2.  **Submit:** Wraps `Scene` in `RenderFramePacket`.
-3.  **Render Step:** Backend draws Arena A while Logic starts building Arena B.
-* **Backend:** Stateless Vulkan. Rebuilds command buffers every frame. Supports Compute Pipelines.
-
-### ⌨️ Input System
-* **Layer:** Decoupled from GLFW.
-* **Events:** Queue-based (Pressed, Released, Typed).
-* **Mapping:** Logical Actions ("Undo", "CamRotate") mapped to physical keys.
-
-### 🧠 Reflection & Binding
-* **Codegen:** Python script scans headers for `// REFLECT` and generates metadata C code.
-* **UI Binding:** UI elements bind to C structs via string paths (e.g., `target: "transform.pos.x"`).
-* **Safety:** Allows building generic inspectors without manual boilerplate.
-
-### 🧮 Math Engine (Feature)
-* **Graph:** Node-based data flow.
-* **IR:** Compiles graph to custom Bytecode (ShaderIR).
-* **Transpiler:** Converts IR to GLSL/SPIR-V for GPU Compute execution.
-
----
-
-## 4. Memory Strategy
-* **Frame Arena:** Temporary data (packet generation, string formatting). Reset every frame. O(1).
-* **Scene Assets:** Persistent data (Meshes, Textures). Loaded once.
-* **Pools:** Fixed-size objects (Graph Nodes) that need stable pointers but dynamic lifetime.
+Root (module.h): Defines what the module does. Opaque handles (typedef struct X X;).
+Internal (internal/module_internal.h): Defines how it works. Full struct definitions.
+Rule: External code includes module.h. Implementation includes internal/*.h.

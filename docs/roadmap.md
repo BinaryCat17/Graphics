@@ -1,43 +1,61 @@
-# Project Roadmap
+---
 
-**Current Focus:** Phase 7 - 3D Visualization & Compute
-**Status:** Architecture Refactoring Complete (v0.7.1)
+### 📅 Обновленный `docs/roadmap.md`
+
+Я разбил план на фазы, чтобы переход был плавным. Самая важная сейчас — **Phase 1**.
+
+```markdown
+# Project Roadmap: Evolution to v1.0
+
+**Current Status:** Architectural Refactoring (Transition to v0.9)
+**Goal:** High-Performance Visualization Engine
 
 ---
 
-## 📅 Active Development (Phase 7: 3D Visualization)
-*Objective: Transition from 2D UI Graphs to procedural 3D Geometry.*
+## 🚨 Phase 1: The Great Split (Critical Architecture Fix)
+*Objective: Separate UI and 3D rendering to fix sorting and performance issues.*
 
-### 🛠 Core Tech
-- [ ] **SceneObjectProvider API:** Create an interface to inject 3D objects into the UI scene without hardcoding (for the Viewport).
-- [ ] **Compute Grid:** Implement `MATH_NODE_SURFACE_GRID` producing a heightmap texture via Compute Shader.
-- [ ] **Async Shader Compilation:** Move `glslc` calls to a worker thread to prevent UI freezes.
+- [ ] **Render Packet Refactor:**
+    - Create specialized structs: `UiBatchCmd` (for 2D) and `MeshDrawCmd` (for 3D).
+    - Rewrite `RenderFramePacket` to contain separate buckets (lists) for UI and World.
+- [ ] **Extraction Layer:**
+    - Implement `scene_extract()` to walk the Logical Graph and populate these buckets.
+- [ ] **Transient Geometry System:**
+    - Implement a `DynamicVertexBuffer` in the Frame Arena.
+    - Rewrite `text_renderer.c` to write vertices directly to this buffer instead of creating Objects.
+- [ ] **Multi-Pass Renderer:**
+    - Modify `vulkan_renderer.c` to execute passes sequentially:
+        1. `WorldPass` (Perspective, Depth ON).
+        2. `UiPass` (Ortho, Depth OFF).
 
-### 🎥 3D Interaction (Crucial)
-- [ ] **Arcball Camera:** Implement an orbital camera for the 3D viewport (Rotate/Pan/Zoom).
-- [ ] **Raycasting System:**
-    * Implement `SceneRaycaster` to replace simple 2D `point_in_rect`.
-    * Support Ray-AABB/Sphere intersections for selecting 3D nodes.
-    * Coordinate space conversion (Screen -> World -> Local).
-- [ ] **3D Gizmos:** Render transformation handles (Arrows/Rings) for manipulating 3D objects.
+## ⚡ Phase 2: Asynchronous Core
+*Objective: Make the editor responsive; eliminate UI freezes.*
 
----
+- [ ] **Job System:**
+    - Implement a simple thread pool (`foundation/thread/job_system.c`).
+- [ ] **Async Compiler:**
+    - Move `glslc` calls to a background job.
+    - Implement "Placeholder" rendering (show a spinner node while compiling).
+- [ ] **Intermediate Representation (IR):**
+    - Refactor `transpiler.c` to produce linear bytecode instead of direct string concatenation.
 
-## 🔮 Backlog & Future Improvements
+## 🎥 Phase 3: 3D Visualization Support
+*Objective: Make the 3D Viewport actually useful.*
 
-### 🏗 Architecture & Stability (Phase 6.5)
-- [ ] **Input System Refactor:** Use `StringId` hashes instead of string comparisons for Actions.
-- [ ] **Reflection Hardening:** Improve `codegen.py` robustness against complex C syntax.
-- [ ] **Renderer Modularization:** Split `vulkan_renderer.c` into `vk_texture`, `vk_compute`, `vk_pipeline`.
-- [ ] **UTF-8 Support:** Full Unicode support in Text Renderer and Input.
+- [ ] **Camera Controller:**
+    - Implement Arcball (Orbit) camera logic, distinct from UI scrolling.
+- [ ] **3D Gizmos:**
+    - Implement Translation/Rotation/Scale handles using the `WorldPass`.
+- [ ] **Raycasting:**
+    - Implement Ray-AABB intersection for 3D object selection.
 
-### 🖥 UI & Editor Experience
-- [ ] **Focus Management:** Implement a `FocusStack` for modals and overlapping windows.
-- [ ] **Typed Events:** Allow UI events to carry complex payloads (not just signals).
-- [ ] **Undo/Redo:** Command history for Graph operations.
-- [ ] **Node Library:** Expand with Trigonometry, Noise (Perlin), and Vector Math.
+## 🛠 Phase 4: Polish & Stability
+*Objective: Production-ready features.*
 
-### 🚀 Advanced Graphics (v1.0+)
-- [ ] **Retained Mode 3D:** Optimization for static geometry (don't upload vertices every frame).
-- [ ] **PBR Materials:** Implement basic Physically Based Rendering (Roughness/Metalness).
-- [ ] **Shadow Mapping:** Basic directional shadows for the 3D viewport.
+- [ ] **Reflection V2:**
+    - Update `codegen.py` to generate byte offsets for structs.
+    - Replace `strcmp` in `ui_binding.c` with direct pointer arithmetic.
+- [ ] **Undo/Redo:**
+    - Implement a Command History stack for Graph operations.
+- [ ] **Binary Assets:**
+    - Create a build step to pack YAML/Shaders into binary blobs.
