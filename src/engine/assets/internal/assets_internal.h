@@ -14,7 +14,7 @@ typedef struct CachedScene {
     SceneAsset* asset;
 } CachedScene;
 
-struct Assets {
+typedef struct Assets {
     MemoryArena arena; // For storing paths and metadata
 
     // Resource Paths
@@ -27,6 +27,6 @@ struct Assets {
     // Cache
     CachedScene cached_scenes[MAX_CACHED_SCENES];
     size_t cached_scene_count;
-};
+} Assets;
 
 #endif // ASSETS_INTERNAL_H

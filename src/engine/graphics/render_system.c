@@ -17,13 +17,13 @@
 #include "engine/ui/ui_node.h" // NEW
 #include "engine/graphics/compute_graph.h"
 
-struct RenderSystem {
+typedef struct RenderSystem {
     // Dependencies
     Assets* assets;
 
     // Internal State
     PlatformWindow* window;
-    struct RendererBackend* backend;
+    RendererBackend* backend;
     Stream* gpu_input_stream; 
     Stream* ui_instance_stream; 
     GpuInstanceData* ui_cpu_buffer;
@@ -47,7 +47,7 @@ struct RenderSystem {
     double current_time;
     
     uint64_t frame_count;
-};
+} RenderSystem;
 
 // ... Helper: Packet Management ...
 

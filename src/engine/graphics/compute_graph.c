@@ -8,10 +8,10 @@
 
 // --- Structures ---
 
-struct ComputeDoubleBuffer {
+typedef struct ComputeDoubleBuffer {
     Stream* streams[2];
     int read_index; // 0 or 1
-};
+} ComputeDoubleBuffer;
 
 typedef enum {
     RESOURCE_STREAM,
@@ -19,7 +19,7 @@ typedef enum {
     RESOURCE_DOUBLE_BUFFER_WRITE
 } ResourceType;
 
-typedef struct {
+typedef struct ComputeResource {
     uint32_t binding;
     ResourceType type;
     union {
@@ -28,7 +28,7 @@ typedef struct {
     };
 } ComputeResource;
 
-struct ComputePass {
+typedef struct ComputePass {
     uint32_t pipeline_id;
     uint32_t group_x;
     uint32_t group_y;
@@ -40,13 +40,13 @@ struct ComputePass {
     ComputeResource* resources;
     size_t resource_count;
     size_t resource_capacity;
-};
+} ComputePass;
 
-struct ComputeGraph {
+typedef struct ComputeGraph {
     ComputePass** passes;
     size_t pass_count;
     size_t pass_capacity;
-};
+} ComputeGraph;
 
 // --- Double Buffer ---
 

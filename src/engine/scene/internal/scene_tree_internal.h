@@ -65,7 +65,7 @@ typedef struct SceneBindingSpec {
 
 // --- SPECIFICATION ---
 
-struct SceneNodeSpec {
+typedef struct SceneNodeSpec {
     // 1. Identity
     StringId id;            // REFLECT
     int kind;               // REFLECT (SceneNodeKind)
@@ -103,11 +103,11 @@ struct SceneNodeSpec {
     
     // Extensibility
     void* system_spec; 
-};
+} SceneNodeSpec;
 
 // --- RUNTIME NODE ---
 
-struct SceneNode {
+typedef struct SceneNode {
     const SceneNodeSpec* spec; // The DNA
     
     // Hierarchy
@@ -159,16 +159,16 @@ struct SceneNode {
     uint32_t flags;             // Runtime flags (SceneFlags)
     uint32_t interaction_flags; // Runtime flags (SceneInteractionFlags)
     uint32_t ui_flags;          // Runtime flags (UiFlags)
-};
+} SceneNode;
 
 // --- SCENE TREE ---
 
-struct SceneTree {
+typedef struct SceneTree {
     MemoryArena arena;
     MemoryPool* node_pool; 
     SceneNode* root;
     SceneAsset* assets;
-};
+} SceneTree;
 
 // --- ASSET ---
 
@@ -178,10 +178,10 @@ typedef struct SceneTemplate {
     struct SceneTemplate* next;
 } SceneTemplate;
 
-struct SceneAsset {
+typedef struct SceneAsset {
     MemoryArena arena;
     SceneNodeSpec* root;
     SceneTemplate* templates;
-};
+} SceneAsset;
 
 #endif // SCENE_TREE_INTERNAL_H

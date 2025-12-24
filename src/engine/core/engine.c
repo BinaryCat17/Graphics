@@ -15,7 +15,7 @@
 #include <string.h>
 #include <stdlib.h>
 
-struct Engine {
+typedef struct Engine {
     // Platform
     PlatformWindow* window;
     InputSystem* input_system;
@@ -39,7 +39,7 @@ struct Engine {
     
     // Callbacks
     void (*on_update)(Engine* engine);
-};
+} Engine;
 
 // --- Input Callbacks ---
 
