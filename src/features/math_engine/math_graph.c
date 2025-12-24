@@ -93,6 +93,19 @@ MathNodeId math_graph_add_node(MathGraph* graph, MathNodeType type) {
     node->id = id;
     node->type = type;
     node->dirty = true;
+
+    // Set default output type
+    switch (type) {
+        case MATH_NODE_UV:
+            node->output_type = MATH_DATA_TYPE_VEC2;
+            break;
+        case MATH_NODE_SURFACE_GRID:
+            node->output_type = MATH_DATA_TYPE_VEC4;
+            break;
+        default:
+            node->output_type = MATH_DATA_TYPE_FLOAT;
+            break;
+    }
     
     // Initialize defaults
     for(int i=0; i<MATH_NODE_MAX_INPUTS; ++i) {
@@ -105,6 +118,12 @@ MathNodeId math_graph_add_node(MathGraph* graph, MathNodeType type) {
     math_graph_set_name(graph, id, buf);
 
     return id;
+}
+
+MathDataType math_graph_get_node_type(MathGraph* graph, MathNodeId id) {
+    MathNode* node = math_graph_get_node(graph, id);
+    if (!node) return MATH_DATA_TYPE_UNKNOWN;
+    return node->output_type;
 }
 
 void math_graph_set_name(MathGraph* graph, MathNodeId id, const char* name) {

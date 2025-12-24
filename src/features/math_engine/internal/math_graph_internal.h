@@ -10,6 +10,7 @@
 struct MathNode {
     MathNodeId id;          // REFLECT
     MathNodeType type;      // REFLECT
+    MathDataType output_type; // REFLECT
     
     // Logic Data
     float value;            // REFLECT

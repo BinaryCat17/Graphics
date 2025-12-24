@@ -3,6 +3,7 @@
 
 #include <stdint.h>
 #include <stdbool.h>
+#include "features/math_engine/math_graph.h"
 
 // Intermediate Representation OpCodes
 typedef enum IrOpCode {
@@ -29,6 +30,7 @@ typedef enum IrOpCode {
 
 typedef struct IrInstruction {
     IrOpCode op;
+    MathDataType type;      // Data type of the result
     uint32_t id;            // Result ID (Virtual Register)
     uint32_t op1_id;        // Operand 1 ID (0 if unused)
     uint32_t op2_id;        // Operand 2 ID (0 if unused)

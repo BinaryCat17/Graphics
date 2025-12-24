@@ -17,7 +17,7 @@ static bool is_visited(int* visited, int count, int id) {
     return false;
 }
 
-static void generate_ir_node(const MathGraph* graph, MathNodeId id, ShaderIR* ir, int* visited, int* visited_count) {
+static void generate_ir_node(const MathGraph* graph, MathNodeId id, ShaderIR* ir, int* visited, int* visited_count, MathDataType* inferred_types) {
     if (id == MATH_NODE_INVALID_ID) return;
     if (is_visited(visited, *visited_count, (int)id)) return; 
     
@@ -29,65 +29,68 @@ static void generate_ir_node(const MathGraph* graph, MathNodeId id, ShaderIR* ir
     // Visit inputs first (Post-order traversal)
     for (int i = 0; i < MATH_NODE_MAX_INPUTS; ++i) {
         if (node->inputs[i] != MATH_NODE_INVALID_ID) {
-            generate_ir_node(graph, node->inputs[i], ir, visited, visited_count);
+            generate_ir_node(graph, node->inputs[i], ir, visited, visited_count, inferred_types);
         }
     }
     
     // Generate IR instruction
-    IrInstruction inst = { .op = IR_OP_NOP, .id = node->id, .op1_id = 0, .op2_id = 0, .float_val = 0.0f };
+    IrInstruction inst = { .op = IR_OP_NOP, .id = node->id, .op1_id = 0, .op2_id = 0, .float_val = 0.0f, .type = MATH_DATA_TYPE_FLOAT };
 
     switch (node->type) {
         case MATH_NODE_VALUE:
             inst.op = IR_OP_CONST_FLOAT;
             inst.float_val = node->value;
+            inst.type = MATH_DATA_TYPE_FLOAT;
             break;
         
         case MATH_NODE_TIME:
             inst.op = IR_OP_LOAD_PARAM_TIME;
+            inst.type = MATH_DATA_TYPE_FLOAT;
             break;
 
         case MATH_NODE_UV:
              inst.op = IR_OP_LOAD_PARAM_UV;
+             inst.type = MATH_DATA_TYPE_VEC2;
              break;
             
         case MATH_NODE_ADD:
-            inst.op = IR_OP_ADD;
-            inst.op1_id = node->inputs[0];
-            inst.op2_id = node->inputs[1];
-            break;
-            
         case MATH_NODE_SUB:
-            inst.op = IR_OP_SUB;
-            inst.op1_id = node->inputs[0];
-            inst.op2_id = node->inputs[1];
-            break;
-
         case MATH_NODE_MUL:
-            inst.op = IR_OP_MUL;
-            inst.op1_id = node->inputs[0];
-            inst.op2_id = node->inputs[1];
-            break;
+        case MATH_NODE_DIV: {
+            if (node->type == MATH_NODE_ADD) inst.op = IR_OP_ADD;
+            else if (node->type == MATH_NODE_SUB) inst.op = IR_OP_SUB;
+            else if (node->type == MATH_NODE_MUL) inst.op = IR_OP_MUL;
+            else if (node->type == MATH_NODE_DIV) inst.op = IR_OP_DIV;
 
-        case MATH_NODE_DIV:
-            inst.op = IR_OP_DIV;
             inst.op1_id = node->inputs[0];
             inst.op2_id = node->inputs[1];
+            
+            MathDataType t1 = inferred_types[inst.op1_id];
+            MathDataType t2 = inferred_types[inst.op2_id];
+            
+            // Simple promotion: max(t1, t2)
+            inst.type = (t1 > t2) ? t1 : t2;
+            if (inst.type == MATH_DATA_TYPE_UNKNOWN) inst.type = MATH_DATA_TYPE_FLOAT;
             break;
+        }
             
         case MATH_NODE_SIN:
-            inst.op = IR_OP_SIN;
+        case MATH_NODE_COS: {
+            if (node->type == MATH_NODE_SIN) inst.op = IR_OP_SIN;
+            else inst.op = IR_OP_COS;
+            
             inst.op1_id = node->inputs[0];
+            inst.type = inferred_types[inst.op1_id]; // Output type same as input
             break;
-
-        case MATH_NODE_COS:
-            inst.op = IR_OP_COS;
-            inst.op1_id = node->inputs[0];
-            break;
+        }
 
         default:
             // Unknown node type
+            inst.type = MATH_DATA_TYPE_FLOAT;
             break;
     }
+
+    inferred_types[id] = inst.type;
 
     if (inst.op != IR_OP_NOP) {
         if (ir->instruction_count < ir->instruction_capacity) {
@@ -106,6 +109,8 @@ static ShaderIR math_graph_to_ir(const MathGraph* graph) {
 
     int* visited = (int*)calloc(graph->node_count, sizeof(int));
     int visited_count = 0;
+    
+    MathDataType* inferred_types = (MathDataType*)calloc(graph->node_count, sizeof(MathDataType));
 
     // 1. Try to find the explicit OUTPUT node
     MathNodeId root_node_id = MATH_NODE_INVALID_ID;
@@ -123,15 +128,21 @@ static ShaderIR math_graph_to_ir(const MathGraph* graph) {
 
     // 2. Generate IR starting from the root (recursively visits inputs)
     if (root_node_id != MATH_NODE_INVALID_ID) {
-        generate_ir_node(graph, root_node_id, &ir, visited, &visited_count);
+        generate_ir_node(graph, root_node_id, &ir, visited, &visited_count, inferred_types);
         
         // Add Return instruction
         if (ir.instruction_count < ir.instruction_capacity) {
-            IrInstruction ret_inst = { .op = IR_OP_RETURN, .id = 0, .op1_id = root_node_id };
+            IrInstruction ret_inst = { 
+                .op = IR_OP_RETURN, 
+                .id = 0, 
+                .op1_id = root_node_id,
+                .type = inferred_types[root_node_id] 
+            };
             ir.instructions[ir.instruction_count++] = ret_inst;
         }
     }
 
+    free(inferred_types);
     free(visited);
     return ir;
 }

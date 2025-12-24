@@ -26,6 +26,14 @@ typedef enum MathNodeType {
     MATH_NODE_COUNT
 } MathNodeType; // REFLECT
 
+typedef enum MathDataType {
+    MATH_DATA_TYPE_UNKNOWN = 0,
+    MATH_DATA_TYPE_FLOAT,
+    MATH_DATA_TYPE_VEC2,
+    MATH_DATA_TYPE_VEC3,
+    MATH_DATA_TYPE_VEC4
+} MathDataType; // REFLECT
+
 #define MATH_NODE_MAX_INPUTS 4
 #define MATH_NODE_NAME_MAX 32
 
@@ -60,6 +68,9 @@ void math_graph_set_value(MathGraph* graph, MathNodeId id, float value);
 
 // Set node name (allocates string in arena).
 void math_graph_set_name(MathGraph* graph, MathNodeId id, const char* name);
+
+// Get the resolved output type of a node.
+MathDataType math_graph_get_node_type(MathGraph* graph, MathNodeId id);
 
 // Evaluate a specific node.
 float math_graph_evaluate(MathGraph* graph, MathNodeId id);
