@@ -273,13 +273,15 @@ static void vulkan_compute_dispatch(RendererBackend* backend, uint32_t pipeline_
     vkEndCommandBuffer(state->compute_cmd);
     
     // Submit
-    VkSubmitInfo submit_info = { 
-        .sType = VK_STRUCTURE_TYPE_SUBMIT_INFO, 
-        .commandBufferCount = 1, 
-        .pCommandBuffers = &state->compute_cmd 
+    VkSubmitInfo submit_info = {
+        .sType = VK_STRUCTURE_TYPE_SUBMIT_INFO,
+        .commandBufferCount = 1,
+        .pCommandBuffers = &state->compute_cmd
     };
     
-    vkQueueSubmit(state->queue, 1, &submit_info, state->compute_fence);
+    if (vkQueueSubmit(state->queue, 1, &submit_info, state->compute_fence) != VK_SUCCESS) {
+        LOG_ERROR("Failed to submit compute queue");
+    }
 }
 
 static void vulkan_compute_wait(RendererBackend* backend) {
@@ -803,6 +805,13 @@ static void vulkan_buffer_destroy(RendererBackend* backend, void* buffer_handle)
     VulkanRendererState* state = (VulkanRendererState*)backend->state;
     VkBufferWrapper* wrapper = (VkBufferWrapper*)buffer_handle;
     if (wrapper) {
+        // Clear bindings if this buffer is bound
+        for (int i=0; i<MAX_COMPUTE_BINDINGS; ++i) {
+            if (state->compute_bindings[i].buffer == wrapper) {
+                state->compute_bindings[i].buffer = NULL;
+            }
+        }
+        
         vk_buffer_destroy(state, wrapper);
         free(wrapper);
     }
