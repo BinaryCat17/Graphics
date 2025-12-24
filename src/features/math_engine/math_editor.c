@@ -361,6 +361,10 @@ MathEditor* math_editor_create(Engine* engine) {
     // 7. GPU Picking Initialization
     editor->gpu_nodes = stream_create(engine_get_render_system(engine), STREAM_CUSTOM, 4096, sizeof(GpuNodeData));
     editor->gpu_picking_result = stream_create(engine_get_render_system(engine), STREAM_UINT, 1, 0);
+
+    // Wires Streams
+    editor->gpu_wires = stream_create(engine_get_render_system(engine), STREAM_CUSTOM, 1024, sizeof(MathWireView)); 
+    editor->gpu_wire_verts = stream_create(engine_get_render_system(engine), STREAM_CUSTOM, 1024 * 64 * 6, 32); 
     
     // Create Pipeline
     AssetData spv = assets_load_file(engine_get_assets(engine), "shaders/compute/picking.comp.spv");
@@ -371,12 +375,41 @@ MathEditor* math_editor_create(Engine* engine) {
         LOG_ERROR("Failed to load picking shader: shaders/compute/picking.comp.spv. Run tools/build_shaders.py");
     }
 
+    // Wires Compute Pipeline
+    AssetData wire_comp = assets_load_file(engine_get_assets(engine), "shaders/compute/wires.comp.spv");
+    if (wire_comp.data) {
+        editor->wire_compute_pipeline_id = render_system_create_compute_pipeline(engine_get_render_system(engine), (uint32_t*)wire_comp.data, wire_comp.size);
+        assets_free_file(&wire_comp);
+    } else {
+        LOG_ERROR("Failed to load wires compute shader.");
+    }
+
+    // Wires Render Pipeline
+    AssetData wire_vert = assets_load_file(engine_get_assets(engine), "shaders/render_wires.vert.spv");
+    AssetData wire_frag = assets_load_file(engine_get_assets(engine), "shaders/render_wires.frag.spv");
+    if (wire_vert.data && wire_frag.data) {
+        editor->wire_render_pipeline_id = render_system_create_graphics_pipeline(
+            engine_get_render_system(engine), 
+            wire_vert.data, wire_vert.size, 
+            wire_frag.data, wire_frag.size, 
+            1 // Zero-Copy Layout
+        );
+        assets_free_file(&wire_vert);
+        assets_free_file(&wire_frag);
+    }
+
     // Create Compute Graph
     if (editor->picking_pipeline_id != 0) {
         editor->gpu_compute_graph = compute_graph_create();
         editor->picking_pass = compute_graph_add_pass(editor->gpu_compute_graph, editor->picking_pipeline_id, 1, 1, 1);
         compute_pass_bind_stream(editor->picking_pass, 0, editor->gpu_nodes);
         compute_pass_bind_stream(editor->picking_pass, 1, editor->gpu_picking_result);
+    }
+
+    if (editor->gpu_compute_graph && editor->wire_compute_pipeline_id != 0) {
+        editor->wire_pass = compute_graph_add_pass(editor->gpu_compute_graph, editor->wire_compute_pipeline_id, 1, 1, 1);
+        compute_pass_bind_stream(editor->wire_pass, 0, editor->gpu_wires);
+        compute_pass_bind_stream(editor->wire_pass, 1, editor->gpu_wire_verts);
     }
     
     // 8. Graphics Pipeline for Nodes
@@ -396,6 +429,7 @@ MathEditor* math_editor_create(Engine* engine) {
     }
 
     editor->draw_data_cache = arena_alloc_zero(&editor->graph_arena, sizeof(CustomDrawData));
+    editor->wire_draw_data = arena_alloc_zero(&editor->graph_arena, sizeof(CustomDrawData));
     
     return editor;
 }
@@ -416,6 +450,21 @@ void math_editor_render(MathEditor* editor, Scene* scene, const struct Assets* a
         obj.prim_type = SCENE_PRIM_CUSTOM;
         obj.layer = LAYER_UI_BACKGROUND; // Draw behind standard UI
         obj.instance_buffer = editor->draw_data_cache;
+        
+        scene_add_object(scene, obj);
+    }
+
+    // 1.5 Render Wires (Custom Compute Generated)
+    if (editor->wire_render_pipeline_id > 0 && editor->view->wires_count > 0 && editor->wire_draw_data) {
+        editor->wire_draw_data->pipeline_id = editor->wire_render_pipeline_id;
+        editor->wire_draw_data->vertex_count = editor->view->wires_count * 64 * 6; // 64 segments * 6 verts
+        editor->wire_draw_data->instance_count = 1;
+        editor->wire_draw_data->buffers[0] = stream_get_handle(editor->gpu_wire_verts);
+        
+        SceneObject obj = {0};
+        obj.prim_type = SCENE_PRIM_CUSTOM;
+        obj.layer = LAYER_UI_BACKGROUND; // Behind Nodes but maybe same layer?
+        obj.instance_buffer = editor->wire_draw_data;
         
         scene_add_object(scene, obj);
     }
@@ -515,9 +564,26 @@ void math_editor_update(MathEditor* editor, Engine* engine) {
         }
     }
 
-    // --- GPU Picking Update ---
-    if (editor->gpu_compute_graph && editor->view->node_views_count > 0) {
-        // 1. Upload Node Data
+    // --- GPU Picking & Wires Update ---
+    if (editor->gpu_compute_graph) {
+        // 0. Update Wires
+        if (editor->wire_pass && editor->view->wires_count > 0) {
+            // Upload Wires
+            stream_set_data(editor->gpu_wires, editor->view->wires, editor->view->wires_count);
+            
+            // Push Constants
+            struct { uint32_t count; uint32_t segs; } push = { editor->view->wires_count, 64 };
+            compute_pass_set_push_constants(editor->wire_pass, &push, sizeof(push));
+            
+            // Dispatch
+            uint32_t groups = (push.count + 63) / 64;
+            compute_pass_set_dispatch_size(editor->wire_pass, groups, 1, 1);
+        } else if (editor->wire_pass) {
+            compute_pass_set_dispatch_size(editor->wire_pass, 0, 0, 0);
+        }
+
+        if (editor->view->node_views_count > 0) {
+            // 1. Upload Node Data
         // Use scratch memory or malloc
         uint32_t count = editor->view->node_views_count;
         if (count > 4096) count = 4096;
@@ -564,6 +630,7 @@ void math_editor_update(MathEditor* editor, Engine* engine) {
              }
         }
     }
+    }
 
     // Recompile Compute Shader if dirty
     if (editor->graph_dirty && engine_get_show_compute(engine)) {
@@ -586,6 +653,8 @@ void math_editor_destroy(MathEditor* editor) {
     if (editor->gpu_compute_graph) compute_graph_destroy(editor->gpu_compute_graph);
     if (editor->gpu_nodes) stream_destroy(editor->gpu_nodes);
     if (editor->gpu_picking_result) stream_destroy(editor->gpu_picking_result);
+    if (editor->gpu_wires) stream_destroy(editor->gpu_wires);
+    if (editor->gpu_wire_verts) stream_destroy(editor->gpu_wire_verts);
     // Note: Pipelines are managed by RenderSystem, usually no explicit destroy needed unless dynamic?
     // Actually render_system_destroy_compute_pipeline exists, we should use it.
     if (editor->picking_pipeline_id != 0) {

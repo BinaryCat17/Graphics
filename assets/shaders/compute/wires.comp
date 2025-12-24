@@ -1,0 +1,98 @@
+#version 450
+layout(local_size_x = 64) in;
+
+struct Wire {
+    vec2 start;
+    vec2 end;
+    vec4 color;
+    float thickness;
+    vec3 padding;
+};
+
+struct Vertex {
+    vec3 pos;
+    vec4 color;
+};
+
+layout(std430, set = 0, binding = 0) readonly buffer Wires {
+    Wire wires[];
+};
+
+layout(std430, set = 0, binding = 1) writeonly buffer Vertices {
+    Vertex verts[];
+};
+
+layout(push_constant) uniform Push {
+    uint wire_count;
+    uint segments;
+};
+
+vec2 cubicBezier(vec2 p0, vec2 p1, vec2 p2, vec2 p3, float t) {
+    float u = 1.0 - t;
+    float tt = t * t;
+    float uu = u * u;
+    float uuu = uu * u;
+    float ttt = tt * t;
+    return uuu * p0 + 3.0 * uu * t * p1 + 3.0 * u * tt * p2 + ttt * p3;
+}
+
+vec2 cubicBezierDerivative(vec2 p0, vec2 p1, vec2 p2, vec2 p3, float t) {
+    float u = 1.0 - t;
+    return 3.0 * u * u * (p1 - p0) + 6.0 * u * t * (p2 - p1) + 3.0 * t * t * (p3 - p2);
+}
+
+void main() {
+    uint id = gl_GlobalInvocationID.x;
+    if (id >= wire_count) return;
+
+    Wire w = wires[id];
+    
+    // Control Points for horizontal sigmoid
+    float dist = abs(w.end.x - w.start.x);
+    vec2 c1 = w.start + vec2(dist * 0.5, 0.0);
+    vec2 c2 = w.end - vec2(dist * 0.5, 0.0);
+    
+    // Each wire generates 'segments' quads (2 triangles = 6 vertices)
+    uint base_v = id * segments * 6;
+    float half_thick = max(w.thickness, 2.0) * 0.5;
+
+    for (uint i = 0; i < segments; ++i) {
+        float t0 = float(i) / float(segments);
+        float t1 = float(i + 1) / float(segments);
+        
+        vec2 p0 = cubicBezier(w.start, c1, c2, w.end, t0);
+        vec2 p1 = cubicBezier(w.start, c1, c2, w.end, t1);
+        
+        vec2 dir0 = normalize(cubicBezierDerivative(w.start, c1, c2, w.end, t0));
+        vec2 dir1 = normalize(cubicBezierDerivative(w.start, c1, c2, w.end, t1));
+        
+        vec2 n0 = vec2(-dir0.y, dir0.x);
+        vec2 n1 = vec2(-dir1.y, dir1.x);
+        
+        // Quad Vertices
+        vec2 v0 = p0 + n0 * half_thick;
+        vec2 v1 = p0 - n0 * half_thick;
+        vec2 v2 = p1 + n1 * half_thick;
+        vec2 v3 = p1 - n1 * half_thick;
+        
+        // Triangle 1: v0, v1, v2
+        verts[base_v + i*6 + 0].pos = vec3(v0, 0.0);
+        verts[base_v + i*6 + 0].color = w.color;
+        
+        verts[base_v + i*6 + 1].pos = vec3(v1, 0.0);
+        verts[base_v + i*6 + 1].color = w.color;
+        
+        verts[base_v + i*6 + 2].pos = vec3(v2, 0.0);
+        verts[base_v + i*6 + 2].color = w.color;
+        
+        // Triangle 2: v2, v1, v3
+        verts[base_v + i*6 + 3].pos = vec3(v2, 0.0);
+        verts[base_v + i*6 + 3].color = w.color;
+        
+        verts[base_v + i*6 + 4].pos = vec3(v1, 0.0);
+        verts[base_v + i*6 + 4].color = w.color;
+        
+        verts[base_v + i*6 + 5].pos = vec3(v3, 0.0);
+        verts[base_v + i*6 + 5].color = w.color;
+    }
+}

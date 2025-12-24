@@ -60,8 +60,8 @@ Hybrid approach to Input and UI.
     - [x] Parallel Reduction to find the closest object ID.
 - [x] **Graph Editor Rendering:**
     - [x] Render thousands of nodes via Instancing (node positions in GPU buffers).
-    - [ ] Spline links generated in Geometry/Compute shaders.
-- [ ] **Hybrid Input System:**
+    - [x] Spline links generated in Geometry/Compute shaders.
+- [x] **Hybrid Input System:**
     - **CPU:** Standard event processing for Editor UI panels (Inspector, Menus).
     - **GPU:** Uniform `InputState` structure for Graph Nodes.
 
@@ -70,6 +70,6 @@ Hybrid approach to Input and UI.
 
 - [ ] **File Format Split:**
     - **Editor UI:** Keep and refine existing `*.layout.yaml` for static panels/menus (Declarative UI).
-    - **Logic/Scene:** Design `*.graph.yaml` (or GDL) to serialize the Graph structure (Nodes, Links, Properties).
+    - **Logic/Scene:** Design `*.gdl` (GDL) to serialize the Graph structure (Nodes, Links, Properties).
 - [ ] **Hot Reloading:** Recompile the graph on-the-fly without restarting the app.
 - [ ] **Visual Debugger:** GPU Buffer Readback to inspect values.

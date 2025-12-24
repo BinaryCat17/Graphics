@@ -35,8 +35,8 @@ children:
             height: 100%
           style:
             color: "#00000000"
-          collection: "view.wires"
-          item_template: "GraphWire"
+          # collection: "view.wires"  <-- Disabled (Rendered via Compute)
+          # item_template: "GraphWire"
 
         # Nodes (Front)
         - type: container 

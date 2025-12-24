@@ -38,6 +38,7 @@ typedef struct MathWireView {
     Vec2 end;              // REFLECT
     Vec4 color;            // REFLECT
     float thickness;       // REFLECT
+    float _pad[3];
 } MathWireView;
 
 // --- Serialization DTOs (Strict Separation) ---
@@ -132,6 +133,14 @@ typedef struct MathEditor {
     // Graphics
     uint32_t nodes_pipeline_id;
     struct CustomDrawData* draw_data_cache; // Persistent allocation for render packet
+
+    // Wires Rendering
+    struct Stream* gpu_wires;
+    struct Stream* gpu_wire_verts;
+    struct ComputePass* wire_pass;
+    uint32_t wire_compute_pipeline_id;
+    uint32_t wire_render_pipeline_id;
+    struct CustomDrawData* wire_draw_data;
 } MathEditor;
 
 #endif // MATH_EDITOR_INTERNAL_H
