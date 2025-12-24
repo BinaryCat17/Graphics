@@ -10,10 +10,10 @@
 
 The most critical phase. Without this, the graph behaves like a slow interpreter.
 
-- [ ] **Graph AST (Micro Graph):**
+- [x] **Graph AST (Micro Graph):**
     - Define data structures for kernel nodes (`Add`, `Mul`, `Sin`, `Sample`).
     - Implement AST construction from raw node data.
-- [ ] **Transpiler V2 (GLSL Emitter):**
+- [x] **Transpiler V2 (GLSL Emitter):**
     - Implement **Kernel Fusion**: traverse AST and generate a single `void main()` function body.
     - Support GLSL Compute Shader code generation.
 - [ ] **CPU Fallback (C Emitter):**
