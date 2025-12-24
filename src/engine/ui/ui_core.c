@@ -26,28 +26,25 @@ void ui_system_shutdown(void) {
     ui_command_shutdown();
 }
 
-SceneNode* ui_node_create(SceneTree* tree, const SceneNodeSpec* spec, void* data, const MetaStruct* meta) {
-    if (!tree || !spec) return NULL;
+static void ui_node_init_recursive(SceneNode* el, SceneTree* tree, const MetaStruct* meta) {
+    if (!el || !el->spec) return;
 
-    // 1. Basic Scene Node
-    SceneNode* el = scene_node_create(tree, spec, data, meta);
-    if (!el) return NULL;
-
-    // 2. UI-specific init
-    el->render_color = spec->style.color;
-    el->rect.x = spec->layout.x;
-    el->rect.y = spec->layout.y;
-    el->on_click_cmd_id = spec->on_click;
-    el->on_change_cmd_id = spec->on_change;
+    // UI-specific init
+    el->render_color = el->spec->style.color;
+    
+    el->rect.x = el->spec->layout.x;
+    el->rect.y = el->spec->layout.y;
+    el->on_click_cmd_id = el->spec->on_click;
+    el->on_change_cmd_id = el->spec->on_change;
 
     // Cache Bindings
-    if (meta && spec->binding_count > 0) {
-        el->ui_bindings = arena_alloc_zero(&tree->arena, spec->binding_count * sizeof(UiBinding));
-        el->ui_binding_count = spec->binding_count;
+    if (meta && el->spec->binding_count > 0) {
+        el->ui_bindings = arena_alloc_zero(&tree->arena, el->spec->binding_count * sizeof(UiBinding));
+        el->ui_binding_count = el->spec->binding_count;
         UiBinding* bindings = (UiBinding*)el->ui_bindings;
         
-        for (size_t i = 0; i < spec->binding_count; ++i) {
-             SceneBindingSpec* b_spec = &spec->bindings[i];
+        for (size_t i = 0; i < el->spec->binding_count; ++i) {
+             SceneBindingSpec* b_spec = &el->spec->bindings[i];
              size_t total_offset = 0;
              const MetaField* f = meta_find_field_by_path(meta, b_spec->source, &total_offset);
              
@@ -59,8 +56,26 @@ SceneNode* ui_node_create(SceneTree* tree, const SceneNodeSpec* spec, void* data
         }
     }
 
-    // Populate Children (UI-way handles collections)
+    // Recurse for static children
+    for (SceneNode* child = el->first_child; child; child = child->next_sibling) {
+        ui_node_init_recursive(child, tree, meta);
+    }
+
+    // Populate Dynamic Children (UI-way handles collections)
+    // Note: ui_node_rebuild_children calls ui_node_create internally for new nodes, 
+    // so we don't need to manually recurse into them here (they are added to the end).
     ui_node_rebuild_children(el, tree);
+}
+
+SceneNode* ui_node_create(SceneTree* tree, const SceneNodeSpec* spec, void* data, const MetaStruct* meta) {
+    if (!tree || !spec) return NULL;
+
+    // 1. Basic Scene Node (Creates entire static subtree)
+    SceneNode* el = scene_node_create(tree, spec, data, meta);
+    if (!el) return NULL;
+
+    // 2. Recursive UI Init
+    ui_node_init_recursive(el, tree, meta);
     
     return el;
 }

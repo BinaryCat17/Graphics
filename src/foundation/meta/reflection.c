@@ -8,19 +8,32 @@
 static bool parse_vec_from_string(const char* str, float* out, int count) {
     if (!str || !out || count < 1 || count > 4) return false;
     
+    // Skip leading whitespace
+    while (*str == ' ' || *str == '\t' || *str == '\n' || *str == '\r') str++;
+    
     // Hex Color support (only for Vec3 and Vec4)
     if (str[0] == '#') {
-        size_t len = strlen(str);
-        if (len == 7 || len == 9) { // #RRGGBB or #RRGGBBAA
+        const char* hex_start = str + 1;
+        size_t hex_len = 0;
+        
+        // Count valid hex characters
+        while (hex_start[hex_len] && (
+               (hex_start[hex_len] >= '0' && hex_start[hex_len] <= '9') ||
+               (hex_start[hex_len] >= 'a' && hex_start[hex_len] <= 'f') ||
+               (hex_start[hex_len] >= 'A' && hex_start[hex_len] <= 'F'))) {
+            hex_len++;
+        }
+
+        if (hex_len == 6 || hex_len == 8) { // #RRGGBB or #RRGGBBAA
             char hex[9];
-            strncpy(hex, str + 1, 8);
-            hex[8] = '\0';
+            strncpy(hex, hex_start, hex_len);
+            hex[hex_len] = '\0';
             
             unsigned long val = strtoul(hex, NULL, 16);
             
             float r, g, b, a = 1.0f;
             
-            if (len == 7) { // RRGGBB
+            if (hex_len == 6) { // RRGGBB
                 r = ((val >> 16) & 0xFF) / 255.0f;
                 g = ((val >> 8) & 0xFF) / 255.0f;
                 b = (val & 0xFF) / 255.0f;
@@ -35,6 +48,7 @@ static bool parse_vec_from_string(const char* str, float* out, int count) {
             if (count >= 2) out[1] = g;
             if (count >= 3) out[2] = b;
             if (count >= 4) out[3] = a;
+            
             return true;
         }
         return false;
