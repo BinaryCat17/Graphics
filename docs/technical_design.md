@@ -1,66 +1,89 @@
-﻿# Technical Design & Internals
+# Technical Design & Internals (v3.0)
 
-**Context:** Implementation details for the v1.0 Architecture.
-
----
-
-## 1. Memory Layout
-
-### Frame Arena Strategy
-We use a Double-Buffered Arena system for the render thread safety.
-*   **Arena A (Logic):** Used by the main thread to build the `RenderFramePacket`.
-*   **Arena B (Render):** Read by the background render thread (if multithreaded) or used for the previous frame's cleanup.
-*   **Transient Vertex Buffer:** A large ring-buffer in the Arena used for generating dynamic geometry (Text, UI batches) on the fly.
-
-### Reflection & Binding
-Instead of string lookups (`strcmp`), the `codegen.py` tool generates a **Byte Offset Table**.
-*   **Runtime:** Bindings use `base_ptr + offset` for O(1) access.
-*   **Safety:** The codegen verifies types at build time.
+**Context:** Implementation details for the Visual Compute Engine.
 
 ---
 
-## 2. Rendering Pipeline Implementation
+## 1. The Transpiler (Micro-Graph Compiler)
 
-### The `RenderFramePacket`
-The packet is not a simple list of objects. It is a struct of **Buckets**:
+The engine does not interpret nodes at runtime. It compiles them.
+
+### Data Structures (AST)
+The Micro Graph is represented as an Abstract Syntax Tree before compilation.
 
 ```c
-struct RenderFramePacket {
-    CameraData camera;
-    
-    // Bucket 1: Compute Jobs
-    ComputeCmd* jobs; 
+typedef enum { NODE_ADD, NODE_MUL, NODE_SIN, ... } NodeType;
 
-    // Bucket 2: 3D World (Sorted Front-to-Back)
-    DrawCmd3D* opaque_queue;
-    DrawCmd3D* transparent_queue; // Sorted Back-to-Front
-
-    // Bucket 3: UI (Sorted by hierarchy/z-index)
-    // Uses Transient Vertex Buffer handles
-    DrawCmdUI* ui_batches;
-};
+typedef struct {
+    NodeType type;
+    NodeId inputs[MAX_INPUTS];
+    // ...
+} AstNode;
 ```
 
-### Text Rendering (Batching)
-Text is not drawn as individual objects.
-*   **Write:** text_renderer writes raw vertices (pos, uv, color) into the Frame Arena's transient buffer.
-*   **Batch:** Consecutive characters share a single DrawCmdUI.
-*   **Draw:** The backend binds the Font Atlas once and issues one draw call for thousands of glyphs.
+### Compilation Stages
+1.  **Topological Sort:** Determine evaluation order.
+2.  **Type Inference:** Deduce output types based on inputs (e.g., `Vec3 + Float = Vec3`).
+3.  **Kernel Fusion (GLSL Generation):**
+    *   Iterate through sorted nodes.
+    *   Generate GLSL variables for intermediate results.
+    *   *Example:* `vec3 temp_0 = var_A + var_B; vec3 result = temp_0 * var_C;`
+4.  **Backend Emit:** Wraps the logic in a Compute Shader boilerplate (`layout(local_size_x = 64) in; void main() { ... }`).
 
-### Async Shader Compilation
-User modifies a Math Node.
-*   **Main Thread:** Marks graph dirty, issues a CompileJob.
-*   **Worker Thread:** Invokes shader compiler (via library, not system()).
-*   **Main Thread:** Checks job status. If ready, uploads SPIR-V to GPU and replaces the pipeline.
+---
 
-## 3. Math Engine Internals
-IR (Intermediate Representation)
-The graph is not transpiled directly to GLSL string concatenation.
-*   **Graph:** Nodes and Links.
-*   **Linear IR:** Flattened bytecode (Stack-based machine).
-*   **Backend Emit:** IR is converted to GLSL/SPIR-V for GPU or C-code for CPU execution.
+## 2. Memory & Data Layout
 
-## 4. Input System
-*   **Action Mapping:** Uses hashed string IDs (StringId) for fast lookup.
-*   **Event Queue:** Fixed-size ring buffer. No allocations during event processing.
+### SoA (Structure of Arrays)
+We avoid Array of Structs (`struct Particle { pos, vel }`) in VRAM.
+Instead, we use independent buffers:
+*   `Buffer<float> PosX`
+*   `Buffer<float> PosY`
+*   `Buffer<float> PosZ`
 
+**Why?**
+1.  **Alignment:** No padding issues between C and GLSL.
+2.  **Flexibility:** A kernel needing only `PosX` doesn't load `VelY` into cache.
+3.  **SIMD:** Fits GPU architecture perfectly.
+
+### Stream<T> Abstraction
+A C-side handle representing a GPU buffer.
+*   `stream_create(type, count)`: Allocates SSBO.
+*   `stream_bind_compute(stream, binding_slot)`: Descriptor set update.
+*   `stream_bind_vertex(stream, attribute_slot)`: Binds as Vertex Buffer (if supported) or SSBO (for manual fetching).
+
+---
+
+## 3. Zero-Copy Rendering
+The traditional `RenderPacket` is replaced/augmented by direct Buffer binding.
+
+**Vertex Shader Approach:**
+Instead of `layout(location=0) in vec3 inPos;`, we use:
+
+```glsl
+layout(std430, binding = 0) readonly buffer PosX { float data[]; } posX;
+layout(std430, binding = 1) readonly buffer PosY { float data[]; } posY;
+// ...
+void main() {
+    uint id = gl_VertexIndex;
+    vec3 pos = vec3(posX.data[id], posY.data[id], ...);
+    gl_Position = view_proj * vec4(pos, 1.0);
+}
+```
+
+This allows the **Compute Shader** to be the *sole producer* of geometry data without CPU intervention.
+
+---
+
+## 4. File Formats
+
+### `*.layout.yaml` (Editor UI)
+Declarative layout for the application shell. Parsed by `ui_layout.c`.
+*   Static structure (Panels, Splits).
+*   CPU-driven.
+
+### `*.graph.yaml` / `*.gdl` (Logic & Scene)
+Serialization of the Nodes and Links.
+*   Defines the Macro and Micro graphs.
+*   Contains initial values for properties.
+*   Loaded into the Graph System -> Transpiled -> Executed.

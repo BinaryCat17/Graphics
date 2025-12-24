@@ -1,54 +1,69 @@
-# Project Roadmap: Evolution to v1.0
+# Project Roadmap: Visual Compute Engine (v3.0)
 
-**Current Status:** Architectural Refactoring (Transition to v0.9)
-**Goal:** High-Performance Visualization Engine
+**Vision:** "The Graph is the Source Code"
+**Architecture:** Data-Oriented | GPU-Driven | Kernel Fusion
 
 ---
 
-## 🚨 Phase 1: The Great Split (Critical Architecture Fix)
-*Objective: Separate UI and 3D rendering to fix sorting and performance issues.*
+## 🧠 Phase 1: The Brain (Transpiler & Kernel Fusion)
+*Objective: Teach the engine to understand and optimize mathematical graphs before execution.*
 
-- [ ] **Render Packet Refactor:**
-    - Create specialized structs: `UiBatchCmd` (for 2D) and `MeshDrawCmd` (for 3D).
-    - Rewrite `RenderFramePacket` to contain separate buckets (lists) for UI and World.
-- [ ] **Extraction Layer:**
-    - Implement `scene_extract()` to walk the Logical Graph and populate these buckets.
-- [ ] **Transient Geometry System:**
-    - Implement a `DynamicVertexBuffer` in the Frame Arena.
-    - Rewrite `text_renderer.c` to write vertices directly to this buffer instead of creating Objects.
-- [ ] **Multi-Pass Renderer:**
-    - Modify `vulkan_renderer.c` to execute passes sequentially:
-        1. `WorldPass` (Perspective, Depth ON).
-        2. `UiPass` (Ortho, Depth OFF).
+The most critical phase. Without this, the graph behaves like a slow interpreter.
 
-## ⚡ Phase 2: Asynchronous Core
-*Objective: Make the editor responsive; eliminate UI freezes.*
+- [ ] **Graph AST (Micro Graph):**
+    - Define data structures for kernel nodes (`Add`, `Mul`, `Sin`, `Sample`).
+    - Implement AST construction from raw node data.
+- [ ] **Transpiler V2 (GLSL Emitter):**
+    - Implement **Kernel Fusion**: traverse AST and generate a single `void main()` function body.
+    - Support GLSL Compute Shader code generation.
+- [ ] **CPU Fallback (C Emitter):**
+    - (Optional) Generate C code for debugging and non-GPU logic.
 
-- [ ] **Job System:**
-    - Implement a simple thread pool (`foundation/thread/job_system.c`).
-- [ ] **Async Compiler:**
-    - Move `glslc` calls to a background job.
-    - Implement "Placeholder" rendering (show a spinner node while compiling).
-- [ ] **Intermediate Representation (IR):**
-    - Refactor `transpiler.c` to produce linear bytecode instead of direct string concatenation.
+## 💾 Phase 2: The Heart (Data & Compute Foundation)
+*Objective: Build the infrastructure for data storage and kernel execution.*
 
-## 🎥 Phase 3: 3D Visualization Support
-*Objective: Make the 3D Viewport actually useful.*
+Here we implement SoA and GPU memory management.
 
-- [ ] **Camera Controller:**
-    - Implement Arcball (Orbit) camera logic, distinct from UI scrolling.
-- [ ] **3D Gizmos:**
-    - Implement Translation/Rotation/Scale handles using the `WorldPass`.
-- [ ] **Raycasting:**
-    - Implement Ray-AABB intersection for 3D object selection.
+- [ ] **Storage Infrastructure (SoA):**
+    - Implement wrappers over Vulkan SSBO (Shader Storage Buffer Objects).
+    - Manage "Streams" (`Stream<T>`) residing in VRAM.
+- [ ] **Compute Graph Executor (Macro Graph):**
+    - Implement `vkCmdDispatch` execution system.
+    - Automatic Memory Barrier insertion between compute stages.
+    - Ping-Pong buffering for simulations (read `State_A`, write `State_B`).
 
-## 🛠 Phase 4: Polish & Stability
-*Objective: Production-ready features.*
+## 🎨 Phase 3: The Eyes (Zero-Copy Rendering)
+*Objective: Render data directly from memory prepared in Phase 2.*
 
-- [ ] **Reflection V2:**
-    - Update `codegen.py` to generate byte offsets for structs.
-    - Replace `strcmp` in `ui_binding.c` with direct pointer arithmetic.
-- [ ] **Undo/Redo:**
-    - Implement a Command History stack for Graph operations.
-- [ ] **Binary Assets:**
-    - Create a build step to pack YAML/Shaders into binary blobs.
+Abandon the classic `Scene::Update` -> `RenderPacket` flow.
+
+- [ ] **Render Nodes:**
+    - Create `DrawInstanced` graph node accepting position/color buffers as inputs.
+    - Implement SSBO binding as Vertex Attributes (Zero-Copy).
+- [ ] **Unified Pipeline:**
+    - Synchronization: Compute Queue -> Graphics Queue.
+    - Integrate with existing `vulkan_renderer.c` (using it as a "draw command executor").
+
+## 🖱️ Phase 4: The Hands (Interaction & Editor)
+*Objective: Make the engine an interactive tool.*
+
+Hybrid approach to Input and UI.
+
+- [ ] **GPU Picking (Raycasting):**
+    - Implement Compute Kernel for mouse ray intersection (Sphere/AABB).
+    - Parallel Reduction to find the closest object ID.
+- [ ] **Graph Editor Rendering:**
+    - Render thousands of nodes via Instancing (node positions in GPU buffers).
+    - Spline links generated in Geometry/Compute shaders.
+- [ ] **Hybrid Input System:**
+    - **CPU:** Standard event processing for Editor UI panels (Inspector, Menus).
+    - **GPU:** Uniform `InputState` structure for Graph Nodes.
+
+## 💾 Phase 5: Persistence & Ecosystem
+*Objective: Save/Load systems and tooling.*
+
+- [ ] **File Format Split:**
+    - **Editor UI:** Keep and refine existing `*.layout.yaml` for static panels/menus (Declarative UI).
+    - **Logic/Scene:** Design `*.graph.yaml` (or GDL) to serialize the Graph structure (Nodes, Links, Properties).
+- [ ] **Hot Reloading:** Recompile the graph on-the-fly without restarting the app.
+- [ ] **Visual Debugger:** GPU Buffer Readback to inspect values.

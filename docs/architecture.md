@@ -1,66 +1,72 @@
-# Architecture Overview
+# Architecture Overview (v3.0)
 
-**Philosophy:** Data-Oriented Design (DOD) | C11 | Zero-Allocation Loop
-**Target:** High-Performance Interactive Tools & Visualization
+**Paradigm:** Implicitly Parallel Compute Graph
+**Philosophy:** "The Graph is the Source Code"
+**Target:** Visual Compute Engine for High-Performance Tools
 
 ---
 
-## 1. Core Philosophy
-The engine ignores traditional OOP hierarchies. Instead, it focuses on **Data Transformations**.
-*   **Data > Objects:** We process homogenous arrays of data, not individual objects.
-*   **Frame Transient:** Most memory used in a frame is valid *only* for that frame. We use linear allocators (Arenas) that reset continuously.
-*   **Separation of Concerns:** The Logic Layer (Scene Graph) knows nothing about the GPU. The Render Layer (Backend) knows nothing about game logic.
+## 1. Core Philosophy: The Two Graphs
+The engine strictly separates high-level data flow from low-level mathematical logic to avoid "spaghetti code" and maximize performance.
 
-## 2. Global Data Flow (The Pipeline)
-The engine executes a strict unidirectional pipeline every frame:
+### Level 1: The Macro Graph (The Pipeline)
+* **Role:** Data Scheduling & Memory Management.
+* **Nodes:** Systems or Simulation Steps (e.g., "ParticleSim", "Culling", "RenderPass").
+* **Links:** Entire Buffers/Streams of data (`Stream<Vec3>`).
+* **Execution:** Managed by the CPU. Handles synchronisation barriers and resource transitions (Compute -> Graphics).
 
-```text
-[INPUT] -> [LOGIC UPDATE] -> [EXTRACTION] -> [BACKEND RENDER]
-```
+### Level 2: The Micro Graph (The Kernel)
+* **Role:** Mathematical Logic.
+* **Nodes:** Atomic operations (`Add`, `Mul`, `Sin`, `Dot`).
+* **Links:** Temporary registers / Local variables.
+* **Execution:** **Compiled** into a single Compute Shader (Kernel Fusion) and executed on the GPU.
+* **Benefit:** Eliminates memory bandwidth overhead by fusing multiple operations into one kernel.
 
-### Phase A: Logic Update (CPU)
-*   **Input Processing:** Raw OS events are converted into logical Actions.
-*   **Graph Evaluation:** The Math Engine processes the node graph to update values.
-*   **Scene Hierarchy:** The Logical Scene (Tree) is updated. Local and World transforms are recalculated here.
-*   **Output:** A dirty Scene Tree and updated application state.
+---
 
-### Phase B: Extraction (The Bridge)
-This is the synchronization point.
-The engine traverses the Logical Scene and "extracts" visual data into a RenderPacket.
-*   **Culling:** Invisible objects are discarded.
-*   **Sorting & Binning:** Objects are sorted by material/depth and placed into specific "Buckets" (e.g., UI, Opaque 3D, Transparent).
-*   **Output:** An immutable RenderFramePacket stored in temporary memory.
+## 2. Hybrid UI Architecture
+We use the right tool for the job, avoiding a "pure GPU" dogma where it hurts usability.
 
-### Phase C: Backend Render (GPU)
-The Backend consumes the RenderFramePacket.
-It is stateless: it builds command buffers from scratch every frame based only on the packet.
-It executes distinct Render Passes (Compute -> Shadow -> World -> UI).
+### A. The Shell (Editor UI)
+* **Technology:** CPU-based, Declarative Layouts (`*.layout.yaml`).
+* **Role:** Panels, Menus, Inspectors, File Browsers.
+* **Rendering:** Traditional textured quads / font atlas.
+* **State:** Maintained on CPU.
 
-## 3. System Architecture
-🧱 Foundation Layer
-Zero-dependency utilities.
-*   **Memory:** Arena (Linear) and Pool (Chunked) allocators.
-*   **Meta:** Reflection system for serialization and UI binding.
-*   **Platform:** OS abstraction (Window, Files, Threads).
+### B. The Viewport (Project Content)
+* **Technology:** GPU-based, Graph-Driven.
+* **Role:** The node graph itself, the 3D scene, huge particle systems.
+* **Rendering:** Instanced rendering from GPU buffers (Zero-Copy).
+* **State:** Maintained in VRAM (SSBOs).
 
-⚙️ Engine Layer
-*   **Scene System:** A unified logical hierarchy. To the user, a UI Button and a 3D Cube are just Nodes.
-*   **UI System:** Layout engine and event bubbling. It operates on the Scene Tree.
-*   **Render System:** Manages the Extraction phase and hands data to the Backend.
+---
 
-🧩 Feature Layer
-Math Engine: Domain-specific logic. It compiles node graphs into Bytecode or Shaders. It runs asynchronously to avoid stalling the UI.
+## 3. The Data Flow Pipeline
+The engine executes a "Compute-First" loop:
 
-## 4. Key Concepts
-The "Unified" Logical Scene
-To the developer, there is only one world. You can attach a UI Label to a 3D Cube. The hierarchy handles coordinate transformations automatically. The separation into 2D/3D only happens strictly during the Extraction phase.
+1.  **Input (Hybrid):**
+    *   CPU events update Editor UI.
+    *   Mouse/Keyboard state is packed into a Uniform Buffer for the GPU.
+2.  **Logic (Compute Queues):**
+    *   The **Macro Graph** executes Compute Shaders.
+    *   Physics, Animation, Layout calculations happen here.
+    *   Result: Updated SSBOs (Positions, Colors).
+3.  **Synchronization:**
+    *   Memory Barriers ensure Compute is finished.
+4.  **Render (Graphics Queue):**
+    *   **Zero-Copy:** Vertex Shaders read directly from the SSBOs written in step 2.
+    *   No data is copied back to CPU for rendering.
 
-Asynchronous Compute
-Heavy operations (Shader compilation, Geometry generation) are offloaded to a Job System. The main loop never blocks waiting for these. Placeholders are rendered until results are ready.
+---
 
-## 5. Interface Standards (Public vs Internal)
-We strictly separate API from Implementation to prevent spaghetti code.
+## 4. Key Systems
 
-Root (module.h): Defines what the module does. Opaque handles (typedef struct X X;).
-Internal (internal/module_internal.h): Defines how it works. Full struct definitions.
-Rule: External code includes module.h. Implementation includes internal/*.h.
+### The Transpiler (The Brain)
+Converts the **Micro Graph** (AST) into GLSL/SPIR-V.
+*   Performs **Kernel Fusion** to optimize math.
+*   Handles type inference.
+
+### Storage System (The Heart)
+Manages `Stream<T>` arrays.
+*   Uses **Structure of Arrays (SoA)** layout (e.g., `pos_x[]`, `pos_y[]`) for coalesced GPU access.
+*   Double-buffered (Ping-Pong) where necessary for simulation time-steps.
