@@ -30,13 +30,13 @@ The most critical phase. Without this, the graph behaves like a slow interpreter
 
 Here we implement SoA and GPU memory management.
 
-- [ ] **Storage Infrastructure (SoA):**
+- [x] **Storage Infrastructure (SoA):**
     - Implement wrappers over Vulkan SSBO (Shader Storage Buffer Objects).
     - Manage "Streams" (`Stream<T>`) residing in VRAM.
-- [ ] **Compute Graph Executor (Macro Graph):**
-    - Implement `vkCmdDispatch` execution system.
-    - Automatic Memory Barrier insertion between compute stages.
-    - Ping-Pong buffering for simulations (read `State_A`, write `State_B`).
+- [x] **Compute Graph Executor (Macro Graph):**
+    - [x] Implement `vkCmdDispatch` execution system.
+    - [x] Automatic Memory Barrier insertion between compute stages.
+    - [x] Ping-Pong buffering for simulations (read `State_A`, write `State_B`).
 
 ## 🎨 Phase 3: The Eyes (Zero-Copy Rendering)
 *Objective: Render data directly from memory prepared in Phase 2.*
