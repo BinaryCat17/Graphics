@@ -22,7 +22,7 @@ The most critical phase. Without this, the graph behaves like a slow interpreter
 - [x] **Texture Sampling:**
     - Support `sampler2D` data type in AST and Transpiler.
     - Implement `SampleTexture` node and `texture()` GLSL generation.
-- [ ] **CPU Fallback (C Emitter):**
+- [x] **CPU Fallback (C Emitter):**
     - (Optional) Generate C code for debugging and non-GPU logic.
 
 ## 💾 Phase 2: The Heart (Data & Compute Foundation)
