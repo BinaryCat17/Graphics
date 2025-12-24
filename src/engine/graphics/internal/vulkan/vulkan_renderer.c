@@ -283,15 +283,7 @@ static bool vulkan_renderer_init(RendererBackend* backend, const RenderBackendIn
     vk_create_depth_resources(state);
     vk_create_cmds_and_sync(state);
     
-    // 7. Descriptor & Pipeline
-    vk_create_descriptor_layout(state);
-    vk_create_pipeline(state);
-
-    // 8. Fonts & Textures
-    vk_create_font_texture(state);
-    vk_create_descriptor_pool_and_set(state);
-
-    // Create Compute SSBO Layout (Set 1)
+    // Create Compute SSBO Layout (Set 1) - Moved before Pipeline Creation
     // Also used for Graphics (Zero-Copy) -> Set 1
     VkDescriptorSetLayoutBinding bindings[MAX_COMPUTE_BINDINGS];
     for (int i=0; i<MAX_COMPUTE_BINDINGS; ++i) {
@@ -309,6 +301,14 @@ static bool vulkan_renderer_init(RendererBackend* backend, const RenderBackendIn
     if (vkCreateDescriptorSetLayout(state->device, &dslci, NULL, &state->compute_ssbo_layout) != VK_SUCCESS) {
         LOG_FATAL("Failed to create compute SSBO layout");
     }
+
+    // 7. Descriptor & Pipeline
+    vk_create_descriptor_layout(state);
+    vk_create_pipeline(state);
+
+    // 8. Fonts & Textures
+    vk_create_font_texture(state);
+    vk_create_descriptor_pool_and_set(state);
 
     VkDescriptorSetAllocateInfo dsai = {
         .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO,
