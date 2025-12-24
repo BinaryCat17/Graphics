@@ -16,7 +16,7 @@ The most critical phase. Without this, the graph behaves like a slow interpreter
 - [x] **Transpiler V2 (GLSL Emitter):**
     - Implement **Kernel Fusion**: traverse AST and generate a single `void main()` function body.
     - Support GLSL Compute Shader code generation.
-- [ ] **Graph Inputs & Uniforms:**
+- [x] **Graph Inputs & Uniforms:**
     - Implement system to define graph parameters (Time, Mouse, Resolution).
     - Dynamic generation of `layout(push_constant)` or Uniform Blocks.
 - [ ] **Texture Sampling:**
