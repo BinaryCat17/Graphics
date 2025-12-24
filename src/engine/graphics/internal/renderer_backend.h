@@ -70,6 +70,20 @@ typedef struct RendererBackend {
     // stage: "compute", "vertex", "fragment"
     bool (*compile_shader)(struct RendererBackend* backend, const char* source, size_t size, const char* stage, void** out_spv, size_t* out_spv_size);
 
+    // --- Buffer Management (SSBO / Vertex) ---
+    // Create a GPU buffer. type: 0=SSBO/Vertex, 1=Staging/Transfer.
+    void* (*buffer_create)(struct RendererBackend* backend, size_t size);
+    void (*buffer_destroy)(struct RendererBackend* backend, void* buffer_handle);
+    void* (*buffer_map)(struct RendererBackend* backend, void* buffer_handle);
+    void (*buffer_unmap)(struct RendererBackend* backend, void* buffer_handle);
+    bool (*buffer_upload)(struct RendererBackend* backend, void* buffer_handle, const void* data, size_t size, size_t offset);
+    bool (*buffer_read)(struct RendererBackend* backend, void* buffer_handle, void* dst, size_t size, size_t offset);
+
+    // --- Compute Binding ---
+    // Bind a buffer to a specific binding slot for the next compute dispatch.
+    // 'slot': The binding index in the shader (layout(binding = slot)).
+    void (*compute_bind_buffer)(struct RendererBackend* backend, void* buffer_handle, uint32_t slot);
+
 } RendererBackend;
 
 // Registry / Factory

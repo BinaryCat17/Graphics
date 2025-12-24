@@ -66,3 +66,20 @@ uint32_t* read_file_bin_u32(const char* filename, size_t* out_size) {
     if (out_size) *out_size = file_size;
     return buffer;
 }
+
+VkCommandBuffer vk_begin_single_time_commands(VulkanRendererState* state) {
+    VkCommandBufferAllocateInfo ai = { .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO, .commandPool = state->cmdpool, .level = VK_COMMAND_BUFFER_LEVEL_PRIMARY, .commandBufferCount = 1 };
+    VkCommandBuffer cb;
+    vkAllocateCommandBuffers(state->device, &ai, &cb);
+    VkCommandBufferBeginInfo bi = { .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO, .flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT };
+    vkBeginCommandBuffer(cb, &bi);
+    return cb;
+}
+
+void vk_end_single_time_commands(VulkanRendererState* state, VkCommandBuffer cb) {
+    vkEndCommandBuffer(cb);
+    VkSubmitInfo si = { .sType = VK_STRUCTURE_TYPE_SUBMIT_INFO, .commandBufferCount = 1, .pCommandBuffers = &cb };
+    vkQueueSubmit(state->queue, 1, &si, VK_NULL_HANDLE);
+    vkQueueWaitIdle(state->queue);
+    vkFreeCommandBuffers(state->device, state->cmdpool, 1, &cb);
+}

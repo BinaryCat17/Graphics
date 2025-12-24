@@ -7,6 +7,7 @@
 #include "engine/graphics/internal/vulkan/vk_pipeline.h"
 #include "engine/graphics/internal/vulkan/vk_resources.h"
 #include "engine/graphics/internal/vulkan/vk_utils.h"
+#include "engine/graphics/internal/vulkan/vk_buffer.h"
 #include "engine/graphics/primitives.h"
 #include "engine/text/font.h"
 
@@ -183,8 +184,39 @@ static void vulkan_compute_dispatch(RendererBackend* backend, uint32_t pipeline_
     VkPipeline pipeline = state->compute_pipelines[idx].pipeline;
     VkPipelineLayout layout = state->compute_pipelines[idx].layout;
     
+    // --- Update SSBO Descriptors (Set 1) ---
+    // Identify active bindings and update the descriptor set on-the-fly.
+    // In production, we should cache these or use Push Descriptors.
+    VkWriteDescriptorSet writes[MAX_COMPUTE_BINDINGS];
+    VkDescriptorBufferInfo dbis[MAX_COMPUTE_BINDINGS];
+    uint32_t write_count = 0;
+
+    for (int i = 0; i < MAX_COMPUTE_BINDINGS; ++i) {
+        if (state->compute_bindings[i].buffer) {
+            dbis[write_count].buffer = state->compute_bindings[i].buffer->buffer;
+            dbis[write_count].offset = 0;
+            dbis[write_count].range = VK_WHOLE_SIZE;
+
+            writes[write_count].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+            writes[write_count].pNext = NULL;
+            writes[write_count].dstSet = state->compute_ssbo_descriptor;
+            writes[write_count].dstBinding = i;
+            writes[write_count].dstArrayElement = 0;
+            writes[write_count].descriptorCount = 1;
+            writes[write_count].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+            writes[write_count].pImageInfo = NULL;
+            writes[write_count].pBufferInfo = &dbis[write_count];
+            writes[write_count].pTexelBufferView = NULL;
+            
+            write_count++;
+        }
+    }
+    
+    if (write_count > 0) {
+        vkUpdateDescriptorSets(state->device, write_count, writes, 0, NULL);
+    }
+    
     // Use the dedicated compute command buffer
-    // Wait for fence to ensure previous submission is done
     vkWaitForFences(state->device, 1, &state->compute_fence, VK_TRUE, UINT64_MAX);
     vkResetFences(state->device, 1, &state->compute_fence);
     
@@ -203,6 +235,11 @@ static void vulkan_compute_dispatch(RendererBackend* backend, uint32_t pipeline_
     if (state->compute_write_descriptor) {
         vkCmdBindDescriptorSets(state->compute_cmd, VK_PIPELINE_BIND_POINT_COMPUTE, layout, 0, 1, &state->compute_write_descriptor, 0, NULL);
     }
+
+    // Bind Descriptor Set 1 (SSBOs)
+    if (state->compute_ssbo_descriptor) {
+        vkCmdBindDescriptorSets(state->compute_cmd, VK_PIPELINE_BIND_POINT_COMPUTE, layout, 1, 1, &state->compute_ssbo_descriptor, 0, NULL);
+    }
     
     // Push Constants
     if (push_constants && push_constants_size > 0) {
@@ -212,11 +249,11 @@ static void vulkan_compute_dispatch(RendererBackend* backend, uint32_t pipeline_
     // Dispatch
     vkCmdDispatch(state->compute_cmd, group_x, group_y, group_z);
     
-    // Barrier (Make sure writes are visible to fragment shader)
+    // Barrier (Global Memory + Image)
     VkImageMemoryBarrier barrier = {
         .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
         .oldLayout = VK_IMAGE_LAYOUT_GENERAL,
-        .newLayout = VK_IMAGE_LAYOUT_GENERAL, // Keep it general for now
+        .newLayout = VK_IMAGE_LAYOUT_GENERAL,
         .srcAccessMask = VK_ACCESS_SHADER_WRITE_BIT,
         .dstAccessMask = VK_ACCESS_SHADER_READ_BIT,
         .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
@@ -225,7 +262,13 @@ static void vulkan_compute_dispatch(RendererBackend* backend, uint32_t pipeline_
         .subresourceRange = { VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1 }
     };
     
-    vkCmdPipelineBarrier(state->compute_cmd, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, 0, 0, NULL, 0, NULL, 1, &barrier);
+    VkMemoryBarrier mem_barrier = {
+        .sType = VK_STRUCTURE_TYPE_MEMORY_BARRIER,
+        .srcAccessMask = VK_ACCESS_SHADER_WRITE_BIT,
+        .dstAccessMask = VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_VERTEX_ATTRIBUTE_READ_BIT | VK_ACCESS_HOST_READ_BIT
+    };
+    
+    vkCmdPipelineBarrier(state->compute_cmd, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, 0, 1, &mem_barrier, 0, NULL, 1, &barrier);
     
     vkEndCommandBuffer(state->compute_cmd);
     
@@ -330,6 +373,34 @@ static bool vulkan_renderer_init(RendererBackend* backend, const RenderBackendIn
     // 8. Fonts & Textures
     vk_create_font_texture(state);
     vk_create_descriptor_pool_and_set(state);
+
+    // Create Compute SSBO Layout (Set 1)
+    VkDescriptorSetLayoutBinding bindings[MAX_COMPUTE_BINDINGS];
+    for (int i=0; i<MAX_COMPUTE_BINDINGS; ++i) {
+        bindings[i].binding = i;
+        bindings[i].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+        bindings[i].descriptorCount = 1;
+        bindings[i].stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
+        bindings[i].pImmutableSamplers = NULL;
+    }
+    VkDescriptorSetLayoutCreateInfo dslci = {
+        .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO,
+        .bindingCount = MAX_COMPUTE_BINDINGS,
+        .pBindings = bindings
+    };
+    if (vkCreateDescriptorSetLayout(state->device, &dslci, NULL, &state->compute_ssbo_layout) != VK_SUCCESS) {
+        LOG_FATAL("Failed to create compute SSBO layout");
+    }
+
+    VkDescriptorSetAllocateInfo dsai = {
+        .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO,
+        .descriptorPool = state->descriptor_pool,
+        .descriptorSetCount = 1,
+        .pSetLayouts = &state->compute_ssbo_layout
+    };
+    if (vkAllocateDescriptorSets(state->device, &dsai, &state->compute_ssbo_descriptor) != VK_SUCCESS) {
+        LOG_FATAL("Failed to allocate compute SSBO descriptor");
+    }
 
     // 9. Static Buffers (Quad)
     // Vertex Buffer
@@ -715,6 +786,55 @@ static void vulkan_renderer_cleanup(RendererBackend* backend) {
     free(backend);
 }
 
+static void* vulkan_buffer_create(RendererBackend* backend, size_t size) {
+    VulkanRendererState* state = (VulkanRendererState*)backend->state;
+    VkBufferWrapper* wrapper = malloc(sizeof(VkBufferWrapper));
+    // Default to Storage Buffer + Transfer Dest/Src + Vertex Buffer
+    if (vk_buffer_create(state, size, 
+        VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_TRANSFER_SRC_BIT, 
+        VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, wrapper)) {
+        return wrapper;
+    }
+    free(wrapper);
+    return NULL;
+}
+
+static void vulkan_buffer_destroy(RendererBackend* backend, void* buffer_handle) {
+    VulkanRendererState* state = (VulkanRendererState*)backend->state;
+    VkBufferWrapper* wrapper = (VkBufferWrapper*)buffer_handle;
+    if (wrapper) {
+        vk_buffer_destroy(state, wrapper);
+        free(wrapper);
+    }
+}
+
+static void* vulkan_buffer_map(RendererBackend* backend, void* buffer_handle) {
+    VulkanRendererState* state = (VulkanRendererState*)backend->state;
+    return vk_buffer_map(state, (VkBufferWrapper*)buffer_handle);
+}
+
+static void vulkan_buffer_unmap(RendererBackend* backend, void* buffer_handle) {
+    VulkanRendererState* state = (VulkanRendererState*)backend->state;
+    vk_buffer_unmap(state, (VkBufferWrapper*)buffer_handle);
+}
+
+static bool vulkan_buffer_upload(RendererBackend* backend, void* buffer_handle, const void* data, size_t size, size_t offset) {
+    VulkanRendererState* state = (VulkanRendererState*)backend->state;
+    return vk_buffer_upload(state, (VkBufferWrapper*)buffer_handle, data, size, offset);
+}
+
+static bool vulkan_buffer_read(RendererBackend* backend, void* buffer_handle, void* dst, size_t size, size_t offset) {
+    VulkanRendererState* state = (VulkanRendererState*)backend->state;
+    return vk_buffer_read(state, (VkBufferWrapper*)buffer_handle, dst, size, offset);
+}
+
+static void vulkan_compute_bind_buffer(RendererBackend* backend, void* buffer_handle, uint32_t slot) {
+    VulkanRendererState* state = (VulkanRendererState*)backend->state;
+    if (slot < MAX_COMPUTE_BINDINGS) {
+        state->compute_bindings[slot].buffer = (VkBufferWrapper*)buffer_handle;
+    }
+}
+
 // Factory
 RendererBackend* vulkan_renderer_backend(void) {
     // Allocate Backend and State on Heap
@@ -741,6 +861,15 @@ RendererBackend* vulkan_renderer_backend(void) {
     backend->compute_dispatch = vulkan_compute_dispatch;
     backend->compute_wait = vulkan_compute_wait;
     backend->compile_shader = vulkan_compile_shader;
+    
+    // Buffer
+    backend->buffer_create = vulkan_buffer_create;
+    backend->buffer_destroy = vulkan_buffer_destroy;
+    backend->buffer_map = vulkan_buffer_map;
+    backend->buffer_unmap = vulkan_buffer_unmap;
+    backend->buffer_upload = vulkan_buffer_upload;
+    backend->buffer_read = vulkan_buffer_read;
+    backend->compute_bind_buffer = vulkan_compute_bind_buffer;
     
     return backend;
 }

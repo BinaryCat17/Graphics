@@ -11,7 +11,7 @@ typedef struct RenderFramePacket RenderFramePacket;
 typedef struct Assets Assets;
 typedef struct PlatformWindow PlatformWindow;
 typedef struct Scene Scene;
-
+typedef struct RendererBackend RendererBackend; // Forward declaration
 
 typedef struct RenderSystemConfig {
     PlatformWindow* window;
@@ -56,5 +56,8 @@ double render_system_get_time(RenderSystem* sys);
 uint64_t render_system_get_frame_count(RenderSystem* sys);
 bool render_system_is_ready(RenderSystem* sys);
 void render_system_set_show_compute(RenderSystem* sys, bool show);
+
+// Internal Access
+RendererBackend* render_system_get_backend(RenderSystem* sys);
 
 #endif // RENDER_SYSTEM_H

@@ -148,13 +148,13 @@ void vk_create_font_texture(VulkanRendererState* state) {
 
 void vk_create_descriptor_pool_and_set(VulkanRendererState* state) {
     VkDescriptorPoolSize pools[] = {
-        { .type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, .descriptorCount = 16 },
-        { .type = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, .descriptorCount = 16 },
-        { .type = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, .descriptorCount = 16 }
+        { .type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, .descriptorCount = 32 },
+        { .type = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, .descriptorCount = 64 },
+        { .type = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, .descriptorCount = 32 }
     };
     VkDescriptorPoolCreateInfo dpci = { 
         .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO, 
-        .maxSets = 16, 
+        .maxSets = 32, 
         .poolSizeCount = 3, 
         .pPoolSizes = pools 
     };

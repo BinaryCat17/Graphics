@@ -17,4 +17,8 @@ uint32_t find_mem_type(VkPhysicalDevice physical_device, uint32_t type_filter, V
 // File I/O
 uint32_t* read_file_bin_u32(const char* filename, size_t* out_size);
 
+// Command Buffer Helpers
+VkCommandBuffer vk_begin_single_time_commands(VulkanRendererState* state);
+void vk_end_single_time_commands(VulkanRendererState* state, VkCommandBuffer cb);
+
 #endif // VK_UTILS_H

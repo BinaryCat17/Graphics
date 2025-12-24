@@ -10,6 +10,7 @@
 #include "engine/graphics/internal/vulkan/vulkan_renderer.h"
 
 typedef struct Font Font;
+struct VkBufferWrapper; // Forward declaration
 
 typedef struct { float viewport[2]; } ViewConstants;
 
@@ -131,6 +132,14 @@ typedef struct VulkanRendererState {
         VkPipeline pipeline;
         VkPipelineLayout layout;
     } compute_pipelines[MAX_COMPUTE_PIPELINES];
+
+#define MAX_COMPUTE_BINDINGS 16
+    struct {
+        struct VkBufferWrapper* buffer; // Pointer to wrapper
+    } compute_bindings[MAX_COMPUTE_BINDINGS];
+    
+    VkDescriptorSetLayout compute_ssbo_layout; // Layout for Set 1 (Buffers)
+    VkDescriptorSet compute_ssbo_descriptor;   // Set 1 Instance
 
 } VulkanRendererState;
 

@@ -1,5 +1,6 @@
 # Architecture Overview (v3.0)
 
+**Language:** C11
 **Paradigm:** Implicitly Parallel Compute Graph
 **Philosophy:** "The Graph is the Source Code"
 **Target:** Visual Compute Engine for High-Performance Tools

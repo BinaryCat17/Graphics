@@ -294,3 +294,7 @@ double render_system_get_time(RenderSystem* sys) { return sys ? sys->current_tim
 uint64_t render_system_get_frame_count(RenderSystem* sys) { return sys ? sys->frame_count : 0; }
 bool render_system_is_ready(RenderSystem* sys) { return sys ? sys->renderer_ready : false; }
 void render_system_set_show_compute(RenderSystem* sys, bool show) { if(sys) sys->show_compute_result = show; }
+
+RendererBackend* render_system_get_backend(RenderSystem* sys) {
+    return sys ? sys->backend : NULL;
+}

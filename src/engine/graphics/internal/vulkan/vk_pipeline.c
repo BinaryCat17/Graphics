@@ -86,6 +86,7 @@ VkResult vk_create_compute_pipeline_shader(VulkanRendererState* state, const uin
     // 2. Create Layout
     // For now, layout_idx is ignored and we always use the default:
     // Set 0: Compute Write (Storage Image)
+    // Set 1: Buffers (SSBOs)
     // Push Constants: 128 bytes
     
     VkPushConstantRange pcr = { 
@@ -94,10 +95,12 @@ VkResult vk_create_compute_pipeline_shader(VulkanRendererState* state, const uin
         .size = 128 
     };
     
+    VkDescriptorSetLayout layouts[] = { state->compute_write_layout, state->compute_ssbo_layout };
+    
     VkPipelineLayoutCreateInfo plci = { 
         .sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO, 
-        .setLayoutCount = 1, 
-        .pSetLayouts = &state->compute_write_layout, 
+        .setLayoutCount = 2, 
+        .pSetLayouts = layouts, 
         .pushConstantRangeCount = 1, 
         .pPushConstantRanges = &pcr 
     };
