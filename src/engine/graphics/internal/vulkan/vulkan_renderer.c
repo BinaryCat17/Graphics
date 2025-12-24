@@ -8,6 +8,7 @@
 #include "engine/graphics/internal/vulkan/vk_utils.h"
 #include "engine/graphics/internal/vulkan/vk_buffer.h"
 #include "engine/graphics/primitives.h"
+#include "engine/graphics/internal/stream_internal.h"
 #include "engine/text/font.h"
 
 #include "foundation/logger/logger.h"
@@ -444,22 +445,24 @@ static void vulkan_renderer_cleanup(RendererBackend* backend) {
     free(backend);
 }
 
-static void* vulkan_buffer_create(RendererBackend* backend, size_t size) {
+static bool vulkan_buffer_create(RendererBackend* backend, Stream* stream) {
     VulkanRendererState* state = (VulkanRendererState*)backend->state;
     VkBufferWrapper* wrapper = malloc(sizeof(VkBufferWrapper));
     // Default to Storage Buffer + Transfer Dest/Src + Vertex Buffer
-    if (vk_buffer_create(state, size, 
+    if (vk_buffer_create(state, stream->total_size, 
         VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_TRANSFER_SRC_BIT, 
         VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, wrapper)) {
-        return wrapper;
+        stream->buffer_handle = wrapper;
+        return true;
     }
     free(wrapper);
-    return NULL;
+    stream->buffer_handle = NULL;
+    return false;
 }
 
-static void vulkan_buffer_destroy(RendererBackend* backend, void* buffer_handle) {
+static void vulkan_buffer_destroy(RendererBackend* backend, Stream* stream) {
     VulkanRendererState* state = (VulkanRendererState*)backend->state;
-    VkBufferWrapper* wrapper = (VkBufferWrapper*)buffer_handle;
+    VkBufferWrapper* wrapper = (VkBufferWrapper*)stream->buffer_handle;
     if (wrapper) {
         // Clear bindings if this buffer is bound
         for (int i=0; i<MAX_COMPUTE_BINDINGS; ++i) {
@@ -467,36 +470,42 @@ static void vulkan_buffer_destroy(RendererBackend* backend, void* buffer_handle)
                 state->compute_bindings[i].buffer = NULL;
             }
         }
+        for (int i=0; i<MAX_COMPUTE_BINDINGS; ++i) {
+            if (state->graphics_bindings[i].buffer == wrapper) {
+                state->graphics_bindings[i].buffer = NULL;
+            }
+        }
         
         vk_buffer_destroy(state, wrapper);
         free(wrapper);
+        stream->buffer_handle = NULL;
     }
 }
 
-static void* vulkan_buffer_map(RendererBackend* backend, void* buffer_handle) {
+static void* vulkan_buffer_map(RendererBackend* backend, Stream* stream) {
     VulkanRendererState* state = (VulkanRendererState*)backend->state;
-    return vk_buffer_map(state, (VkBufferWrapper*)buffer_handle);
+    return vk_buffer_map(state, (VkBufferWrapper*)stream->buffer_handle);
 }
 
-static void vulkan_buffer_unmap(RendererBackend* backend, void* buffer_handle) {
+static void vulkan_buffer_unmap(RendererBackend* backend, Stream* stream) {
     VulkanRendererState* state = (VulkanRendererState*)backend->state;
-    vk_buffer_unmap(state, (VkBufferWrapper*)buffer_handle);
+    vk_buffer_unmap(state, (VkBufferWrapper*)stream->buffer_handle);
 }
 
-static bool vulkan_buffer_upload(RendererBackend* backend, void* buffer_handle, const void* data, size_t size, size_t offset) {
+static bool vulkan_buffer_upload(RendererBackend* backend, Stream* stream, const void* data, size_t size, size_t offset) {
     VulkanRendererState* state = (VulkanRendererState*)backend->state;
-    return vk_buffer_upload(state, (VkBufferWrapper*)buffer_handle, data, size, offset);
+    return vk_buffer_upload(state, (VkBufferWrapper*)stream->buffer_handle, data, size, offset);
 }
 
-static bool vulkan_buffer_read(RendererBackend* backend, void* buffer_handle, void* dst, size_t size, size_t offset) {
+static bool vulkan_buffer_read(RendererBackend* backend, Stream* stream, void* dst, size_t size, size_t offset) {
     VulkanRendererState* state = (VulkanRendererState*)backend->state;
-    return vk_buffer_read(state, (VkBufferWrapper*)buffer_handle, dst, size, offset);
+    return vk_buffer_read(state, (VkBufferWrapper*)stream->buffer_handle, dst, size, offset);
 }
 
-static void vulkan_compute_bind_buffer(RendererBackend* backend, void* buffer_handle, uint32_t slot) {
+static void vulkan_compute_bind_buffer(RendererBackend* backend, Stream* stream, uint32_t slot) {
     VulkanRendererState* state = (VulkanRendererState*)backend->state;
     if (slot < MAX_COMPUTE_BINDINGS) {
-        state->compute_bindings[slot].buffer = (VkBufferWrapper*)buffer_handle;
+        state->compute_bindings[slot].buffer = (VkBufferWrapper*)stream->buffer_handle;
     }
 }
 
@@ -547,10 +556,10 @@ static void vulkan_graphics_pipeline_destroy(RendererBackend* backend, uint32_t 
     }
 }
 
-static void vulkan_graphics_bind_buffer(RendererBackend* backend, void* buffer_handle, uint32_t slot) {
+static void vulkan_graphics_bind_buffer(RendererBackend* backend, Stream* stream, uint32_t slot) {
     VulkanRendererState* state = (VulkanRendererState*)backend->state;
     if (slot < MAX_COMPUTE_BINDINGS) {
-        state->graphics_bindings[slot].buffer = (VkBufferWrapper*)buffer_handle;
+        state->graphics_bindings[slot].buffer = (VkBufferWrapper*)stream->buffer_handle;
     }
 }
 
@@ -645,7 +654,11 @@ static void vulkan_renderer_submit_commands(RendererBackend* backend, const Rend
             }
             case RENDER_CMD_BIND_BUFFER: {
                 if (rc->bind_buffer.slot < 4) {
-                    pending_buffers[rc->bind_buffer.slot] = (VkBufferWrapper*)rc->bind_buffer.buffer_handle;
+                    if (rc->bind_buffer.stream) {
+                        pending_buffers[rc->bind_buffer.slot] = (VkBufferWrapper*)rc->bind_buffer.stream->buffer_handle;
+                    } else {
+                        pending_buffers[rc->bind_buffer.slot] = NULL;
+                    }
                     bindings_dirty = true;
                 }
                 break;

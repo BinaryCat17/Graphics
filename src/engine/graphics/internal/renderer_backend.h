@@ -11,6 +11,7 @@ typedef struct PlatformWindow PlatformWindow;
 typedef struct PlatformSurface PlatformSurface;
 typedef struct Scene Scene;
 typedef struct Font Font;
+typedef struct Stream Stream;
 
 // Backend Initialization Parameters
 typedef struct RenderBackendInit {
@@ -73,17 +74,19 @@ typedef struct RendererBackend {
 
     // --- Buffer Management (SSBO / Vertex) ---
     // Create a GPU buffer. type: 0=SSBO/Vertex, 1=Staging/Transfer.
-    void* (*buffer_create)(struct RendererBackend* backend, size_t size);
-    void (*buffer_destroy)(struct RendererBackend* backend, void* buffer_handle);
-    void* (*buffer_map)(struct RendererBackend* backend, void* buffer_handle);
-    void (*buffer_unmap)(struct RendererBackend* backend, void* buffer_handle);
-    bool (*buffer_upload)(struct RendererBackend* backend, void* buffer_handle, const void* data, size_t size, size_t offset);
-    bool (*buffer_read)(struct RendererBackend* backend, void* buffer_handle, void* dst, size_t size, size_t offset);
+    // The 'stream' struct must be partially initialized (total_size set).
+    // The backend will allocate the handle and store it in stream->buffer_handle.
+    bool (*buffer_create)(struct RendererBackend* backend, Stream* stream);
+    void (*buffer_destroy)(struct RendererBackend* backend, Stream* stream);
+    void* (*buffer_map)(struct RendererBackend* backend, Stream* stream);
+    void (*buffer_unmap)(struct RendererBackend* backend, Stream* stream);
+    bool (*buffer_upload)(struct RendererBackend* backend, Stream* stream, const void* data, size_t size, size_t offset);
+    bool (*buffer_read)(struct RendererBackend* backend, Stream* stream, void* dst, size_t size, size_t offset);
 
     // --- Compute Binding ---
     // Bind a buffer to a specific binding slot for the next compute dispatch.
     // 'slot': The binding index in the shader (layout(binding = slot)).
-    void (*compute_bind_buffer)(struct RendererBackend* backend, void* buffer_handle, uint32_t slot);
+    void (*compute_bind_buffer)(struct RendererBackend* backend, Stream* stream, uint32_t slot);
 
     // --- Graphics Subsystem (Zero-Copy) ---
     // Create a graphics pipeline.
@@ -93,7 +96,7 @@ typedef struct RendererBackend {
     void (*graphics_pipeline_destroy)(struct RendererBackend* backend, uint32_t pipeline_id);
     
     // Bind a buffer to a specific binding slot (Set 1) for the next draw call.
-    void (*graphics_bind_buffer)(struct RendererBackend* backend, void* buffer_handle, uint32_t slot);
+    void (*graphics_bind_buffer)(struct RendererBackend* backend, Stream* stream, uint32_t slot);
     
     // Draw Instanced (Zero-Copy)
     // Uses the bound pipeline and buffers.

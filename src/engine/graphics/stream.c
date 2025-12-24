@@ -1,18 +1,9 @@
 #include "stream.h"
 #include "render_system.h"
 #include "internal/renderer_backend.h"
+#include "internal/stream_internal.h"
 #include "foundation/logger/logger.h"
 #include <stdlib.h>
-
-struct Stream {
-    RenderSystem* sys;
-    RendererBackend* backend;
-    void* buffer_handle;
-    
-    StreamType type;
-    size_t count;      // Capacity (number of elements)
-    size_t element_size;
-};
 
 static size_t get_element_size(StreamType type, size_t custom_size) {
     switch (type) {
@@ -45,20 +36,23 @@ Stream* stream_create(RenderSystem* sys, StreamType type, size_t count, size_t c
 
     size_t total_size = elem_size * count;
     
-    void* handle = backend->buffer_create(backend, total_size);
-    if (!handle) {
-        LOG_ERROR("Stream: Failed to allocate GPU buffer (%zu bytes).", total_size);
-        return NULL;
-    }
-
     Stream* s = malloc(sizeof(Stream));
+    if (!s) return NULL;
+
     s->sys = sys;
     s->backend = backend;
-    s->buffer_handle = handle;
     s->type = type;
     s->count = count;
     s->element_size = elem_size;
+    s->total_size = total_size;
+    s->buffer_handle = NULL;
     
+    if (!backend->buffer_create(backend, s)) {
+        LOG_ERROR("Stream: Failed to allocate GPU buffer (%zu bytes).", total_size);
+        free(s);
+        return NULL;
+    }
+
     LOG_TRACE("Stream created: %p (Count: %zu, Size: %zu bytes)", (void*)s, count, total_size);
     return s;
 }
@@ -67,7 +61,7 @@ void stream_destroy(Stream* stream) {
     if (!stream) return;
     
     if (stream->backend && stream->backend->buffer_destroy) {
-        stream->backend->buffer_destroy(stream->backend, stream->buffer_handle);
+        stream->backend->buffer_destroy(stream->backend, stream);
     }
     
     free(stream);
@@ -82,7 +76,7 @@ bool stream_set_data(Stream* stream, const void* data, size_t count) {
     
     if (!stream->backend->buffer_upload) return false;
     
-    return stream->backend->buffer_upload(stream->backend, stream->buffer_handle, data, count * stream->element_size, 0);
+    return stream->backend->buffer_upload(stream->backend, stream, data, count * stream->element_size, 0);
 }
 
 bool stream_read_back(Stream* stream, void* out_data, size_t count) {
@@ -94,18 +88,15 @@ bool stream_read_back(Stream* stream, void* out_data, size_t count) {
         return false;
     }
     
-    return stream->backend->buffer_read(stream->backend, stream->buffer_handle, out_data, count * stream->element_size, 0);
+    return stream->backend->buffer_read(stream->backend, stream, out_data, count * stream->element_size, 0);
 }
 
 void stream_bind_compute(Stream* stream, uint32_t binding_slot) {
     if (!stream || !stream->backend->compute_bind_buffer) return;
-    stream->backend->compute_bind_buffer(stream->backend, stream->buffer_handle, binding_slot);
+    stream->backend->compute_bind_buffer(stream->backend, stream, binding_slot);
 }
 
 size_t stream_get_count(Stream* stream) {
     return stream ? stream->count : 0;
 }
 
-void* stream_get_handle(Stream* stream) {
-    return stream ? stream->buffer_handle : NULL;
-}

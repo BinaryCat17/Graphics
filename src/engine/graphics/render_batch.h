@@ -7,6 +7,7 @@
 
 // Forward decl
 struct Mesh;
+typedef struct Stream Stream;
 
 // Represents a 3D draw call or compute dispatch
 typedef struct RenderBatch {
@@ -17,7 +18,7 @@ typedef struct RenderBatch {
     struct Mesh* mesh;         // If drawing a mesh
     
     // Custom Bindings (for SSBOs/UBOs)
-    void* bind_buffers[4];     // Handles to Streams/Buffers
+    Stream* bind_buffers[4];   // Streams
     uint32_t bind_slots[4];
     uint32_t bind_count;
 

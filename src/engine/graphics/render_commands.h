@@ -5,6 +5,9 @@
 #include <stddef.h>
 #include "foundation/math/math_types.h"
 
+// Forward Declaration
+typedef struct Stream Stream;
+
 typedef enum RenderCommandType {
     RENDER_CMD_BIND_PIPELINE,
     RENDER_CMD_BIND_BUFFER,       // Bind SSBO/UBO to a specific slot
@@ -24,11 +27,11 @@ typedef struct RenderCmdBindPipeline {
 
 typedef struct RenderCmdBindBuffer {
     uint32_t slot;
-    void* buffer_handle;
+    Stream* stream;
 } RenderCmdBindBuffer;
 
 typedef struct RenderCmdUpdateBuffer {
-    void* buffer_handle;
+    Stream* stream;
     const void* data;
     size_t size;
     size_t offset;
@@ -50,7 +53,7 @@ typedef struct RenderCmdDrawIndexed {
 } RenderCmdDrawIndexed;
 
 typedef struct RenderCmdDrawIndirect {
-    void* buffer_handle; // Buffer containing draw commands
+    Stream* stream; // Buffer containing draw commands
     size_t offset;
     uint32_t draw_count;
     uint32_t stride;

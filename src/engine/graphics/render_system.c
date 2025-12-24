@@ -343,7 +343,7 @@ void render_system_draw(RenderSystem* sys) {
          
          cmd.type = RENDER_CMD_BIND_BUFFER;
          cmd.bind_buffer.slot = 0;
-         cmd.bind_buffer.buffer_handle = stream_get_handle(sys->ui_instance_stream);
+         cmd.bind_buffer.stream = sys->ui_instance_stream;
          cmd_list_add(&sys->cmd_list, cmd);
          
          // Upload Data
@@ -376,7 +376,7 @@ void render_system_draw(RenderSystem* sys) {
                 RenderCommand cmd = {0};
                 cmd.type = RENDER_CMD_BIND_BUFFER;
                 cmd.bind_buffer.slot = batch->bind_slots[b];
-                cmd.bind_buffer.buffer_handle = batch->bind_buffers[b];
+                cmd.bind_buffer.stream = batch->bind_buffers[b];
                 cmd_list_add(&sys->cmd_list, cmd);
             }
         }

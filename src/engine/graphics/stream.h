@@ -50,7 +50,4 @@ void stream_bind_compute(Stream* stream, uint32_t binding_slot);
 // Возвращает количество элементов (емкость).
 size_t stream_get_count(Stream* stream);
 
-// Возвращает внутренний дескриптор буфера (для низкоуровневых операций).
-void* stream_get_handle(Stream* stream);
-
 #endif // STREAM_H

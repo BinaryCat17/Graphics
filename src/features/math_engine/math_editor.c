@@ -540,7 +540,7 @@ void math_editor_render(MathEditor* editor, Scene* scene, const struct Assets* a
         batch.vertex_count = 6; 
         batch.instance_count = editor->view->node_views_count;
         
-        batch.bind_buffers[0] = stream_get_handle(editor->gpu_nodes);
+        batch.bind_buffers[0] = editor->gpu_nodes;
         batch.bind_slots[0] = 0; // set 0, binding 0 in shader? (Check shader)
         // Usually: set=0 is global, set=1 is per pass? 
         // We assume binding 0.
@@ -556,7 +556,7 @@ void math_editor_render(MathEditor* editor, Scene* scene, const struct Assets* a
         batch.vertex_count = editor->view->wires_count * 64 * 6;
         batch.instance_count = 1;
         
-        batch.bind_buffers[0] = stream_get_handle(editor->gpu_wire_verts);
+        batch.bind_buffers[0] = editor->gpu_wire_verts;
         batch.bind_slots[0] = 0;
         batch.bind_count = 1;
         
