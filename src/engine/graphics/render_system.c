@@ -15,6 +15,7 @@
 #include "engine/graphics/internal/vulkan/vulkan_renderer.h"
 #include "engine/graphics/stream.h"
 #include "engine/ui/ui_node.h" // NEW
+#include "engine/graphics/compute_graph.h"
 
 struct RenderSystem {
     // Dependencies
@@ -36,10 +37,13 @@ struct RenderSystem {
     bool packet_ready;
     Mutex* packet_mutex;
     
+    // Compute Graphs
+    ComputeGraph** compute_graphs;
+    size_t compute_graph_count;
+    size_t compute_graph_capacity;
+    
     bool running;
     bool renderer_ready;
-    bool show_compute_result;
-    uint32_t active_compute_pipeline;
     double current_time;
     
     uint64_t frame_count;
@@ -202,7 +206,7 @@ void render_system_begin_frame(RenderSystem* sys, double time) {
     SceneCamera camera = {0};
     camera.view_matrix = mat4_identity();
     Mat4 proj = mat4_orthographic(0.0f, w, 0.0f, h, -100.0f, 100.0f);
-    camera.view_matrix = proj; 
+    camera.proj_matrix = proj; 
     
     scene_set_camera(dest->scene, camera);
 }
@@ -210,34 +214,14 @@ void render_system_begin_frame(RenderSystem* sys, double time) {
 void render_system_update(RenderSystem* sys) {
     if (!sys || !sys->renderer_ready) return;
 
-    if (sys->active_compute_pipeline > 0 && sys->backend && sys->backend->compute_dispatch) {
-        struct {
-            float time;
-            float width;
-            float height;
-            float _padding; 
-            float mouse[4];
-        } push = {
-            .time = (float)sys->current_time,
-            .width = 512.0f,
-            .height = 512.0f,
-            ._padding = 0.0f,
-            .mouse = {0, 0, 0, 0}
-        };
-        
-        sys->backend->compute_dispatch(sys->backend, sys->active_compute_pipeline, 32, 32, 1, &push, sizeof(push));
-    }
-
-    if (sys->show_compute_result) {
-        RenderFramePacket* dest = &sys->packets[sys->back_packet_index];
-        UiNode quad = {0};
-        quad.id = 9999;
-        quad.rect = (Rect){600.0f, 100.0f, 512.0f, 512.0f};
-        quad.color = (Vec4){1.0f, 1.0f, 1.0f, 1.0f};
-        quad.primitive_type = SCENE_MODE_USER_TEXTURE;
-        quad.uv_rect = (Vec4){0.0f, 0.0f, 1.0f, 1.0f};
-        quad.flags = UI_RENDER_FLAG_TEXTURED | UI_RENDER_FLAG_HAS_BG;
-        scene_push_ui_node(dest->scene, quad);
+    // 1. Execute Registered Compute Graphs
+    if (sys->compute_graphs) {
+        for (size_t i = 0; i < sys->compute_graph_count; ++i) {
+            ComputeGraph* graph = sys->compute_graphs[i];
+            if (graph) {
+                compute_graph_execute(graph, sys);
+            }
+        }
     }
 
     mutex_lock(sys->packet_mutex);
@@ -335,6 +319,21 @@ void render_system_draw(RenderSystem* sys) {
         inst->clip_rect = (Vec4){node->clip_rect.x, node->clip_rect.y, node->clip_rect.w, node->clip_rect.h};
     }
     
+    // Submit
+    
+    // Calculate ViewProj
+    SceneCamera cam = scene_get_camera(scene);
+    Mat4 view_proj = mat4_multiply(&cam.view_matrix, &cam.proj_matrix);
+
+    // Push Constants Command
+    RenderCommand pc_cmd = {0};
+    pc_cmd.type = RENDER_CMD_PUSH_CONSTANTS;
+    pc_cmd.push_constants.data = &view_proj;
+    pc_cmd.push_constants.size = sizeof(Mat4);
+    pc_cmd.push_constants.stage_flags = 3; // VERTEX | FRAGMENT
+    
+    cmd_list_add(&sys->cmd_list, pc_cmd);
+
     // 2. Flush UI Batch
     if (ui_count > 0) {
          RenderCommand cmd = {0};
@@ -408,12 +407,6 @@ void render_system_resize(RenderSystem* sys, int width, int height) {
     }
 }
 
-void render_system_set_compute_pipeline(RenderSystem* sys, uint32_t pipeline_id) {
-    if (!sys) return;
-    sys->active_compute_pipeline = pipeline_id;
-    LOG_INFO("RenderSystem: Active compute pipeline set to %u", pipeline_id);
-}
-
 uint32_t render_system_create_compute_pipeline(RenderSystem* sys, uint32_t* spv_code, size_t spv_size) {
     if (!sys || !sys->backend || !sys->backend->compute_pipeline_create) return 0;
     return sys->backend->compute_pipeline_create(sys->backend, spv_code, spv_size, 0);
@@ -471,7 +464,6 @@ void render_system_request_screenshot(RenderSystem* sys, const char* filepath) {
 double render_system_get_time(RenderSystem* sys) { return sys ? sys->current_time : 0.0; }
 uint64_t render_system_get_frame_count(RenderSystem* sys) { return sys ? sys->frame_count : 0; }
 bool render_system_is_ready(RenderSystem* sys) { return sys ? sys->renderer_ready : false; }
-void render_system_set_show_compute(RenderSystem* sys, bool show) { if(sys) sys->show_compute_result = show; }
 
 RendererBackend* render_system_get_backend(RenderSystem* sys) {
     return sys ? sys->backend : NULL;
@@ -485,3 +477,38 @@ void render_system_update_gpu_input(RenderSystem* sys, const GpuInputState* stat
     if (!sys || !state || !sys->gpu_input_stream) return;
     stream_set_data(sys->gpu_input_stream, state, 1);
 }
+
+void render_system_register_compute_graph(RenderSystem* sys, ComputeGraph* graph) {
+    if (!sys || !graph) return;
+    
+    // Check duplicates
+    for (size_t i = 0; i < sys->compute_graph_count; ++i) {
+        if (sys->compute_graphs[i] == graph) return;
+    }
+    
+    if (sys->compute_graph_count >= sys->compute_graph_capacity) {
+        size_t new_cap = sys->compute_graph_capacity > 0 ? sys->compute_graph_capacity * 2 : 4;
+        ComputeGraph** new_arr = (ComputeGraph**)realloc((void*)sys->compute_graphs, new_cap * sizeof(ComputeGraph*));
+        if (!new_arr) return;
+        sys->compute_graphs = new_arr;
+        sys->compute_graph_capacity = new_cap;
+    }
+    
+    sys->compute_graphs[sys->compute_graph_count++] = graph;
+    LOG_INFO("RenderSystem: Registered compute graph.");
+}
+
+void render_system_unregister_compute_graph(RenderSystem* sys, ComputeGraph* graph) {
+    if (!sys || !graph) return;
+    
+    for (size_t i = 0; i < sys->compute_graph_count; ++i) {
+        if (sys->compute_graphs[i] == graph) {
+            // Swap with last
+            sys->compute_graphs[i] = sys->compute_graphs[sys->compute_graph_count - 1];
+            sys->compute_graph_count--;
+            LOG_INFO("RenderSystem: Unregistered compute graph.");
+            return;
+        }
+    }
+}
+

@@ -108,9 +108,12 @@ struct Stream;
 struct ComputeGraph;
 struct ComputePass;
 struct CustomDrawData;
+struct RenderSystem;
 
 // The State of the Graph Editor Feature (The "C" in MVC)
 typedef struct MathEditor {
+    struct RenderSystem* render_system;
+    
     MathGraph* graph;
     MemoryArena graph_arena;
     
@@ -132,6 +135,10 @@ typedef struct MathEditor {
     
     // Graphics
     uint32_t nodes_pipeline_id;
+
+    // Transpiled Logic Execution
+    struct ComputeGraph* logic_compute_graph;
+    struct ComputePass* logic_pass;
 
     // Wires Rendering
     struct Stream* gpu_wires;

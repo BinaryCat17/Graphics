@@ -74,11 +74,24 @@ static void math_editor_recompile_graph(MathEditor* editor, RenderSystem* rs) {
     }
 
     // 3. Swap
+    if (editor->logic_compute_graph) {
+        render_system_unregister_compute_graph(rs, editor->logic_compute_graph);
+        compute_graph_destroy(editor->logic_compute_graph);
+        editor->logic_compute_graph = NULL;
+        editor->logic_pass = NULL;
+    }
+
     if (editor->current_pipeline > 0) {
         render_system_destroy_compute_pipeline(rs, editor->current_pipeline);
     }
     editor->current_pipeline = new_pipe;
-    render_system_set_compute_pipeline(rs, new_pipe);
+    
+    if (new_pipe != 0) {
+         editor->logic_compute_graph = compute_graph_create();
+         // Group size 32x32 was used in old render_system_update dispatch
+         editor->logic_pass = compute_graph_add_pass(editor->logic_compute_graph, new_pipe, 32, 32, 1);
+         render_system_register_compute_graph(rs, editor->logic_compute_graph);
+    }
     
     LOG_INFO("Editor: Graph Recompiled Successfully (ID: %u)", new_pipe);
 }
@@ -321,6 +334,7 @@ static void math_editor_load_palette(MathEditor* editor, const char* path) {
 MathEditor* math_editor_create(Engine* engine) {
     MathEditor* editor = (MathEditor*)calloc(1, sizeof(MathEditor));
     if (!editor) return NULL;
+    editor->render_system = engine_get_render_system(engine);
 
     // 1. Init Memory
     arena_init(&editor->graph_arena, 1024 * 1024); // 1MB for Graph Data
@@ -411,7 +425,7 @@ MathEditor* math_editor_create(Engine* engine) {
 
     // 5. Initial Compute Compile
     engine_set_show_compute(engine, true);
-    render_system_set_show_compute(engine_get_render_system(engine), true);
+    // render_system_set_show_compute(engine_get_render_system(engine), true); // Removed
     math_editor_recompile_graph(editor, engine_get_render_system(engine));
 
     // 6. Input Mappings
@@ -507,6 +521,10 @@ MathEditor* math_editor_create(Engine* engine) {
     // so we don't strictly need persistent cache unless we want to avoid recreating the struct every frame.
     // However, RenderBatch is small enough to create on stack.
     
+    if (editor->gpu_compute_graph) {
+        render_system_register_compute_graph(editor->render_system, editor->gpu_compute_graph);
+    }
+    
     return editor;
 }
 
@@ -552,6 +570,31 @@ void math_editor_render(MathEditor* editor, Scene* scene, const struct Assets* a
 void math_editor_update(MathEditor* editor, Engine* engine) {
     if (!editor) return;
     
+    // Update Logic Graph Constants
+    if (editor->logic_pass) {
+        InputSystem* input = engine_get_input_system(engine);
+        struct {
+            float time;
+            float width;
+            float height;
+            float _padding; 
+            float mouse[4];
+        } push = {
+            .time = (float)render_system_get_time(engine_get_render_system(engine)),
+            .width = 512.0f,
+            .height = 512.0f,
+            ._padding = 0.0f,
+            .mouse = {0}
+        };
+        if (input) {
+            push.mouse[0] = input_get_mouse_x(input);
+            push.mouse[1] = input_get_mouse_y(input);
+            push.mouse[2] = input_is_mouse_down(input) ? 1.0f : 0.0f;
+        }
+        
+        compute_pass_set_push_constants(editor->logic_pass, &push, sizeof(push));
+    }
+    
     // Sync Logic -> View (one way binding for visual updates)
     math_editor_sync_view_data(editor);
 
@@ -559,7 +602,7 @@ void math_editor_update(MathEditor* editor, Engine* engine) {
     if (input_is_action_just_pressed(engine_get_input_system(engine), "ToggleCompute")) {
          bool show = !engine_get_show_compute(engine);
          engine_set_show_compute(engine, show);
-         render_system_set_show_compute(engine_get_render_system(engine), show);
+         // render_system_set_show_compute removed
          if (show) {
              editor->graph_dirty = true; 
          }
@@ -686,16 +729,22 @@ void math_editor_update(MathEditor* editor, Engine* engine) {
         uint32_t invalid_id = MATH_NODE_INVALID_ID;
         stream_set_data(editor->gpu_picking_result, &invalid_id, 1);
 
-        // 5. Execute
-        compute_graph_execute(editor->gpu_compute_graph, engine_get_render_system(engine));
+        // 5. Execute (Now handled by RenderSystem)
+        // compute_graph_execute(editor->gpu_compute_graph, engine_get_render_system(engine));
         
         // 6. Read Back
         uint32_t picked_id = MATH_NODE_INVALID_ID;
         if (stream_read_back(editor->gpu_picking_result, &picked_id, 1)) {
+             static uint32_t last_picked_id = MATH_NODE_INVALID_ID;
              if (picked_id != MATH_NODE_INVALID_ID) {
                   // Only log on click to avoid spam
                   if (input_is_mouse_down(input)) {
-                       LOG_DEBUG("GPU Picked ID: %u", picked_id);
+                       if (picked_id != last_picked_id) {
+                            LOG_DEBUG("GPU Picked ID: %u", picked_id);
+                            last_picked_id = picked_id;
+                       }
+                  } else {
+                       last_picked_id = MATH_NODE_INVALID_ID;
                   }
              }
         }
@@ -720,7 +769,19 @@ void math_editor_destroy(MathEditor* editor) {
     }
 
     // Cleanup GPU Resources
-    if (editor->gpu_compute_graph) compute_graph_destroy(editor->gpu_compute_graph);
+    if (editor->logic_compute_graph) {
+        if (editor->render_system) {
+            render_system_unregister_compute_graph(editor->render_system, editor->logic_compute_graph);
+        }
+        compute_graph_destroy(editor->logic_compute_graph);
+    }
+    
+    if (editor->gpu_compute_graph) {
+        if (editor->render_system) {
+            render_system_unregister_compute_graph(editor->render_system, editor->gpu_compute_graph);
+        }
+        compute_graph_destroy(editor->gpu_compute_graph);
+    }
     if (editor->gpu_nodes) stream_destroy(editor->gpu_nodes);
     if (editor->gpu_picking_result) stream_destroy(editor->gpu_picking_result);
     if (editor->gpu_wires) stream_destroy(editor->gpu_wires);

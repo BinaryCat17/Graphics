@@ -30,22 +30,25 @@
 - [x] **Debug & Fix Renderer Crash (Segfault)**
     - [x] Investigate `RenderBatch` processing and buffer binding.
     - [x] Verify Vulkan descriptor set updates.
+    - [x] Fix: Added missing Push Constants (ViewProj) to RenderSystem.
 
 **Status:** Phase 2 Complete. Ready for Phase 3.
 
 ## ⚡ Phase 3: Compute Unification
 *Цель: Универсальная система выполнения вычислительных шейдеров.*
 
-- [ ] **Абстракция `ComputePass`**
-    - [ ] Добавить список активных графов в `RenderSystem`.
-- [ ] **Система регистрации**
-    - [ ] Реализовать `render_system_register_compute(graph)`.
-    - [ ] Подключить `MathEditor` к регистрации своего графа при старте.
-- [ ] **Цикл исполнения**
-    - [ ] Вызывать `compute_graph_execute` для всех зарегистрированных графов в начале кадра.
-- [ ] **Очистка `RenderSystem`**
-    - [ ] Удалить поле `active_compute_pipeline`.
-    - [ ] Удалить поле `show_compute_result`.
+- [x] **Абстракция `ComputePass`**
+    - [x] Добавить список активных графов в `RenderSystem`.
+- [x] **Система регистрации**
+    - [x] Реализовать `render_system_register_compute(graph)`.
+    - [x] Подключить `MathEditor` к регистрации своего графа при старте.
+- [x] **Цикл исполнения**
+    - [x] Вызывать `compute_graph_execute` для всех зарегистрированных графов в начале кадра.
+- [x] **Очистка `RenderSystem`**
+    - [x] Удалить поле `active_compute_pipeline`.
+    - [x] Удалить поле `show_compute_result`.
+
+**Status:** Phase 3 Complete. Ready for Phase 4.
 
 ## 🧹 Phase 4: Cleanup & Optimization
 *Цель: Упрощение кода и использование новых систем.*

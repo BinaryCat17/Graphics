@@ -14,6 +14,7 @@ typedef struct Assets Assets;
 typedef struct PlatformWindow PlatformWindow;
 typedef struct Scene Scene;
 typedef struct RendererBackend RendererBackend; // Forward declaration
+typedef struct ComputeGraph ComputeGraph;
 
 typedef struct RenderSystemConfig {
     PlatformWindow* window;
@@ -41,12 +42,14 @@ void render_system_draw(RenderSystem* sys);
 // Notifies system of resize
 void render_system_resize(RenderSystem* sys, int width, int height);
 
-// Sets the active compute pipeline for the next frames
-void render_system_set_compute_pipeline(RenderSystem* sys, uint32_t pipeline_id);
 uint32_t render_system_create_compute_pipeline(RenderSystem* sys, uint32_t* spv_code, size_t spv_size);
 // Compiles GLSL (if supported by backend) and creates pipeline
 uint32_t render_system_create_compute_pipeline_from_source(RenderSystem* sys, const char* source);
 void render_system_destroy_compute_pipeline(RenderSystem* sys, uint32_t pipeline_id);
+
+// Registers a Compute Graph for automatic execution each frame
+void render_system_register_compute_graph(RenderSystem* sys, ComputeGraph* graph);
+void render_system_unregister_compute_graph(RenderSystem* sys, ComputeGraph* graph);
 
 // Creates a graphics pipeline from SPIR-V bytecode.
 // layout_index: 0 = UI (Default), 1 = Zero-Copy (No vertex input, SSBO bindings)
@@ -62,7 +65,6 @@ const RenderFramePacket* render_system_acquire_packet(RenderSystem* sys);
 double render_system_get_time(RenderSystem* sys);
 uint64_t render_system_get_frame_count(RenderSystem* sys);
 bool render_system_is_ready(RenderSystem* sys);
-void render_system_set_show_compute(RenderSystem* sys, bool show);
 
 // Internal Access
 RendererBackend* render_system_get_backend(RenderSystem* sys);
