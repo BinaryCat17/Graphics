@@ -34,6 +34,8 @@ static void ui_node_init_recursive(SceneNode* el, SceneTree* tree, const MetaStr
     
     el->rect.x = el->spec->layout.x;
     el->rect.y = el->spec->layout.y;
+    el->desired_x = el->spec->layout.x;
+    el->desired_y = el->spec->layout.y;
     el->on_click_cmd_id = el->spec->on_click;
     el->on_change_cmd_id = el->spec->on_change;
 

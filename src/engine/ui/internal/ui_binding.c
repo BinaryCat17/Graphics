@@ -74,10 +74,10 @@ void ui_apply_binding_value(SceneNode* el, UiBinding* b) {
             break;
         }
         case BINDING_TARGET_LAYOUT_X:
-            if (f->type == META_TYPE_FLOAT) el->rect.x = *(float*)ptr;
+            if (f->type == META_TYPE_FLOAT) el->desired_x = *(float*)ptr;
             break;
         case BINDING_TARGET_LAYOUT_Y:
-            if (f->type == META_TYPE_FLOAT) el->rect.y = *(float*)ptr;
+            if (f->type == META_TYPE_FLOAT) el->desired_y = *(float*)ptr;
             break;
         case BINDING_TARGET_LAYOUT_WIDTH:
             if (f->type == META_TYPE_FLOAT) el->rect.w = *(float*)ptr;

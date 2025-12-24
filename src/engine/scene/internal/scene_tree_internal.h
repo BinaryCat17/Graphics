@@ -146,6 +146,10 @@ struct SceneNode {
     float content_w;
     float content_h;
 
+    // Original Layout values (from bindings or spec)
+    float desired_x;
+    float desired_y;
+
     // Data Binding (Runtime Cache)
     void* ui_bindings; 
     size_t ui_binding_count;

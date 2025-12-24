@@ -40,20 +40,7 @@ void vk_create_descriptor_layout(VulkanRendererState* state) {
     state->res = vkCreateDescriptorSetLayout(state->device, &lci0, NULL, &state->descriptor_layout);
     if (state->res != VK_SUCCESS) fatal_vk("vkCreateDescriptorSetLayout (Set 0)", state->res);
     
-    // Set 1: Instance Buffer (SSBO)
-    VkDescriptorSetLayoutBinding binding1 = { 
-        .binding = 0, 
-        .descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 
-        .descriptorCount = 1, 
-        .stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT
-    };
-    VkDescriptorSetLayoutCreateInfo lci1 = { 
-        .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO, 
-        .bindingCount = 1, 
-        .pBindings = &binding1 
-    };
-    state->res = vkCreateDescriptorSetLayout(state->device, &lci1, NULL, &state->instance_layout);
-    if (state->res != VK_SUCCESS) fatal_vk("vkCreateDescriptorSetLayout (Set 1)", state->res);
+
 
     // Compute Layout: Set 0 = Storage Image (Write)
     VkDescriptorSetLayoutBinding bindingC = {
@@ -292,7 +279,7 @@ void vk_create_pipeline(VulkanRendererState* state) {
         .sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO,
         .depthTestEnable = VK_TRUE,
         .depthWriteEnable = VK_TRUE,
-        .depthCompareOp = VK_COMPARE_OP_LESS,
+        .depthCompareOp = VK_COMPARE_OP_LESS_OR_EQUAL,
         .depthBoundsTestEnable = VK_FALSE,
         .stencilTestEnable = VK_FALSE
     };
@@ -313,7 +300,7 @@ void vk_create_pipeline(VulkanRendererState* state) {
     VkPushConstantRange pcr = { .stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, .offset = 0, .size = 64 };
     
     // Layouts: Set 0 (Tex), Set 1 (Inst), Set 2 (User Tex)
-    VkDescriptorSetLayout layouts[] = { state->descriptor_layout, state->instance_layout, state->descriptor_layout };
+    VkDescriptorSetLayout layouts[] = { state->descriptor_layout, state->compute_ssbo_layout, state->descriptor_layout }; // Set 0: Tex, Set 1: SSBO, Set 2: Target (Tex)
     
     VkPipelineLayoutCreateInfo plci = { .sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO, .setLayoutCount = 3, .pSetLayouts = layouts, .pushConstantRangeCount = 1, .pPushConstantRanges = &pcr };
     

@@ -282,7 +282,7 @@ void vk_destroy_device_resources(VulkanRendererState* state) {
 
     if (state->descriptor_pool) { vkDestroyDescriptorPool(state->device, state->descriptor_pool, NULL); state->descriptor_pool = VK_NULL_HANDLE; }
     if (state->descriptor_layout) { vkDestroyDescriptorSetLayout(state->device, state->descriptor_layout, NULL); state->descriptor_layout = VK_NULL_HANDLE; }
-    if (state->instance_layout) { vkDestroyDescriptorSetLayout(state->device, state->instance_layout, NULL); state->instance_layout = VK_NULL_HANDLE; }
+
     if (state->font_sampler) { vkDestroySampler(state->device, state->font_sampler, NULL); state->font_sampler = VK_NULL_HANDLE; }
     if (state->font_image_view) { vkDestroyImageView(state->device, state->font_image_view, NULL); state->font_image_view = VK_NULL_HANDLE; }
     if (state->font_image) { vkDestroyImage(state->device, state->font_image, NULL); state->font_image = VK_NULL_HANDLE; }

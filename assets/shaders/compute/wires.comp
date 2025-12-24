@@ -14,11 +14,11 @@ struct Vertex {
     vec4 color;
 };
 
-layout(std430, set = 0, binding = 0) readonly buffer Wires {
+layout(std430, set = 1, binding = 0) readonly buffer Wires {
     Wire wires[];
 };
 
-layout(std430, set = 0, binding = 1) writeonly buffer Vertices {
+layout(std430, set = 1, binding = 1) writeonly buffer Vertices {
     Vertex verts[];
 };
 

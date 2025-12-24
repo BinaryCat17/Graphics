@@ -4,6 +4,7 @@
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
+#include "engine/graphics/render_commands.h"
 
 // Forward Declarations
 typedef struct PlatformWindow PlatformWindow;
@@ -39,7 +40,7 @@ typedef struct RendererBackend {
     void (*cleanup)(struct RendererBackend* backend);
 
     // Core Loop
-    void (*render_scene)(struct RendererBackend* backend, const Scene* scene);
+    void (*submit_commands)(struct RendererBackend* backend, const RenderCommandList* commands);
     void (*update_viewport)(struct RendererBackend* backend, int width, int height);
 
     // Utilities

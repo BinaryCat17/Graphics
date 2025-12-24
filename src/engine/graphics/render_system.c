@@ -1,6 +1,8 @@
 #include "engine/graphics/render_system.h"
 #include "engine/assets/assets.h"
 #include "engine/graphics/internal/render_frame_packet.h"
+#include "engine/graphics/primitives.h"
+#include "engine/graphics/render_commands.h"
 #include "foundation/logger/logger.h"
 
 #include <stdio.h>
@@ -21,6 +23,12 @@ struct RenderSystem {
     PlatformWindow* window;
     struct RendererBackend* backend;
     Stream* gpu_input_stream; // Global Input Stream (SSBO)
+    Stream* ui_instance_stream; // NEW: UI Instance Buffer
+    GpuInstanceData* ui_cpu_buffer;
+    size_t ui_cpu_capacity;
+    
+    // Command Buffer
+    RenderCommandList cmd_list; 
     
     // Packet buffering
     RenderFramePacket packets[2];
@@ -39,7 +47,7 @@ struct RenderSystem {
     uint64_t frame_count;
 };
 
-// --- Helper: Packet Management ---
+// ... Helper: Packet Management ...
 
 static void render_packet_free_resources(RenderFramePacket* packet) {
     if (!packet) return;
@@ -66,7 +74,7 @@ Scene* render_system_get_scene(RenderSystem* sys) {
     return sys->packets[sys->back_packet_index].scene;
 }
 
-// --- Init & Bootstrap ---
+// ... Init & Bootstrap ...
 
 static void try_bootstrap_renderer(RenderSystem* sys) {
     if (!sys) return;
@@ -100,6 +108,19 @@ static void try_bootstrap_renderer(RenderSystem* sys) {
 
     sys->renderer_ready = sys->backend->init(sys->backend, &init);
     
+    // Create Streams now that backend is ready
+    if (sys->renderer_ready) {
+        if (!sys->gpu_input_stream) {
+            sys->gpu_input_stream = stream_create(sys, STREAM_CUSTOM, 1, sizeof(GpuInputState));
+            if (sys->gpu_input_stream) stream_bind_compute(sys->gpu_input_stream, 1);
+        }
+        
+        if (!sys->ui_instance_stream) {
+            // Initial capacity was set in create, now we create the GPU resource
+            sys->ui_instance_stream = stream_create(sys, STREAM_CUSTOM, sys->ui_cpu_capacity, sizeof(GpuInstanceData));
+        }
+    }
+    
     // Cleanup loaded assets (Backend should have copied what it needs)
     assets_free_file(&vert_shader);
     assets_free_file(&frag_shader);
@@ -116,8 +137,14 @@ RenderSystem* render_system_create(const RenderSystemConfig* config) {
     sys->back_packet_index = 1;
     sys->frame_count = 0;
 
-    // Create Input Stream (Single struct, aligned)
-    sys->gpu_input_stream = stream_create(sys, STREAM_CUSTOM, 1, sizeof(GpuInputState));
+    // Create UI Instance Stream (CPU Only initially)
+    sys->ui_cpu_capacity = 1024;
+    sys->ui_cpu_buffer = malloc(sizeof(GpuInstanceData) * sys->ui_cpu_capacity);
+    
+    // Init Command List
+    sys->cmd_list.capacity = 2048;
+    sys->cmd_list.commands = malloc(sizeof(RenderCommand) * sys->cmd_list.capacity);
+    sys->cmd_list.count = 0;
 
     // Create Scenes
     sys->packets[0].scene = scene_create();
@@ -147,6 +174,10 @@ void render_system_destroy(RenderSystem* sys) {
     }
     
     stream_destroy(sys->gpu_input_stream);
+    stream_destroy(sys->ui_instance_stream);
+    if (sys->ui_cpu_buffer) free(sys->ui_cpu_buffer);
+    
+    if (sys->cmd_list.commands) free(sys->cmd_list.commands);
 
     render_packet_free_resources(&sys->packets[0]);
     scene_destroy(sys->packets[0].scene);
@@ -237,13 +268,156 @@ void render_system_update(RenderSystem* sys) {
     mutex_unlock(sys->packet_mutex);
 }
 
+static void cmd_list_add(RenderCommandList* list, RenderCommand cmd) {
+    if (list->count >= list->capacity) {
+        size_t new_cap = list->capacity > 0 ? list->capacity * 2 : 1024;
+        list->capacity = (uint32_t)new_cap;
+        
+        RenderCommand* new_cmds = realloc(list->commands, sizeof(RenderCommand) * list->capacity);
+        if (new_cmds) {
+            list->commands = new_cmds;
+        } else {
+            LOG_ERROR("RenderSystem: Failed to grow command list!");
+            return;
+        }
+    }
+    list->commands[list->count++] = cmd;
+}
+
 void render_system_draw(RenderSystem* sys) {
     if (!sys || !sys->renderer_ready || !sys->backend) return;
     
     const RenderFramePacket* packet = render_system_acquire_packet(sys);
-    if (packet && sys->backend->render_scene) {
-        sys->backend->render_scene(sys->backend, packet->scene);
+    if (!packet) return;
+    
+    Scene* scene = packet->scene;
+    size_t count = 0;
+    const SceneObject* objects = scene_get_all_objects(scene, &count);
+    
+    // Reset Command List
+    sys->cmd_list.count = 0;
+    
+    // Ensure CPU buffer capacity
+    size_t required_ui_slots = 0;
+    for(size_t i=0; i<count; ++i) if (objects[i].prim_type != SCENE_PRIM_CUSTOM) required_ui_slots++;
+    
+    if (required_ui_slots > sys->ui_cpu_capacity) {
+        size_t new_cap = required_ui_slots + 1024;
+        GpuInstanceData* new_buf = realloc(sys->ui_cpu_buffer, sizeof(GpuInstanceData) * new_cap);
+        
+        if (new_buf) {
+            sys->ui_cpu_capacity = new_cap;
+            sys->ui_cpu_buffer = new_buf;
+            
+            if (sys->ui_instance_stream) stream_destroy(sys->ui_instance_stream);
+            sys->ui_instance_stream = stream_create(sys, STREAM_CUSTOM, sys->ui_cpu_capacity, sizeof(GpuInstanceData));
+        } else {
+            LOG_ERROR("RenderSystem: Failed to grow UI buffer!");
+        }
     }
+    
+    size_t ui_idx = 0;
+    size_t ui_batch_start = 0;
+    
+    for (size_t i = 0; i < count; ++i) {
+        const SceneObject* obj = &objects[i];
+        
+        if (obj->prim_type == SCENE_PRIM_CUSTOM) {
+             // Flush UI
+             if (ui_idx > ui_batch_start) {
+                 RenderCommand cmd = {0};
+                 cmd.type = RENDER_CMD_BIND_PIPELINE;
+                 cmd.bind_pipeline.pipeline_id = 0; // Default
+                 cmd_list_add(&sys->cmd_list, cmd);
+                 
+                 cmd.type = RENDER_CMD_BIND_BUFFER;
+                 cmd.bind_buffer.slot = 0; // Instance Slot
+                 cmd.bind_buffer.buffer_handle = stream_get_handle(sys->ui_instance_stream);
+                 cmd_list_add(&sys->cmd_list, cmd);
+                 
+                 cmd.type = RENDER_CMD_DRAW_INDEXED;
+                 cmd.draw_indexed.index_count = 6;
+                 cmd.draw_indexed.instance_count = (uint32_t)(ui_idx - ui_batch_start);
+                 cmd.draw_indexed.first_index = 0;
+                 cmd.draw_indexed.vertex_offset = 0;
+                 cmd.draw_indexed.first_instance = (uint32_t)ui_batch_start;
+                 cmd_list_add(&sys->cmd_list, cmd);
+                 
+                 ui_batch_start = ui_idx;
+             }
+             
+             CustomDrawData* data = (CustomDrawData*)obj->instance_buffer;
+             if (data) {
+                 RenderCommand cmd = {0};
+                 cmd.type = RENDER_CMD_BIND_PIPELINE;
+                 cmd.bind_pipeline.pipeline_id = data->pipeline_id;
+                 cmd_list_add(&sys->cmd_list, cmd);
+                 
+                 for (int b=0; b<4; ++b) {
+                     if (data->buffers[b]) {
+                         cmd.type = RENDER_CMD_BIND_BUFFER;
+                         cmd.bind_buffer.slot = b;
+                         cmd.bind_buffer.buffer_handle = data->buffers[b];
+                         cmd_list_add(&sys->cmd_list, cmd);
+                     }
+                 }
+                 
+                 cmd.type = RENDER_CMD_DRAW;
+                 cmd.draw.vertex_count = data->vertex_count;
+                 cmd.draw.instance_count = data->instance_count;
+                 cmd.draw.first_vertex = 0;
+                 cmd.draw.first_instance = 0;
+                 cmd_list_add(&sys->cmd_list, cmd);
+             }
+        } else {
+            // UI Object
+            if (ui_idx < sys->ui_cpu_capacity) {
+                Mat4 m;
+                Mat4 s = mat4_scale(obj->scale);
+                Mat4 t = mat4_translation(obj->position);
+                m = mat4_multiply(&t, &s);
+                
+                GpuInstanceData* inst = &sys->ui_cpu_buffer[ui_idx];
+                inst->model = m;
+                inst->color = obj->color;
+                inst->uv_rect = obj->uv_rect;
+                inst->params_1 = obj->raw.params_0;
+                inst->params_2 = obj->raw.params_1;
+                inst->clip_rect = obj->ui.clip_rect;
+                
+                ui_idx++;
+            }
+        }
+    }
+    
+    // Flush Final Batch
+    if (ui_idx > ui_batch_start) {
+         RenderCommand cmd = {0};
+         cmd.type = RENDER_CMD_BIND_PIPELINE;
+         cmd.bind_pipeline.pipeline_id = 0;
+         cmd_list_add(&sys->cmd_list, cmd);
+         
+         cmd.type = RENDER_CMD_BIND_BUFFER;
+         cmd.bind_buffer.slot = 0;
+         cmd.bind_buffer.buffer_handle = stream_get_handle(sys->ui_instance_stream);
+         cmd_list_add(&sys->cmd_list, cmd);
+         
+         cmd.type = RENDER_CMD_DRAW_INDEXED;
+         cmd.draw_indexed.index_count = 6;
+         cmd.draw_indexed.instance_count = (uint32_t)(ui_idx - ui_batch_start);
+         cmd.draw_indexed.first_index = 0;
+         cmd.draw_indexed.vertex_offset = 0;
+         cmd.draw_indexed.first_instance = (uint32_t)ui_batch_start;
+         cmd_list_add(&sys->cmd_list, cmd);
+    }
+    
+    // Upload Data
+    if (ui_idx > 0) {
+        stream_set_data(sys->ui_instance_stream, sys->ui_cpu_buffer, ui_idx);
+    }
+    
+    // Submit
+    sys->backend->submit_commands(sys->backend, &sys->cmd_list);
 }
 
 void render_system_resize(RenderSystem* sys, int width, int height) {

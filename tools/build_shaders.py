@@ -59,14 +59,26 @@ def main():
                 input_path = os.path.join(root, file)
                 output_path = input_path + ".spv"
                 
-                # Always compile
-                print(f"[Shader] Compiling {file} -> {file}.spv")
-                cmd = [glslc, input_path, "-o", output_path]
-                res = subprocess.run(cmd)
-                if res.returncode != 0:
-                    print(f"Error compiling {file}")
-                    sys.exit(1)
-                count += 1
+                # Check for incremental build
+                should_compile = True
+                if os.path.exists(output_path):
+                    src_mtime = os.path.getmtime(input_path)
+                    dst_mtime = os.path.getmtime(output_path)
+                    if src_mtime <= dst_mtime:
+                        should_compile = False
+                
+                if should_compile:
+                    print(f"[Shader] Compiling {file} -> {file}.spv")
+                    cmd = [glslc, input_path, "-o", output_path]
+                    res = subprocess.run(cmd)
+                    if res.returncode != 0:
+                        print(f"Error compiling {file}")
+                        sys.exit(1)
+                    count += 1
+                else:
+                    # Optional: Verbose logging
+                    # print(f"[Shader] Skipping {file} (Up to date)")
+                    pass
                 
     if count == 0:
         print("Shaders are up to date.")

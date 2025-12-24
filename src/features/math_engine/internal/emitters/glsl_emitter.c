@@ -97,8 +97,8 @@ char* ir_to_glsl(const ShaderIR* ir, TranspilerMode mode) {
     stream_printf(&stream, "    uint _padding;\n");
     stream_printf(&stream, "};\n\n");
     
-    // We reserve set=0, binding=1 for Global Input State
-    stream_printf(&stream, "layout(set=0, binding=1) readonly buffer GlobalInput {\n");
+    // We reserve set=1, binding=1 for Global Input State
+    stream_printf(&stream, "layout(set=1, binding=1) readonly buffer GlobalInput {\n");
     stream_printf(&stream, "    InputState params;\n");
     stream_printf(&stream, "};\n\n");
 

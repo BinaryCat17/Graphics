@@ -1,75 +1,55 @@
-# Project Roadmap: Visual Compute Engine (v3.0)
+# Roadmap: Refactoring v3.0 (The Great Decoupling)
 
-**Vision:** "The Graph is the Source Code"
-**Architecture:** Data-Oriented | GPU-Driven | Kernel Fusion
+Главная цель: Превратить Core-слой в "тупого" исполнителя команд и разделить данные UI и 3D/Compute.
 
----
+## 🛠️ Phase 1: Renderer Backend Cleanup (Command Buffer)
+*Цель: Убрать зависимость от `Scene*` в `vulkan_renderer.c`.*
 
-## 🧠 Phase 1: The Brain (Transpiler & Kernel Fusion)
-*Objective: Teach the engine to understand and optimize mathematical graphs before execution.*
+- [ ] **Создать структуру `RenderCommandList`** (в `engine/graphics`)
+    - [ ] Определить типы команд: `CMD_BIND_PIPELINE`, `CMD_BIND_BUFFER`, `CMD_DRAW`, `CMD_DRAW_INDIRECT`.
+    - [ ] Реализовать линейный список команд вместо передачи графа сцены.
+- [ ] **Переписать `vulkan_renderer_render_scene`**
+    - [ ] Реализовать цикл обработки `RenderCommandList`.
+    - [ ] Транслировать команды движка в вызовы `vkCmd*`.
+- [ ] **Вынести логику Math Node**
+    - [ ] Убрать специфичную для Math Nodes логику (биндинг SSBO по условию) из бэкенда.
+    - [ ] Реализовать генерацию команд `CMD_BIND_BUFFER` / `CMD_DRAW` на стороне `MathRenderSystem`.
 
-The most critical phase. Without this, the graph behaves like a slow interpreter.
+## 📦 Phase 2: Data Separation
+*Цель: Разделить `SceneObject` на специализированные структуры.*
 
-- [x] **Graph AST (Micro Graph):**
-    - Define data structures for kernel nodes (`Add`, `Mul`, `Sin`, `Sample`).
-    - Implement AST construction from raw node data.
-- [x] **Transpiler V2 (GLSL Emitter):**
-    - Implement **Kernel Fusion**: traverse AST and generate a single `void main()` function body.
-    - Support GLSL Compute Shader code generation.
-- [x] **Graph Inputs & Uniforms:**
-    - Implement system to define graph parameters (Time, Mouse, Resolution).
-    - Dynamic generation of `layout(push_constant)` or Uniform Blocks.
-- [x] **Texture Sampling:**
-    - Support `sampler2D` data type in AST and Transpiler.
-    - Implement `SampleTexture` node and `texture()` GLSL generation.
-- [x] **CPU Fallback (C Emitter):**
-    - (Optional) Generate C code for debugging and non-GPU logic.
+- [ ] **Реализовать `UiNode`** (в `engine/ui`)
+    - [ ] Структура для интерфейса: Layout (x,y,w,h), Style, Flags.
+    - [ ] Поддержка иерархии (Parent/Child).
+- [ ] **Реализовать `RenderBatch`** (для Графа и 3D)
+    - [ ] Плоская структура (без иерархии).
+    - [ ] Состав: `PipelineID`, `BindGroup` (ресурсы), `DrawParams`.
+- [ ] **Очистить `render_packet.h`**
+    - [ ] Удалить универсальный `union` (SceneObject).
+    - [ ] Разделить пакет на два списка: `UiCmds` (для UI) и `RenderBatches` (для сцены).
 
-## 💾 Phase 2: The Heart (Data & Compute Foundation)
-*Objective: Build the infrastructure for data storage and kernel execution.*
+## ⚡ Phase 3: Compute Unification
+*Цель: Универсальная система выполнения вычислительных шейдеров.*
 
-Here we implement SoA and GPU memory management.
+- [ ] **Абстракция `ComputePass`**
+    - [ ] Добавить список активных графов в `RenderSystem`.
+- [ ] **Система регистрации**
+    - [ ] Реализовать `render_system_register_compute(graph)`.
+    - [ ] Подключить `MathEditor` к регистрации своего графа при старте.
+- [ ] **Цикл исполнения**
+    - [ ] Вызывать `compute_graph_execute` для всех зарегистрированных графов в начале кадра.
+- [ ] **Очистка `RenderSystem`**
+    - [ ] Удалить поле `active_compute_pipeline`.
+    - [ ] Удалить поле `show_compute_result`.
 
-- [x] **Storage Infrastructure (SoA):**
-    - Implement wrappers over Vulkan SSBO (Shader Storage Buffer Objects).
-    - Manage "Streams" (`Stream<T>`) residing in VRAM.
-- [x] **Compute Graph Executor (Macro Graph):**
-    - [x] Implement `vkCmdDispatch` execution system.
-    - [x] Automatic Memory Barrier insertion between compute stages.
-    - [x] Ping-Pong buffering for simulations (read `State_A`, write `State_B`).
+## 🧹 Phase 4: Cleanup & Optimization
+*Цель: Упрощение кода и использование новых систем.*
 
-## 🎨 Phase 3: The Eyes (Zero-Copy Rendering)
-*Objective: Render data directly from memory prepared in Phase 2.*
-
-Abandon the classic `Scene::Update` -> `RenderPacket` flow.
-
-- [x] **Render Nodes:**
-    - Create `DrawInstanced` graph node accepting position/color buffers as inputs.
-    - Implement SSBO binding as Vertex Attributes (Zero-Copy).
-- [x] **Unified Pipeline:**
-    - Synchronization: Compute Queue -> Graphics Queue.
-    - Integrate with existing `vulkan_renderer.c` (using it as a "draw command executor").
-
-## 🖱️ Phase 4: The Hands (Interaction & Editor)
-*Objective: Make the engine an interactive tool.*
-
-Hybrid approach to Input and UI.
-
-- [x] **GPU Picking (Raycasting):**
-    - [x] Implement Compute Kernel for mouse ray intersection (Sphere/AABB).
-    - [x] Parallel Reduction to find the closest object ID.
-- [x] **Graph Editor Rendering:**
-    - [x] Render thousands of nodes via Instancing (node positions in GPU buffers).
-    - [x] Spline links generated in Geometry/Compute shaders.
-- [x] **Hybrid Input System:**
-    - **CPU:** Standard event processing for Editor UI panels (Inspector, Menus).
-    - **GPU:** Uniform `InputState` structure for Graph Nodes.
-
-## 💾 Phase 5: Persistence & Ecosystem
-*Objective: Save/Load systems and tooling.*
-
-- [ ] **File Format Split:**
-    - **Editor UI:** Keep and refine existing `*.layout.yaml` for static panels/menus (Declarative UI).
-    - **Logic/Scene:** Design `*.gdl` (GDL) to serialize the Graph structure (Nodes, Links, Properties).
-- [ ] **Hot Reloading:** Recompile the graph on-the-fly without restarting the app.
-- [ ] **Visual Debugger:** GPU Buffer Readback to inspect values.
+- [ ] **Refactor `scene_loader.c`**
+    - [ ] Переписать парсинг на использование `src/foundation/meta/reflection.h`.
+    - [ ] Заменить ручной разбор полей на `meta_set_from_string`.
+- [ ] **Unify Buffer Management**
+    - [ ] Сделать `Stream` основным владельцем GPU-буферов.
+    - [ ] Научить бэкенд принимать `Stream*` напрямую.
+    - [ ] Удалить/Спрятать внутренние обертки `VkBufferWrapper`.
+    

@@ -80,7 +80,6 @@ static void layout_column(SceneNode* el, float start_x, float start_y, float* ou
         float child_right = child->rect.x + child->rect.w;
         if (child_right > *out_max_x) *out_max_x = child_right;
     }
-    if (el->child_count > 0) cursor_y -= el->spec->layout.spacing;
     *out_max_y = cursor_y;
 }
 
@@ -95,25 +94,21 @@ static void layout_row(SceneNode* el, float start_x, float start_y, float* out_m
         float child_bottom = child->rect.y + child->rect.h;
         if (child_bottom > *out_max_y) *out_max_y = child_bottom;
     }
-    if (el->child_count > 0) cursor_x -= el->spec->layout.spacing;
     *out_max_x = cursor_x;
 }
 
-static void layout_canvas(SceneNode* el, float* out_max_x, float* out_max_y) {
+static void layout_canvas(SceneNode* el, float start_x, float start_y, float* out_max_x, float* out_max_y) {
     *out_max_x = 0;
     *out_max_y = 0;
     for (SceneNode* child = el->first_child; child; child = child->next_sibling) {
-    // 4. Handle Overflow / Scroll
-    if (el->ui_flags & UI_FLAG_SCROLLABLE) {
-            child->rect.x -= el->scroll_x;
-            child->rect.y -= el->scroll_y;
-        }
+        float layout_x = child->desired_x;
+        float layout_y = child->desired_y;
+
+        child->rect.x = start_x + layout_x;
+        child->rect.y = start_y + layout_y;
         
-        // Calculate content bounds (using logical coordinates, reverting scroll)
-        float logical_x = child->rect.x + (el->ui_flags & UI_FLAG_SCROLLABLE ? el->scroll_x : 0);
-        float logical_y = child->rect.y + (el->ui_flags & UI_FLAG_SCROLLABLE ? el->scroll_y : 0);
-        float right = logical_x + child->rect.w;
-        float bottom = logical_y + child->rect.h;
+        float right = layout_x + child->rect.w;
+        float bottom = layout_y + child->rect.h;
         
         if (right > *out_max_x) *out_max_x = right;
         if (bottom > *out_max_y) *out_max_y = bottom;
@@ -211,7 +206,7 @@ static void layout_recursive(SceneNode* el, Rect available, uint64_t frame_numbe
             el->content_h = max_y - start_y;
             break;
         case SCENE_LAYOUT_CANVAS:
-            layout_canvas(el, &max_x, &max_y);
+            layout_canvas(el, start_x, start_y, &max_x, &max_y);
             el->content_w = max_x;
             el->content_h = max_y;
             break;

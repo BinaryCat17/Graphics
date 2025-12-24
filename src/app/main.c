@@ -108,11 +108,11 @@ int main(int argc, char** argv) {
     int log_level = LOG_LEVEL_INFO;
     const char* log_lvl_str = config_get_string("log_level", "info");
 
-    if (strcmp(log_lvl_str, "debug") == 0) log_level = LOG_LEVEL_DEBUG;
-    else if (strcmp(log_lvl_str, "trace") == 0) log_level = LOG_LEVEL_TRACE;
-    else if (strcmp(log_lvl_str, "warn") == 0) log_level = LOG_LEVEL_WARN;
-    else if (strcmp(log_lvl_str, "error") == 0) log_level = LOG_LEVEL_ERROR;
-    else if (strcmp(log_lvl_str, "fatal") == 0) log_level = LOG_LEVEL_FATAL;
+    if (strcmp(log_lvl_str, "debug") == 0 || strcmp(log_lvl_str, "DEBUG") == 0) log_level = LOG_LEVEL_DEBUG;
+    else if (strcmp(log_lvl_str, "trace") == 0 || strcmp(log_lvl_str, "TRACE") == 0) log_level = LOG_LEVEL_TRACE;
+    else if (strcmp(log_lvl_str, "warn") == 0 || strcmp(log_lvl_str, "WARN") == 0) log_level = LOG_LEVEL_WARN;
+    else if (strcmp(log_lvl_str, "error") == 0 || strcmp(log_lvl_str, "ERROR") == 0) log_level = LOG_LEVEL_ERROR;
+    else if (strcmp(log_lvl_str, "fatal") == 0 || strcmp(log_lvl_str, "FATAL") == 0) log_level = LOG_LEVEL_FATAL;
 
     EngineConfig config = {
         .width = config_get_int("width", 1280), 

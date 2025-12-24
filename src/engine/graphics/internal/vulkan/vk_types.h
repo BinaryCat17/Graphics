@@ -34,12 +34,7 @@ typedef struct {
     FrameStage stage;
     VkFence inflight_fence;
 
-    // Per-Frame Instance Buffer (Dynamic)
-    VkBuffer instance_buffer;
-    VkDeviceMemory instance_memory;
-    void* instance_mapped;
-    VkDescriptorSet instance_set; // Set 1: Points to this frame's buffer
-    size_t instance_capacity;     // Current capacity (element count)
+    // Per-Frame Instance Buffer (Dynamic) removed
     
     VkDescriptorPool frame_descriptor_pool; // For dynamic custom draws
 } FrameResources;
@@ -110,8 +105,7 @@ typedef struct VulkanRendererState {
     VkBuffer unit_quad_index_buffer;
     VkDeviceMemory unit_quad_index_memory;
     
-    // Instancing (Global Layout, Per-Frame Sets)
-    VkDescriptorSetLayout instance_layout;
+    // Instancing (Global Layout, Per-Frame Sets) removed
 
     // Compute Target (Visualization)
     VkImage compute_target_image;
@@ -141,7 +135,7 @@ typedef struct VulkanRendererState {
     } compute_bindings[MAX_COMPUTE_BINDINGS];
     
     VkDescriptorSetLayout compute_ssbo_layout; // Layout for Set 1 (Buffers)
-    VkDescriptorSet compute_ssbo_descriptor;   // Set 1 Instance
+    VkDescriptorSet compute_ssbo_descriptor;   // Set 1 Instance (For legacy Compute Dispatch)
 
     // --- Graphics Pipeline Pool ---
 #define MAX_GRAPHICS_PIPELINES 32
@@ -154,8 +148,6 @@ typedef struct VulkanRendererState {
     struct {
         struct VkBufferWrapper* buffer;
     } graphics_bindings[MAX_COMPUTE_BINDINGS];
-    
-    VkDescriptorSet graphics_ssbo_descriptor; // Set 1 for Graphics (Zero-Copy)
 
 } VulkanRendererState;
 
