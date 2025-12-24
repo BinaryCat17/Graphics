@@ -182,12 +182,59 @@ int test_transpiler_mouse(void) {
     return 1;
 }
 
+int test_transpiler_texture_sample(void) {
+    MemoryArena arena;
+    arena_init(&arena, 1024 * 1024);
+    
+    MathGraph* graph = math_graph_create(&arena);
+    
+    // Create UV Node
+    MathNodeId uv = math_graph_add_node(graph, MATH_NODE_UV);
+    
+    // Create Texture Param
+    MathNodeId tex_param = math_graph_add_node(graph, MATH_NODE_TEXTURE_PARAM);
+    math_graph_set_name(graph, tex_param, "MyTexture");
+    
+    // Create Sample Node
+    MathNodeId sample = math_graph_add_node(graph, MATH_NODE_TEXTURE_SAMPLE);
+    math_graph_connect(graph, sample, 0, tex_param); // Input 0: Texture
+    math_graph_connect(graph, sample, 1, uv);        // Input 1: UV
+    
+    // Create Output
+    MathNodeId output = math_graph_add_node(graph, MATH_NODE_OUTPUT);
+    math_graph_connect(graph, output, 0, sample);
+    
+    // Transpile
+    char* glsl = math_graph_transpile(graph, TRANSPILE_MODE_BUFFER_1D, SHADER_TARGET_GLSL_VULKAN);
+    TEST_ASSERT(glsl != NULL);
+    
+    printf("\n--- Generated GLSL (Texture Sample) ---\n%s\n---------------------------------------\n", glsl);
+    
+    // Checks:
+    // 1. Uniform Declaration
+    // The name "MyTexture" is not currently used in transpiler V1 for generation, 
+    // it uses ID. e.g. "uniform sampler2D u_tex_%d"
+    char buf[128];
+    snprintf(buf, 128, "layout(set=0, binding=1) uniform sampler2D u_tex_%d;", tex_param);
+    TEST_ASSERT(strstr(glsl, buf) != NULL);
+    
+    // 2. Texture Sampling
+    snprintf(buf, 128, "vec4 v_%d = texture(u_tex_%d, v_%d);", sample, tex_param, uv);
+    TEST_ASSERT(strstr(glsl, buf) != NULL);
+    
+    free(glsl);
+    math_graph_destroy(graph);
+    arena_destroy(&arena);
+    return 1;
+}
+
 int main(void) {
     printf("Running Transpiler Tests...\n");
     RUN_TEST(test_transpiler_simple_add);
     RUN_TEST(test_transpiler_with_output_node);
     RUN_TEST(test_transpiler_vec2_uv);
     RUN_TEST(test_transpiler_mouse);
+    RUN_TEST(test_transpiler_texture_sample);
     
     if (g_tests_failed > 0) {
         printf(TERM_RED "\n%d tests failed!\n" TERM_RESET, g_tests_failed);

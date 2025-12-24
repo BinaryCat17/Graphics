@@ -53,6 +53,18 @@ static void generate_ir_node(const MathGraph* graph, MathNodeId id, ShaderIR* ir
             inst.type = MATH_DATA_TYPE_VEC4;
             break;
 
+        case MATH_NODE_TEXTURE_PARAM:
+            inst.op = IR_OP_LOAD_PARAM_TEXTURE;
+            inst.type = MATH_DATA_TYPE_SAMPLER2D;
+            break;
+
+        case MATH_NODE_TEXTURE_SAMPLE:
+            inst.op = IR_OP_SAMPLE_TEXTURE;
+            inst.type = MATH_DATA_TYPE_VEC4;
+            inst.op1_id = node->inputs[0]; // Sampler
+            inst.op2_id = node->inputs[1]; // UV
+            break;
+
         case MATH_NODE_UV:
              inst.op = IR_OP_LOAD_PARAM_UV;
              inst.type = MATH_DATA_TYPE_VEC2;

@@ -13,6 +13,7 @@ typedef enum IrOpCode {
     IR_OP_CONST_FLOAT,      // res = float_val
     IR_OP_LOAD_PARAM_TIME,  // res = time
     IR_OP_LOAD_PARAM_MOUSE, // res = mouse (vec4)
+    IR_OP_LOAD_PARAM_TEXTURE, // res = sampler2D (handle)
     IR_OP_LOAD_PARAM_UV,    // res = uv.x (or uv vector in future)
     
     // Arithmetic
@@ -24,6 +25,9 @@ typedef enum IrOpCode {
     // Math Functions
     IR_OP_SIN,              // res = sin(op1)
     IR_OP_COS,              // res = cos(op1)
+    
+    // Texture
+    IR_OP_SAMPLE_TEXTURE,   // res = texture(op1_sampler, op2_uv)
 
     // Output
     IR_OP_RETURN            // result = op1 (Final output of the shader)

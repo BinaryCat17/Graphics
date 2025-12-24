@@ -53,6 +53,7 @@ static const char* get_type_name(MathDataType type) {
         case MATH_DATA_TYPE_VEC2: return "vec2";
         case MATH_DATA_TYPE_VEC3: return "vec3";
         case MATH_DATA_TYPE_VEC4: return "vec4";
+        case MATH_DATA_TYPE_SAMPLER2D: return "sampler2D";
         case MATH_DATA_TYPE_FLOAT:
         default: return "float";
     }
@@ -103,6 +104,15 @@ char* ir_to_glsl(const ShaderIR* ir, TranspilerMode mode) {
         stream_printf(&stream, "const Params params = Params(0.0, 1.0, 1.0, vec4(0));\n\n");
     }
 
+    // Pre-pass: Declare Textures
+    int texture_binding = 1; // Start binding from 1 (0 is output)
+    for (uint32_t i = 0; i < ir->instruction_count; ++i) {
+        if (ir->instructions[i].op == IR_OP_LOAD_PARAM_TEXTURE) {
+            stream_printf(&stream, "layout(set=0, binding=%d) uniform sampler2D u_tex_%d;\n", texture_binding++, ir->instructions[i].id);
+        }
+    }
+    stream_printf(&stream, "\n");
+
     stream_printf(&stream, "void main() {\n");
 
     // Setup UV/Coordinates
@@ -136,6 +146,13 @@ char* ir_to_glsl(const ShaderIR* ir, TranspilerMode mode) {
                 break;
             case IR_OP_LOAD_PARAM_MOUSE:
                 stream_printf(&stream, "    vec4 v_%d = params.mouse;\n", inst->id);
+                break;
+            case IR_OP_LOAD_PARAM_TEXTURE:
+                // No code gen needed inside main, accessed via global u_tex_ID
+                break;
+            case IR_OP_SAMPLE_TEXTURE:
+                // op1 is Texture Param ID (u_tex_ID), op2 is UV
+                stream_printf(&stream, "    vec4 v_%d = texture(u_tex_%d, v_%d);\n", inst->id, inst->op1_id, inst->op2_id);
                 break;
             case IR_OP_LOAD_PARAM_UV:
                  stream_printf(&stream, "    vec2 v_%d = uv;\n", inst->id);
