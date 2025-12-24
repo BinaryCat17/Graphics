@@ -6,7 +6,7 @@
 #include <stdint.h> // uint64_t
 
 #include "engine/ui/ui_node.h"
-#include "engine/graphics/render_batch.h"
+#include "engine/graphics/graphics_types.h"
 
 // --- Basic Types ---
 

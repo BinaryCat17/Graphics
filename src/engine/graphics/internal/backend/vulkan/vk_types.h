@@ -7,7 +7,7 @@
 
 #include "foundation/math/coordinate_systems.h"
 #include "foundation/platform/platform.h"
-#include "engine/graphics/internal/vulkan/vulkan_renderer.h"
+#include "engine/graphics/internal/backend/vulkan/vulkan_renderer.h"
 
 typedef struct Font Font;
 struct VkBufferWrapper; // Forward declaration

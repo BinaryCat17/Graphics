@@ -1,89 +1,158 @@
-# Technical Design & Internals (v3.0)
+﻿# Technical Design & Internals (v4.0)
 
-**Context:** Implementation details for the Visual Compute Engine.
+**Context:** Implementation rules and standards for the codebase refactoring.
 
 ---
 
-## 1. The Transpiler (Micro-Graph Compiler)
+## 1. File Structure & Encapsulation Standard
 
-The engine does not interpret nodes at runtime. It compiles them.
+We enforce a strict separation to prevent "Header Hell".
 
-### Data Structures (AST)
-The Micro Graph is represented as an Abstract Syntax Tree before compilation.
+### Directory Layout
+
+```text
+[src/engine/module_name]
+  ├── module.h           // PUBLIC API. Opaque handles only. No includes from other modules.
+  ├── module.c           // FACADE. Implements module.h, delegates to internal implementation.
+  ├── module_types.h     // (Optional) Public enums/structs required by the API.
+  └── internal/
+        ├── module_impl.h    // PRIVATE. Real struct definitions. Internal headers only.
+        ├── subcomponent_a.c // Implementation logic.
+        └── subcomponent_b.c // Implementation logic.
+```
+
+### Opaque Pointers (PIMPL) Rule
+
+**❌ Bad (v3.0):**
+*Leaks implementation details and forces heavy includes on consumers.*
 
 ```c
-typedef enum { NODE_ADD, NODE_MUL, NODE_SIN, ... } NodeType;
+// render_system.h
+#include "vulkan_backend.h" 
 
-typedef struct {
-    NodeType type;
-    NodeId inputs[MAX_INPUTS];
-    // ...
-} AstNode;
+typedef struct RenderSystem {
+    VulkanBackend* backend; // Now everyone knows about Vulkan
+    VkDevice device;        // Disaster: Vulkan headers leaked everywhere
+} RenderSystem;
 ```
 
-### Compilation Stages
-1.  **Topological Sort:** Determine evaluation order.
-2.  **Type Inference:** Deduce output types based on inputs (e.g., `Vec3 + Float = Vec3`).
-3.  **Kernel Fusion (GLSL Generation):**
-    *   Iterate through sorted nodes.
-    *   Generate GLSL variables for intermediate results.
-    *   *Example:* `vec3 temp_0 = var_A + var_B; vec3 result = temp_0 * var_C;`
-4.  **Backend Emit:** Wraps the logic in a Compute Shader boilerplate (`layout(local_size_x = 64) in; void main() { ... }`).
+**✅ Good (v4.0):**
+*Clean interface, implementation is completely hidden.*
 
----
+```c
+// render_system.h
+typedef struct RenderSystem RenderSystem; // Incomplete type (Opaque)
 
-## 2. Memory & Data Layout
-
-### SoA (Structure of Arrays)
-We avoid Array of Structs (`struct Particle { pos, vel }`) in VRAM.
-Instead, we use independent buffers:
-*   `Buffer<float> PosX`
-*   `Buffer<float> PosY`
-*   `Buffer<float> PosZ`
-
-**Why?**
-1.  **Alignment:** No padding issues between C and GLSL.
-2.  **Flexibility:** A kernel needing only `PosX` doesn't load `VelY` into cache.
-3.  **SIMD:** Fits GPU architecture perfectly.
-
-### Stream<T> Abstraction
-A C-side handle representing a GPU buffer.
-*   `stream_create(type, count)`: Allocates SSBO.
-*   `stream_bind_compute(stream, binding_slot)`: Descriptor set update.
-*   `stream_bind_vertex(stream, attribute_slot)`: Binds as Vertex Buffer (if supported) or SSBO (for manual fetching).
-
----
-
-## 3. Zero-Copy Rendering
-The traditional `RenderPacket` is replaced/augmented by direct Buffer binding.
-
-**Vertex Shader Approach:**
-Instead of `layout(location=0) in vec3 inPos;`, we use:
-
-```glsl
-layout(std430, binding = 0) readonly buffer PosX { float data[]; } posX;
-layout(std430, binding = 1) readonly buffer PosY { float data[]; } posY;
-// ...
-void main() {
-    uint id = gl_VertexIndex;
-    vec3 pos = vec3(posX.data[id], posY.data[id], ...);
-    gl_Position = view_proj * vec4(pos, 1.0);
-}
+RenderSystem* render_system_create(void);
+void render_system_update(RenderSystem* self);
 ```
 
-This allows the **Compute Shader** to be the *sole producer* of geometry data without CPU intervention.
+```c
+// src/engine/graphics/internal/render_system_internal.h
+#include "renderer_backend.h"
+
+struct RenderSystem {
+    RendererBackend* backend; // Implementation detail hidden
+    uint32_t frame_index;
+};
+```
 
 ---
 
-## 4. File Formats
+## 2. The GDL (Graph Definition Language)
 
-### `*.layout.yaml` (Editor UI)
-Declarative layout for the application shell. Parsed by `ui_layout.c`.
-*   Static structure (Panels, Splits).
-*   CPU-driven.
+The engine's frame loop is defined by a YAML file, parsed by `config/pipeline_loader.c`.
 
-### `*.graph.yaml` / `*.gdl` (Logic & Scene)
-Serialization of the Nodes and Links.
-*   Defines the Macro and Micro graphs.
-*   Contains initial values for properties.
-*   Loaded into the Graph System -> Transpiled -> Executed.
+### Format Spec (`assets/config/pipeline.yaml`)
+
+```yaml
+pipeline:
+  resources:
+    - name: "SceneColor"
+      type: IMAGE_2D
+      format: RGBA8
+      size: [window_width, window_height]
+    - name: "PhysicsData"
+      type: BUFFER
+      size: 1MB
+
+  passes:
+    - name: "SimulatePhysics"
+      type: COMPUTE
+      shader: "physics_solve.comp"
+      outputs: ["PhysicsData"]
+
+    - name: "Render3D"
+      type: GRAPHICS
+      inputs: ["PhysicsData"]
+      outputs: ["SceneColor"]
+      draw_list: "SceneBatches"  # Consumes batches tagged 'SceneBatches'
+
+    - name: "RenderUI"
+      type: GRAPHICS
+      outputs: ["swapchain"]     # Output to screen
+      draw_list: "UIBatches"     # Consumes batches tagged 'UIBatches'
+```
+
+---
+
+## 3. The Feature System (Plugin Architecture)
+
+To decouple `engine.c` from specific tools like `MathEditor`, we use a registration interface.
+
+### The Interface
+
+```c
+typedef struct EngineFeature {
+    const char* name;
+    void* user_data;
+    
+    void (*on_init)(struct EngineFeature* self, Engine* engine);
+    void (*on_update)(struct EngineFeature* self, Engine* engine);
+    void (*on_extract)(struct EngineFeature* self, RenderCommandList* out_list);
+    void (*on_shutdown)(struct EngineFeature* self);
+} EngineFeature;
+```
+
+### Usage Pattern
+1. `MathEditor` implements this interface.
+2. In `main.c`, we call `engine_register_feature(engine, math_editor_feature())`.
+3. The Engine iterates over registered features calling `on_update` and `on_extract`, unaware of what the feature actually does.
+
+---
+
+## 4. Render Command List (The Lingua Franca)
+
+To decouple the Renderer from systems like UI or Scene, they communicate purely via data packets.
+
+### The RenderBatch Structure
+
+```c
+typedef struct RenderBatch {
+    uint32_t pipeline_id;
+
+    // Geometry
+    Stream* vertex_stream;
+    Stream* index_stream;
+    uint32_t index_count;
+
+    // Data (SSBOs/UBOs for the shader)
+    Stream* bind_groups[4]; 
+
+    // Sorting & Layering
+    uint32_t layer;
+    float depth;
+} RenderBatch;
+```
+
+**Workflow:**
+1. **UI System** iterates its nodes, packs transforms/colors into a temporary `Stream`, and creates a `RenderBatch`.
+2. **Render System** receives the batch, binds the pipeline, binds the stream, and issues a draw call. It does not know it is drawing a "UI Button".
+
+---
+
+## 5. Memory Management
+
+*   **Frame Arena:** A linear allocator reset every frame. Used for generating `RenderCommandList` and temporary per-frame data.
+*   **Asset Pool:** Pool allocators for long-lived resources (Textures, Meshes) to avoid fragmentation.
+*   **Streams:** Wrappers around GPU buffers. This is the **only** permitted way to upload data to VRAM.

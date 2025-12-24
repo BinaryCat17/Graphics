@@ -4,7 +4,7 @@
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
-#include "engine/graphics/render_commands.h"
+#include "engine/graphics/graphics_types.h"
 
 // Forward Declarations
 typedef struct PlatformWindow PlatformWindow;

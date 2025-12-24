@@ -4,7 +4,7 @@
 #include "foundation/config/config_system.h"
 #include "engine/graphics/render_system.h"
 #include "engine/graphics/stream.h"
-#include "engine/graphics/internal/renderer_backend.h" // For manual dispatch test
+#include "engine/graphics/internal/backend/renderer_backend.h" // For manual dispatch test
 #include "engine/assets/assets.h"
 #include "foundation/memory/arena.h"
 

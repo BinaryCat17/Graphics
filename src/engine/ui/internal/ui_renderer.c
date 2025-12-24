@@ -2,7 +2,7 @@
 #include "../ui_core.h"
 #include "ui_internal.h"
 #include "engine/scene/render_packet.h"
-#include "engine/graphics/layer_constants.h"
+#include "engine/graphics/graphics_types.h"
 #include "foundation/logger/logger.h"
 #include "engine/text/text_renderer.h" 
 #include "engine/text/font.h" 

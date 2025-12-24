@@ -1,8 +1,7 @@
 #ifndef STREAM_INTERNAL_H
 #define STREAM_INTERNAL_H
 
-#include "../stream.h"
-#include "renderer_backend.h"
+#include "engine/graphics/stream.h"
 
 struct Stream {
     RenderSystem* sys;

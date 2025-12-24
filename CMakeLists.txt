@@ -160,17 +160,17 @@ target_link_libraries(engine_assets PUBLIC foundation_platform foundation_config
 
 # Graphics (Renderer + Vulkan)
 set(ENGINE_GRAPHICS_SOURCES
-    "src/engine/graphics/internal/renderer_backend.c"
-    "src/engine/graphics/internal/vulkan/vulkan_renderer.c"
-    "src/engine/graphics/internal/vulkan/vk_utils.c"
-    "src/engine/graphics/internal/vulkan/vk_buffer.c"
-    "src/engine/graphics/internal/vulkan/vk_context.c"
-    "src/engine/graphics/stream.c"
-    "src/engine/graphics/gpu_input.c"
-    "src/engine/graphics/compute_graph.c"
-    "src/engine/graphics/internal/vulkan/vk_swapchain.c"
-    "src/engine/graphics/internal/vulkan/vk_pipeline.c"
-    "src/engine/graphics/internal/vulkan/vk_resources.c"
+    "src/engine/graphics/internal/backend/renderer_backend.c"
+    "src/engine/graphics/internal/backend/vulkan/vulkan_renderer.c"
+    "src/engine/graphics/internal/backend/vulkan/vk_utils.c"
+    "src/engine/graphics/internal/backend/vulkan/vk_buffer.c"
+    "src/engine/graphics/internal/backend/vulkan/vk_context.c"
+    "src/engine/graphics/internal/resources/stream.c"
+    "src/engine/graphics/internal/resources/gpu_input.c"
+    "src/engine/graphics/internal/compute/compute_graph.c"
+    "src/engine/graphics/internal/backend/vulkan/vk_swapchain.c"
+    "src/engine/graphics/internal/backend/vulkan/vk_pipeline.c"
+    "src/engine/graphics/internal/backend/vulkan/vk_resources.c"
     "src/engine/graphics/render_system.c"
 )
 add_library(engine_graphics STATIC ${ENGINE_GRAPHICS_SOURCES})

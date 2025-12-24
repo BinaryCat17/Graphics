@@ -1,6 +1,6 @@
 #include "engine/assets/assets.h"
 #include "engine/assets/internal/assets_internal.h"
-#include "engine/graphics/primitives.h"
+#include "engine/graphics/internal/resources/primitives.h"
 #include "engine/text/font.h"
 #include "foundation/platform/platform.h"
 #include "foundation/platform/fs.h"

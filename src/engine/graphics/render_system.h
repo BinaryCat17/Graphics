@@ -4,7 +4,7 @@
 #include <stdbool.h>
 #include <stdint.h>
 #include <stddef.h>
-#include "engine/graphics/gpu_input.h" // Added for GpuInputState
+#include "engine/graphics/graphics_types.h" // Added for GpuInputState
 
 typedef struct RenderSystem RenderSystem;
 typedef struct RenderFramePacket RenderFramePacket;

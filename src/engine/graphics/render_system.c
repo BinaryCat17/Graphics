@@ -1,8 +1,8 @@
 #include "engine/graphics/render_system.h"
 #include "engine/assets/assets.h"
 #include "engine/graphics/internal/render_frame_packet.h"
-#include "engine/graphics/primitives.h"
-#include "engine/graphics/render_commands.h"
+#include "engine/graphics/internal/resources/primitives.h"
+#include "engine/graphics/graphics_types.h"
 #include "foundation/logger/logger.h"
 
 #include <stdio.h>
@@ -11,43 +11,12 @@
 #include "foundation/thread/thread.h"
 
 #include "foundation/platform/platform.h"
-#include "engine/graphics/internal/renderer_backend.h"
-#include "engine/graphics/internal/vulkan/vulkan_renderer.h"
+#include "engine/graphics/internal/backend/renderer_backend.h"
+#include "engine/graphics/internal/backend/vulkan/vulkan_renderer.h"
 #include "engine/graphics/stream.h"
 #include "engine/ui/ui_node.h" // NEW
 #include "engine/graphics/compute_graph.h"
-
-typedef struct RenderSystem {
-    // Dependencies
-    Assets* assets;
-
-    // Internal State
-    PlatformWindow* window;
-    RendererBackend* backend;
-    Stream* gpu_input_stream; 
-    Stream* ui_instance_stream; 
-    GpuInstanceData* ui_cpu_buffer;
-    size_t ui_cpu_capacity;
-    
-    RenderCommandList cmd_list; 
-    
-    RenderFramePacket packets[2];
-    int front_packet_index;
-    int back_packet_index;
-    bool packet_ready;
-    Mutex* packet_mutex;
-    
-    // Compute Graphs
-    ComputeGraph** compute_graphs;
-    size_t compute_graph_count;
-    size_t compute_graph_capacity;
-    
-    bool running;
-    bool renderer_ready;
-    double current_time;
-    
-    uint64_t frame_count;
-} RenderSystem;
+#include "engine/graphics/internal/render_system_internal.h"
 
 // ... Helper: Packet Management ...
 

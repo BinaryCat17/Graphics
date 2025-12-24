@@ -1,73 +1,74 @@
-# Architecture Overview (v3.0)
+# Architecture Overview (v4.0)
 
-**Language:** C11
-**Paradigm:** Implicitly Parallel Compute Graph
-**Philosophy:** "The Graph is the Source Code"
-**Target:** Visual Compute Engine for High-Performance Tools
-
----
-
-## 1. Core Philosophy: The Two Graphs
-The engine strictly separates high-level data flow from low-level mathematical logic to avoid "spaghetti code" and maximize performance.
-
-### Level 1: The Macro Graph (The Pipeline)
-* **Role:** Data Scheduling & Memory Management.
-* **Nodes:** Systems or Simulation Steps (e.g., "ParticleSim", "Culling", "RenderPass").
-* **Links:** Entire Buffers/Streams of data (`Stream<Vec3>`).
-* **Execution:** Managed by the CPU. Handles synchronisation barriers and resource transitions (Compute -> Graphics).
-
-### Level 2: The Micro Graph (The Kernel)
-* **Role:** Mathematical Logic.
-* **Nodes:** Atomic operations (`Add`, `Mul`, `Sin`, `Dot`).
-* **Links:** Temporary registers / Local variables.
-* **Execution:** **Compiled** into a single Compute Shader (Kernel Fusion) and executed on the GPU.
-* **Benefit:** Eliminates memory bandwidth overhead by fusing multiple operations into one kernel.
+**Paradigm:** Data-Driven Modular Engine
+**Philosophy:** "Strict Hierarchy, Loose Coupling"
+**Target:** High-Performance Visual Tools
 
 ---
 
-## 2. Hybrid UI Architecture
-We use the right tool for the job, avoiding a "pure GPU" dogma where it hurts usability.
+## 1. The Core Principles
 
-### A. The Shell (Editor UI)
-* **Technology:** CPU-based, Declarative Layouts (`*.layout.yaml`).
-* **Role:** Panels, Menus, Inspectors, File Browsers.
-* **Rendering:** Traditional textured quads / font atlas.
-* **State:** Maintained on CPU.
+### A. Strict Layering (The Flow of Dependency)
+The engine is built in strict layers. A layer may only depend on layers **below** it. Circular dependencies are forbidden.
 
-### B. The Viewport (Project Content)
-* **Technology:** GPU-based, Graph-Driven.
-* **Role:** The node graph itself, the 3D scene, huge particle systems.
-* **Rendering:** Instanced rendering from GPU buffers (Zero-Copy).
-* **State:** Maintained in VRAM (SSBOs).
+1.  **Application (App):** The entry point. Configures the engine and registers features.
+2.  **Features (Plugins):** Isolated logic modules (e.g., `MathEngine`, `SceneEditor`). They implement specific behavior but do not own system resources.
+3.  **Engine (Systems):** Major subsystems (`RenderSystem`, `InputSystem`, `AssetSystem`). They manage lifecycle and resources but contain *no business logic*.
+4.  **Foundation (Base):** Zero-dependency utilities (`Memory`, `Math`, `Logger`, `Platform`).
 
----
+### B. The Facade Pattern (Public vs. Internal)
+Every module follows the **Iceberg Principle** to prevent architectural entropy:
+*   **Public Interface (`module.h`):** Contains only opaque handles (`typedef struct System System;`) and API function prototypes. Minimal includes.
+*   **Implementation (`src/internal/...`):** Contains the real structs, Vulkan headers, and logic. Hidden from the rest of the engine.
+*   **Facade (`src/module.c`):** The root `.c` file acts as a thin wrapper that validates inputs and delegates work to the internal implementation.
 
-## 3. The Data Flow Pipeline
-The engine executes a "Compute-First" loop:
-
-1.  **Input (Hybrid):**
-    *   CPU events update Editor UI.
-    *   Mouse/Keyboard state is packed into a Uniform Buffer for the GPU.
-2.  **Logic (Compute Queues):**
-    *   The **Macro Graph** executes Compute Shaders.
-    *   Physics, Animation, Layout calculations happen here.
-    *   Result: Updated SSBOs (Positions, Colors).
-3.  **Synchronization:**
-    *   Memory Barriers ensure Compute is finished.
-4.  **Render (Graphics Queue):**
-    *   **Zero-Copy:** Vertex Shaders read directly from the SSBOs written in step 2.
-    *   No data is copied back to CPU for rendering.
+### C. Data-Driven Pipeline
+The engine loop is not hardcoded in C. It is defined declaratively in a **Pipeline Definition File (`.gdl`)**.
+*   The engine reads the graph at startup.
+*   It schedules systems and passes based on this graph.
+*   *Benefit:* We can rearrange the rendering order or add compute passes without recompiling the C code.
 
 ---
 
-## 4. Key Systems
+## 2. System Architecture
 
-### The Transpiler (The Brain)
-Converts the **Micro Graph** (AST) into GLSL/SPIR-V.
-*   Performs **Kernel Fusion** to optimize math.
-*   Handles type inference.
+### The "Dumb" Renderer
+In v3.0, the Renderer knew about UI Nodes and 3D Objects. In v4.0, the Renderer is agnostic.
+*   **Producers:** UI System, Scene System, Math Editor. They generate generic `RenderBatch` packets.
+*   **Consumer:** Render System. It takes a list of `RenderBatch` and executes them. It does not know *what* it is drawing, only *how* to draw it (Mesh, Shader, Uniforms).
 
-### Storage System (The Heart)
-Manages `Stream<T>` arrays.
-*   Uses **Structure of Arrays (SoA)** layout (e.g., `pos_x[]`, `pos_y[]`) for coalesced GPU access.
-*   Double-buffered (Ping-Pong) where necessary for simulation time-steps.
+### The Macro Graph (Global Pipeline)
+Manages the frame execution flow.
+*   **Nodes:** `Pass` (e.g., "ShadowMapPass", "UIPass", "PhysicsStep").
+*   **Edges:** Resource dependencies (Buffers/Textures).
+*   **Execution:** Orchestrated by the Core, executed sequentially or in parallel (future).
+
+### The Micro Graph (Compute Kernel)
+Manages low-level math logic (The Math Engine Feature).
+*   **Nodes:** Math operations (`Add`, `Sin`).
+*   **Output:** JIT-compiled Compute Shaders (SPIR-V).
+*   **Execution:** GPU-side numerical processing.
+
+---
+
+## 3. Data Flow Architecture
+
+1.  **Input Phase:**
+    *   Platform collects events.
+    *   InputSystem normalizes them.
+    *   Features react to events and update their internal state models.
+
+2.  **Simulation Phase:**
+    *   Features execute logic (physics steps, node graph evaluation, animation).
+    *   State is updated. Dirty data is marked for upload.
+
+3.  **Extraction Phase (The Great Decoupling):**
+    *   *Critical Step:* Features extract visual data into linear **Command Lists** (`RenderBatch`).
+    *   This happens on the CPU. The data is converted to GPU-friendly formats (SoA) here.
+    *   This ensures the "Simulation" state is safe to modify while "Rendering" processes the snapshot.
+
+4.  **Execution Phase:**
+    *   RenderSystem takes the Command Lists.
+    *   Executes the pipeline defined in `.gdl`.
+    *   Submits work to GPU queues.
+    

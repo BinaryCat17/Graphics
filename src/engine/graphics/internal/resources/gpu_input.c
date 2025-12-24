@@ -1,5 +1,6 @@
-#include "gpu_input.h"
+#include "engine/graphics/graphics_types.h"
 #include "engine/input/input.h"
+#include <string.h>
 
 void gpu_input_update(GpuInputState* state, const InputSystem* input, float time, float dt, float width, float height) {
     if (!state || !input) return;

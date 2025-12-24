@@ -1,8 +1,8 @@
-#include "compute_graph.h"
-#include "render_system.h"
-#include "stream.h"
+#include "engine/graphics/compute_graph.h"
+#include "engine/graphics/render_system.h"
+#include "engine/graphics/stream.h"
 #include "foundation/logger/logger.h"
-#include "internal/renderer_backend.h"
+#include "engine/graphics/internal/backend/renderer_backend.h"
 #include <stdlib.h>
 #include <string.h>
 
