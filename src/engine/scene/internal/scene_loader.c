@@ -223,9 +223,14 @@ static SceneNodeSpec* load_recursive(SceneAsset* asset, const ConfigNode* node) 
         // --- Generic Reflection ---
         const MetaField* field = meta_find_field(meta, key);
 
+        // Handle Aliases / Deprecated names
+        if (!field) {
+            if (strcmp(key, "provider") == 0) field = meta_find_field(meta, "provider_id");
+        }
+
         if (field) {
             // Special handling for 'text' field to support Binding Syntax "{...}"
-            if (strcmp(key, "text") == 0 && val->scalar && val->scalar[0] == '{' && temp_binding_count < 64) {
+            if (strcmp(field->name, "text") == 0 && val->scalar && val->scalar[0] == '{' && temp_binding_count < 64) {
                  size_t len = strlen(val->scalar);
                  if (len > 2) {
                      char* buf = arena_push_string_n(&asset->arena, val->scalar + 1, len - 2);
@@ -240,10 +245,6 @@ static SceneNodeSpec* load_recursive(SceneAsset* asset, const ConfigNode* node) 
 
             parse_field_value(spec, field, val, asset);
 
-        } else if (strcmp(key, "provider") == 0) {
-             if (val->scalar) {
-                 spec->provider_id = str_id(val->scalar);
-             }
         } else {
             LOG_WARN("UiParser: Unknown field '%s' in SceneNodeSpec (Node ID:%u). Check indentation or spelling.", key, spec->id);
         }
