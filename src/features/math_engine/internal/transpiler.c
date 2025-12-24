@@ -108,13 +108,11 @@ static ShaderIR math_graph_to_ir(const MathGraph* graph) {
     int visited_count = 0;
 
     // 1. Try to find the explicit OUTPUT node
-    MathNodeId output_node_id = MATH_NODE_INVALID_ID;
     MathNodeId root_node_id = MATH_NODE_INVALID_ID;
 
     for (uint32_t i = 0; i < graph->node_count; ++i) {
         const MathNode* n = math_graph_get_node((MathGraph*)graph, i);
         if (n && n->type == MATH_NODE_OUTPUT) {
-            output_node_id = i;
             // The result is what's connected to Input 0 of the Output Node
             if (n->inputs[0] != MATH_NODE_INVALID_ID) {
                 root_node_id = n->inputs[0];
@@ -123,18 +121,7 @@ static ShaderIR math_graph_to_ir(const MathGraph* graph) {
         }
     }
 
-    // 2. Fallback: If no OUTPUT node, use the last valid node (Legacy behavior for tests)
-    if (output_node_id == MATH_NODE_INVALID_ID) {
-        for (int i = (int)graph->node_count - 1; i >= 0; --i) {
-            const MathNode* n = math_graph_get_node((MathGraph*)graph, i);
-            if (n && n->type != MATH_NODE_NONE) {
-                root_node_id = i;
-                break;
-            }
-        }
-    }
-
-    // 3. Generate IR starting from the root (recursively visits inputs)
+    // 2. Generate IR starting from the root (recursively visits inputs)
     if (root_node_id != MATH_NODE_INVALID_ID) {
         generate_ir_node(graph, root_node_id, &ir, visited, &visited_count);
         

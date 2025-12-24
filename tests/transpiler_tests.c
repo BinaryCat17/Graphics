@@ -24,6 +24,10 @@ int test_transpiler_simple_add(void) {
     
     math_graph_connect(graph, id_add, 0, id1);
     math_graph_connect(graph, id_add, 1, id2);
+
+    // Create Output Node
+    MathNodeId output = math_graph_add_node(graph, MATH_NODE_OUTPUT);
+    math_graph_connect(graph, output, 0, id_add);
     
     // Transpile
     char* glsl = math_graph_transpile(graph, TRANSPILE_MODE_BUFFER_1D, SHADER_TARGET_GLSL_VULKAN);
