@@ -14,30 +14,28 @@
 #include "engine/graphics/internal/renderer_backend.h"
 #include "engine/graphics/internal/vulkan/vulkan_renderer.h"
 #include "engine/graphics/stream.h"
+#include "engine/ui/ui_node.h" // NEW
 
 struct RenderSystem {
-    // Dependencies (Injectable)
+    // Dependencies
     Assets* assets;
 
     // Internal State
     PlatformWindow* window;
     struct RendererBackend* backend;
-    Stream* gpu_input_stream; // Global Input Stream (SSBO)
-    Stream* ui_instance_stream; // NEW: UI Instance Buffer
+    Stream* gpu_input_stream; 
+    Stream* ui_instance_stream; 
     GpuInstanceData* ui_cpu_buffer;
     size_t ui_cpu_capacity;
     
-    // Command Buffer
     RenderCommandList cmd_list; 
     
-    // Packet buffering
     RenderFramePacket packets[2];
     int front_packet_index;
     int back_packet_index;
     bool packet_ready;
     Mutex* packet_mutex;
     
-    // Thread control
     bool running;
     bool renderer_ready;
     bool show_compute_result;
@@ -80,12 +78,10 @@ static void try_bootstrap_renderer(RenderSystem* sys) {
     if (!sys) return;
     if (sys->renderer_ready) return;
     
-    // Dependencies Check
     if (!sys->window) return;
     if (!sys->assets) return;
     if (!sys->backend) return;
 
-    // Load Shaders into Memory
     AssetData vert_shader = assets_load_file(sys->assets, "shaders/ui_default.vert.spv");
     AssetData frag_shader = assets_load_file(sys->assets, "shaders/ui_default.frag.spv");
     
@@ -100,7 +96,7 @@ static void try_bootstrap_renderer(RenderSystem* sys) {
     
     RenderBackendInit init = {
         .window = sys->window,
-        .surface = &surface, // Pass pointer to empty surface struct, backend/platform fills it
+        .surface = &surface, 
         .font = assets_get_font(sys->assets),
         .vert_shader = { .data = vert_shader.data, .size = vert_shader.size },
         .frag_shader = { .data = frag_shader.data, .size = frag_shader.size },
@@ -108,7 +104,6 @@ static void try_bootstrap_renderer(RenderSystem* sys) {
 
     sys->renderer_ready = sys->backend->init(sys->backend, &init);
     
-    // Create Streams now that backend is ready
     if (sys->renderer_ready) {
         if (!sys->gpu_input_stream) {
             sys->gpu_input_stream = stream_create(sys, STREAM_CUSTOM, 1, sizeof(GpuInputState));
@@ -116,12 +111,10 @@ static void try_bootstrap_renderer(RenderSystem* sys) {
         }
         
         if (!sys->ui_instance_stream) {
-            // Initial capacity was set in create, now we create the GPU resource
             sys->ui_instance_stream = stream_create(sys, STREAM_CUSTOM, sys->ui_cpu_capacity, sizeof(GpuInstanceData));
         }
     }
     
-    // Cleanup loaded assets (Backend should have copied what it needs)
     assets_free_file(&vert_shader);
     assets_free_file(&frag_shader);
 }
@@ -137,20 +130,16 @@ RenderSystem* render_system_create(const RenderSystemConfig* config) {
     sys->back_packet_index = 1;
     sys->frame_count = 0;
 
-    // Create UI Instance Stream (CPU Only initially)
     sys->ui_cpu_capacity = 1024;
     sys->ui_cpu_buffer = malloc(sizeof(GpuInstanceData) * sys->ui_cpu_capacity);
     
-    // Init Command List
     sys->cmd_list.capacity = 2048;
     sys->cmd_list.commands = malloc(sizeof(RenderCommand) * sys->cmd_list.capacity);
     sys->cmd_list.count = 0;
 
-    // Create Scenes
     sys->packets[0].scene = scene_create();
     sys->packets[1].scene = scene_create();
 
-    // Register Backend
     renderer_backend_register(vulkan_renderer_backend());
     const char* backend_id = config->backend_type ? config->backend_type : "vulkan";
     sys->backend = renderer_backend_get(backend_id);
@@ -199,27 +188,21 @@ void render_system_begin_frame(RenderSystem* sys, double time) {
     sys->frame_count++;
     sys->current_time = time;
 
-    // Prepare Back Packet
     RenderFramePacket* dest = &sys->packets[sys->back_packet_index];
-    
-    // Clear old scene
-    render_packet_free_resources(dest);
+    render_packet_free_resources(dest); // scene_clear
     
     scene_set_frame_number(dest->scene, sys->frame_count);
 
-    // Setup Camera (Ortho)
     PlatformWindowSize size = platform_get_framebuffer_size(sys->window);
     float w = (float)size.width;
     float h = (float)size.height;
     if (w < 1.0f) w = 1.0f;
     if (h < 1.0f) h = 1.0f;
 
-    // View: Identity (Camera at 0,0)
     SceneCamera camera = {0};
     camera.view_matrix = mat4_identity();
-    
     Mat4 proj = mat4_orthographic(0.0f, w, 0.0f, h, -100.0f, 100.0f);
-    camera.view_matrix = proj; // Matches original behavior (overwriting view with proj)
+    camera.view_matrix = proj; 
     
     scene_set_camera(dest->scene, camera);
 }
@@ -228,8 +211,6 @@ void render_system_update(RenderSystem* sys) {
     if (!sys || !sys->renderer_ready) return;
 
     if (sys->active_compute_pipeline > 0 && sys->backend && sys->backend->compute_dispatch) {
-        // Must match generated GLSL push constant layout in glsl_emitter.c
-        // GLSL: float time(0), width(4), height(8), [padding(12)], vec4 mouse(16)
         struct {
             float time;
             float width;
@@ -244,25 +225,21 @@ void render_system_update(RenderSystem* sys) {
             .mouse = {0, 0, 0, 0}
         };
         
-        // Dispatch Compute (Target is 512x512, assuming 16x16 workgroups)
         sys->backend->compute_dispatch(sys->backend, sys->active_compute_pipeline, 32, 32, 1, &push, sizeof(push));
     }
 
-    // DEBUG: Compute Result Visualization
     if (sys->show_compute_result) {
-        SceneObject quad = {0};
-        quad.id = 9999;
-        quad.position = (Vec3){600.0f, 100.0f, 0.0f};
-        quad.scale = (Vec3){512.0f, 512.0f, 1.0f};
-        quad.color = (Vec4){1.0f, 1.0f, 1.0f, 1.0f};
-        quad.raw.params_0.x = (float)SCENE_MODE_USER_TEXTURE; // User Texture
-        quad.uv_rect = (Vec4){0.0f, 0.0f, 1.0f, 1.0f};
-        
         RenderFramePacket* dest = &sys->packets[sys->back_packet_index];
-        scene_add_object(dest->scene, quad);
+        UiNode quad = {0};
+        quad.id = 9999;
+        quad.rect = (Rect){600.0f, 100.0f, 512.0f, 512.0f};
+        quad.color = (Vec4){1.0f, 1.0f, 1.0f, 1.0f};
+        quad.primitive_type = SCENE_MODE_USER_TEXTURE;
+        quad.uv_rect = (Vec4){0.0f, 0.0f, 1.0f, 1.0f};
+        quad.flags = UI_RENDER_FLAG_TEXTURED | UI_RENDER_FLAG_HAS_BG;
+        scene_push_ui_node(dest->scene, quad);
     }
 
-    // Mark Packet Ready
     mutex_lock(sys->packet_mutex);
     sys->packet_ready = true;
     mutex_unlock(sys->packet_mutex);
@@ -291,18 +268,18 @@ void render_system_draw(RenderSystem* sys) {
     if (!packet) return;
     
     Scene* scene = packet->scene;
-    size_t count = 0;
-    const SceneObject* objects = scene_get_all_objects(scene, &count);
+    size_t ui_count = 0;
+    const UiNode* ui_nodes = scene_get_ui_nodes(scene, &ui_count);
+    
+    size_t batch_count = 0;
+    const RenderBatch* batches = scene_get_render_batches(scene, &batch_count);
     
     // Reset Command List
     sys->cmd_list.count = 0;
     
-    // Ensure CPU buffer capacity
-    size_t required_ui_slots = 0;
-    for(size_t i=0; i<count; ++i) if (objects[i].prim_type != SCENE_PRIM_CUSTOM) required_ui_slots++;
-    
-    if (required_ui_slots > sys->ui_cpu_capacity) {
-        size_t new_cap = required_ui_slots + 1024;
+    // 1. Process UI Nodes -> CPU Instance Buffer
+    if (ui_count > sys->ui_cpu_capacity) {
+        size_t new_cap = ui_count + 1024;
         GpuInstanceData* new_buf = realloc(sys->ui_cpu_buffer, sizeof(GpuInstanceData) * new_cap);
         
         if (new_buf) {
@@ -311,90 +288,58 @@ void render_system_draw(RenderSystem* sys) {
             
             if (sys->ui_instance_stream) stream_destroy(sys->ui_instance_stream);
             sys->ui_instance_stream = stream_create(sys, STREAM_CUSTOM, sys->ui_cpu_capacity, sizeof(GpuInstanceData));
-        } else {
-            LOG_ERROR("RenderSystem: Failed to grow UI buffer!");
         }
     }
     
-    size_t ui_idx = 0;
-    size_t ui_batch_start = 0;
-    
-    for (size_t i = 0; i < count; ++i) {
-        const SceneObject* obj = &objects[i];
+    for (size_t i = 0; i < ui_count; ++i) {
+        const UiNode* node = &ui_nodes[i];
         
-        if (obj->prim_type == SCENE_PRIM_CUSTOM) {
-             // Flush UI
-             if (ui_idx > ui_batch_start) {
-                 RenderCommand cmd = {0};
-                 cmd.type = RENDER_CMD_BIND_PIPELINE;
-                 cmd.bind_pipeline.pipeline_id = 0; // Default
-                 cmd_list_add(&sys->cmd_list, cmd);
-                 
-                 cmd.type = RENDER_CMD_BIND_BUFFER;
-                 cmd.bind_buffer.slot = 0; // Instance Slot
-                 cmd.bind_buffer.buffer_handle = stream_get_handle(sys->ui_instance_stream);
-                 cmd_list_add(&sys->cmd_list, cmd);
-                 
-                 cmd.type = RENDER_CMD_DRAW_INDEXED;
-                 cmd.draw_indexed.index_count = 6;
-                 cmd.draw_indexed.instance_count = (uint32_t)(ui_idx - ui_batch_start);
-                 cmd.draw_indexed.first_index = 0;
-                 cmd.draw_indexed.vertex_offset = 0;
-                 cmd.draw_indexed.first_instance = (uint32_t)ui_batch_start;
-                 cmd_list_add(&sys->cmd_list, cmd);
-                 
-                 ui_batch_start = ui_idx;
-             }
-             
-             CustomDrawData* data = (CustomDrawData*)obj->instance_buffer;
-             if (data) {
-                 RenderCommand cmd = {0};
-                 cmd.type = RENDER_CMD_BIND_PIPELINE;
-                 cmd.bind_pipeline.pipeline_id = data->pipeline_id;
-                 cmd_list_add(&sys->cmd_list, cmd);
-                 
-                 for (int b=0; b<4; ++b) {
-                     if (data->buffers[b]) {
-                         cmd.type = RENDER_CMD_BIND_BUFFER;
-                         cmd.bind_buffer.slot = b;
-                         cmd.bind_buffer.buffer_handle = data->buffers[b];
-                         cmd_list_add(&sys->cmd_list, cmd);
-                     }
-                 }
-                 
-                 cmd.type = RENDER_CMD_DRAW;
-                 cmd.draw.vertex_count = data->vertex_count;
-                 cmd.draw.instance_count = data->instance_count;
-                 cmd.draw.first_vertex = 0;
-                 cmd.draw.first_instance = 0;
-                 cmd_list_add(&sys->cmd_list, cmd);
-             }
+        Mat4 m;
+        // Rect to Transform (Scale + Translate)
+        // Rect is (x, y, w, h). Origin is bottom-left (OpenGL style usually, but check orthographic)
+        // Matrix: Translate(x, y, z) * Scale(w, h, 1)
+        Mat4 s = mat4_scale((Vec3){node->rect.w, node->rect.h, 1.0f});
+        Mat4 t = mat4_translation((Vec3){node->rect.x, node->rect.y, node->z_index});
+        m = mat4_multiply(&t, &s);
+        
+        GpuInstanceData* inst = &sys->ui_cpu_buffer[i];
+        inst->model = m;
+        inst->color = node->color;
+        inst->uv_rect = node->uv_rect;
+        
+        // Packing Params
+        // params_1.x = type
+        inst->params_1.x = (float)node->primitive_type;
+        // params_1.y = corner_radius
+        inst->params_1.y = node->corner_radius;
+        // params_1.z = border_width (or texture_size.x for 9slice)
+        if (node->primitive_type == SCENE_MODE_9_SLICE) {
+            inst->params_1.z = node->texture_size.x;
+            inst->params_1.w = node->texture_size.y;
+            inst->params_2 = node->slice_borders;
+        } else if (node->primitive_type == SCENE_PRIM_CURVE) {
+            // Curves use custom params
+            inst->params_1.y = 1.0f; // Something from old code?
+            inst->params_2 = node->params; // (u1, v1, u2, v2)
+            inst->params_1.z = node->border_width; // Thickness
+            // params_1.w = width/height? Old code had it.
+            // Let's assume the shader uses params_2 mainly.
+            // Recalculating aspect ratio param if needed:
+            if (node->rect.h > 0) inst->params_1.w = node->rect.w / node->rect.h;
         } else {
-            // UI Object
-            if (ui_idx < sys->ui_cpu_capacity) {
-                Mat4 m;
-                Mat4 s = mat4_scale(obj->scale);
-                Mat4 t = mat4_translation(obj->position);
-                m = mat4_multiply(&t, &s);
-                
-                GpuInstanceData* inst = &sys->ui_cpu_buffer[ui_idx];
-                inst->model = m;
-                inst->color = obj->color;
-                inst->uv_rect = obj->uv_rect;
-                inst->params_1 = obj->raw.params_0;
-                inst->params_2 = obj->raw.params_1;
-                inst->clip_rect = obj->ui.clip_rect;
-                
-                ui_idx++;
-            }
+             inst->params_1.z = node->border_width;
+             inst->params_1.w = 0.0f;
+             inst->params_2 = (Vec4){0};
         }
+        
+        inst->clip_rect = (Vec4){node->clip_rect.x, node->clip_rect.y, node->clip_rect.w, node->clip_rect.h};
     }
     
-    // Flush Final Batch
-    if (ui_idx > ui_batch_start) {
+    // 2. Flush UI Batch
+    if (ui_count > 0) {
          RenderCommand cmd = {0};
          cmd.type = RENDER_CMD_BIND_PIPELINE;
-         cmd.bind_pipeline.pipeline_id = 0;
+         cmd.bind_pipeline.pipeline_id = 0; // Default UI Pipeline
          cmd_list_add(&sys->cmd_list, cmd);
          
          cmd.type = RENDER_CMD_BIND_BUFFER;
@@ -402,18 +347,55 @@ void render_system_draw(RenderSystem* sys) {
          cmd.bind_buffer.buffer_handle = stream_get_handle(sys->ui_instance_stream);
          cmd_list_add(&sys->cmd_list, cmd);
          
+         // Upload Data
+         stream_set_data(sys->ui_instance_stream, sys->ui_cpu_buffer, ui_count);
+         
          cmd.type = RENDER_CMD_DRAW_INDEXED;
          cmd.draw_indexed.index_count = 6;
-         cmd.draw_indexed.instance_count = (uint32_t)(ui_idx - ui_batch_start);
+         cmd.draw_indexed.instance_count = (uint32_t)ui_count;
          cmd.draw_indexed.first_index = 0;
          cmd.draw_indexed.vertex_offset = 0;
-         cmd.draw_indexed.first_instance = (uint32_t)ui_batch_start;
+         cmd.draw_indexed.first_instance = 0;
          cmd_list_add(&sys->cmd_list, cmd);
     }
     
-    // Upload Data
-    if (ui_idx > 0) {
-        stream_set_data(sys->ui_instance_stream, sys->ui_cpu_buffer, ui_idx);
+    // 3. Process Render Batches (3D/Custom)
+    for (size_t i = 0; i < batch_count; ++i) {
+        const RenderBatch* batch = &batches[i];
+        
+        // 1. Pipeline
+        if (batch->pipeline_id != 0) {
+             RenderCommand cmd = {0};
+             cmd.type = RENDER_CMD_BIND_PIPELINE;
+             cmd.bind_pipeline.pipeline_id = batch->pipeline_id;
+             cmd_list_add(&sys->cmd_list, cmd);
+        }
+        
+        // 2. Custom Bindings
+        for (uint32_t b = 0; b < batch->bind_count && b < 4; ++b) {
+            if (batch->bind_buffers[b]) {
+                RenderCommand cmd = {0};
+                cmd.type = RENDER_CMD_BIND_BUFFER;
+                cmd.bind_buffer.slot = batch->bind_slots[b];
+                cmd.bind_buffer.buffer_handle = batch->bind_buffers[b];
+                cmd_list_add(&sys->cmd_list, cmd);
+            }
+        }
+        
+        // 3. Draw
+        if (batch->mesh) {
+            // TODO: Implement Mesh Binding (Vertex Buffers) in Backend or via Commands
+            // For now assuming Custom Shaders or immediate mode for logic consistency
+        } else {
+            // Draw Arrays/Custom
+            RenderCommand cmd = {0};
+            cmd.type = RENDER_CMD_DRAW;
+            cmd.draw.vertex_count = batch->vertex_count;
+            cmd.draw.instance_count = batch->instance_count;
+            cmd.draw.first_vertex = 0;
+            cmd.draw.first_instance = batch->first_instance;
+            cmd_list_add(&sys->cmd_list, cmd);
+        }
     }
     
     // Submit

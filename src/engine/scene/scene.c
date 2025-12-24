@@ -12,6 +12,24 @@
 #include <math.h>
 
 #define SCENE_ARENA_SIZE (4 * 1024 * 1024)
+#define MAX_UI_NODES 16384
+#define MAX_BATCHES 4096
+
+// --- Scene Struct Definition ---
+
+struct Scene {
+    MemoryArena arena;
+    SceneCamera camera;
+    uint64_t frame_number;
+    
+    UiNode* ui_nodes;
+    size_t ui_count;
+    size_t ui_capacity;
+    
+    RenderBatch* batches;
+    size_t batch_count;
+    size_t batch_capacity;
+};
 
 // --- System Lifecycle ---
 
@@ -33,7 +51,8 @@ Scene* scene_create(void) {
             free(scene);
             return NULL;
         }
-        scene->objects = (SceneObject*)scene->arena.base;
+        // Pre-allocate arrays
+        scene_clear(scene);
     }
     return scene;
 }
@@ -44,20 +63,27 @@ void scene_destroy(Scene* scene) {
     free(scene);
 }
 
-void scene_add_object(Scene* scene, SceneObject obj) {
-    if (!scene) return;
-    SceneObject* new_slot = (SceneObject*)arena_alloc(&scene->arena, sizeof(SceneObject));
-    if (new_slot) {
-        *new_slot = obj;
-        scene->object_count++;
-    }
-}
-
 void scene_clear(Scene* scene) {
     if (!scene) return;
     arena_reset(&scene->arena);
-    scene->object_count = 0;
-    scene->objects = (SceneObject*)scene->arena.base;
+    
+    scene->ui_nodes = (UiNode*)arena_alloc(&scene->arena, sizeof(UiNode) * MAX_UI_NODES);
+    scene->ui_capacity = MAX_UI_NODES;
+    scene->ui_count = 0;
+    
+    scene->batches = (RenderBatch*)arena_alloc(&scene->arena, sizeof(RenderBatch) * MAX_BATCHES);
+    scene->batch_capacity = MAX_BATCHES;
+    scene->batch_count = 0;
+}
+
+void scene_push_ui_node(Scene* scene, UiNode node) {
+    if (!scene || scene->ui_count >= scene->ui_capacity) return;
+    scene->ui_nodes[scene->ui_count++] = node;
+}
+
+void scene_push_render_batch(Scene* scene, RenderBatch batch) {
+    if (!scene || scene->batch_count >= scene->batch_capacity) return;
+    scene->batches[scene->batch_count++] = batch;
 }
 
 void scene_set_camera(Scene* scene, SceneCamera camera) {
@@ -78,32 +104,35 @@ uint64_t scene_get_frame_number(const Scene* scene) {
     return scene ? scene->frame_number : 0;
 }
 
-const SceneObject* scene_get_all_objects(const Scene* scene, size_t* out_count) {
-    if (!scene) {
-        if (out_count) *out_count = 0;
-        return NULL;
-    }
-    if (out_count) *out_count = scene->object_count;
-    return scene->objects;
+const UiNode* scene_get_ui_nodes(const Scene* scene, size_t* out_count) {
+    if (!scene) { if (out_count) *out_count = 0; return NULL; }
+    if (out_count) *out_count = scene->ui_count;
+    return scene->ui_nodes;
 }
 
-// --- High-Level Drawing API ---
+const RenderBatch* scene_get_render_batches(const Scene* scene, size_t* out_count) {
+    if (!scene) { if (out_count) *out_count = 0; return NULL; }
+    if (out_count) *out_count = scene->batch_count;
+    return scene->batches;
+}
+
+// --- High-Level Drawing API (Adapted to UiNode) ---
 
 void scene_push_rect_sdf(Scene* scene, Vec3 pos, Vec2 size, Vec4 color, float radius, float border, Vec4 clip_rect) {
-    SceneObject obj = {0};
-    obj.prim_type = SCENE_PRIM_QUAD;
-    obj.position = pos;
-    obj.scale = (Vec3){size.x, size.y, 1.0f};
-    obj.color = color;
-    obj.ui.clip_rect = clip_rect;
-    obj.uv_rect = (Vec4){0.0f, 0.0f, 1.0f, 1.0f}; 
-    obj.ui.style_params.x = (float)SCENE_MODE_SDF_BOX;
-    obj.ui.style_params.y = radius;
-    obj.ui.style_params.z = border;
-    scene_add_object(scene, obj);
+    UiNode node = {0};
+    node.rect = (Rect){pos.x, pos.y, size.x, size.y};
+    node.z_index = pos.z;
+    node.color = color;
+    node.clip_rect = (Rect){clip_rect.x, clip_rect.y, clip_rect.z, clip_rect.w};
+    node.primitive_type = SCENE_MODE_SDF_BOX; // Using enum from render_packet.h or similar
+    node.corner_radius = radius;
+    node.border_width = border;
+    node.flags = UI_RENDER_FLAG_HAS_BG | UI_RENDER_FLAG_ROUNDED;
+    scene_push_ui_node(scene, node);
 }
 
 void scene_push_circle_sdf(Scene* scene, Vec3 center, float radius, Vec4 color, Vec4 clip_rect) {
+    // Circle is just a very rounded square
     scene_push_rect_sdf(scene, 
         (Vec3){center.x - radius, center.y - radius, center.z}, 
         (Vec2){radius * 2.0f, radius * 2.0f}, 
@@ -129,57 +158,69 @@ void scene_push_curve(Scene* scene, Vec3 start, Vec3 end, float thickness, Vec4 
     float u2 = (end.x - min_x) / width;
     float v2 = (end.y - min_y) / height;
 
-    SceneObject wire = {0};
-    wire.prim_type = SCENE_PRIM_CURVE;
-    wire.position = (Vec3){min_x + width * 0.5f, min_y + height * 0.5f, start.z};
-    wire.scale = (Vec3){width, height, 1.0f};
-    wire.color = color;
-    wire.ui.clip_rect = clip_rect;
-    wire.uv_rect = (Vec4){0.0f, 0.0f, 1.0f, 1.0f};
-    wire.ui.style_params.y = 1.0f; 
-    wire.ui.extra_params = (Vec4){u1, v1, u2, v2};
-    wire.ui.style_params.z = thickness / height; 
-    wire.ui.style_params.w = width / height; 
-    scene_add_object(scene, wire);
+    UiNode node = {0};
+    node.rect = (Rect){min_x + width * 0.5f - width*0.5f, min_y + height * 0.5f - height*0.5f, width, height}; // Rect is x,y,w,h (bottom-left)
+    // Actually, previous implementation used center pos + scale.
+    // Rect usually implies x,y (bottom-left or top-left). 
+    // Let's assume RenderPacket expects x,y,w,h.
+    // Previous: pos = center. scale = size.
+    node.rect = (Rect){min_x, min_y, width, height};
+    node.z_index = start.z;
+    node.color = color;
+    node.primitive_type = SCENE_PRIM_CURVE; // 1
+    node.flags = UI_RENDER_FLAG_NONE;
+    
+    // Packing params into custom Vec4
+    // params.x = u1, params.y = v1, params.z = u2, params.w = v2
+    node.params = (Vec4){u1, v1, u2, v2};
+    // We also need thickness.
+    // In previous code: style_params.z = thickness/height.
+    // We might need another param slot if we want to be clean.
+    // But for now let's squeeze it or assume shader handles it.
+    // Wait, UiNode has uv_rect. We can use that for u1,v1,u2,v2?
+    node.uv_rect = (Vec4){u1, v1, u2, v2};
+    node.border_width = thickness; // Use border_width for thickness
+    
+    node.clip_rect = (Rect){clip_rect.x, clip_rect.y, clip_rect.z, clip_rect.w};
+    
+    scene_push_ui_node(scene, node);
 }
 
 void scene_push_quad(Scene* scene, Vec3 pos, Vec2 size, Vec4 color, Vec4 clip_rect) {
-    SceneObject obj = {0};
-    obj.prim_type = SCENE_PRIM_QUAD;
-    obj.position = pos;
-    obj.scale = (Vec3){size.x, size.y, 1.0f};
-    obj.color = color;
-    obj.ui.clip_rect = clip_rect;
-    obj.ui.style_params.x = (float)SCENE_MODE_SOLID;
-    obj.uv_rect = (Vec4){0.0f, 0.0f, 1.0f, 1.0f}; 
-    scene_add_object(scene, obj);
+    UiNode node = {0};
+    node.rect = (Rect){pos.x, pos.y, size.x, size.y};
+    node.z_index = pos.z;
+    node.color = color;
+    node.clip_rect = (Rect){clip_rect.x, clip_rect.y, clip_rect.z, clip_rect.w};
+    node.primitive_type = SCENE_MODE_SOLID;
+    node.flags = UI_RENDER_FLAG_HAS_BG;
+    scene_push_ui_node(scene, node);
 }
 
 void scene_push_quad_textured(Scene* scene, Vec3 pos, Vec2 size, Vec4 color, Vec4 uv_rect, Vec4 clip_rect) {
-    SceneObject obj = {0};
-    obj.prim_type = SCENE_PRIM_QUAD;
-    obj.position = pos;
-    obj.scale = (Vec3){size.x, size.y, 1.0f};
-    obj.color = color;
-    obj.ui.clip_rect = clip_rect;
-    obj.uv_rect = uv_rect;
-    obj.ui.style_params.x = (float)SCENE_MODE_TEXTURED;
-    scene_add_object(scene, obj);
+    UiNode node = {0};
+    node.rect = (Rect){pos.x, pos.y, size.x, size.y};
+    node.z_index = pos.z;
+    node.color = color;
+    node.clip_rect = (Rect){clip_rect.x, clip_rect.y, clip_rect.z, clip_rect.w};
+    node.uv_rect = uv_rect;
+    node.primitive_type = SCENE_MODE_TEXTURED;
+    node.flags = UI_RENDER_FLAG_HAS_BG | UI_RENDER_FLAG_TEXTURED;
+    scene_push_ui_node(scene, node);
 }
 
 void scene_push_quad_9slice(Scene* scene, Vec3 pos, Vec2 size, Vec4 color, Vec4 uv_rect, Vec2 texture_size, Vec4 borders, Vec4 clip_rect) {
-    SceneObject obj = {0};
-    obj.prim_type = SCENE_PRIM_QUAD;
-    obj.position = pos;
-    obj.scale = (Vec3){size.x, size.y, 1.0f};
-    obj.color = color;
-    obj.ui.clip_rect = clip_rect;
-    obj.uv_rect = uv_rect;
-    obj.ui.style_params.x = (float)SCENE_MODE_9_SLICE;
-    obj.ui.style_params.z = texture_size.x; 
-    obj.ui.style_params.w = texture_size.y; 
-    obj.ui.extra_params = borders;
-    scene_add_object(scene, obj);
+    UiNode node = {0};
+    node.rect = (Rect){pos.x, pos.y, size.x, size.y};
+    node.z_index = pos.z;
+    node.color = color;
+    node.clip_rect = (Rect){clip_rect.x, clip_rect.y, clip_rect.z, clip_rect.w};
+    node.uv_rect = uv_rect;
+    node.texture_size = texture_size;
+    node.slice_borders = borders;
+    node.primitive_type = SCENE_MODE_9_SLICE;
+    node.flags = UI_RENDER_FLAG_HAS_BG | UI_RENDER_FLAG_TEXTURED | UI_RENDER_FLAG_9_SLICE;
+    scene_push_ui_node(scene, node);
 }
 
 // --- Scene Tree Wrappers ---

@@ -502,8 +502,10 @@ MathEditor* math_editor_create(Engine* engine) {
         LOG_ERROR("Failed to load editor_nodes shaders.");
     }
 
-    editor->draw_data_cache = arena_alloc_zero(&editor->graph_arena, sizeof(CustomDrawData));
-    editor->wire_draw_data = arena_alloc_zero(&editor->graph_arena, sizeof(CustomDrawData));
+    // editor->draw_data_cache and editor->wire_draw_data were used for caching pointers
+    // but RenderBatch is passed by value/copy to scene_push_render_batch, 
+    // so we don't strictly need persistent cache unless we want to avoid recreating the struct every frame.
+    // However, RenderBatch is small enough to create on stack.
     
     return editor;
 }
@@ -514,44 +516,36 @@ void math_editor_render(MathEditor* editor, Scene* scene, const struct Assets* a
     if (!editor || !scene || !editor->view->ui_instance) return;
 
     // 1. Render Graph Nodes (GPU Instancing)
-    if (editor->nodes_pipeline_id > 0 && editor->view->node_views_count > 0 && editor->draw_data_cache) {
-        editor->draw_data_cache->pipeline_id = editor->nodes_pipeline_id;
-        editor->draw_data_cache->vertex_count = 6; // Quad
-        editor->draw_data_cache->instance_count = editor->view->node_views_count;
-        editor->draw_data_cache->buffers[0] = stream_get_handle(editor->gpu_nodes); 
+    if (editor->nodes_pipeline_id > 0 && editor->view->node_views_count > 0) {
+        RenderBatch batch = {0};
+        batch.pipeline_id = editor->nodes_pipeline_id;
+        batch.vertex_count = 6; 
+        batch.instance_count = editor->view->node_views_count;
         
-        SceneObject obj = {0};
-        obj.prim_type = SCENE_PRIM_CUSTOM;
-        obj.layer = LAYER_UI_BACKGROUND; // Draw behind standard UI
-        obj.instance_buffer = editor->draw_data_cache;
-        
-        scene_add_object(scene, obj);
+        batch.bind_buffers[0] = stream_get_handle(editor->gpu_nodes);
+        batch.bind_slots[0] = 0; // set 0, binding 0 in shader? (Check shader)
+        // Usually: set=0 is global, set=1 is per pass? 
+        // We assume binding 0.
+        batch.bind_count = 1;
+
+        scene_push_render_batch(scene, batch);
     }
 
     // 1.5 Render Wires (Custom Compute Generated)
-    if (editor->wire_render_pipeline_id > 0 && editor->view->wires_count > 0 && editor->wire_draw_data) {
-        editor->wire_draw_data->pipeline_id = editor->wire_render_pipeline_id;
-        editor->wire_draw_data->vertex_count = editor->view->wires_count * 64 * 6; // 64 segments * 6 verts
-        editor->wire_draw_data->instance_count = 1;
-        editor->wire_draw_data->buffers[0] = stream_get_handle(editor->gpu_wire_verts);
+    if (editor->wire_render_pipeline_id > 0 && editor->view->wires_count > 0) {
+        RenderBatch batch = {0};
+        batch.pipeline_id = editor->wire_render_pipeline_id;
+        batch.vertex_count = editor->view->wires_count * 64 * 6;
+        batch.instance_count = 1;
         
-        SceneObject obj = {0};
-        obj.prim_type = SCENE_PRIM_CUSTOM;
-        obj.layer = LAYER_UI_BACKGROUND; // Behind Nodes but maybe same layer?
-        obj.instance_buffer = editor->wire_draw_data;
+        batch.bind_buffers[0] = stream_get_handle(editor->gpu_wire_verts);
+        batch.bind_slots[0] = 0;
+        batch.bind_count = 1;
         
-        scene_add_object(scene, obj);
+        scene_push_render_batch(scene, batch);
     }
 
-    // 2. Render UI Overlay (Inspector, Palette, Wireframe Links)
-    // Links are currently drawn by UI system as lines?
-    // math_editor_sync_wires -> editor->view->wires.
-    // ui_system_render -> draws scene_tree.
-    // We need to ensure wires are drawn. UI system handles that if they are part of the UI tree.
-    // But wires in MathEditor are separate struct?
-    // Let's check ui_renderer.c. It likely only renders UI Nodes.
-    // If we want wires, we should add them to scene here too.
-    
+    // 2. Render UI Overlay
     ui_system_render(editor->view->ui_instance, scene, assets, arena);
 }
 

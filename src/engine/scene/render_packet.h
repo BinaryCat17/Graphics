@@ -5,6 +5,9 @@
 #include <stddef.h> // size_t
 #include <stdint.h> // uint64_t
 
+#include "engine/ui/ui_node.h"
+#include "engine/graphics/render_batch.h"
+
 // --- Basic Types ---
 
 // Simple mesh descriptor for the Unified Scene
@@ -34,13 +37,6 @@ typedef enum ScenePrimitiveType {
     SCENE_PRIM_CUSTOM = 2 // Custom Pipeline / Zero-Copy
 } ScenePrimitiveType;
 
-typedef struct CustomDrawData {
-    uint32_t pipeline_id;
-    uint32_t vertex_count;
-    uint32_t instance_count;
-    void* buffers[4]; // PosX, PosY, PosZ, Color (Backend handles)
-} CustomDrawData;
-
 // Standard Rendering Modes for UI/2D Shader
 typedef enum SceneShaderMode {
     SCENE_MODE_SOLID        = 0, // Solid Color
@@ -57,54 +53,6 @@ typedef struct SceneCamera {
     Mat4 proj_matrix;
 } SceneCamera;
 
-typedef struct SceneObject {
-    // --- Identification & Classification ---
-    int id;
-    RenderLayer layer;
-    ScenePrimitiveType prim_type;
-    
-    // --- Transform ---
-    Vec3 position;
-    Vec3 rotation; 
-    Vec3 scale;
-    
-    // --- Rendering ---
-    const Mesh* mesh; 
-
-    // --- Material & Styling ---
-    Vec4 color; 
-    Vec4 uv_rect; // Texture Subset (xy=off, zw=scale)
-
-    // --- Advanced / Generic Shader Data ---
-    // Domain-specific data accessed via union to save memory and improve semantics
-    union {
-        // UI Context
-        struct {
-            Vec4 style_params; // x=type, y=radius, z=width, w=height
-            Vec4 extra_params; // Borders etc.
-            Vec4 clip_rect;    // Scissor bounds (x,y,w,h)
-        } ui;
-
-        // PBR / 3D Context (Reserved)
-        struct {
-            Vec4 pbr_data;     // x=roughness, y=metal, z=ao
-            Vec4 user_data;
-            Vec4 emission;
-        } pbr;
-
-        // Raw Access
-        struct {
-            Vec4 params_0; // Maps to style_params
-            Vec4 params_1; // Maps to extra_params
-            Vec4 params_2; // Maps to clip_rect
-        } raw;
-    };
-
-    // --- Instancing (Data-Driven Visualization) ---
-    void* instance_buffer; // Pointer to GpuBuffer (if massive instancing)
-    size_t instance_count;
-} SceneObject;
-
 // --- The Scene Container ---
 
 typedef struct Scene Scene;
@@ -117,9 +65,9 @@ void scene_destroy(Scene* scene);
 
 void scene_clear(Scene* scene);
 
-// Adds an object to the scene. 
-// Uses a fast linear allocator (MemoryArena), so this is very cheap.
-void scene_add_object(Scene* scene, SceneObject obj); 
+// Push commands
+void scene_push_ui_node(Scene* scene, UiNode node);
+void scene_push_render_batch(Scene* scene, RenderBatch batch);
 
 // Accessors
 void scene_set_camera(Scene* scene, SceneCamera camera);
@@ -128,11 +76,12 @@ SceneCamera scene_get_camera(const Scene* scene);
 void scene_set_frame_number(Scene* scene, uint64_t frame_number);
 uint64_t scene_get_frame_number(const Scene* scene);
 
-// Returns pointer to internal linear array and sets out_count. 
-// Do not free or persist this pointer across frames.
-const SceneObject* scene_get_all_objects(const Scene* scene, size_t* out_count);
+// Data Access for Backend
+// Returns pointer to internal linear array and sets out_count.
+const UiNode* scene_get_ui_nodes(const Scene* scene, size_t* out_count);
+const RenderBatch* scene_get_render_batches(const Scene* scene, size_t* out_count);
 
-// --- High-Level Drawing API ---
+// --- High-Level Drawing API (Legacy/Helpers) ---
 
 void scene_push_rect_sdf(Scene* scene, Vec3 pos, Vec2 size, Vec4 color, float radius, float border, Vec4 clip_rect);
 void scene_push_circle_sdf(Scene* scene, Vec3 center, float radius, Vec4 color, Vec4 clip_rect);

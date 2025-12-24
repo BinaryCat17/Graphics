@@ -6,6 +6,8 @@
 #include <string.h>
 #include <stdint.h>
 
+#include "engine/ui/ui_node.h"
+
 void scene_add_text_clipped(Scene* scene, const Font* font, const char* text, Vec3 pos, float scale, Vec4 color, Vec4 clip_rect) {
     if (!scene || !text || !font) return;
 
@@ -27,37 +29,27 @@ void scene_add_text_clipped(Scene* scene, const Font* font, const char* text, Ve
             float scaled_yoff = g.yoff * scale;
             float scaled_advance = g.advance * scale;
 
-            // Create Scene Object
-            SceneObject obj;
-            memset(&obj, 0, sizeof(SceneObject));
+            // Create UiNode
+            UiNode node = {0};
             
             // Position
-            // Assuming Top-Left origin for Quad and Screen
-            obj.position.x = cursor_x + scaled_xoff;
-            obj.position.y = cursor_y + scaled_yoff;
-            obj.position.z = pos.z;
-            
-            // Scale
-            obj.scale.x = scaled_w;
-            obj.scale.y = scaled_h;
-            obj.scale.z = 1.0f;
+            node.rect = (Rect){cursor_x + scaled_xoff, cursor_y + scaled_yoff, scaled_w, scaled_h};
+            node.z_index = pos.z;
             
             // Color
-            obj.color = color;
+            node.color = color;
             
-            // Texture Params (1.0 = use texture)
-            obj.raw.params_0.x = (float)SCENE_MODE_TEXTURED;
+            // Texture Params
+            node.primitive_type = SCENE_MODE_TEXTURED;
+            node.flags = UI_RENDER_FLAG_TEXTURED | UI_RENDER_FLAG_HAS_BG;
             
             // UVs
-            obj.uv_rect.x = g.u0;
-            obj.uv_rect.y = g.v0;
-            obj.uv_rect.z = g.u1 - g.u0; // Width
-            obj.uv_rect.w = g.v1 - g.v0; // Height
+            node.uv_rect = (Vec4){g.u0, g.v0, g.u1 - g.u0, g.v1 - g.v0};
             
             // Clipping
-            obj.ui.clip_rect = clip_rect;
+            node.clip_rect = (Rect){clip_rect.x, clip_rect.y, clip_rect.z, clip_rect.w};
             
-            scene_add_object(scene, obj);
+            scene_push_ui_node(scene, node);
             
             cursor_x += scaled_advance;
         }
