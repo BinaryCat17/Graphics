@@ -12,7 +12,10 @@ typedef enum IrOpCode {
     // Values & Parameters
     IR_OP_CONST_FLOAT,      // res = float_val
     IR_OP_LOAD_PARAM_TIME,  // res = time
-    IR_OP_LOAD_PARAM_MOUSE, // res = mouse (vec4)
+    IR_OP_LOAD_PARAM_MOUSE, // res = mouse (vec2)
+    IR_OP_LOAD_PARAM_MOUSE_DELTA, // res = mouse_delta (vec2)
+    IR_OP_LOAD_PARAM_MOUSE_SCROLL, // res = mouse_scroll (vec2)
+    IR_OP_LOAD_PARAM_MOUSE_BUTTONS, // res = mouse_buttons (uint)
     IR_OP_LOAD_PARAM_TEXTURE, // res = sampler2D (handle)
     IR_OP_LOAD_PARAM_UV,    // res = uv.x (or uv vector in future)
     

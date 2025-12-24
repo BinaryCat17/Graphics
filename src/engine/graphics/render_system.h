@@ -4,9 +4,11 @@
 #include <stdbool.h>
 #include <stdint.h>
 #include <stddef.h>
+#include "engine/graphics/gpu_input.h" // Added for GpuInputState
 
 typedef struct RenderSystem RenderSystem;
 typedef struct RenderFramePacket RenderFramePacket;
+typedef struct Stream Stream; // Forward declaration
 
 typedef struct Assets Assets;
 typedef struct PlatformWindow PlatformWindow;
@@ -64,5 +66,7 @@ void render_system_set_show_compute(RenderSystem* sys, bool show);
 
 // Internal Access
 RendererBackend* render_system_get_backend(RenderSystem* sys);
+Stream* render_system_get_input_stream(RenderSystem* sys);
+void render_system_update_gpu_input(RenderSystem* sys, const GpuInputState* state);
 
 #endif // RENDER_SYSTEM_H

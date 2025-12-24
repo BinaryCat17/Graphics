@@ -22,8 +22,10 @@ typedef struct GpuInputState {
     // Total: 48 bytes -> aligned to 64 bytes if needed, or just 48
 } GpuInputState;
 
+typedef struct InputSystem InputSystem;
+
 // Updates the GPU Input State struct from the Engine's InputSystem.
 // This does NOT upload to GPU, it just prepares the struct.
-void gpu_input_update(GpuInputState* state, const struct InputSystem* input, float time, float dt, float width, float height);
+void gpu_input_update(GpuInputState* state, const InputSystem* input, float time, float dt, float width, float height);
 
 #endif // GPU_INPUT_H

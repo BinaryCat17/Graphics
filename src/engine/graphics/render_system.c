@@ -11,6 +11,7 @@
 #include "foundation/platform/platform.h"
 #include "engine/graphics/internal/renderer_backend.h"
 #include "engine/graphics/internal/vulkan/vulkan_renderer.h"
+#include "engine/graphics/stream.h"
 
 struct RenderSystem {
     // Dependencies (Injectable)
@@ -19,6 +20,7 @@ struct RenderSystem {
     // Internal State
     PlatformWindow* window;
     struct RendererBackend* backend;
+    Stream* gpu_input_stream; // Global Input Stream (SSBO)
     
     // Packet buffering
     RenderFramePacket packets[2];
@@ -114,6 +116,9 @@ RenderSystem* render_system_create(const RenderSystemConfig* config) {
     sys->back_packet_index = 1;
     sys->frame_count = 0;
 
+    // Create Input Stream (Single struct, aligned)
+    sys->gpu_input_stream = stream_create(sys, STREAM_CUSTOM, 1, sizeof(GpuInputState));
+
     // Create Scenes
     sys->packets[0].scene = scene_create();
     sys->packets[1].scene = scene_create();
@@ -141,6 +146,8 @@ void render_system_destroy(RenderSystem* sys) {
         sys->backend->cleanup(sys->backend);
     }
     
+    stream_destroy(sys->gpu_input_stream);
+
     render_packet_free_resources(&sys->packets[0]);
     scene_destroy(sys->packets[0].scene);
     
@@ -312,4 +319,13 @@ void render_system_set_show_compute(RenderSystem* sys, bool show) { if(sys) sys-
 
 RendererBackend* render_system_get_backend(RenderSystem* sys) {
     return sys ? sys->backend : NULL;
+}
+
+Stream* render_system_get_input_stream(RenderSystem* sys) {
+    return sys ? sys->gpu_input_stream : NULL;
+}
+
+void render_system_update_gpu_input(RenderSystem* sys, const GpuInputState* state) {
+    if (!sys || !state || !sys->gpu_input_stream) return;
+    stream_set_data(sys->gpu_input_stream, state, 1);
 }

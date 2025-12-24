@@ -84,28 +84,36 @@ char* ir_to_glsl(const ShaderIR* ir, TranspilerMode mode) {
     // Header
     stream_printf(&stream, "#version 450\n");
 
+    // Input State SSBO (Shared across all compute shaders)
+    stream_printf(&stream, "struct InputState {\n");
+    stream_printf(&stream, "    float time;\n");
+    stream_printf(&stream, "    float delta_time;\n");
+    stream_printf(&stream, "    float screen_width;\n");
+    stream_printf(&stream, "    float screen_height;\n");
+    stream_printf(&stream, "    vec2 mouse_pos;\n");
+    stream_printf(&stream, "    vec2 mouse_delta;\n");
+    stream_printf(&stream, "    vec2 mouse_scroll;\n");
+    stream_printf(&stream, "    uint mouse_buttons;\n");
+    stream_printf(&stream, "    uint _padding;\n");
+    stream_printf(&stream, "};\n\n");
+    
+    // We reserve set=0, binding=1 for Global Input State
+    stream_printf(&stream, "layout(set=0, binding=1) readonly buffer GlobalInput {\n");
+    stream_printf(&stream, "    InputState params;\n");
+    stream_printf(&stream, "};\n\n");
+
     if (mode == TRANSPILE_MODE_IMAGE_2D) {
         stream_printf(&stream, "layout(local_size_x = 16, local_size_y = 16) in;\n\n");
         stream_printf(&stream, "layout(set=0, binding=0, rgba8) writeonly uniform image2D outImg;\n\n");
-        
-        stream_printf(&stream, "layout(push_constant) uniform Params {\n");
-        stream_printf(&stream, "    float time;\n");
-        stream_printf(&stream, "    float width;\n");
-        stream_printf(&stream, "    float height;\n");
-        stream_printf(&stream, "    vec4 mouse;\n");
-        stream_printf(&stream, "} params;\n\n");
     } else {
         stream_printf(&stream, "layout(local_size_x = 1) in;\n\n");
         stream_printf(&stream, "layout(set=0, binding=0) buffer OutBuf {\n");
         stream_printf(&stream, "    %s result;\n", result_type_name);
         stream_printf(&stream, "} b_out;\n\n");
-        
-        stream_printf(&stream, "struct Params { float time; float width; float height; vec4 mouse; };\n");
-        stream_printf(&stream, "const Params params = Params(0.0, 1.0, 1.0, vec4(0));\n\n");
     }
 
     // Pre-pass: Declare Textures
-    int texture_binding = 1; // Start binding from 1 (0 is output)
+    int texture_binding = 2; // Start binding from 2 (0=output, 1=input_state)
     for (uint32_t i = 0; i < ir->instruction_count; ++i) {
         if (ir->instructions[i].op == IR_OP_LOAD_PARAM_TEXTURE) {
             stream_printf(&stream, "layout(set=0, binding=%d) uniform sampler2D u_tex_%d;\n", texture_binding++, ir->instructions[i].id);
@@ -118,8 +126,8 @@ char* ir_to_glsl(const ShaderIR* ir, TranspilerMode mode) {
     // Setup UV/Coordinates
     if (mode == TRANSPILE_MODE_IMAGE_2D) {
         stream_printf(&stream, "    ivec2 storePos = ivec2(gl_GlobalInvocationID.xy);\n");
-        stream_printf(&stream, "    if (storePos.x >= int(params.width) || storePos.y >= int(params.height)) return;\n\n");
-        stream_printf(&stream, "    vec2 uv = vec2(storePos) / vec2(params.width, params.height);\n\n");
+        stream_printf(&stream, "    if (storePos.x >= int(params.screen_width) || storePos.y >= int(params.screen_height)) return;\n\n");
+        stream_printf(&stream, "    vec2 uv = vec2(storePos) / vec2(params.screen_width, params.screen_height);\n\n");
     } else {
         stream_printf(&stream, "    vec2 uv = vec2(0.0, 0.0);\n\n");
     }
@@ -145,7 +153,16 @@ char* ir_to_glsl(const ShaderIR* ir, TranspilerMode mode) {
                 stream_printf(&stream, "    float v_%d = params.time;\n", inst->id);
                 break;
             case IR_OP_LOAD_PARAM_MOUSE:
-                stream_printf(&stream, "    vec4 v_%d = params.mouse;\n", inst->id);
+                stream_printf(&stream, "    vec2 v_%d = params.mouse_pos;\n", inst->id);
+                break;
+            case IR_OP_LOAD_PARAM_MOUSE_DELTA:
+                stream_printf(&stream, "    vec2 v_%d = params.mouse_delta;\n", inst->id);
+                break;
+            case IR_OP_LOAD_PARAM_MOUSE_SCROLL:
+                stream_printf(&stream, "    vec2 v_%d = params.mouse_scroll;\n", inst->id);
+                break;
+            case IR_OP_LOAD_PARAM_MOUSE_BUTTONS:
+                stream_printf(&stream, "    float v_%d = float(params.mouse_buttons);\n", inst->id);
                 break;
             case IR_OP_LOAD_PARAM_TEXTURE:
                 // No code gen needed inside main, accessed via global u_tex_ID

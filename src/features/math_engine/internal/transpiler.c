@@ -51,7 +51,22 @@ static void generate_ir_node(const MathGraph* graph, MathNodeId id, ShaderIR* ir
 
         case MATH_NODE_MOUSE:
             inst.op = IR_OP_LOAD_PARAM_MOUSE;
-            inst.type = MATH_DATA_TYPE_VEC4;
+            inst.type = MATH_DATA_TYPE_VEC2;
+            break;
+
+        case MATH_NODE_MOUSE_DELTA:
+            inst.op = IR_OP_LOAD_PARAM_MOUSE_DELTA;
+            inst.type = MATH_DATA_TYPE_VEC2;
+            break;
+
+        case MATH_NODE_MOUSE_SCROLL:
+            inst.op = IR_OP_LOAD_PARAM_MOUSE_SCROLL;
+            inst.type = MATH_DATA_TYPE_VEC2;
+            break;
+
+        case MATH_NODE_MOUSE_BUTTONS:
+            inst.op = IR_OP_LOAD_PARAM_MOUSE_BUTTONS;
+            inst.type = MATH_DATA_TYPE_FLOAT; // Buttons as bitmask, but float in node evaluation context usually
             break;
 
         case MATH_NODE_TEXTURE_PARAM:

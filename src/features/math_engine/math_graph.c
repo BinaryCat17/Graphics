@@ -97,18 +97,19 @@ MathNodeId math_graph_add_node(MathGraph* graph, MathNodeType type) {
     // Set default output type
     switch (type) {
         case MATH_NODE_UV:
+        case MATH_NODE_MOUSE:
+        case MATH_NODE_MOUSE_DELTA:
+        case MATH_NODE_MOUSE_SCROLL:
             node->output_type = MATH_DATA_TYPE_VEC2;
             break;
         case MATH_NODE_TEXTURE_PARAM:
             node->output_type = MATH_DATA_TYPE_SAMPLER2D;
             break;
         case MATH_NODE_TEXTURE_SAMPLE:
-        case MATH_NODE_MOUSE:
         case MATH_NODE_SURFACE_GRID:
             node->output_type = MATH_DATA_TYPE_VEC4;
             break;
-            node->output_type = MATH_DATA_TYPE_VEC4;
-            break;
+        case MATH_NODE_MOUSE_BUTTONS:
         default:
             node->output_type = MATH_DATA_TYPE_FLOAT;
             break;
@@ -238,6 +239,9 @@ float math_graph_evaluate(MathGraph* graph, MathNodeId id) {
         case MATH_NODE_COS: result = cosf(v[0]); break;
         case MATH_NODE_TIME: 
         case MATH_NODE_MOUSE:
+        case MATH_NODE_MOUSE_DELTA:
+        case MATH_NODE_MOUSE_SCROLL:
+        case MATH_NODE_MOUSE_BUTTONS:
         case MATH_NODE_TEXTURE_PARAM:
         case MATH_NODE_TEXTURE_SAMPLE:
             result = 0.0f; break; // GPU only / Global context

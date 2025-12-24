@@ -1,4 +1,6 @@
 #include "compute_graph.h"
+#include "render_system.h"
+#include "stream.h"
 #include "foundation/logger/logger.h"
 #include "internal/renderer_backend.h"
 #include <stdlib.h>
@@ -179,6 +181,12 @@ void compute_graph_execute(ComputeGraph* graph, RenderSystem* sys) {
     for (size_t i = 0; i < graph->pass_count; ++i) {
         ComputePass* pass = graph->passes[i];
         
+        // 0. Bind Global Input (Reserved Slot 1)
+        Stream* input_stream = render_system_get_input_stream(sys);
+        if (input_stream) {
+            stream_bind_compute(input_stream, 1);
+        }
+
         // 1. Bind Resources
         for (size_t r = 0; r < pass->resource_count; ++r) {
             ComputeResource* res = &pass->resources[r];

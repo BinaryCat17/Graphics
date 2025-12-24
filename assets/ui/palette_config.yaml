@@ -19,3 +19,15 @@ items:
 
   - label: "Time"
     type: "MATH_NODE_TIME"
+
+  - label: "Mouse Position"
+    type: "MATH_NODE_MOUSE"
+
+  - label: "Mouse Delta"
+    type: "MATH_NODE_MOUSE_DELTA"
+
+  - label: "Mouse Scroll"
+    type: "MATH_NODE_MOUSE_SCROLL"
+
+  - label: "Mouse Buttons"
+    type: "MATH_NODE_MOUSE_BUTTONS"

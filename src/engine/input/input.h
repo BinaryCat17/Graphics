@@ -226,6 +226,10 @@ bool input_is_action_released(const InputSystem* sys, const char* action_name);
 
 float input_get_mouse_x(const InputSystem* sys);
 float input_get_mouse_y(const InputSystem* sys);
+void input_get_mouse_delta(const InputSystem* sys, float* dx, float* dy);
+void input_get_scroll(const InputSystem* sys, float* dx, float* dy);
+uint32_t input_get_mouse_buttons(const InputSystem* sys); // Returns bitmask
+
 bool input_is_mouse_down(const InputSystem* sys);
 bool input_is_key_down(const InputSystem* sys, InputKey key);
 

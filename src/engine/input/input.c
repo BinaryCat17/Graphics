@@ -42,11 +42,16 @@ static void on_mouse_button(PlatformWindow* window, PlatformMouseButton button, 
     if (!sys) return;
     
     // State
-    if (button == PLATFORM_MOUSE_BUTTON_LEFT) {
+    uint32_t bit = 0;
+    if (button == PLATFORM_MOUSE_BUTTON_LEFT) bit = 1;
+    else if (button == PLATFORM_MOUSE_BUTTON_RIGHT) bit = 2;
+    else if (button == PLATFORM_MOUSE_BUTTON_MIDDLE) bit = 4;
+    
+    if (bit) {
         if (action == PLATFORM_PRESS) {
-            sys->state.mouse_down = true;
+            sys->state.mouse_buttons |= bit;
         } else if (action == PLATFORM_RELEASE) {
-            sys->state.mouse_down = false;
+            sys->state.mouse_buttons &= ~bit;
         }
     }
 
@@ -68,6 +73,10 @@ static void on_scroll(PlatformWindow* window, double xoff, double yoff, void* us
     (void)window;
     InputSystem* sys = (InputSystem*)user_data;
     if (!sys) return;
+
+    // State
+    sys->state.scroll_x += (float)xoff;
+    sys->state.scroll_y += (float)yoff;
 
     // Event
     InputEvent event = {0};
@@ -162,11 +171,18 @@ void input_system_destroy(InputSystem* sys) {
 void input_system_update(InputSystem* sys) {
     if (!sys) return;
 
-    // Reset per-frame input
-    sys->queue.count = 0;
-    
-    sys->_prev_mouse_down = sys->state.mouse_down;
+    // Snapshot previous state for delta/just_pressed checks
+    sys->state.prev_mouse_x = sys->state.mouse_x;
+    sys->state.prev_mouse_y = sys->state.mouse_y;
+    sys->_prev_mouse_buttons = sys->state.mouse_buttons;
     memcpy(sys->_prev_keys, sys->state.keys, sizeof(sys->state.keys));
+
+    // Reset per-frame accumulations
+    sys->state.scroll_x = 0.0f;
+    sys->state.scroll_y = 0.0f;
+    
+    // Reset event queue
+    sys->queue.count = 0;
 }
 
 // --- Action Mapping ---
@@ -262,8 +278,32 @@ float input_get_mouse_y(const InputSystem* sys) {
     return sys ? sys->state.mouse_y : 0.0f;
 }
 
+void input_get_mouse_delta(const InputSystem* sys, float* dx, float* dy) {
+    if (sys) {
+        if (dx) *dx = sys->state.mouse_x - sys->state.prev_mouse_x;
+        if (dy) *dy = sys->state.mouse_y - sys->state.prev_mouse_y;
+    } else {
+        if (dx) *dx = 0;
+        if (dy) *dy = 0;
+    }
+}
+
+void input_get_scroll(const InputSystem* sys, float* dx, float* dy) {
+    if (sys) {
+        if (dx) *dx = sys->state.scroll_x;
+        if (dy) *dy = sys->state.scroll_y;
+    } else {
+        if (dx) *dx = 0;
+        if (dy) *dy = 0;
+    }
+}
+
+uint32_t input_get_mouse_buttons(const InputSystem* sys) {
+    return sys ? sys->state.mouse_buttons : 0;
+}
+
 bool input_is_mouse_down(const InputSystem* sys) {
-    return sys ? sys->state.mouse_down : false;
+    return sys ? (sys->state.mouse_buttons != 0) : false;
 }
 
 bool input_is_key_down(const InputSystem* sys, InputKey key) {

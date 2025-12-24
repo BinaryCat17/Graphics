@@ -8,6 +8,7 @@
 #include "engine/graphics/render_system.h"
 #include "engine/assets/assets.h"
 #include "engine/input/input.h"
+#include "engine/graphics/gpu_input.h"
 #include "engine/ui/ui_core.h"
 
 #include <stdio.h>
@@ -201,6 +202,14 @@ void engine_run(Engine* engine) {
         
         // Input Poll (Triggers callbacks)
         platform_poll_events();
+
+        // GPU Input Sync (Branch B)
+        {
+            PlatformWindowSize size = platform_get_framebuffer_size(engine->window);
+            GpuInputState gpu_input = {0};
+            gpu_input_update(&gpu_input, engine->input_system, (float)now, engine->dt, (float)size.width, (float)size.height);
+            render_system_update_gpu_input(rs, &gpu_input);
+        }
 
         // Application Update Hook (App updates Graph, UI Layout, etc.)
         if (engine->on_update) {

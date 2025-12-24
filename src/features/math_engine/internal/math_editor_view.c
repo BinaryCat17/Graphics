@@ -45,6 +45,10 @@ static int get_node_input_count(MathNodeType type) {
         case MATH_NODE_UV:  
         case MATH_NODE_VALUE: 
         case MATH_NODE_TIME: 
+        case MATH_NODE_MOUSE:
+        case MATH_NODE_MOUSE_DELTA:
+        case MATH_NODE_MOUSE_SCROLL:
+        case MATH_NODE_MOUSE_BUTTONS:
         default: return 0;
     }
 }
