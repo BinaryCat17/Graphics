@@ -10,7 +10,9 @@
 #include "foundation/config/simple_yaml.h"
 #include "foundation/config/config_system.h"
 #include "features/math_engine/internal/transpiler.h"
-#include "features/math_engine/internal/math_graph_internal.h" // Access to internal Graph/Node structs
+#include "features/math_engine/internal/math_graph_internal.h"
+#include "features/math_engine/math_serializer.h"
+ // Access to internal Graph/Node structs
 #include "engine/graphics/internal/renderer_backend.h"
 #include "engine/graphics/layer_constants.h"
 #include "engine/graphics/stream.h"
@@ -52,14 +54,18 @@ static void math_editor_recompile_graph(MathEditor* editor, RenderSystem* rs) {
     LOG_INFO("Editor: Recompiling Math Graph...");
 
     // 1. Transpile to GLSL
+    LOG_INFO("Step 1: Transpiling...");
     char* glsl = math_graph_transpile(editor->graph, TRANSPILE_MODE_IMAGE_2D, SHADER_TARGET_GLSL_VULKAN);
     if (!glsl) {
         LOG_ERROR("Transpilation failed.");
         return;
     }
+    LOG_INFO("Step 1 Done. GLSL generated.");
 
     // 2. Create Pipeline (Compiles internally)
+    LOG_INFO("Step 2: Creating Pipeline...");
     uint32_t new_pipe = render_system_create_compute_pipeline_from_source(rs, glsl);
+    LOG_INFO("Step 2 Done. Pipe ID: %u", new_pipe);
     free(glsl);
 
     if (new_pipe == 0) {
@@ -137,10 +143,64 @@ UI_COMMAND(cmd_recompile, MathEditor) {
     ctx->graph_dirty = true;
 }
 
+UI_COMMAND(cmd_save_graph, MathEditor) {
+    LOG_INFO("Command: Graph.Save");
+    // Hardcoded path for now, ideally open a file dialog
+    math_serializer_save_graph(ctx->graph, "assets/ui/saved_graph.gdl");
+}
+
+UI_COMMAND(cmd_load_graph, MathEditor) {
+    LOG_INFO("Command: Graph.Load");
+    if (math_serializer_load_graph(ctx->graph, "assets/ui/saved_graph.gdl")) {
+        // We need to rebuild views since IDs might have changed (although serializer tries to keep them,
+        // actually serializer clears graph so IDs are new).
+        
+        // Clear old views
+        ctx->view->node_views_count = 0;
+        ctx->view->selected_node_id = MATH_NODE_INVALID_ID;
+        ctx->view->selection_dirty = true;
+        
+        // Recreate views for all nodes
+        // Layout info is lost currently (reset to default or grid)
+        int x = 50, y = 50;
+        for (uint32_t i = 0; i < ctx->graph->node_count; ++i) {
+             MathNodeId id = ctx->graph->node_ptrs[i]->id; // Access internal directly or use helper?
+             // Graph internal access is available here
+             math_editor_add_view(ctx, id, x, y);
+             x += 250;
+             if (x > 1000) { x = 50; y += 200; }
+        }
+        
+        math_editor_refresh_graph_view(ctx);
+        ctx->graph_dirty = true;
+    }
+}
+
 // --- Lifecycle ---
 
 static void math_editor_load_graph(MathEditor* editor, const char* path) {
     LOG_INFO("Editor: Loading graph from %s", path);
+    
+    // Check extension
+    const char* ext = strrchr(path, '.');
+    if (ext && strcmp(ext, ".gdl") == 0) {
+        if (math_serializer_load_graph(editor->graph, path)) {
+            // Auto-layout simple fallback since GDL doesn't store positions yet
+             int x = 50, y = 50;
+             for (uint32_t i = 0; i < editor->graph->node_count; ++i) {
+                  // Hacky internal access or we iterate IDs
+                  // We know IDs are 0..count-1 roughly
+                  if (math_graph_get_node_type(editor->graph, i) != MATH_DATA_TYPE_UNKNOWN) {
+                      math_editor_add_view(editor, i, x, y);
+                      x += 250;
+                      if (x > 1000) { x = 50; y += 200; }
+                  }
+             }
+             math_editor_sync_view_data(editor);
+             return;
+        }
+    }
+
     char* content = fs_read_text(NULL, path);
     if (!content) {
         LOG_WARN("Failed to load graph: %s. Using fallback.", path);
@@ -298,6 +358,8 @@ MathEditor* math_editor_create(Engine* engine) {
     UI_REGISTER_COMMAND("Graph.AddNode", cmd_add_node, editor);
     UI_REGISTER_COMMAND("Graph.Clear", cmd_clear_graph, editor);
     UI_REGISTER_COMMAND("Graph.Recompile", cmd_recompile, editor);
+    UI_REGISTER_COMMAND("Graph.Save", cmd_save_graph, editor);
+    UI_REGISTER_COMMAND("Graph.Load", cmd_load_graph, editor);
     
     // ui_register_provider("GraphNetwork", math_graph_view_provider); // Removed: All UI is declarative now
 
@@ -357,18 +419,23 @@ MathEditor* math_editor_create(Engine* engine) {
     if (input) {
         input_map_action(input, "ToggleCompute", INPUT_KEY_C, INPUT_MOD_NONE);
     }
+    LOG_INFO("Step 6 Done.");
 
     // 7. GPU Picking Initialization
+    LOG_INFO("Step 7: Creating Streams...");
     editor->gpu_nodes = stream_create(engine_get_render_system(engine), STREAM_CUSTOM, 4096, sizeof(GpuNodeData));
     editor->gpu_picking_result = stream_create(engine_get_render_system(engine), STREAM_UINT, 1, 0);
 
     // Wires Streams
     editor->gpu_wires = stream_create(engine_get_render_system(engine), STREAM_CUSTOM, 1024, sizeof(MathWireView)); 
     editor->gpu_wire_verts = stream_create(engine_get_render_system(engine), STREAM_CUSTOM, 1024 * 64 * 6, 32); 
+    LOG_INFO("Step 7: Streams Created.");
     
     // Create Pipeline
+    LOG_INFO("Loading picking shader...");
     AssetData spv = assets_load_file(engine_get_assets(engine), "shaders/compute/picking.comp.spv");
     if (spv.data) {
+        LOG_INFO("Creating picking pipeline...");
         editor->picking_pipeline_id = render_system_create_compute_pipeline(engine_get_render_system(engine), (uint32_t*)spv.data, spv.size);
         assets_free_file(&spv);
     } else {
@@ -376,8 +443,10 @@ MathEditor* math_editor_create(Engine* engine) {
     }
 
     // Wires Compute Pipeline
+    LOG_INFO("Loading wires compute shader...");
     AssetData wire_comp = assets_load_file(engine_get_assets(engine), "shaders/compute/wires.comp.spv");
     if (wire_comp.data) {
+        LOG_INFO("Creating wires compute pipeline...");
         editor->wire_compute_pipeline_id = render_system_create_compute_pipeline(engine_get_render_system(engine), (uint32_t*)wire_comp.data, wire_comp.size);
         assets_free_file(&wire_comp);
     } else {
@@ -385,9 +454,11 @@ MathEditor* math_editor_create(Engine* engine) {
     }
 
     // Wires Render Pipeline
+    LOG_INFO("Loading wires render shaders...");
     AssetData wire_vert = assets_load_file(engine_get_assets(engine), "shaders/render_wires.vert.spv");
     AssetData wire_frag = assets_load_file(engine_get_assets(engine), "shaders/render_wires.frag.spv");
     if (wire_vert.data && wire_frag.data) {
+        LOG_INFO("Creating wires graphics pipeline...");
         editor->wire_render_pipeline_id = render_system_create_graphics_pipeline(
             engine_get_render_system(engine), 
             wire_vert.data, wire_vert.size, 
@@ -400,6 +471,7 @@ MathEditor* math_editor_create(Engine* engine) {
 
     // Create Compute Graph
     if (editor->picking_pipeline_id != 0) {
+        LOG_INFO("Creating picking compute pass...");
         editor->gpu_compute_graph = compute_graph_create();
         editor->picking_pass = compute_graph_add_pass(editor->gpu_compute_graph, editor->picking_pipeline_id, 1, 1, 1);
         compute_pass_bind_stream(editor->picking_pass, 0, editor->gpu_nodes);
@@ -407,12 +479,14 @@ MathEditor* math_editor_create(Engine* engine) {
     }
 
     if (editor->gpu_compute_graph && editor->wire_compute_pipeline_id != 0) {
+        LOG_INFO("Creating wires compute pass...");
         editor->wire_pass = compute_graph_add_pass(editor->gpu_compute_graph, editor->wire_compute_pipeline_id, 1, 1, 1);
         compute_pass_bind_stream(editor->wire_pass, 0, editor->gpu_wires);
         compute_pass_bind_stream(editor->wire_pass, 1, editor->gpu_wire_verts);
     }
     
     // 8. Graphics Pipeline for Nodes
+    LOG_INFO("Loading editor nodes shaders...");
     AssetData vert = assets_load_file(engine_get_assets(engine), "shaders/editor_nodes.vert.spv");
     AssetData frag = assets_load_file(engine_get_assets(engine), "shaders/editor_nodes.frag.spv");
     if (vert.data && frag.data) {
@@ -596,7 +670,9 @@ void math_editor_update(MathEditor* editor, Engine* engine) {
                 gpu_data[i].size = (Vec2){NODE_WIDTH, NODE_HEADER_HEIGHT + v->input_ports_count * NODE_PORT_SPACING}; 
                 gpu_data[i].id = v->node_id;
             }
-            stream_set_data(editor->gpu_nodes, gpu_data, count);
+            if (!stream_set_data(editor->gpu_nodes, gpu_data, count)) {
+                 LOG_ERROR("Failed to upload node data!");
+            }
             free(gpu_data);
         }
 
