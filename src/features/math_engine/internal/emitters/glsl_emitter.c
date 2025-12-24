@@ -170,10 +170,10 @@ char* ir_to_glsl(const ShaderIR* ir, TranspilerMode mode) {
                 stream_printf(&stream, "    %s v_%d = v_%d / (v_%d + 0.0001);\n", tname, inst->id, inst->op1_id, inst->op2_id);
                 break;
             case IR_OP_SIN:
-                stream_printf(&stream, "    %s v_%d = sin(v_%d);\n", tname, inst->id, inst->op1_id);
+                stream_printf(&stream, "    %s v_%d = sin(v_%d) * 0.5 + 0.5;\n", tname, inst->id, inst->op1_id);
                 break;
             case IR_OP_COS:
-                stream_printf(&stream, "    %s v_%d = cos(v_%d);\n", tname, inst->id, inst->op1_id);
+                stream_printf(&stream, "    %s v_%d = cos(v_%d) * 0.5 + 0.5;\n", tname, inst->id, inst->op1_id);
                 break;
             case IR_OP_RETURN:
                 final_result_id = inst->op1_id;
@@ -189,13 +189,13 @@ char* ir_to_glsl(const ShaderIR* ir, TranspilerMode mode) {
         if (mode == TRANSPILE_MODE_IMAGE_2D) {
             // If result is float, replicate to RGB. If vec3/4, use it.
             if (result_type == MATH_DATA_TYPE_FLOAT) {
-                 stream_printf(&stream, "    vec4 finalColor = vec4(v_%d, v_%d, v_%d, 1.0);\n", final_result_id, final_result_id, final_result_id);
+                 stream_printf(&stream, "    vec4 finalColor = vec4(vec3(abs(v_%d)), 1.0);\n", final_result_id);
             } else if (result_type == MATH_DATA_TYPE_VEC3) {
-                 stream_printf(&stream, "    vec4 finalColor = vec4(v_%d, 1.0);\n", final_result_id);
+                 stream_printf(&stream, "    vec4 finalColor = vec4(abs(v_%d), 1.0);\n", final_result_id);
             } else if (result_type == MATH_DATA_TYPE_VEC2) {
-                 stream_printf(&stream, "    vec4 finalColor = vec4(v_%d, 0.0, 1.0);\n", final_result_id);
+                 stream_printf(&stream, "    vec4 finalColor = vec4(abs(v_%d), 0.0, 1.0);\n", final_result_id);
             } else {
-                 stream_printf(&stream, "    vec4 finalColor = v_%d;\n", final_result_id);
+                 stream_printf(&stream, "    vec4 finalColor = abs(v_%d);\n", final_result_id);
             }
             stream_printf(&stream, "    imageStore(outImg, storePos, finalColor);\n");
         } else {
@@ -204,7 +204,7 @@ char* ir_to_glsl(const ShaderIR* ir, TranspilerMode mode) {
     } else {
         // Default 0
         if (mode == TRANSPILE_MODE_IMAGE_2D) {
-            stream_printf(&stream, "    imageStore(outImg, storePos, vec4(0,0,0,1));\n");
+            stream_printf(&stream, "    imageStore(outImg, storePos, vec4(1,1,1,1));\n"); // WHITE if no result
         } else {
             // Need to match result type
             if (result_type == MATH_DATA_TYPE_FLOAT) stream_printf(&stream, "    b_out.result = 0.0;\n");

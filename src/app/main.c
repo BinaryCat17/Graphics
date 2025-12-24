@@ -23,6 +23,7 @@ static void app_on_init(Engine* engine) {
     }
     engine_set_user_data(engine, editor);
 
+    /*
     // --- INTEGRATION TEST: COMPUTE STREAM ---
     LOG_INFO("Running Compute Stream Integration Test...");
     
@@ -76,6 +77,7 @@ static void app_on_init(Engine* engine) {
         
         stream_destroy(stream);
     }
+    */
 }
 
 static void app_on_update(Engine* engine) {

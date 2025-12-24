@@ -102,6 +102,12 @@ typedef struct MathGraphView {
     bool no_selection;           // REFLECT (helper for UI visibility)
 } MathGraphView;
 
+// Forward Declarations
+struct Stream;
+struct ComputeGraph;
+struct ComputePass;
+struct CustomDrawData;
+
 // The State of the Graph Editor Feature (The "C" in MVC)
 typedef struct MathEditor {
     MathGraph* graph;
@@ -114,7 +120,18 @@ typedef struct MathEditor {
     size_t palette_items_count;          // REFLECT
 
     bool graph_dirty;
-    uint32_t current_pipeline; // Vulkan Compute Pipeline ID
+    uint32_t current_pipeline; // Vulkan Compute Pipeline ID for Transpiled Graph
+
+    // GPU Picking & Rendering
+    struct Stream* gpu_nodes;
+    struct Stream* gpu_picking_result;
+    struct ComputeGraph* gpu_compute_graph; // Manages the compute passes (Picking, etc)
+    struct ComputePass* picking_pass;
+    uint32_t picking_pipeline_id;
+    
+    // Graphics
+    uint32_t nodes_pipeline_id;
+    struct CustomDrawData* draw_data_cache; // Persistent allocation for render packet
 } MathEditor;
 
 #endif // MATH_EDITOR_INTERNAL_H

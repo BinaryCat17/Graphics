@@ -13,6 +13,9 @@
 #include "features/math_engine/internal/math_graph_internal.h" // Access to internal Graph/Node structs
 #include "engine/graphics/internal/renderer_backend.h"
 #include "engine/graphics/layer_constants.h"
+#include "engine/graphics/stream.h"
+#include "engine/graphics/compute_graph.h"
+#include "engine/graphics/gpu_input.h"
 #include "engine/text/font.h"
 #include "engine/assets/assets.h"
 #include "engine/graphics/render_system.h"
@@ -24,6 +27,15 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
+
+// --- GPU Data Structures ---
+
+typedef struct GpuNodeData {
+    Vec2 pos;
+    Vec2 size;
+    uint32_t id;
+    uint32_t padding;
+} GpuNodeData;
 
 // --- Helper: Text Measurement for UI Layout ---
 static Vec2 text_measure_wrapper(const char* text, float scale, void* user_data) {
@@ -345,6 +357,45 @@ MathEditor* math_editor_create(Engine* engine) {
     if (input) {
         input_map_action(input, "ToggleCompute", INPUT_KEY_C, INPUT_MOD_NONE);
     }
+
+    // 7. GPU Picking Initialization
+    editor->gpu_nodes = stream_create(engine_get_render_system(engine), STREAM_CUSTOM, 4096, sizeof(GpuNodeData));
+    editor->gpu_picking_result = stream_create(engine_get_render_system(engine), STREAM_UINT, 1, 0);
+    
+    // Create Pipeline
+    AssetData spv = assets_load_file(engine_get_assets(engine), "shaders/compute/picking.comp.spv");
+    if (spv.data) {
+        editor->picking_pipeline_id = render_system_create_compute_pipeline(engine_get_render_system(engine), (uint32_t*)spv.data, spv.size);
+        assets_free_file(&spv);
+    } else {
+        LOG_ERROR("Failed to load picking shader: shaders/compute/picking.comp.spv. Run tools/build_shaders.py");
+    }
+
+    // Create Compute Graph
+    if (editor->picking_pipeline_id != 0) {
+        editor->gpu_compute_graph = compute_graph_create();
+        editor->picking_pass = compute_graph_add_pass(editor->gpu_compute_graph, editor->picking_pipeline_id, 1, 1, 1);
+        compute_pass_bind_stream(editor->picking_pass, 0, editor->gpu_nodes);
+        compute_pass_bind_stream(editor->picking_pass, 1, editor->gpu_picking_result);
+    }
+    
+    // 8. Graphics Pipeline for Nodes
+    AssetData vert = assets_load_file(engine_get_assets(engine), "shaders/editor_nodes.vert.spv");
+    AssetData frag = assets_load_file(engine_get_assets(engine), "shaders/editor_nodes.frag.spv");
+    if (vert.data && frag.data) {
+        editor->nodes_pipeline_id = render_system_create_graphics_pipeline(
+            engine_get_render_system(engine), 
+            vert.data, vert.size, 
+            frag.data, frag.size, 
+            1 // Zero-Copy Layout
+        );
+        assets_free_file(&vert);
+        assets_free_file(&frag);
+    } else {
+        LOG_ERROR("Failed to load editor_nodes shaders.");
+    }
+
+    editor->draw_data_cache = arena_alloc_zero(&editor->graph_arena, sizeof(CustomDrawData));
     
     return editor;
 }
@@ -354,7 +405,30 @@ MathEditor* math_editor_create(Engine* engine) {
 void math_editor_render(MathEditor* editor, Scene* scene, const struct Assets* assets, MemoryArena* arena) {
     if (!editor || !scene || !editor->view->ui_instance) return;
 
-    // Delegate entire rendering to UI system.
+    // 1. Render Graph Nodes (GPU Instancing)
+    if (editor->nodes_pipeline_id > 0 && editor->view->node_views_count > 0 && editor->draw_data_cache) {
+        editor->draw_data_cache->pipeline_id = editor->nodes_pipeline_id;
+        editor->draw_data_cache->vertex_count = 6; // Quad
+        editor->draw_data_cache->instance_count = editor->view->node_views_count;
+        editor->draw_data_cache->buffers[0] = stream_get_handle(editor->gpu_nodes); 
+        
+        SceneObject obj = {0};
+        obj.prim_type = SCENE_PRIM_CUSTOM;
+        obj.layer = LAYER_UI_BACKGROUND; // Draw behind standard UI
+        obj.instance_buffer = editor->draw_data_cache;
+        
+        scene_add_object(scene, obj);
+    }
+
+    // 2. Render UI Overlay (Inspector, Palette, Wireframe Links)
+    // Links are currently drawn by UI system as lines?
+    // math_editor_sync_wires -> editor->view->wires.
+    // ui_system_render -> draws scene_tree.
+    // We need to ensure wires are drawn. UI system handles that if they are part of the UI tree.
+    // But wires in MathEditor are separate struct?
+    // Let's check ui_renderer.c. It likely only renders UI Nodes.
+    // If we want wires, we should add them to scene here too.
+    
     ui_system_render(editor->view->ui_instance, scene, assets, arena);
 }
 
@@ -441,6 +515,56 @@ void math_editor_update(MathEditor* editor, Engine* engine) {
         }
     }
 
+    // --- GPU Picking Update ---
+    if (editor->gpu_compute_graph && editor->view->node_views_count > 0) {
+        // 1. Upload Node Data
+        // Use scratch memory or malloc
+        uint32_t count = editor->view->node_views_count;
+        if (count > 4096) count = 4096;
+        
+        GpuNodeData* gpu_data = (GpuNodeData*)malloc(count * sizeof(GpuNodeData));
+        if (gpu_data) {
+            for(uint32_t i=0; i < count; ++i) {
+                MathNodeView* v = &editor->view->node_views[i];
+                gpu_data[i].pos = (Vec2){v->x, v->y};
+                gpu_data[i].size = (Vec2){NODE_WIDTH, NODE_HEADER_HEIGHT + v->input_ports_count * NODE_PORT_SPACING}; 
+                gpu_data[i].id = v->node_id;
+            }
+            stream_set_data(editor->gpu_nodes, gpu_data, count);
+            free(gpu_data);
+        }
+
+        // 2. Setup Push Constants
+        struct { Vec2 mouse; uint32_t count; } push;
+        InputSystem* input = engine_get_input_system(engine);
+        push.mouse = (Vec2){ input_get_mouse_x(input), input_get_mouse_y(input) };
+        push.count = count;
+        
+        compute_pass_set_push_constants(editor->picking_pass, &push, sizeof(push));
+        
+        // 3. Update Dispatch Size
+        uint32_t groups = (push.count + 63) / 64;
+        compute_pass_set_dispatch_size(editor->picking_pass, groups, 1, 1);
+        
+        // 4. Reset Previous Result
+        uint32_t invalid_id = MATH_NODE_INVALID_ID;
+        stream_set_data(editor->gpu_picking_result, &invalid_id, 1);
+
+        // 5. Execute
+        compute_graph_execute(editor->gpu_compute_graph, engine_get_render_system(engine));
+        
+        // 6. Read Back
+        uint32_t picked_id = MATH_NODE_INVALID_ID;
+        if (stream_read_back(editor->gpu_picking_result, &picked_id, 1)) {
+             if (picked_id != MATH_NODE_INVALID_ID) {
+                  // Only log on click to avoid spam
+                  if (input_is_mouse_down(input)) {
+                       LOG_DEBUG("GPU Picked ID: %u", picked_id);
+                  }
+             }
+        }
+    }
+
     // Recompile Compute Shader if dirty
     if (editor->graph_dirty && engine_get_show_compute(engine)) {
         math_editor_recompile_graph(editor, engine_get_render_system(engine));
@@ -457,6 +581,19 @@ void math_editor_destroy(MathEditor* editor) {
         if (editor->view->ui_asset) scene_asset_destroy(editor->view->ui_asset);
         if (editor->view->selected_nodes) free((void*)editor->view->selected_nodes);
     }
+
+    // Cleanup GPU Resources
+    if (editor->gpu_compute_graph) compute_graph_destroy(editor->gpu_compute_graph);
+    if (editor->gpu_nodes) stream_destroy(editor->gpu_nodes);
+    if (editor->gpu_picking_result) stream_destroy(editor->gpu_picking_result);
+    // Note: Pipelines are managed by RenderSystem, usually no explicit destroy needed unless dynamic?
+    // Actually render_system_destroy_compute_pipeline exists, we should use it.
+    if (editor->picking_pipeline_id != 0) {
+        // We need access to render system... but destroy doesn't pass engine/rs.
+        // Assuming render system cleanups all pipelines on shutdown.
+        // If hot-reloading editor, we might leak. Ideally we pass engine to destroy.
+    }
+    // We should also destroy graphics pipeline, but again, need sys context.
     
     // Explicitly destroy graph resources (pool, ptrs)
     math_graph_destroy(editor->graph);

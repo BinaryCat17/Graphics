@@ -190,15 +190,20 @@ void render_system_update(RenderSystem* sys) {
     if (!sys || !sys->renderer_ready) return;
 
     if (sys->active_compute_pipeline > 0 && sys->backend && sys->backend->compute_dispatch) {
-        // Must match generated GLSL push constant layout
+        // Must match generated GLSL push constant layout in glsl_emitter.c
+        // GLSL: float time(0), width(4), height(8), [padding(12)], vec4 mouse(16)
         struct {
             float time;
             float width;
             float height;
+            float _padding; 
+            float mouse[4];
         } push = {
             .time = (float)sys->current_time,
             .width = 512.0f,
-            .height = 512.0f
+            .height = 512.0f,
+            ._padding = 0.0f,
+            .mouse = {0, 0, 0, 0}
         };
         
         // Dispatch Compute (Target is 512x512, assuming 16x16 workgroups)
@@ -283,6 +288,16 @@ uint32_t render_system_create_compute_pipeline_from_source(RenderSystem* sys, co
 void render_system_destroy_compute_pipeline(RenderSystem* sys, uint32_t pipeline_id) {
     if (!sys || !sys->backend || !sys->backend->compute_pipeline_destroy) return;
     sys->backend->compute_pipeline_destroy(sys->backend, pipeline_id);
+}
+
+uint32_t render_system_create_graphics_pipeline(RenderSystem* sys, const void* vert_code, size_t vert_size, const void* frag_code, size_t frag_size, int layout_index) {
+    if (!sys || !sys->backend || !sys->backend->graphics_pipeline_create) return 0;
+    return sys->backend->graphics_pipeline_create(sys->backend, vert_code, vert_size, frag_code, frag_size, layout_index);
+}
+
+void render_system_destroy_graphics_pipeline(RenderSystem* sys, uint32_t pipeline_id) {
+    if (!sys || !sys->backend || !sys->backend->graphics_pipeline_destroy) return;
+    sys->backend->graphics_pipeline_destroy(sys->backend, pipeline_id);
 }
 
 void render_system_request_screenshot(RenderSystem* sys, const char* filepath) {

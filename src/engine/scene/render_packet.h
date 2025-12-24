@@ -30,8 +30,16 @@ typedef enum RenderLayer {
 
 typedef enum ScenePrimitiveType {
     SCENE_PRIM_QUAD = 0, // Standard Mesh/Quad
-    SCENE_PRIM_CURVE = 1 // SDF Bezier Curve
+    SCENE_PRIM_CURVE = 1, // SDF Bezier Curve
+    SCENE_PRIM_CUSTOM = 2 // Custom Pipeline / Zero-Copy
 } ScenePrimitiveType;
+
+typedef struct CustomDrawData {
+    uint32_t pipeline_id;
+    uint32_t vertex_count;
+    uint32_t instance_count;
+    void* buffers[4]; // PosX, PosY, PosZ, Color (Backend handles)
+} CustomDrawData;
 
 // Standard Rendering Modes for UI/2D Shader
 typedef enum SceneShaderMode {

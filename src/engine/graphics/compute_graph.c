@@ -131,6 +131,13 @@ void compute_pass_set_push_constants(ComputePass* pass, const void* data, size_t
     }
 }
 
+void compute_pass_set_dispatch_size(ComputePass* pass, uint32_t group_x, uint32_t group_y, uint32_t group_z) {
+    if (!pass) return;
+    pass->group_x = group_x;
+    pass->group_y = group_y;
+    pass->group_z = group_z;
+}
+
 static void add_resource(ComputePass* pass, uint32_t binding, ResourceType type, void* ptr) {
     if (!pass) return;
     

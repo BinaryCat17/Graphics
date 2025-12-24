@@ -1,0 +1,43 @@
+#version 450
+layout(local_size_x = 64) in;
+
+struct NodeData {
+    vec2 pos;
+    vec2 size;
+    uint id;
+    uint padding;
+};
+
+layout(std430, set = 1, binding = 0) readonly buffer Nodes {
+    NodeData nodes[];
+};
+
+layout(std430, set = 1, binding = 1) buffer Result {
+    uint hovered_id;
+};
+
+layout(push_constant) uniform Input {
+    vec2 mouse_pos;
+    uint node_count;
+} params;
+
+bool is_inside(vec2 p, vec2 rect_pos, vec2 rect_size) {
+    return p.x >= rect_pos.x && p.x <= rect_pos.x + rect_size.x &&
+           p.y >= rect_pos.y && p.y <= rect_pos.y + rect_size.y;
+}
+
+void main() {
+    uint idx = gl_GlobalInvocationID.x;
+    if (idx >= params.node_count) return;
+
+    NodeData node = nodes[idx];
+    
+    // Simple AABB check
+    if (is_inside(params.mouse_pos, node.pos, node.size)) {
+        // We use atomicExchange. Since we process nodes in parallel, 
+        // if multiple nodes overlap, the winner is non-deterministic.
+        // For a basic editor, this is often acceptable or can be improved 
+        // by sorting or atomicMax on Z-index/Array-index.
+        atomicExchange(hovered_id, node.id);
+    }
+}

@@ -36,6 +36,9 @@ ComputePass* compute_graph_add_pass(ComputeGraph* graph, uint32_t pipeline_id, u
 // Data is copied.
 void compute_pass_set_push_constants(ComputePass* pass, const void* data, size_t size);
 
+// Updates the dispatch group counts for an existing pass.
+void compute_pass_set_dispatch_size(ComputePass* pass, uint32_t group_x, uint32_t group_y, uint32_t group_z);
+
 // --- Resource Binding ---
 
 // Bind a single stream to a slot.

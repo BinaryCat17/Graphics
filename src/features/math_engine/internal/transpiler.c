@@ -144,6 +144,11 @@ static ShaderIR math_graph_to_ir(const MathGraph* graph) {
         }
     }
 
+    // Fallback: Use the last added node as output if none specified
+    if (root_node_id == MATH_NODE_INVALID_ID && graph->node_count > 0) {
+        root_node_id = (MathNodeId)(graph->node_count - 1);
+    }
+
     // 2. Generate IR starting from the root (recursively visits inputs)
     if (root_node_id != MATH_NODE_INVALID_ID) {
         generate_ir_node(graph, root_node_id, &ir, visited, &visited_count, inferred_types);

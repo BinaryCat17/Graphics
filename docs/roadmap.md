@@ -43,10 +43,10 @@ Here we implement SoA and GPU memory management.
 
 Abandon the classic `Scene::Update` -> `RenderPacket` flow.
 
-- [ ] **Render Nodes:**
+- [x] **Render Nodes:**
     - Create `DrawInstanced` graph node accepting position/color buffers as inputs.
     - Implement SSBO binding as Vertex Attributes (Zero-Copy).
-- [ ] **Unified Pipeline:**
+- [x] **Unified Pipeline:**
     - Synchronization: Compute Queue -> Graphics Queue.
     - Integrate with existing `vulkan_renderer.c` (using it as a "draw command executor").
 
@@ -55,12 +55,12 @@ Abandon the classic `Scene::Update` -> `RenderPacket` flow.
 
 Hybrid approach to Input and UI.
 
-- [ ] **GPU Picking (Raycasting):**
-    - Implement Compute Kernel for mouse ray intersection (Sphere/AABB).
-    - Parallel Reduction to find the closest object ID.
-- [ ] **Graph Editor Rendering:**
-    - Render thousands of nodes via Instancing (node positions in GPU buffers).
-    - Spline links generated in Geometry/Compute shaders.
+- [x] **GPU Picking (Raycasting):**
+    - [x] Implement Compute Kernel for mouse ray intersection (Sphere/AABB).
+    - [x] Parallel Reduction to find the closest object ID.
+- [x] **Graph Editor Rendering:**
+    - [x] Render thousands of nodes via Instancing (node positions in GPU buffers).
+    - [ ] Spline links generated in Geometry/Compute shaders.
 - [ ] **Hybrid Input System:**
     - **CPU:** Standard event processing for Editor UI panels (Inspector, Menus).
     - **GPU:** Uniform `InputState` structure for Graph Nodes.

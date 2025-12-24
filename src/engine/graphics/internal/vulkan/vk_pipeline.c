@@ -137,6 +137,119 @@ VkResult vk_create_compute_pipeline_shader(VulkanRendererState* state, const uin
     return res;
 }
 
+VkResult vk_create_graphics_pipeline_shader(VulkanRendererState* state, const uint32_t* vert_code, size_t vert_size, const uint32_t* frag_code, size_t frag_size, int layout_index, VkPipeline* out_pipeline, VkPipelineLayout* out_layout) {
+    // 1. Modules
+    VkShaderModule vs = create_shader_module(state, vert_code, vert_size);
+    VkShaderModule fs = create_shader_module(state, frag_code, frag_size);
+    if (vs == VK_NULL_HANDLE || fs == VK_NULL_HANDLE) return VK_ERROR_INITIALIZATION_FAILED;
+
+    // 2. Stages
+    VkPipelineShaderStageCreateInfo stages[2] = {
+        {.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO, .stage = VK_SHADER_STAGE_VERTEX_BIT, .module = vs, .pName = "main" },
+        {.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO, .stage = VK_SHADER_STAGE_FRAGMENT_BIT, .module = fs, .pName = "main" }
+    };
+
+    // 3. Vertex Input
+    VkPipelineVertexInputStateCreateInfo vxi = { .sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO };
+    if (layout_index == 1) {
+        // Zero-Copy: No Vertex Input!
+        vxi.vertexBindingDescriptionCount = 0;
+        vxi.vertexAttributeDescriptionCount = 0;
+    } else {
+        // If layout_index == 0, maybe we mimic UI? Or just error.
+    }
+
+    // 4. Input Assembly
+    VkPipelineInputAssemblyStateCreateInfo ia = { .sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO, .topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST };
+
+    // 5. Viewport (Dynamic)
+    VkPipelineViewportStateCreateInfo vpci = { .sType = VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO, .viewportCount = 1, .scissorCount = 1 };
+    VkDynamicState dyn[] = { VK_DYNAMIC_STATE_VIEWPORT, VK_DYNAMIC_STATE_SCISSOR };
+    VkPipelineDynamicStateCreateInfo dsci = { .sType = VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO, .dynamicStateCount = 2, .pDynamicStates = dyn };
+
+    // 6. Rasterization
+    VkPipelineRasterizationStateCreateInfo rs = { 
+        .sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO, 
+        .polygonMode = VK_POLYGON_MODE_FILL, 
+        .cullMode = VK_CULL_MODE_NONE, 
+        .frontFace = VK_FRONT_FACE_CLOCKWISE, 
+        .lineWidth = 1.0f 
+    };
+
+    // 7. Multisample
+    VkPipelineMultisampleStateCreateInfo ms = { .sType = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO, .rasterizationSamples = VK_SAMPLE_COUNT_1_BIT };
+
+    // 8. Depth
+    VkPipelineDepthStencilStateCreateInfo depth_stencil = {
+        .sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO,
+        .depthTestEnable = VK_TRUE,
+        .depthWriteEnable = VK_TRUE,
+        .depthCompareOp = VK_COMPARE_OP_LESS
+    };
+
+    // 9. Blend
+    VkPipelineColorBlendAttachmentState cbatt = { 
+        .blendEnable = VK_TRUE, 
+        .srcColorBlendFactor = VK_BLEND_FACTOR_SRC_ALPHA, 
+        .dstColorBlendFactor = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA, 
+        .colorBlendOp = VK_BLEND_OP_ADD, 
+        .srcAlphaBlendFactor = VK_BLEND_FACTOR_ONE, 
+        .dstAlphaBlendFactor = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA, 
+        .alphaBlendOp = VK_BLEND_OP_ADD, 
+        .colorWriteMask = 0xF 
+    };
+    VkPipelineColorBlendStateCreateInfo cb = { .sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO, .attachmentCount = 1, .pAttachments = &cbatt };
+
+    // 10. Layout
+    // For Zero-Copy (Index 1): Set 0=Global(Tex), Set 1=SSBOs
+    VkDescriptorSetLayout layouts[] = { state->descriptor_layout, state->compute_ssbo_layout }; // Reuse compute layout for SSBOs
+    
+    VkPushConstantRange pcr = { .stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, .offset = 0, .size = 128 };
+    
+    VkPipelineLayoutCreateInfo plci = { 
+        .sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO, 
+        .setLayoutCount = 2, 
+        .pSetLayouts = layouts, 
+        .pushConstantRangeCount = 1, 
+        .pPushConstantRanges = &pcr 
+    };
+
+    VkResult res = vkCreatePipelineLayout(state->device, &plci, NULL, out_layout);
+    if (res != VK_SUCCESS) {
+        vkDestroyShaderModule(state->device, vs, NULL);
+        vkDestroyShaderModule(state->device, fs, NULL);
+        return res;
+    }
+
+    // 11. Pipeline
+    VkGraphicsPipelineCreateInfo gpci = { 
+        .sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO, 
+        .stageCount = 2, 
+        .pStages = stages, 
+        .pVertexInputState = &vxi, 
+        .pInputAssemblyState = &ia, 
+        .pViewportState = &vpci, 
+        .pRasterizationState = &rs, 
+        .pMultisampleState = &ms, 
+        .pDepthStencilState = &depth_stencil, 
+        .pColorBlendState = &cb, 
+        .pDynamicState = &dsci,
+        .layout = *out_layout, 
+        .renderPass = state->render_pass, 
+        .subpass = 0 
+    };
+
+    res = vkCreateGraphicsPipelines(state->device, VK_NULL_HANDLE, 1, &gpci, NULL, out_pipeline);
+
+    vkDestroyShaderModule(state->device, vs, NULL);
+    vkDestroyShaderModule(state->device, fs, NULL);
+
+    if (res != VK_SUCCESS) {
+        vkDestroyPipelineLayout(state->device, *out_layout, NULL);
+    }
+    return res;
+}
+
 void vk_create_pipeline(VulkanRendererState* state) {
     VkShaderModule vs = create_shader_module(state, state->vert_shader_src.code, state->vert_shader_src.size);
     VkShaderModule fs = create_shader_module(state, state->frag_shader_src.code, state->frag_shader_src.size);
@@ -175,11 +288,11 @@ void vk_create_pipeline(VulkanRendererState* state) {
     VkPipelineRasterizationStateCreateInfo rs = { .sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO, .polygonMode = VK_POLYGON_MODE_FILL, .cullMode = VK_CULL_MODE_NONE, .frontFace = VK_FRONT_FACE_CLOCKWISE, .lineWidth = 1.0f };
     VkPipelineMultisampleStateCreateInfo ms = { .sType = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO, .rasterizationSamples = VK_SAMPLE_COUNT_1_BIT };
     
-    VkPipelineDepthStencilStateCreateInfo ds = {
+    VkPipelineDepthStencilStateCreateInfo depth_stencil = {
         .sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO,
         .depthTestEnable = VK_TRUE,
         .depthWriteEnable = VK_TRUE,
-        .depthCompareOp = VK_COMPARE_OP_LESS_OR_EQUAL,
+        .depthCompareOp = VK_COMPARE_OP_LESS,
         .depthBoundsTestEnable = VK_FALSE,
         .stencilTestEnable = VK_FALSE
     };
@@ -216,7 +329,7 @@ void vk_create_pipeline(VulkanRendererState* state) {
         .pViewportState = &vpci, 
         .pRasterizationState = &rs, 
         .pMultisampleState = &ms, 
-        .pDepthStencilState = &ds, 
+        .pDepthStencilState = &depth_stencil, 
         .pColorBlendState = &cb, 
         .layout = state->pipeline_layout, 
         .renderPass = state->render_pass, 

@@ -14,20 +14,21 @@ struct Stream {
     size_t element_size;
 };
 
-static size_t get_element_size(StreamType type) {
+static size_t get_element_size(StreamType type, size_t custom_size) {
     switch (type) {
         case STREAM_FLOAT: return sizeof(float);
         case STREAM_VEC2:  return 2 * sizeof(float);
-        case STREAM_VEC3:  return 3 * sizeof(float); // Note: std430 alignment might be tricky, but assuming tight pack for now
+        case STREAM_VEC3:  return 3 * sizeof(float);
         case STREAM_VEC4:  return 4 * sizeof(float);
         case STREAM_MAT4:  return 16 * sizeof(float);
         case STREAM_INT:   return sizeof(int32_t);
         case STREAM_UINT:  return sizeof(uint32_t);
+        case STREAM_CUSTOM: return custom_size;
         default: return 0;
     }
 }
 
-Stream* stream_create(RenderSystem* sys, StreamType type, size_t count) {
+Stream* stream_create(RenderSystem* sys, StreamType type, size_t count, size_t custom_element_size) {
     if (!sys || count == 0) return NULL;
     
     RendererBackend* backend = render_system_get_backend(sys);
@@ -36,7 +37,12 @@ Stream* stream_create(RenderSystem* sys, StreamType type, size_t count) {
         return NULL;
     }
 
-    size_t elem_size = get_element_size(type);
+    size_t elem_size = get_element_size(type, custom_element_size);
+    if (elem_size == 0) {
+        LOG_ERROR("Stream: Invalid element size.");
+        return NULL;
+    }
+
     size_t total_size = elem_size * count;
     
     void* handle = backend->buffer_create(backend, total_size);
@@ -98,4 +104,8 @@ void stream_bind_compute(Stream* stream, uint32_t binding_slot) {
 
 size_t stream_get_count(Stream* stream) {
     return stream ? stream->count : 0;
+}
+
+void* stream_get_handle(Stream* stream) {
+    return stream ? stream->buffer_handle : NULL;
 }

@@ -25,6 +25,7 @@ typedef enum MathNodeType {
     MATH_NODE_TEXTURE_PARAM,
     MATH_NODE_TEXTURE_SAMPLE,
     MATH_NODE_OUTPUT, 
+    MATH_NODE_RENDER, // New: Render/Draw Node
     MATH_NODE_SURFACE_GRID,
     MATH_NODE_COUNT
 } MathNodeType; // REFLECT

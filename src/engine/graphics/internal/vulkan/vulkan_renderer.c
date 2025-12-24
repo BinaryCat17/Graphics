@@ -433,6 +433,20 @@ static bool vulkan_renderer_init(RendererBackend* backend, const RenderBackendIn
         state->frame_resources[i].instance_buffer = VK_NULL_HANDLE;
         state->frame_resources[i].instance_set = VK_NULL_HANDLE;
         ensure_instance_capacity(state, &state->frame_resources[i], 1024); // Initial allocation
+        
+        // Create Pool for Custom Descriptors
+        VkDescriptorPoolSize sizes[] = {
+            { VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 128 } // Allow up to 128 buffers per frame
+        };
+        VkDescriptorPoolCreateInfo dpci = {
+            .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO,
+            .maxSets = 32, // Allow up to 32 custom draw calls per frame
+            .poolSizeCount = 1,
+            .pPoolSizes = sizes
+        };
+        if (vkCreateDescriptorPool(state->device, &dpci, NULL, &state->frame_resources[i].frame_descriptor_pool) != VK_SUCCESS) {
+            LOG_FATAL("Failed to create frame descriptor pool");
+        }
     }
 
     // 11. Compute Infrastructure
@@ -513,43 +527,21 @@ static void vulkan_renderer_render_scene(RendererBackend* backend, const Scene* 
     // --- UPDATE RESOURCES ---
     FrameResources* frame = &state->frame_resources[state->current_frame_cursor];
     
-    // 1. Check Capacity and Resize if needed
+    // --- PREPARE DATA ---
     size_t count = 0;
     const SceneObject* scene_objects = scene_get_all_objects(scene, &count);
     
-    if (count == 0) count = 1; // Avoid 0 size
-    ensure_instance_capacity(state, frame, count);
+    // Calculate UI Capacity needed (exclude Custom nodes)
+    size_t ui_count = 0;
+    for(size_t i=0; i<count; ++i) {
+        if (scene_objects[i].prim_type != SCENE_PRIM_CUSTOM) ui_count++;
+    }
+    if (ui_count == 0) ui_count = 1; 
+    ensure_instance_capacity(state, frame, ui_count);
     
-    // 2. Upload Data
     GpuInstanceData* instances = (GpuInstanceData*)frame->instance_mapped;
-    if (scene_objects) {
-        for (size_t i = 0; i < (count == 1 && !scene_objects ? 0 : count); ++i) { // Handle dummy count=1 if objects are null
-             // Re-check count usage. If scene_objects is NULL, count is 0 from accessor, but we forced it to 1 above for buffer alloc.
-             // So we must use original count for loop, or check scene_objects.
-             // Better:
-        }
-    }
-    
-    // Refined loop:
-    size_t actual_count = 0;
-    scene_objects = scene_get_all_objects(scene, &actual_count);
-    
-    for (size_t i = 0; i < actual_count; ++i) {
-        const SceneObject* obj = &scene_objects[i];
-        
-        Mat4 m;
-        Mat4 s = mat4_scale(obj->scale);
-        Mat4 t = mat4_translation(obj->position);
-        m = mat4_multiply(&t, &s);
-        
-        instances[i].model = m;
-        instances[i].color = obj->color;
-        instances[i].uv_rect = obj->uv_rect;
-        instances[i].params_1 = obj->raw.params_0;
-        instances[i].params_2 = obj->raw.params_1; // Pass through extra data (9-slice or curves)
-        instances[i].clip_rect = obj->ui.clip_rect;
-    }
-    
+    size_t current_ui_idx = 0;
+
     // --- COMMAND RECORDING ---
     VkCommandBuffer cmd = state->cmdbuffers[state->current_frame_cursor];
     vkResetCommandBuffer(cmd, 0);
@@ -565,9 +557,9 @@ static void vulkan_renderer_render_scene(RendererBackend* backend, const Scene* 
     pass_info.renderArea.extent = state->swapchain_extent;
     
     VkClearValue clear_values[2];
-    clear_values[0].color = (VkClearColorValue){{0.1f, 0.1f, 0.12f, 1.0f}};
+    clear_values[0].color = (VkClearColorValue){{0.1f, 0.1f, 0.1f, 1.0f}}; 
     clear_values[1].depthStencil = (VkClearDepthStencilValue){1.0f, 0};
-    
+
     pass_info.clearValueCount = 2;
     pass_info.pClearValues = clear_values;
     
@@ -586,20 +578,117 @@ static void vulkan_renderer_render_scene(RendererBackend* backend, const Scene* 
     vkCmdBindVertexBuffers(cmd, 0, 1, &state->unit_quad_buffer, offsets);
     vkCmdBindIndexBuffer(cmd, state->unit_quad_index_buffer, 0, VK_INDEX_TYPE_UINT32);
 
-    // Bind Descriptors
-    // Set 0: Global Textures (Font)
+    // Bind Descriptors (UI Defaults)
     vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, state->pipeline_layout, 0, 1, &state->descriptor_set, 0, NULL);
-    
-    // Set 1: Instance Data (Per-Frame)
     vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, state->pipeline_layout, 1, 1, &frame->instance_set, 0, NULL);
+    vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, state->pipeline_layout, 2, 1, &state->compute_target_descriptor, 0, NULL);
     
     // Push Constants (ViewProj)
     SceneCamera cam = scene_get_camera(scene);
     vkCmdPushConstants(cmd, state->pipeline_layout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(Mat4), &cam.view_matrix); 
 
-    // Draw
-    if (actual_count > 0) {
-        vkCmdDrawIndexed(cmd, PRIM_QUAD_INDEX_COUNT, (uint32_t)actual_count, 0, 0, 0);
+    size_t prev_drawn_ui_count = 0;
+    
+    // --- RENDER LOOP ---
+    for (size_t i = 0; i < count; ++i) {
+        const SceneObject* obj = &scene_objects[i];
+        
+        if (obj->prim_type == SCENE_PRIM_CUSTOM) {
+             // 1. Flush Pending UI
+            if (current_ui_idx > prev_drawn_ui_count) {
+                uint32_t draw_count = (uint32_t)(current_ui_idx - prev_drawn_ui_count);
+                vkCmdDrawIndexed(cmd, PRIM_QUAD_INDEX_COUNT, draw_count, 0, 0, (uint32_t)prev_drawn_ui_count);
+                prev_drawn_ui_count = current_ui_idx;
+            }
+            
+            // 2. Draw Custom
+            CustomDrawData* data = (CustomDrawData*)obj->instance_buffer;
+            if (data && data->pipeline_id > 0 && data->pipeline_id <= MAX_GRAPHICS_PIPELINES) {
+                int pid = (int)data->pipeline_id - 1;
+                if (state->graphics_pipelines[pid].active) {
+                    VkPipeline pipe = state->graphics_pipelines[pid].pipeline;
+                    VkPipelineLayout layout = state->graphics_pipelines[pid].layout;
+                    
+                    vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipe);
+                    
+                    // Allocate Descriptor Set
+                    VkDescriptorSet custom_set = VK_NULL_HANDLE;
+                    VkDescriptorSetAllocateInfo alloc_info = {
+                        .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO,
+                        .descriptorPool = frame->frame_descriptor_pool,
+                        .descriptorSetCount = 1,
+                        .pSetLayouts = &state->compute_ssbo_layout
+                    };
+                    
+                    if (vkAllocateDescriptorSets(state->device, &alloc_info, &custom_set) == VK_SUCCESS) {
+                        VkWriteDescriptorSet writes[4];
+                        VkDescriptorBufferInfo dbis[4];
+                        uint32_t w_count = 0;
+                        
+                        for(int b=0; b<4; ++b) {
+                            VkBufferWrapper* bw = (VkBufferWrapper*)data->buffers[b];
+                            if (bw) {
+                                dbis[w_count].buffer = bw->buffer;
+                                dbis[w_count].offset = 0;
+                                dbis[w_count].range = VK_WHOLE_SIZE;
+                                
+                                writes[w_count].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+                                writes[w_count].pNext = NULL;
+                                writes[w_count].dstSet = custom_set;
+                                writes[w_count].dstBinding = b;
+                                writes[w_count].dstArrayElement = 0;
+                                writes[w_count].descriptorCount = 1;
+                                writes[w_count].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+                                writes[w_count].pImageInfo = NULL;
+                                writes[w_count].pBufferInfo = &dbis[w_count];
+                                writes[w_count].pTexelBufferView = NULL;
+                                w_count++;
+                            }
+                        }
+                        if (w_count > 0) vkUpdateDescriptorSets(state->device, w_count, writes, 0, NULL);
+                        
+                        vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, layout, 1, 1, &custom_set, 0, NULL);
+                        
+                        // Push Constants (Assume same camera)
+                        vkCmdPushConstants(cmd, layout, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(Mat4), &cam.view_matrix);
+                        
+                        vkCmdDraw(cmd, data->vertex_count, data->instance_count, 0, 0);
+                    }
+                    
+                    // Restore UI Pipeline State
+                    vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, state->pipeline);
+                    vkCmdBindVertexBuffers(cmd, 0, 1, &state->unit_quad_buffer, offsets);
+                    vkCmdBindIndexBuffer(cmd, state->unit_quad_index_buffer, 0, VK_INDEX_TYPE_UINT32);
+                    vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, state->pipeline_layout, 0, 1, &state->descriptor_set, 0, NULL);
+                    vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, state->pipeline_layout, 1, 1, &frame->instance_set, 0, NULL);
+                    vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, state->pipeline_layout, 2, 1, &state->compute_target_descriptor, 0, NULL);
+                }
+            }
+
+        } else {
+            // UI Object
+            if (current_ui_idx < frame->instance_capacity) {
+                Mat4 m;
+                Mat4 s = mat4_scale(obj->scale);
+                Mat4 t = mat4_translation(obj->position);
+                m = mat4_multiply(&t, &s);
+                
+                instances[current_ui_idx].model = m;
+                instances[current_ui_idx].color = obj->color;
+                instances[current_ui_idx].uv_rect = obj->uv_rect;
+                instances[current_ui_idx].params_1 = obj->raw.params_0;
+                instances[current_ui_idx].params_2 = obj->raw.params_1; 
+                instances[current_ui_idx].clip_rect = obj->ui.clip_rect;
+                
+                current_ui_idx++;
+            }
+        }
+    }
+    
+    // Final Flush
+    if (current_ui_idx > prev_drawn_ui_count) {
+        uint32_t draw_count = (uint32_t)(current_ui_idx - prev_drawn_ui_count);
+        vkCmdDrawIndexed(cmd, PRIM_QUAD_INDEX_COUNT, draw_count, 0, 0, (uint32_t)prev_drawn_ui_count);
     }
     
     vkCmdEndRenderPass(cmd);
@@ -771,6 +860,9 @@ static void vulkan_renderer_cleanup(RendererBackend* backend) {
                 vkDestroyBuffer(state->device, state->frame_resources[i].instance_buffer, NULL);
                 vkFreeMemory(state->device, state->frame_resources[i].instance_memory, NULL);
             }
+            if (state->frame_resources[i].frame_descriptor_pool) {
+                vkDestroyDescriptorPool(state->device, state->frame_resources[i].frame_descriptor_pool, NULL);
+            }
         }
         
         if (state->vert_shader_src.code) free(state->vert_shader_src.code);
@@ -844,6 +936,68 @@ static void vulkan_compute_bind_buffer(RendererBackend* backend, void* buffer_ha
     }
 }
 
+static uint32_t vulkan_graphics_pipeline_create(RendererBackend* backend, const void* vert_code, size_t vert_size, const void* frag_code, size_t frag_size, int layout_index) {
+    VulkanRendererState* state = (VulkanRendererState*)backend->state;
+    
+    // Find free slot
+    int slot = -1;
+    for (int i = 0; i < MAX_GRAPHICS_PIPELINES; ++i) {
+        if (!state->graphics_pipelines[i].active) {
+            slot = i;
+            break;
+        }
+    }
+    
+    if (slot == -1) {
+        LOG_ERROR("Max graphics pipelines reached (%d)", MAX_GRAPHICS_PIPELINES);
+        return 0;
+    }
+    
+    VkPipeline pipeline;
+    VkPipelineLayout layout;
+    
+    // Convert void* to uint32_t* (assume aligned)
+    VkResult res = vk_create_graphics_pipeline_shader(state, (const uint32_t*)vert_code, vert_size, (const uint32_t*)frag_code, frag_size, layout_index, &pipeline, &layout);
+    
+    if (res != VK_SUCCESS) {
+        LOG_ERROR("Failed to create graphics pipeline: %d", res);
+        return 0;
+    }
+    
+    state->graphics_pipelines[slot].active = true;
+    state->graphics_pipelines[slot].pipeline = pipeline;
+    state->graphics_pipelines[slot].layout = layout;
+    
+    return (uint32_t)(slot + 1);
+}
+
+static void vulkan_graphics_pipeline_destroy(RendererBackend* backend, uint32_t pipeline_id) {
+    VulkanRendererState* state = (VulkanRendererState*)backend->state;
+    if (pipeline_id == 0 || pipeline_id > MAX_GRAPHICS_PIPELINES) return;
+    
+    int idx = (int)pipeline_id - 1;
+    if (state->graphics_pipelines[idx].active) {
+        vkDestroyPipeline(state->device, state->graphics_pipelines[idx].pipeline, NULL);
+        vkDestroyPipelineLayout(state->device, state->graphics_pipelines[idx].layout, NULL);
+        state->graphics_pipelines[idx].active = false;
+    }
+}
+
+static void vulkan_graphics_bind_buffer(RendererBackend* backend, void* buffer_handle, uint32_t slot) {
+    VulkanRendererState* state = (VulkanRendererState*)backend->state;
+    if (slot < MAX_COMPUTE_BINDINGS) {
+        state->graphics_bindings[slot].buffer = (VkBufferWrapper*)buffer_handle;
+    }
+}
+
+static void vulkan_graphics_draw(RendererBackend* backend, uint32_t pipeline_id, uint32_t vertex_count, uint32_t instance_count) {
+    // This function is intended to be called from within a generic render pass logic,
+    // but currently render_scene handles the pass. 
+    // We leave this empty or for future use if we expose pass control.
+    // The actual draw logic for Custom Nodes is integrated into vulkan_renderer_render_scene.
+    (void)backend; (void)pipeline_id; (void)vertex_count; (void)instance_count;
+}
+
 // Factory
 RendererBackend* vulkan_renderer_backend(void) {
     // Allocate Backend and State on Heap
@@ -880,5 +1034,11 @@ RendererBackend* vulkan_renderer_backend(void) {
     backend->buffer_read = vulkan_buffer_read;
     backend->compute_bind_buffer = vulkan_compute_bind_buffer;
     
+    // Graphics
+    backend->graphics_pipeline_create = vulkan_graphics_pipeline_create;
+    backend->graphics_pipeline_destroy = vulkan_graphics_pipeline_destroy;
+    backend->graphics_bind_buffer = vulkan_graphics_bind_buffer;
+    backend->graphics_draw = vulkan_graphics_draw;
+
     return backend;
 }

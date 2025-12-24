@@ -276,7 +276,26 @@ void vk_create_render_pass(VulkanRendererState* state) {
     VkAttachmentReference color_ref = { .attachment = 0, .layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL };
     VkAttachmentReference depth_ref = { .attachment = 1, .layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL };
     VkSubpassDescription sub = { .pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS, .colorAttachmentCount = 1, .pColorAttachments = &color_ref, .pDepthStencilAttachment = &depth_ref };
-    VkRenderPassCreateInfo rpci = { .sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO, .attachmentCount = 2, .pAttachments = attachments, .subpassCount = 1, .pSubpasses = &sub };
+    
+    // Dependency to ensure layout transition happens after image acquisition
+    VkSubpassDependency dependency = {
+        .srcSubpass = VK_SUBPASS_EXTERNAL,
+        .dstSubpass = 0,
+        .srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+        .srcAccessMask = 0,
+        .dstStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+        .dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT
+    };
+    
+    VkRenderPassCreateInfo rpci = { 
+        .sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO, 
+        .attachmentCount = 2, 
+        .pAttachments = attachments, 
+        .subpassCount = 1, 
+        .pSubpasses = &sub,
+        .dependencyCount = 1,
+        .pDependencies = &dependency
+    };
     state->res = vkCreateRenderPass(state->device, &rpci, NULL, &state->render_pass);
     if (state->res != VK_SUCCESS) fatal_vk("vkCreateRenderPass", state->res);
 }

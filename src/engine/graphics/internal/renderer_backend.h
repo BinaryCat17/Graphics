@@ -84,6 +84,20 @@ typedef struct RendererBackend {
     // 'slot': The binding index in the shader (layout(binding = slot)).
     void (*compute_bind_buffer)(struct RendererBackend* backend, void* buffer_handle, uint32_t slot);
 
+    // --- Graphics Subsystem (Zero-Copy) ---
+    // Create a graphics pipeline.
+    // 'layout_index': 0 = UI (Default), 1 = Zero-Copy (No vertex input, SSBO bindings)
+    uint32_t (*graphics_pipeline_create)(struct RendererBackend* backend, const void* vert_code, size_t vert_size, const void* frag_code, size_t frag_size, int layout_index);
+    
+    void (*graphics_pipeline_destroy)(struct RendererBackend* backend, uint32_t pipeline_id);
+    
+    // Bind a buffer to a specific binding slot (Set 1) for the next draw call.
+    void (*graphics_bind_buffer)(struct RendererBackend* backend, void* buffer_handle, uint32_t slot);
+    
+    // Draw Instanced (Zero-Copy)
+    // Uses the bound pipeline and buffers.
+    void (*graphics_draw)(struct RendererBackend* backend, uint32_t pipeline_id, uint32_t vertex_count, uint32_t instance_count);
+
 } RendererBackend;
 
 // Registry / Factory

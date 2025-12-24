@@ -40,6 +40,8 @@ typedef struct {
     void* instance_mapped;
     VkDescriptorSet instance_set; // Set 1: Points to this frame's buffer
     size_t instance_capacity;     // Current capacity (element count)
+    
+    VkDescriptorPool frame_descriptor_pool; // For dynamic custom draws
 } FrameResources;
 
 typedef struct VulkanRendererState {
@@ -140,6 +142,20 @@ typedef struct VulkanRendererState {
     
     VkDescriptorSetLayout compute_ssbo_layout; // Layout for Set 1 (Buffers)
     VkDescriptorSet compute_ssbo_descriptor;   // Set 1 Instance
+
+    // --- Graphics Pipeline Pool ---
+#define MAX_GRAPHICS_PIPELINES 32
+    struct {
+        bool active;
+        VkPipeline pipeline;
+        VkPipelineLayout layout;
+    } graphics_pipelines[MAX_GRAPHICS_PIPELINES];
+
+    struct {
+        struct VkBufferWrapper* buffer;
+    } graphics_bindings[MAX_COMPUTE_BINDINGS];
+    
+    VkDescriptorSet graphics_ssbo_descriptor; // Set 1 for Graphics (Zero-Copy)
 
 } VulkanRendererState;
 

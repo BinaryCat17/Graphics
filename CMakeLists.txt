@@ -166,6 +166,7 @@ set(ENGINE_GRAPHICS_SOURCES
     "src/engine/graphics/internal/vulkan/vk_buffer.c"
     "src/engine/graphics/internal/vulkan/vk_context.c"
     "src/engine/graphics/stream.c"
+    "src/engine/graphics/gpu_input.c"
     "src/engine/graphics/compute_graph.c"
     "src/engine/graphics/internal/vulkan/vk_swapchain.c"
     "src/engine/graphics/internal/vulkan/vk_pipeline.c"

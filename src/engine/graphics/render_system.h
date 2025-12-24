@@ -46,6 +46,11 @@ uint32_t render_system_create_compute_pipeline(RenderSystem* sys, uint32_t* spv_
 uint32_t render_system_create_compute_pipeline_from_source(RenderSystem* sys, const char* source);
 void render_system_destroy_compute_pipeline(RenderSystem* sys, uint32_t pipeline_id);
 
+// Creates a graphics pipeline from SPIR-V bytecode.
+// layout_index: 0 = UI (Default), 1 = Zero-Copy (No vertex input, SSBO bindings)
+uint32_t render_system_create_graphics_pipeline(RenderSystem* sys, const void* vert_code, size_t vert_size, const void* frag_code, size_t frag_size, int layout_index);
+void render_system_destroy_graphics_pipeline(RenderSystem* sys, uint32_t pipeline_id);
+
 // Request a screenshot to be saved to the specified path
 void render_system_request_screenshot(RenderSystem* sys, const char* filepath);
 

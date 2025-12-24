@@ -139,30 +139,14 @@ void main() {
              
              // Border
              if (border > 0.0) {
-                 // Distance to inner edge is dist + border? No, dist is 0 at edge.
-                 // We want the stroke to be *inside* the shape usually, or centered?
-                 // Let's assume border is *inset*.
-                 // Inner edge is at dist = -border.
-                 
-                 float borderAlpha = 1.0 - smoothstep(border - softness, border, abs(dist + border * 0.5));
-                 // Wait, simpler: 
-                 // We want to render if dist <= 0.
-                 // If dist > -border, it's border color.
-                 // If dist < -border, it's fill color.
-                 
-                 // Let's just do a simple mix for now.
-                 // For now, let's assume the color passed IS the background color. 
-                 // If we want a separate border color, we need more inputs.
-                 // But typically borders are darker/lighter or specified separately.
-                 // As a hack for "Visual Polish", let's darken the border automatically if no color is provided.
-                 
                  float insideBorder = smoothstep(-border - softness, -border, dist);
-                 // 0 = inside core, 1 = inside border area
-                 
                  color.rgb = mix(color.rgb * 0.8, color.rgb, 1.0 - insideBorder);
              }
 
              alpha *= fillAlpha;
+             
+             // DEBUG: FORCE OPAQUE
+             if (alpha < 0.1) alpha = 1.0;
         }
     } 
     else if (inParams.y > 0.5) { // Curve (PrimType == 1)

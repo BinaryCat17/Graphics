@@ -111,10 +111,10 @@ int ui_resolve_count(void* data, const MetaStruct* meta, const char* field_name)
 void ui_node_rebuild_children(SceneNode* el, SceneTree* tree) {
     if (!el || !tree || !el->spec) return;
     
-    scene_node_clear_children(el, tree);
-
     const SceneNodeSpec* spec = el->spec;
     if (!spec->collection || !el->meta || !el->data_ptr) return;
+
+    scene_node_clear_children(el, tree);
 
     const MetaField* collection_field = meta_find_field(el->meta, spec->collection);
     if (!collection_field) return;

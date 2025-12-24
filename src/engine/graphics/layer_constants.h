@@ -15,18 +15,18 @@
 // --- UI Depth Layers ---
 
 // The deepest background layer (e.g., Canvas background)
+// Start deeper so children can stack on top (towards 0.0)
 #define RENDER_LAYER_UI_BASE        (-10.0f)
 
-// Standard UI Panels (Windows, Sidebars) - significantly above the canvas
-#define RENDER_LAYER_UI_PANEL       (-5.0f)
+// Standard UI Panels (Windows, Sidebars)
+#define RENDER_LAYER_UI_PANEL       (-9.0f)
 
-// Overlay Elements (Tooltips, Dropdowns, Modals) - on top of everything
+// Overlay Elements
 #define RENDER_LAYER_UI_OVERLAY     (-1.0f)
 
 // --- Increments ---
-// Amount to increment Z for each nested child in the UI tree
+// Increment Z (move closer to 0 / positive) for each child
 #define RENDER_DEPTH_STEP_UI        (0.01f)
-// Finer increment for content within the same container (text on button)
 #define RENDER_DEPTH_STEP_CONTENT   (0.001f)
 
 #endif // LAYER_CONSTANTS_H

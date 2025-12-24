@@ -53,6 +53,7 @@ typedef struct SceneBuilderContext {
     MemoryArena* arena;
     OverlayNode* overlay_head;
     OverlayNode* overlay_tail;
+    int node_count;
 } SceneBuilderContext;
 
 // Helper: Intersection
@@ -89,7 +90,7 @@ static void render_background(const SceneNode* el, SceneBuilderContext* ctx, Vec
 
     // Resolve base color
     Vec4 color = el->render_color;
-    if (color.w == 0) color = (Vec4){0.1f, 0.1f, 0.1f, 0.8f}; // Fallback
+    if (color.w == 0) color = (Vec4){1.0f, 0.0f, 1.0f, 1.0f}; // Fallback DEBUG MAGENTA
 
     // Apply Hover/Active tints
     if (el->is_active) {
@@ -292,6 +293,7 @@ static void process_node(const SceneNode* el, SceneBuilderContext* ctx, Rect cur
         effective_clip = rect_intersect(effective_clip, el->screen_rect);
     }
     
+    ctx->node_count++;
     Vec4 clip_vec = {effective_clip.x, effective_clip.y, effective_clip.w, effective_clip.h};
 
     // 1. Draw Background
@@ -359,9 +361,16 @@ void scene_tree_render(SceneTree* instance, Scene* scene, const Assets* assets, 
     process_node(root, &ctx, infinite_clip, RENDER_LAYER_UI_BASE, false);
     
     // Pass 2: Draw Overlays
+    int overlays = 0;
     OverlayNode* curr = ctx.overlay_head;
     while (curr) {
         process_node(curr->el, &ctx, infinite_clip, RENDER_LAYER_UI_OVERLAY, true);
         curr = curr->next;
+        overlays++;
+    }
+
+    static int frame_throttle = 0;
+    if (frame_throttle++ % 120 == 0) {
+        LOG_DEBUG("UI Render: %d nodes, %d overlays", ctx.node_count, overlays);
     }
 }

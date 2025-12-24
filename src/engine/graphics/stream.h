@@ -16,7 +16,8 @@ typedef enum {
     STREAM_VEC4,
     STREAM_MAT4,
     STREAM_INT,
-    STREAM_UINT
+    STREAM_UINT,
+    STREAM_CUSTOM // User-defined struct
 } StreamType;
 
 // --- Жизненный цикл ---
@@ -24,7 +25,8 @@ typedef enum {
 // Создает поток данных (SSBO) на GPU.
 // count: количество элементов.
 // type: тип элемента.
-Stream* stream_create(RenderSystem* sys, StreamType type, size_t count);
+// element_size: размер одного элемента в байтах (игнорируется для стандартных типов, обязателен для STREAM_CUSTOM).
+Stream* stream_create(RenderSystem* sys, StreamType type, size_t count, size_t element_size);
 
 // Уничтожает поток.
 void stream_destroy(Stream* stream);
@@ -47,5 +49,8 @@ void stream_bind_compute(Stream* stream, uint32_t binding_slot);
 
 // Возвращает количество элементов (емкость).
 size_t stream_get_count(Stream* stream);
+
+// Возвращает внутренний дескриптор буфера (для низкоуровневых операций).
+void* stream_get_handle(Stream* stream);
 
 #endif // STREAM_H
