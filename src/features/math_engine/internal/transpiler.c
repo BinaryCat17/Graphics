@@ -107,29 +107,40 @@ static ShaderIR math_graph_to_ir(const MathGraph* graph) {
     int* visited = (int*)calloc(graph->node_count, sizeof(int));
     int visited_count = 0;
 
-    // Traverse all nodes
-    // Note: In a real compiler, we would only traverse from the "Output" node.
-    // Here we traverse everything, similar to the previous implementation.
+    // 1. Try to find the explicit OUTPUT node
+    MathNodeId output_node_id = MATH_NODE_INVALID_ID;
+    MathNodeId root_node_id = MATH_NODE_INVALID_ID;
+
     for (uint32_t i = 0; i < graph->node_count; ++i) {
         const MathNode* n = math_graph_get_node((MathGraph*)graph, i);
-        if (n && n->type != MATH_NODE_NONE) {
-            generate_ir_node(graph, i, &ir, visited, &visited_count);
-        }
-    }
-    
-    // Determine Output Node (Last non-free node)
-    int last_id = -1;
-    for (int i = (int)graph->node_count - 1; i >= 0; --i) {
-        const MathNode* n = math_graph_get_node((MathGraph*)graph, i);
-        if (n && n->type != MATH_NODE_NONE) {
-            last_id = i;
+        if (n && n->type == MATH_NODE_OUTPUT) {
+            output_node_id = i;
+            // The result is what's connected to Input 0 of the Output Node
+            if (n->inputs[0] != MATH_NODE_INVALID_ID) {
+                root_node_id = n->inputs[0];
+            }
             break;
         }
     }
 
-    if (last_id != -1) {
+    // 2. Fallback: If no OUTPUT node, use the last valid node (Legacy behavior for tests)
+    if (output_node_id == MATH_NODE_INVALID_ID) {
+        for (int i = (int)graph->node_count - 1; i >= 0; --i) {
+            const MathNode* n = math_graph_get_node((MathGraph*)graph, i);
+            if (n && n->type != MATH_NODE_NONE) {
+                root_node_id = i;
+                break;
+            }
+        }
+    }
+
+    // 3. Generate IR starting from the root (recursively visits inputs)
+    if (root_node_id != MATH_NODE_INVALID_ID) {
+        generate_ir_node(graph, root_node_id, &ir, visited, &visited_count);
+        
+        // Add Return instruction
         if (ir.instruction_count < ir.instruction_capacity) {
-            IrInstruction ret_inst = { .op = IR_OP_RETURN, .id = 0, .op1_id = last_id };
+            IrInstruction ret_inst = { .op = IR_OP_RETURN, .id = 0, .op1_id = root_node_id };
             ir.instructions[ir.instruction_count++] = ret_inst;
         }
     }
