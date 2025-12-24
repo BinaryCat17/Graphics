@@ -200,7 +200,8 @@ set(FEATURE_MATH_ENGINE_SOURCES
     "src/features/math_engine/math_editor.c"
     "src/features/math_engine/internal/math_editor_view.c"
     "src/features/math_engine/internal/transpiler.c"
-    "src/features/math_engine/internal/emitters/glsl_emitter.c")
+    "src/features/math_engine/internal/emitters/glsl_emitter.c"
+    "src/features/math_engine/internal/emitters/c_emitter.c")
 add_library(feature_math_engine STATIC ${FEATURE_MATH_ENGINE_SOURCES})
 target_include_directories(feature_math_engine PUBLIC "src/")
 target_link_libraries(feature_math_engine PUBLIC foundation_math foundation_memory)

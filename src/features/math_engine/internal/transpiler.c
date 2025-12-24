@@ -2,6 +2,7 @@
 #include "math_graph_internal.h"
 #include "shader_ir.h"
 #include "emitters/glsl_emitter.h"
+#include "emitters/c_emitter.h"
 #include "foundation/memory/arena.h"
 #include <stdio.h>
 #include <stdlib.h>
@@ -181,6 +182,9 @@ char* math_graph_transpile(const MathGraph* graph, TranspilerMode mode, ShaderTa
     switch (target) {
         case SHADER_TARGET_GLSL_VULKAN:
             result = ir_to_glsl(&ir, mode);
+            break;
+        case SHADER_TARGET_C:
+            result = ir_to_c(&ir, mode);
             break;
         default:
             // Fallback or error

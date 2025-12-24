@@ -11,8 +11,7 @@ typedef enum TranspilerMode {
 
 typedef enum ShaderTarget {
     SHADER_TARGET_GLSL_VULKAN,
-    // Future: SHADER_TARGET_WGSL_WEBGPU,
-    // Future: SHADER_TARGET_MSL_METAL
+    SHADER_TARGET_C // CPU Fallback
 } ShaderTarget;
 
 // Generates shader source code for the specified target.

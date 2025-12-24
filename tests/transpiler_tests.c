@@ -228,6 +228,47 @@ int test_transpiler_texture_sample(void) {
     return 1;
 }
 
+int test_transpiler_c_generation(void) {
+    MemoryArena arena;
+    arena_init(&arena, 1024 * 1024);
+    
+    MathGraph* graph = math_graph_create(&arena);
+    
+    // Create Nodes: 3.0 + 5.0
+    MathNodeId id1 = math_graph_add_node(graph, MATH_NODE_VALUE);
+    math_graph_set_value(graph, id1, 3.0f);
+    
+    MathNodeId id2 = math_graph_add_node(graph, MATH_NODE_VALUE);
+    math_graph_set_value(graph, id2, 5.0f);
+    
+    MathNodeId id_add = math_graph_add_node(graph, MATH_NODE_ADD);
+    math_graph_connect(graph, id_add, 0, id1);
+    math_graph_connect(graph, id_add, 1, id2);
+
+    MathNodeId output = math_graph_add_node(graph, MATH_NODE_OUTPUT);
+    math_graph_connect(graph, output, 0, id_add);
+    
+    // Transpile to C
+    char* c_code = math_graph_transpile(graph, TRANSPILE_MODE_BUFFER_1D, SHADER_TARGET_C);
+    TEST_ASSERT(c_code != NULL);
+    
+    printf("\n--- Generated C Code ---\n%s\n----------------------\n", c_code);
+    
+    // Checks
+    TEST_ASSERT(strstr(c_code, "void execute_graph(void* out_buffer, GraphParams params)") != NULL);
+    TEST_ASSERT(strstr(c_code, "typedef struct { float x, y; } vec2;") != NULL);
+    
+    char buf[128];
+    snprintf(buf, 128, "float v_%d = f_add(v_%d, v_%d);", id_add, id1, id2);
+    TEST_ASSERT(strstr(c_code, buf) != NULL);
+    
+    free(c_code);
+    
+    math_graph_destroy(graph);
+    arena_destroy(&arena);
+    return 1;
+}
+
 int main(void) {
     printf("Running Transpiler Tests...\n");
     RUN_TEST(test_transpiler_simple_add);
@@ -235,6 +276,7 @@ int main(void) {
     RUN_TEST(test_transpiler_vec2_uv);
     RUN_TEST(test_transpiler_mouse);
     RUN_TEST(test_transpiler_texture_sample);
+    RUN_TEST(test_transpiler_c_generation);
     
     if (g_tests_failed > 0) {
         printf(TERM_RED "\n%d tests failed!\n" TERM_RESET, g_tests_failed);
