@@ -99,6 +99,7 @@ MathNodeId math_graph_add_node(MathGraph* graph, MathNodeType type) {
         case MATH_NODE_UV:
             node->output_type = MATH_DATA_TYPE_VEC2;
             break;
+        case MATH_NODE_MOUSE:
         case MATH_NODE_SURFACE_GRID:
             node->output_type = MATH_DATA_TYPE_VEC4;
             break;
@@ -229,7 +230,9 @@ float math_graph_evaluate(MathGraph* graph, MathNodeId id) {
         case MATH_NODE_DIV: result = (v[1] != 0.0f) ? v[0] / v[1] : 0.0f; break;
         case MATH_NODE_SIN: result = sinf(v[0]); break;
         case MATH_NODE_COS: result = cosf(v[0]); break;
-        case MATH_NODE_TIME: result = 0.0f; break; // Needs global context
+        case MATH_NODE_TIME: 
+        case MATH_NODE_MOUSE:
+            result = 0.0f; break; // Needs global context
         case MATH_NODE_UV:   result = 0.5f; break; // Needs global context
         default: break;
     }

@@ -91,6 +91,7 @@ char* ir_to_glsl(const ShaderIR* ir, TranspilerMode mode) {
         stream_printf(&stream, "    float time;\n");
         stream_printf(&stream, "    float width;\n");
         stream_printf(&stream, "    float height;\n");
+        stream_printf(&stream, "    vec4 mouse;\n");
         stream_printf(&stream, "} params;\n\n");
     } else {
         stream_printf(&stream, "layout(local_size_x = 1) in;\n\n");
@@ -98,8 +99,8 @@ char* ir_to_glsl(const ShaderIR* ir, TranspilerMode mode) {
         stream_printf(&stream, "    %s result;\n", result_type_name);
         stream_printf(&stream, "} b_out;\n\n");
         
-        stream_printf(&stream, "struct Params { float time; float width; float height; };\n");
-        stream_printf(&stream, "const Params params = Params(0.0, 1.0, 1.0);\n\n");
+        stream_printf(&stream, "struct Params { float time; float width; float height; vec4 mouse; };\n");
+        stream_printf(&stream, "const Params params = Params(0.0, 1.0, 1.0, vec4(0));\n\n");
     }
 
     stream_printf(&stream, "void main() {\n");
@@ -132,6 +133,9 @@ char* ir_to_glsl(const ShaderIR* ir, TranspilerMode mode) {
                 break;
             case IR_OP_LOAD_PARAM_TIME:
                 stream_printf(&stream, "    float v_%d = params.time;\n", inst->id);
+                break;
+            case IR_OP_LOAD_PARAM_MOUSE:
+                stream_printf(&stream, "    vec4 v_%d = params.mouse;\n", inst->id);
                 break;
             case IR_OP_LOAD_PARAM_UV:
                  stream_printf(&stream, "    vec2 v_%d = uv;\n", inst->id);

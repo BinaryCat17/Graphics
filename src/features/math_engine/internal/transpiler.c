@@ -48,6 +48,11 @@ static void generate_ir_node(const MathGraph* graph, MathNodeId id, ShaderIR* ir
             inst.type = MATH_DATA_TYPE_FLOAT;
             break;
 
+        case MATH_NODE_MOUSE:
+            inst.op = IR_OP_LOAD_PARAM_MOUSE;
+            inst.type = MATH_DATA_TYPE_VEC4;
+            break;
+
         case MATH_NODE_UV:
              inst.op = IR_OP_LOAD_PARAM_UV;
              inst.type = MATH_DATA_TYPE_VEC2;

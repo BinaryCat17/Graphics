@@ -12,6 +12,7 @@ typedef enum IrOpCode {
     // Values & Parameters
     IR_OP_CONST_FLOAT,      // res = float_val
     IR_OP_LOAD_PARAM_TIME,  // res = time
+    IR_OP_LOAD_PARAM_MOUSE, // res = mouse (vec4)
     IR_OP_LOAD_PARAM_UV,    // res = uv.x (or uv vector in future)
     
     // Arithmetic

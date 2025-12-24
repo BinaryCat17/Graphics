@@ -20,6 +20,7 @@ typedef enum MathNodeType {
     MATH_NODE_SIN,
     MATH_NODE_COS,
     MATH_NODE_TIME, 
+    MATH_NODE_MOUSE,
     MATH_NODE_UV,   
     MATH_NODE_OUTPUT, 
     MATH_NODE_SURFACE_GRID,
