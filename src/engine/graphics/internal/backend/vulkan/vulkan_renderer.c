@@ -53,7 +53,7 @@ static void vulkan_renderer_request_screenshot(RendererBackend* backend, const c
     VulkanRendererState* state = (VulkanRendererState*)backend->state;
     if (!state || !filepath) return;
     
-    LOG_DEBUG("Vulkan: Queueing screenshot to %s", filepath);
+    LOG_TRACE("Vulkan: Queueing screenshot to %s", filepath);
     platform_strncpy(state->screenshot_path, filepath, sizeof(state->screenshot_path) - 1);
     state->screenshot_pending = true;
 }

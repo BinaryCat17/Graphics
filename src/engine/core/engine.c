@@ -210,7 +210,7 @@ void engine_run(Engine* engine) {
         if (engine->screenshot_interval > 0.0 && (now - engine->last_screenshot_time) > engine->screenshot_interval) {
             char path[256];
             snprintf(path, sizeof(path), "logs/screenshots/screen_%.3f.png", now);
-            LOG_INFO("Requesting screenshot: %s", path);
+            LOG_TRACE("Requesting screenshot: %s", path);
             render_system_request_screenshot(rs, path);
             engine->last_screenshot_time = now;
         }
