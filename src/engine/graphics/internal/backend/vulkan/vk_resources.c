@@ -1,25 +1,13 @@
 #include "vk_resources.h"
 #include "vk_swapchain.h"
 #include "vk_utils.h"
+#include "vk_buffer.h"
 #include "foundation/logger/logger.h"
 #include "engine/text/font.h" // Include Font Module
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
 #include <math.h>
-
-// ... (previous functions unchanged)
-
-void vk_create_buffer(VulkanRendererState* state, VkDeviceSize size, VkBufferUsageFlags usage, VkMemoryPropertyFlags props, VkBuffer* out_buf, VkDeviceMemory* out_mem) {
-    VkBufferCreateInfo bci = { .sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO, .size = size, .usage = usage, .sharingMode = VK_SHARING_MODE_EXCLUSIVE };
-    state->res = vkCreateBuffer(state->device, &bci, NULL, out_buf);
-    if (state->res != VK_SUCCESS) fatal_vk("vkCreateBuffer", state->res);
-    VkMemoryRequirements mr; vkGetBufferMemoryRequirements(state->device, *out_buf, &mr);
-    VkMemoryAllocateInfo mai = { .sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO, .allocationSize = mr.size, .memoryTypeIndex = find_mem_type(state->physical_device, mr.memoryTypeBits, props) };
-    state->res = vkAllocateMemory(state->device, &mai, NULL, out_mem);
-    if (state->res != VK_SUCCESS) fatal_vk("vkAllocateMemory", state->res);
-    vkBindBufferMemory(state->device, *out_buf, *out_mem, 0);
-}
 
 static VkCommandBuffer begin_single_time_commands(VulkanRendererState* state) {
     VkCommandBufferAllocateInfo ai = { .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO, .commandPool = state->cmdpool, .level = VK_COMMAND_BUFFER_LEVEL_PRIMARY, .commandBufferCount = 1 };
@@ -80,31 +68,16 @@ bool vk_create_vertex_buffer(VulkanRendererState* state, FrameResources *frame, 
         frame->vertex_capacity = 0;
     }
 
-    VkBuffer new_buffer = VK_NULL_HANDLE;
-    VkDeviceMemory new_memory = VK_NULL_HANDLE;
-    VkBufferCreateInfo bci = { .sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO, .size = bytes, .usage = VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT, .sharingMode = VK_SHARING_MODE_EXCLUSIVE };
-    
-    VkResult create = vkCreateBuffer(state->device, &bci, NULL, &new_buffer);
-    if (create != VK_SUCCESS) {
-        LOG_ERROR("vkCreateBuffer failed for vertex buffer");
+    VkBufferWrapper wrapper = {0};
+    if (vk_buffer_create(state, bytes, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, &wrapper)) {
+        frame->vertex_buffer = wrapper.buffer;
+        frame->vertex_memory = wrapper.memory;
+        frame->vertex_capacity = bytes;
+        return true;
+    } else {
+        LOG_ERROR("vk_buffer_create failed for vertex buffer");
         return false;
     }
-
-    VkMemoryRequirements mr; vkGetBufferMemoryRequirements(state->device, new_buffer, &mr);
-    VkMemoryAllocateInfo mai = { .sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO, .allocationSize = mr.size, .memoryTypeIndex = find_mem_type(state->physical_device, mr.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT) };
-    
-    VkResult alloc = vkAllocateMemory(state->device, &mai, NULL, &new_memory);
-    if (alloc != VK_SUCCESS) {
-        LOG_ERROR("vkAllocateMemory failed for vertex buffer");
-        vkDestroyBuffer(state->device, new_buffer, NULL);
-        return false;
-    }
-
-    vkBindBufferMemory(state->device, new_buffer, new_memory, 0);
-    frame->vertex_buffer = new_buffer;
-    frame->vertex_memory = new_memory;
-    frame->vertex_capacity = bytes;
-    return true;
 }
 
 void vk_create_font_texture(VulkanRendererState* state) {
@@ -126,16 +99,23 @@ void vk_create_font_texture(VulkanRendererState* state) {
     if (state->res != VK_SUCCESS) fatal_vk("vkAllocateMemory", state->res);
     vkBindImageMemory(state->device, state->font_image, state->font_image_mem, 0);
 
-    VkBuffer staging = VK_NULL_HANDLE; VkDeviceMemory staging_mem = VK_NULL_HANDLE;
-    vk_create_buffer(state, width * height, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, &staging, &staging_mem);
-    void* mapped = NULL; vkMapMemory(state->device, staging_mem, 0, VK_WHOLE_SIZE, 0, &mapped); memcpy(mapped, pixels, width * height); vkUnmapMemory(state->device, staging_mem);
+    VkBufferWrapper staging = {0};
+    if (!vk_buffer_create(state, width * height, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, &staging)) {
+        LOG_FATAL("Failed to create font staging buffer");
+        return;
+    }
+    
+    void* mapped = vk_buffer_map(state, &staging);
+    if (mapped) {
+        memcpy(mapped, pixels, width * height);
+        vk_buffer_unmap(state, &staging);
+    }
 
     vk_transition_image_layout(state, state->font_image, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
-    copy_buffer_to_image(state, staging, state->font_image, (uint32_t)width, (uint32_t)height);
+    copy_buffer_to_image(state, staging.buffer, state->font_image, (uint32_t)width, (uint32_t)height);
     vk_transition_image_layout(state, state->font_image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
 
-    vkDestroyBuffer(state->device, staging, NULL);
-    vkFreeMemory(state->device, staging_mem, NULL);
+    vk_buffer_destroy(state, &staging);
 
     VkImageViewCreateInfo ivci = { .sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO, .image = state->font_image, .viewType = VK_IMAGE_VIEW_TYPE_2D, .format = VK_FORMAT_R8_UNORM, .subresourceRange = { .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT, .baseMipLevel = 0, .levelCount = 1, .baseArrayLayer = 0, .layerCount = 1 } };
     state->res = vkCreateImageView(state->device, &ivci, NULL, &state->font_image_view);
@@ -289,10 +269,8 @@ void vk_destroy_device_resources(VulkanRendererState* state) {
     if (state->font_image_mem) { vkFreeMemory(state->device, state->font_image_mem, NULL); state->font_image_mem = VK_NULL_HANDLE; }
     
     // Unified Resources (Quad)
-    if (state->unit_quad_buffer) { vkDestroyBuffer(state->device, state->unit_quad_buffer, NULL); state->unit_quad_buffer = VK_NULL_HANDLE; }
-    if (state->unit_quad_memory) { vkFreeMemory(state->device, state->unit_quad_memory, NULL); state->unit_quad_memory = VK_NULL_HANDLE; }
-    if (state->unit_quad_index_buffer) { vkDestroyBuffer(state->device, state->unit_quad_index_buffer, NULL); state->unit_quad_index_buffer = VK_NULL_HANDLE; }
-    if (state->unit_quad_index_memory) { vkFreeMemory(state->device, state->unit_quad_index_memory, NULL); state->unit_quad_index_memory = VK_NULL_HANDLE; }
+    if (state->unit_quad_buffer) { vk_buffer_destroy(state, state->unit_quad_buffer); free(state->unit_quad_buffer); state->unit_quad_buffer = NULL; }
+    if (state->unit_quad_index_buffer) { vk_buffer_destroy(state, state->unit_quad_index_buffer); free(state->unit_quad_index_buffer); state->unit_quad_index_buffer = NULL; }
 
     // Cleanup Compute
     if (state->compute_target_view) { vkDestroyImageView(state->device, state->compute_target_view, NULL); state->compute_target_view = VK_NULL_HANDLE; }
@@ -309,4 +287,27 @@ void vk_destroy_device_resources(VulkanRendererState* state) {
     }
     if (state->sem_img_avail) { vkDestroySemaphore(state->device, state->sem_img_avail, NULL); state->sem_img_avail = VK_NULL_HANDLE; }
     if (state->sem_render_done) { vkDestroySemaphore(state->device, state->sem_render_done, NULL); state->sem_render_done = VK_NULL_HANDLE; }
+
+    // Cleanup Dynamic Pipelines
+    for (int i = 0; i < MAX_COMPUTE_PIPELINES; ++i) {
+        if (state->compute_pipelines[i].active) {
+            vkDestroyPipeline(state->device, state->compute_pipelines[i].pipeline, NULL);
+            vkDestroyPipelineLayout(state->device, state->compute_pipelines[i].layout, NULL);
+            for(uint32_t j=0; j<state->compute_pipelines[i].set_layout_count; ++j) {
+                vkDestroyDescriptorSetLayout(state->device, state->compute_pipelines[i].set_layouts[j], NULL);
+            }
+            state->compute_pipelines[i].active = false;
+        }
+    }
+    
+    for (int i = 0; i < MAX_GRAPHICS_PIPELINES; ++i) {
+        if (state->graphics_pipelines[i].active) {
+            vkDestroyPipeline(state->device, state->graphics_pipelines[i].pipeline, NULL);
+            vkDestroyPipelineLayout(state->device, state->graphics_pipelines[i].layout, NULL);
+            for(uint32_t j=0; j<state->graphics_pipelines[i].set_layout_count; ++j) {
+                vkDestroyDescriptorSetLayout(state->device, state->graphics_pipelines[i].set_layouts[j], NULL);
+            }
+            state->graphics_pipelines[i].active = false;
+        }
+    }
 }

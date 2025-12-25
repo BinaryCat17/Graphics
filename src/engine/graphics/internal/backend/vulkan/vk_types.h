@@ -100,10 +100,8 @@ typedef struct VulkanRendererState {
     void* screenshot_threads_head; // Linked list of active screenshot threads
 
     // Unified Resources
-    VkBuffer unit_quad_buffer;
-    VkDeviceMemory unit_quad_memory;
-    VkBuffer unit_quad_index_buffer;
-    VkDeviceMemory unit_quad_index_memory;
+    struct VkBufferWrapper* unit_quad_buffer;
+    struct VkBufferWrapper* unit_quad_index_buffer;
     
     // Instancing (Global Layout, Per-Frame Sets) removed
 
@@ -127,6 +125,8 @@ typedef struct VulkanRendererState {
         bool active;
         VkPipeline pipeline;
         VkPipelineLayout layout;
+        VkDescriptorSetLayout set_layouts[4];
+        uint32_t set_layout_count;
     } compute_pipelines[MAX_COMPUTE_PIPELINES];
 
 #define MAX_COMPUTE_BINDINGS 16
@@ -143,6 +143,8 @@ typedef struct VulkanRendererState {
         bool active;
         VkPipeline pipeline;
         VkPipelineLayout layout;
+        VkDescriptorSetLayout set_layouts[4];
+        uint32_t set_layout_count;
     } graphics_pipelines[MAX_GRAPHICS_PIPELINES];
 
     struct {

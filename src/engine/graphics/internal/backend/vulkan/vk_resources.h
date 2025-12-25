@@ -3,7 +3,7 @@
 
 #include "vk_types.h"
 
-void vk_create_buffer(VulkanRendererState* state, VkDeviceSize size, VkBufferUsageFlags usage, VkMemoryPropertyFlags props, VkBuffer* out_buf, VkDeviceMemory* out_mem);
+// vk_create_buffer removed in favor of vk_buffer_create (vk_buffer.h)
 bool vk_create_vertex_buffer(VulkanRendererState* state, FrameResources *frame, size_t bytes);
 void vk_create_font_texture(VulkanRendererState* state);
 void vk_create_descriptor_pool_and_set(VulkanRendererState* state);

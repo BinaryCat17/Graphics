@@ -619,7 +619,29 @@ void render_system_resize(RenderSystem* sys, int width, int height) {
 
 uint32_t render_system_create_compute_pipeline(RenderSystem* sys, uint32_t* spv_code, size_t spv_size) {
     if (!sys || !sys->backend || !sys->backend->compute_pipeline_create) return 0;
-    return sys->backend->compute_pipeline_create(sys->backend, spv_code, spv_size, 0);
+    
+    // Default Compute Layouts (Matches old hardcoded behavior)
+    // Set 0: Compute Write (Storage Image)
+    // Set 1: SSBOs
+    DescriptorLayoutDef layouts[2] = {0};
+    
+    // Set 0
+    layouts[0].binding_count = 1;
+    layouts[0].bindings[0].binding = 0;
+    layouts[0].bindings[0].descriptor_type = 2; // STORAGE_IMAGE
+    layouts[0].bindings[0].descriptor_count = 1;
+    layouts[0].bindings[0].stage_flags = 32; // COMPUTE (0x20)
+    
+    // Set 1
+    layouts[1].binding_count = 16;
+    for(int i=0; i<16; ++i) {
+        layouts[1].bindings[i].binding = i;
+        layouts[1].bindings[i].descriptor_type = 1; // STORAGE_BUFFER
+        layouts[1].bindings[i].descriptor_count = 1;
+        layouts[1].bindings[i].stage_flags = 1 | 16 | 32; // VERT | FRAG | COMP
+    }
+
+    return sys->backend->compute_pipeline_create(sys->backend, spv_code, spv_size, layouts, 2);
 }
 
 uint32_t render_system_create_compute_pipeline_from_source(RenderSystem* sys, const char* source) {
@@ -640,10 +662,7 @@ uint32_t render_system_create_compute_pipeline_from_source(RenderSystem* sys, co
     }
     
     // 2. Create Pipeline
-    uint32_t id = 0;
-    if (sys->backend->compute_pipeline_create) {
-        id = sys->backend->compute_pipeline_create(sys->backend, spv_code, spv_size, 0);
-    }
+    uint32_t id = render_system_create_compute_pipeline(sys, (uint32_t*)spv_code, spv_size);
     
     // 3. Free SPIR-V
     free(spv_code);
@@ -658,7 +677,31 @@ void render_system_destroy_compute_pipeline(RenderSystem* sys, uint32_t pipeline
 
 uint32_t render_system_create_graphics_pipeline(RenderSystem* sys, const void* vert_code, size_t vert_size, const void* frag_code, size_t frag_size, int layout_index) {
     if (!sys || !sys->backend || !sys->backend->graphics_pipeline_create) return 0;
-    return sys->backend->graphics_pipeline_create(sys->backend, vert_code, vert_size, frag_code, frag_size, layout_index);
+    
+    // Default Graphics Layouts (Matches old hardcoded behavior)
+    // Set 0: Texture (Global)
+    // Set 1: SSBOs
+    DescriptorLayoutDef layouts[2] = {0};
+
+    // Set 0
+    layouts[0].binding_count = 1;
+    layouts[0].bindings[0].binding = 0;
+    layouts[0].bindings[0].descriptor_type = 0; // SAMPLER
+    layouts[0].bindings[0].descriptor_count = 1;
+    layouts[0].bindings[0].stage_flags = 16; // FRAGMENT (0x10)
+    
+    // Set 1
+    layouts[1].binding_count = 16;
+    for(int i=0; i<16; ++i) {
+        layouts[1].bindings[i].binding = i;
+        layouts[1].bindings[i].descriptor_type = 1; // STORAGE_BUFFER
+        layouts[1].bindings[i].descriptor_count = 1;
+        layouts[1].bindings[i].stage_flags = 1 | 16 | 32; // ALL
+    }
+    
+    // layout_index 0 = UI (Vertex Input), 1 = Zero Copy (No Vertex Input)
+    // We pass layout_index as 'flags' to control vertex input generation backend-side.
+    return sys->backend->graphics_pipeline_create(sys->backend, vert_code, vert_size, frag_code, frag_size, layouts, 2, (uint32_t)layout_index);
 }
 
 void render_system_destroy_graphics_pipeline(RenderSystem* sys, uint32_t pipeline_id) {

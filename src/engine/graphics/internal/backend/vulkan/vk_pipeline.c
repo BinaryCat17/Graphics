@@ -1,5 +1,6 @@
 #include "vk_pipeline.h"
 #include "vk_utils.h"
+#include "engine/graphics/graphics_types.h"
 #include "foundation/logger/logger.h"
 #include <stdlib.h>
 #include <stddef.h>
@@ -24,7 +25,50 @@ static VkShaderModule create_shader_module(VulkanRendererState* state, const uin
     return mod;
 }
 
+static VkDescriptorSetLayout vk_create_layout_from_def(VulkanRendererState* state, const DescriptorLayoutDef* def) {
+    if (!def || def->binding_count == 0) {
+        // Empty layout
+        VkDescriptorSetLayoutCreateInfo lci = { .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO };
+        VkDescriptorSetLayout layout;
+        if (vkCreateDescriptorSetLayout(state->device, &lci, NULL, &layout) != VK_SUCCESS) {
+             LOG_ERROR("Failed to create empty descriptor set layout");
+             return VK_NULL_HANDLE;
+        }
+        return layout;
+    }
+
+    VkDescriptorSetLayoutBinding bindings[16];
+    for (uint32_t i = 0; i < def->binding_count && i < 16; ++i) {
+        bindings[i].binding = def->bindings[i].binding;
+        bindings[i].descriptorCount = def->bindings[i].descriptor_count;
+        bindings[i].stageFlags = def->bindings[i].stage_flags;
+        bindings[i].pImmutableSamplers = NULL;
+
+        switch (def->bindings[i].descriptor_type) {
+            case 0: bindings[i].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER; break;
+            case 1: bindings[i].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER; break;
+            case 2: bindings[i].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE; break;
+            default: bindings[i].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER; break;
+        }
+    }
+
+    VkDescriptorSetLayoutCreateInfo lci = { 
+        .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO, 
+        .bindingCount = def->binding_count, 
+        .pBindings = bindings 
+    };
+    
+    VkDescriptorSetLayout layout;
+    VkResult res = vkCreateDescriptorSetLayout(state->device, &lci, NULL, &layout);
+    if (res != VK_SUCCESS) {
+        LOG_ERROR("Failed to create descriptor set layout");
+        return VK_NULL_HANDLE;
+    }
+    return layout;
+}
+
 void vk_create_descriptor_layout(VulkanRendererState* state) {
+    // Legacy global layouts (kept for text/MVP compatibility)
     // Set 0: Texture Sampler
     VkDescriptorSetLayoutBinding binding0 = { 
         .binding = 0, 
@@ -39,8 +83,6 @@ void vk_create_descriptor_layout(VulkanRendererState* state) {
     };
     state->res = vkCreateDescriptorSetLayout(state->device, &lci0, NULL, &state->descriptor_layout);
     if (state->res != VK_SUCCESS) fatal_vk("vkCreateDescriptorSetLayout (Set 0)", state->res);
-    
-
 
     // Compute Layout: Set 0 = Storage Image (Write)
     VkDescriptorSetLayoutBinding bindingC = {
@@ -51,15 +93,14 @@ void vk_create_descriptor_layout(VulkanRendererState* state) {
     };
     VkDescriptorSetLayoutCreateInfo lciC = {
         .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO,
-        .bindingCount = 1,
-        .pBindings = &bindingC
+        .bindingCount = 1, 
+        .pBindings = &bindingC 
     };
     state->res = vkCreateDescriptorSetLayout(state->device, &lciC, NULL, &state->compute_write_layout);
     if (state->res != VK_SUCCESS) fatal_vk("vkCreateDescriptorSetLayout (Compute)", state->res);
 }
 
-VkResult vk_create_compute_pipeline_shader(VulkanRendererState* state, const uint32_t* code, size_t size, int layout_idx, VkPipeline* out_pipeline, VkPipelineLayout* out_layout) {
-    (void)layout_idx; // Unused for now
+VkResult vk_create_compute_pipeline_shader(VulkanRendererState* state, const uint32_t* code, size_t size, const DescriptorLayoutDef* layouts, uint32_t layout_count, VkPipeline* out_pipeline, VkPipelineLayout* out_layout, VkDescriptorSetLayout* out_set_layouts) {
     // 1. Create Shader Module
     VkShaderModuleCreateInfo ci = { 
         .sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO,
@@ -70,24 +111,32 @@ VkResult vk_create_compute_pipeline_shader(VulkanRendererState* state, const uin
     VkResult res = vkCreateShaderModule(state->device, &ci, NULL, &mod);
     if (res != VK_SUCCESS) return res;
 
-    // 2. Create Layout
-    // For now, layout_idx is ignored and we always use the default:
-    // Set 0: Compute Write (Storage Image)
-    // Set 1: Buffers (SSBOs)
-    // Push Constants: 128 bytes
+    // 2. Create Layouts
+    VkDescriptorSetLayout vk_layouts[8];
+    uint32_t vk_layout_count = 0;
     
+    for (uint32_t i = 0; i < layout_count && i < 8; ++i) {
+        vk_layouts[i] = vk_create_layout_from_def(state, &layouts[i]);
+        if (vk_layouts[i] == VK_NULL_HANDLE) {
+            vkDestroyShaderModule(state->device, mod, NULL);
+            // Cleanup already created
+            for (uint32_t j=0; j<i; ++j) vkDestroyDescriptorSetLayout(state->device, vk_layouts[j], NULL);
+            return VK_ERROR_INITIALIZATION_FAILED;
+        }
+        if (out_set_layouts) out_set_layouts[i] = vk_layouts[i];
+        vk_layout_count++;
+    }
+
     VkPushConstantRange pcr = { 
         .stageFlags = VK_SHADER_STAGE_COMPUTE_BIT, 
         .offset = 0, 
         .size = 128 
     };
     
-    VkDescriptorSetLayout layouts[] = { state->compute_write_layout, state->compute_ssbo_layout };
-    
     VkPipelineLayoutCreateInfo plci = { 
         .sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO, 
-        .setLayoutCount = 2, 
-        .pSetLayouts = layouts, 
+        .setLayoutCount = vk_layout_count, 
+        .pSetLayouts = vk_layouts, 
         .pushConstantRangeCount = 1, 
         .pPushConstantRanges = &pcr 
     };
@@ -95,6 +144,7 @@ VkResult vk_create_compute_pipeline_shader(VulkanRendererState* state, const uin
     res = vkCreatePipelineLayout(state->device, &plci, NULL, out_layout);
     if (res != VK_SUCCESS) {
         vkDestroyShaderModule(state->device, mod, NULL);
+        for (uint32_t i=0; i<vk_layout_count; ++i) vkDestroyDescriptorSetLayout(state->device, vk_layouts[i], NULL);
         return res;
     }
 
@@ -114,17 +164,17 @@ VkResult vk_create_compute_pipeline_shader(VulkanRendererState* state, const uin
     
     res = vkCreateComputePipelines(state->device, VK_NULL_HANDLE, 1, &cpci, NULL, out_pipeline);
     
-    // Module can be destroyed after pipeline creation
     vkDestroyShaderModule(state->device, mod, NULL);
     
     if (res != VK_SUCCESS) {
         vkDestroyPipelineLayout(state->device, *out_layout, NULL);
+        for (uint32_t i=0; i<vk_layout_count; ++i) vkDestroyDescriptorSetLayout(state->device, vk_layouts[i], NULL);
     }
     
     return res;
 }
 
-VkResult vk_create_graphics_pipeline_shader(VulkanRendererState* state, const uint32_t* vert_code, size_t vert_size, const uint32_t* frag_code, size_t frag_size, int layout_index, VkPipeline* out_pipeline, VkPipelineLayout* out_layout) {
+VkResult vk_create_graphics_pipeline_shader(VulkanRendererState* state, const uint32_t* vert_code, size_t vert_size, const uint32_t* frag_code, size_t frag_size, const DescriptorLayoutDef* layouts, uint32_t layout_count, uint32_t flags, VkPipeline* out_pipeline, VkPipelineLayout* out_layout, VkDescriptorSetLayout* out_set_layouts) {
     // 1. Modules
     VkShaderModule vs = create_shader_module(state, vert_code, vert_size);
     VkShaderModule fs = create_shader_module(state, frag_code, frag_size);
@@ -138,12 +188,23 @@ VkResult vk_create_graphics_pipeline_shader(VulkanRendererState* state, const ui
 
     // 3. Vertex Input
     VkPipelineVertexInputStateCreateInfo vxi = { .sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO };
-    if (layout_index == 1) {
+    
+    VkVertexInputBindingDescription bind = { .binding = 0, .stride = 5 * sizeof(float), .inputRate = VK_VERTEX_INPUT_RATE_VERTEX };
+    VkVertexInputAttributeDescription attr[2] = {
+        {.location = 0, .binding = 0, .format = VK_FORMAT_R32G32B32_SFLOAT, .offset = 0 },
+        {.location = 1, .binding = 0, .format = VK_FORMAT_R32G32_SFLOAT, .offset = 3 * sizeof(float) }
+    };
+
+    if (flags == 1) {
         // Zero-Copy: No Vertex Input!
         vxi.vertexBindingDescriptionCount = 0;
         vxi.vertexAttributeDescriptionCount = 0;
     } else {
-        // If layout_index == 0, maybe we mimic UI? Or just error.
+        // Default UI (Pos + UV)
+        vxi.vertexBindingDescriptionCount = 1;
+        vxi.pVertexBindingDescriptions = &bind;
+        vxi.vertexAttributeDescriptionCount = 2;
+        vxi.pVertexAttributeDescriptions = attr;
     }
 
     // 4. Input Assembly
@@ -187,16 +248,28 @@ VkResult vk_create_graphics_pipeline_shader(VulkanRendererState* state, const ui
     };
     VkPipelineColorBlendStateCreateInfo cb = { .sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO, .attachmentCount = 1, .pAttachments = &cbatt };
 
-    // 10. Layout
-    // For Zero-Copy (Index 1): Set 0=Global(Tex), Set 1=SSBOs
-    VkDescriptorSetLayout layouts[] = { state->descriptor_layout, state->compute_ssbo_layout }; // Reuse compute layout for SSBOs
+    // 10. Layouts
+    VkDescriptorSetLayout vk_layouts[8];
+    uint32_t vk_layout_count = 0;
+    
+    for (uint32_t i = 0; i < layout_count && i < 8; ++i) {
+        vk_layouts[i] = vk_create_layout_from_def(state, &layouts[i]);
+        if (vk_layouts[i] == VK_NULL_HANDLE) {
+            vkDestroyShaderModule(state->device, vs, NULL);
+            vkDestroyShaderModule(state->device, fs, NULL);
+            for (uint32_t j=0; j<i; ++j) vkDestroyDescriptorSetLayout(state->device, vk_layouts[j], NULL);
+            return VK_ERROR_INITIALIZATION_FAILED;
+        }
+        if (out_set_layouts) out_set_layouts[i] = vk_layouts[i];
+        vk_layout_count++;
+    }
     
     VkPushConstantRange pcr = { .stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, .offset = 0, .size = 128 };
     
     VkPipelineLayoutCreateInfo plci = { 
         .sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO, 
-        .setLayoutCount = 2, 
-        .pSetLayouts = layouts, 
+        .setLayoutCount = vk_layout_count, 
+        .pSetLayouts = vk_layouts, 
         .pushConstantRangeCount = 1, 
         .pPushConstantRanges = &pcr 
     };
@@ -205,6 +278,7 @@ VkResult vk_create_graphics_pipeline_shader(VulkanRendererState* state, const ui
     if (res != VK_SUCCESS) {
         vkDestroyShaderModule(state->device, vs, NULL);
         vkDestroyShaderModule(state->device, fs, NULL);
+        for (uint32_t i=0; i<vk_layout_count; ++i) vkDestroyDescriptorSetLayout(state->device, vk_layouts[i], NULL);
         return res;
     }
 
@@ -233,23 +307,23 @@ VkResult vk_create_graphics_pipeline_shader(VulkanRendererState* state, const ui
 
     if (res != VK_SUCCESS) {
         vkDestroyPipelineLayout(state->device, *out_layout, NULL);
+        for (uint32_t i=0; i<vk_layout_count; ++i) vkDestroyDescriptorSetLayout(state->device, vk_layouts[i], NULL);
     }
     return res;
 }
 
 void vk_create_pipeline(VulkanRendererState* state) {
+    // Legacy function preserved for reference or fallback
+    // Similar to original implementation...
     VkShaderModule vs = create_shader_module(state, state->vert_shader_src.code, state->vert_shader_src.size);
     VkShaderModule fs = create_shader_module(state, state->frag_shader_src.code, state->frag_shader_src.size);
     
-    // ... (stages, vertex input) ...
     VkPipelineShaderStageCreateInfo stages[2] = {
         {.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO, .stage = VK_SHADER_STAGE_VERTEX_BIT, .module = vs, .pName = "main" },
         {.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO, .stage = VK_SHADER_STAGE_FRAGMENT_BIT, .module = fs, .pName = "main" }
     };
     
-    // Stride = 20 bytes (5 floats)
     VkVertexInputBindingDescription bind = { .binding = 0, .stride = 5 * sizeof(float), .inputRate = VK_VERTEX_INPUT_RATE_VERTEX };
-    
     VkVertexInputAttributeDescription attr[2] = {
         {.location = 0, .binding = 0, .format = VK_FORMAT_R32G32B32_SFLOAT, .offset = 0 },
         {.location = 1, .binding = 0, .format = VK_FORMAT_R32G32_SFLOAT, .offset = 3 * sizeof(float) }
@@ -296,11 +370,9 @@ void vk_create_pipeline(VulkanRendererState* state) {
     };
     VkPipelineColorBlendStateCreateInfo cb = { .sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO, .attachmentCount = 1, .pAttachments = &cbatt };
     
-    // Unified Push Constants: view_proj only (64 bytes)
     VkPushConstantRange pcr = { .stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, .offset = 0, .size = 64 };
     
-    // Layouts: Set 0 (Tex), Set 1 (Inst), Set 2 (User Tex)
-    VkDescriptorSetLayout layouts[] = { state->descriptor_layout, state->compute_ssbo_layout, state->descriptor_layout }; // Set 0: Tex, Set 1: SSBO, Set 2: Target (Tex)
+    VkDescriptorSetLayout layouts[] = { state->descriptor_layout, state->compute_ssbo_layout, state->descriptor_layout };
     
     VkPipelineLayoutCreateInfo plci = { .sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO, .setLayoutCount = 3, .pSetLayouts = layouts, .pushConstantRangeCount = 1, .pPushConstantRanges = &pcr };
     

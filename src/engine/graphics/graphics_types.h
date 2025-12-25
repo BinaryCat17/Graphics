@@ -61,6 +61,23 @@ typedef struct Mesh Mesh;
 
 
 // =================================================================================================
+// [DESCRIPTOR LAYOUT]
+// =================================================================================================
+
+typedef struct DescriptorBindingDef {
+    uint32_t binding;
+    uint32_t descriptor_type; // 0=Sampler, 1=StorageBuffer, 2=StorageImage
+    uint32_t descriptor_count;
+    uint32_t stage_flags;     // 1=Vert, 2=Frag, 4=Comp
+} DescriptorBindingDef;
+
+typedef struct DescriptorLayoutDef {
+    uint32_t binding_count;
+    DescriptorBindingDef bindings[16];
+} DescriptorLayoutDef;
+
+
+// =================================================================================================
 // [RENDER COMMANDS]
 // =================================================================================================
 

@@ -51,8 +51,8 @@ typedef struct RendererBackend {
     
     // Create a compute pipeline from SPIR-V bytecode.
     // Returns a handle > 0 on success, 0 on failure.
-    // 'layout_index' allows selecting pre-defined layouts (0 = Default: Output Image + UBO).
-    uint32_t (*compute_pipeline_create)(struct RendererBackend* backend, const void* spirv_code, size_t size, int layout_index);
+    // 'layouts': Array of descriptor set layouts. 'layout_count': Number of sets.
+    uint32_t (*compute_pipeline_create)(struct RendererBackend* backend, const void* spirv_code, size_t size, const DescriptorLayoutDef* layouts, uint32_t layout_count);
     
     // Destroy a compute pipeline.
     void (*compute_pipeline_destroy)(struct RendererBackend* backend, uint32_t pipeline_id);
@@ -90,8 +90,9 @@ typedef struct RendererBackend {
 
     // --- Graphics Subsystem (Zero-Copy) ---
     // Create a graphics pipeline.
-    // 'layout_index': 0 = UI (Default), 1 = Zero-Copy (No vertex input, SSBO bindings)
-    uint32_t (*graphics_pipeline_create)(struct RendererBackend* backend, const void* vert_code, size_t vert_size, const void* frag_code, size_t frag_size, int layout_index);
+    // 'layouts': Array of descriptor set layouts.
+    // 'flags': 0 = Default (Vertex Input), 1 = Zero-Copy (No Vertex Input)
+    uint32_t (*graphics_pipeline_create)(struct RendererBackend* backend, const void* vert_code, size_t vert_size, const void* frag_code, size_t frag_size, const DescriptorLayoutDef* layouts, uint32_t layout_count, uint32_t flags);
     
     void (*graphics_pipeline_destroy)(struct RendererBackend* backend, uint32_t pipeline_id);
     

@@ -62,7 +62,7 @@ static void vulkan_renderer_request_screenshot(RendererBackend* backend, const c
 
 // --- COMPUTE SUBSYSTEM ---
 
-static uint32_t vulkan_compute_pipeline_create(RendererBackend* backend, const void* spirv_code, size_t size, int layout_index) {
+static uint32_t vulkan_compute_pipeline_create(RendererBackend* backend, const void* spirv_code, size_t size, const DescriptorLayoutDef* layouts, uint32_t layout_count) {
     VulkanRendererState* state = (VulkanRendererState*)backend->state;
     
     // Find free slot
@@ -81,9 +81,10 @@ static uint32_t vulkan_compute_pipeline_create(RendererBackend* backend, const v
     
     VkPipeline pipeline;
     VkPipelineLayout layout;
+    VkDescriptorSetLayout set_layouts[4] = {0};
     
     // Convert void* to uint32_t* (assume 4-byte aligned and size is bytes)
-    VkResult res = vk_create_compute_pipeline_shader(state, (const uint32_t*)spirv_code, size, layout_index, &pipeline, &layout);
+    VkResult res = vk_create_compute_pipeline_shader(state, (const uint32_t*)spirv_code, size, layouts, layout_count, &pipeline, &layout, set_layouts);
     
     if (res != VK_SUCCESS) {
         LOG_ERROR("Failed to create compute pipeline: %d", res);
@@ -93,6 +94,13 @@ static uint32_t vulkan_compute_pipeline_create(RendererBackend* backend, const v
     state->compute_pipelines[slot].active = true;
     state->compute_pipelines[slot].pipeline = pipeline;
     state->compute_pipelines[slot].layout = layout;
+    
+    // Store layouts for cleanup
+    state->compute_pipelines[slot].set_layout_count = 0;
+    for(uint32_t i=0; i<layout_count && i<4; ++i) {
+        state->compute_pipelines[slot].set_layouts[i] = set_layouts[i];
+        state->compute_pipelines[slot].set_layout_count++;
+    }
     
     return (uint32_t)(slot + 1);
 }
@@ -351,25 +359,21 @@ static bool vulkan_renderer_init(RendererBackend* backend, const RenderBackendIn
     // 9. Static Buffers (Quad)
     // Vertex Buffer
     VkDeviceSize v_size = sizeof(PRIM_QUAD_VERTS);
-    vk_create_buffer(state, v_size, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, 
-                     VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, 
-                     &state->unit_quad_buffer, &state->unit_quad_memory);
-    
-    void* v_map;
-    vkMapMemory(state->device, state->unit_quad_memory, 0, VK_WHOLE_SIZE, 0, &v_map);
-    memcpy(v_map, PRIM_QUAD_VERTS, v_size);
-    vkUnmapMemory(state->device, state->unit_quad_memory);
+    state->unit_quad_buffer = calloc(1, sizeof(struct VkBufferWrapper));
+    if (!vk_buffer_create(state, v_size, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT, 
+                     VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, state->unit_quad_buffer)) {
+         LOG_FATAL("Failed to create unit quad vertex buffer");
+    }
+    vk_buffer_upload(state, state->unit_quad_buffer, PRIM_QUAD_VERTS, v_size, 0);
 
     // Index Buffer
     VkDeviceSize i_size = sizeof(PRIM_QUAD_INDICES);
-    vk_create_buffer(state, i_size, VK_BUFFER_USAGE_INDEX_BUFFER_BIT, 
-                     VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, 
-                     &state->unit_quad_index_buffer, &state->unit_quad_index_memory);
-                     
-    void* i_map;
-    vkMapMemory(state->device, state->unit_quad_index_memory, 0, VK_WHOLE_SIZE, 0, &i_map);
-    memcpy(i_map, PRIM_QUAD_INDICES, i_size);
-    vkUnmapMemory(state->device, state->unit_quad_index_memory);
+    state->unit_quad_index_buffer = calloc(1, sizeof(struct VkBufferWrapper));
+    if (!vk_buffer_create(state, i_size, VK_BUFFER_USAGE_INDEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT, 
+                     VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, state->unit_quad_index_buffer)) {
+         LOG_FATAL("Failed to create unit quad index buffer");
+    }
+    vk_buffer_upload(state, state->unit_quad_index_buffer, PRIM_QUAD_INDICES, i_size, 0);
     
     // 10. Per-Frame Instance Resources
     for (int i = 0; i < 2; ++i) {
@@ -536,7 +540,7 @@ static void vulkan_compute_bind_buffer(RendererBackend* backend, Stream* stream,
     }
 }
 
-static uint32_t vulkan_graphics_pipeline_create(RendererBackend* backend, const void* vert_code, size_t vert_size, const void* frag_code, size_t frag_size, int layout_index) {
+static uint32_t vulkan_graphics_pipeline_create(RendererBackend* backend, const void* vert_code, size_t vert_size, const void* frag_code, size_t frag_size, const DescriptorLayoutDef* layouts, uint32_t layout_count, uint32_t flags) {
     VulkanRendererState* state = (VulkanRendererState*)backend->state;
     
     // Find free slot
@@ -555,9 +559,10 @@ static uint32_t vulkan_graphics_pipeline_create(RendererBackend* backend, const 
     
     VkPipeline pipeline;
     VkPipelineLayout layout;
+    VkDescriptorSetLayout set_layouts[4] = {0};
     
     // Convert void* to uint32_t* (assume aligned)
-    VkResult res = vk_create_graphics_pipeline_shader(state, (const uint32_t*)vert_code, vert_size, (const uint32_t*)frag_code, frag_size, layout_index, &pipeline, &layout);
+    VkResult res = vk_create_graphics_pipeline_shader(state, (const uint32_t*)vert_code, vert_size, (const uint32_t*)frag_code, frag_size, layouts, layout_count, flags, &pipeline, &layout, set_layouts);
     
     if (res != VK_SUCCESS) {
         LOG_ERROR("Failed to create graphics pipeline: %d", res);
@@ -567,6 +572,13 @@ static uint32_t vulkan_graphics_pipeline_create(RendererBackend* backend, const 
     state->graphics_pipelines[slot].active = true;
     state->graphics_pipelines[slot].pipeline = pipeline;
     state->graphics_pipelines[slot].layout = layout;
+
+    // Store layouts for cleanup
+    state->graphics_pipelines[slot].set_layout_count = 0;
+    for(uint32_t i=0; i<layout_count && i<4; ++i) {
+        state->graphics_pipelines[slot].set_layouts[i] = set_layouts[i];
+        state->graphics_pipelines[slot].set_layout_count++;
+    }
     
     return (uint32_t)(slot + 1);
 }
@@ -865,10 +877,9 @@ static void vulkan_renderer_submit_commands(RendererBackend* backend, const Rend
     vkCmdSetScissor(cmd, 0, 1, &scissor);
 
     // Bind Quad Vertex Buffer (Global default)
-    VkDeviceSize offsets[] = {0};
-    vkCmdBindVertexBuffers(cmd, 0, 1, &state->unit_quad_buffer, offsets);
-    vkCmdBindIndexBuffer(cmd, state->unit_quad_index_buffer, 0, VK_INDEX_TYPE_UINT32);
-
+                VkDeviceSize offsets[] = {0};
+                vkCmdBindVertexBuffers(cmd, 0, 1, &state->unit_quad_buffer->buffer, offsets);
+                vkCmdBindIndexBuffer(cmd, state->unit_quad_index_buffer->buffer, 0, VK_INDEX_TYPE_UINT32);
     // Bind Global Sets (0 and 2)
     vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, state->pipeline_layout, 0, 1, &state->descriptor_set, 0, NULL);
     vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, state->pipeline_layout, 2, 1, &state->compute_target_descriptor, 0, NULL);
