@@ -24,4 +24,8 @@ void math_editor_render(MathEditor* editor, Scene* scene, const Assets* assets, 
 // Shuts down the editor and frees resources
 void math_editor_destroy(MathEditor* editor);
 
+// Feature Factory
+#include "engine/core/engine.h"
+EngineFeature math_engine_feature(void);
+
 #endif // MATH_EDITOR_H

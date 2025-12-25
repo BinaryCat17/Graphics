@@ -26,6 +26,7 @@
 
 #include "engine/ui/ui_core.h"
 #include "engine/ui/ui_input.h"
+#include "engine/graphics/primitive_batcher.h"
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
@@ -179,7 +180,7 @@ UI_COMMAND(cmd_load_graph, MathEditor) {
         for (uint32_t i = 0; i < ctx->graph->node_count; ++i) {
              MathNodeId id = ctx->graph->node_ptrs[i]->id; // Access internal directly or use helper?
              // Graph internal access is available here
-             math_editor_add_view(ctx, id, x, y);
+             math_editor_add_view(ctx, id, x, y); 
              x += 250;
              if (x > 1000) { x = 50; y += 200; }
         }
@@ -440,9 +441,10 @@ MathEditor* math_editor_create(Engine* engine) {
     editor->gpu_nodes = stream_create(engine_get_render_system(engine), STREAM_CUSTOM, 4096, sizeof(GpuNodeData));
     editor->gpu_picking_result = stream_create(engine_get_render_system(engine), STREAM_UINT, 1, 0);
 
-    // Wires Streams
-    editor->gpu_wires = stream_create(engine_get_render_system(engine), STREAM_CUSTOM, 1024, sizeof(MathWireView)); 
-    editor->gpu_wire_verts = stream_create(engine_get_render_system(engine), STREAM_CUSTOM, 1024 * 64 * 6, 32); 
+    // Wires Streams (Removed: Using PrimitiveBatcher)
+    // editor->gpu_wires = stream_create(...)
+    // editor->gpu_wire_verts = stream_create(...)
+    editor->primitive_batcher = primitive_batcher_create(engine_get_render_system(engine));
     LOG_INFO("Step 7: Streams Created.");
     
     // Create Pipeline
@@ -456,17 +458,8 @@ MathEditor* math_editor_create(Engine* engine) {
         LOG_ERROR("Failed to load picking shader: shaders/compute/picking.comp.spv. Run tools/build_shaders.py");
     }
 
-    // Wires Compute Pipeline
-    LOG_INFO("Loading wires compute shader...");
-    AssetData wire_comp = assets_load_file(engine_get_assets(engine), "shaders/compute/wires.comp.spv");
-    if (wire_comp.data) {
-        LOG_INFO("Creating wires compute pipeline...");
-        editor->wire_compute_pipeline_id = render_system_create_compute_pipeline(engine_get_render_system(engine), (uint32_t*)wire_comp.data, wire_comp.size);
-        assets_free_file(&wire_comp);
-    } else {
-        LOG_ERROR("Failed to load wires compute shader.");
-    }
-
+    // Wires Compute Pipeline (Removed) 
+    
     // Wires Render Pipeline
     LOG_INFO("Loading wires render shaders...");
     AssetData wire_vert = assets_load_file(engine_get_assets(engine), "shaders/render_wires.vert.spv");
@@ -479,6 +472,8 @@ MathEditor* math_editor_create(Engine* engine) {
             wire_frag.data, wire_frag.size, 
             1 // Zero-Copy Layout
         );
+        primitive_batcher_set_pipeline(editor->primitive_batcher, editor->wire_render_pipeline_id);
+
         assets_free_file(&wire_vert);
         assets_free_file(&wire_frag);
     }
@@ -491,13 +486,8 @@ MathEditor* math_editor_create(Engine* engine) {
         compute_pass_bind_stream(editor->picking_pass, 0, editor->gpu_nodes);
         compute_pass_bind_stream(editor->picking_pass, 1, editor->gpu_picking_result);
     }
-
-    if (editor->gpu_compute_graph && editor->wire_compute_pipeline_id != 0) {
-        LOG_INFO("Creating wires compute pass...");
-        editor->wire_pass = compute_graph_add_pass(editor->gpu_compute_graph, editor->wire_compute_pipeline_id, 1, 1, 1);
-        compute_pass_bind_stream(editor->wire_pass, 0, editor->gpu_wires);
-        compute_pass_bind_stream(editor->wire_pass, 1, editor->gpu_wire_verts);
-    }
+    
+    // Wires Pass Binding (Removed) 
     
     // 8. Graphics Pipeline for Nodes
     LOG_INFO("Loading editor nodes shaders...");
@@ -519,7 +509,7 @@ MathEditor* math_editor_create(Engine* engine) {
     // editor->draw_data_cache and editor->wire_draw_data were used for caching pointers
     // but RenderBatch is passed by value/copy to scene_push_render_batch, 
     // so we don't strictly need persistent cache unless we want to avoid recreating the struct every frame.
-    // However, RenderBatch is small enough to create on stack.
+    // However, RenderBatch is small enough to create on stack. 
     
     if (editor->gpu_compute_graph) {
         render_system_register_compute_graph(editor->render_system, editor->gpu_compute_graph);
@@ -542,25 +532,38 @@ void math_editor_render(MathEditor* editor, Scene* scene, const struct Assets* a
         
         batch.bind_buffers[0] = editor->gpu_nodes;
         batch.bind_slots[0] = 0; // set 0, binding 0 in shader? (Check shader)
-        // Usually: set=0 is global, set=1 is per pass? 
+        // Usually: set=0 is global, set=1 is per pass?
         // We assume binding 0.
         batch.bind_count = 1;
 
         scene_push_render_batch(scene, batch);
     }
 
-    // 1.5 Render Wires (Custom Compute Generated)
-    if (editor->wire_render_pipeline_id > 0 && editor->view->wires_count > 0) {
-        RenderBatch batch = {0};
-        batch.pipeline_id = editor->wire_render_pipeline_id;
-        batch.vertex_count = editor->view->wires_count * 64 * 6;
-        batch.instance_count = 1;
+    // 1.5 Render Wires (Unified Geometry Stream)
+    if (editor->primitive_batcher && editor->view->wires_count > 0) {
+        primitive_batcher_begin(editor->primitive_batcher);
         
-        batch.bind_buffers[0] = editor->gpu_wire_verts;
-        batch.bind_slots[0] = 0;
-        batch.bind_count = 1;
+                for (uint32_t i = 0; i < editor->view->wires_count; ++i) {
+                    MathWireView* w = &editor->view->wires[i];
+                    // Tangents
+                    float dist = w->end.x - w->start.x;
+                    if (dist < 0) dist = -dist;
+                    float cx = dist * 0.5f;
+                    if (cx < 50.0f) cx = 50.0f;
         
-        scene_push_render_batch(scene, batch);
+                    // Z-index: -5.0f (Under Nodes)
+                    Vec3 p0 = {w->start.x, w->start.y, -5.0f};
+                    Vec3 p3 = {w->end.x, w->end.y, -5.0f};
+                    Vec3 p1 = {w->start.x + cx, w->start.y, -5.0f};
+                    Vec3 p2 = {w->end.x - cx, w->end.y, -5.0f};
+        
+                    primitive_batcher_push_cubic_bezier(editor->primitive_batcher, 
+                        p0, p1, p2, p3, 
+                        w->color, 
+                        w->thickness, 
+                        24); // 24 segments
+                }        
+        primitive_batcher_end(editor->primitive_batcher, scene);
     }
 
     // 2. Render UI Overlay
@@ -677,21 +680,7 @@ void math_editor_update(MathEditor* editor, Engine* engine) {
 
     // --- GPU Picking & Wires Update ---
     if (editor->gpu_compute_graph) {
-        // 0. Update Wires
-        if (editor->wire_pass && editor->view->wires_count > 0) {
-            // Upload Wires
-            stream_set_data(editor->gpu_wires, editor->view->wires, editor->view->wires_count);
-            
-            // Push Constants
-            struct { uint32_t count; uint32_t segs; } push = { editor->view->wires_count, 64 };
-            compute_pass_set_push_constants(editor->wire_pass, &push, sizeof(push));
-            
-            // Dispatch
-            uint32_t groups = (push.count + 63) / 64;
-            compute_pass_set_dispatch_size(editor->wire_pass, groups, 1, 1);
-        } else if (editor->wire_pass) {
-            compute_pass_set_dispatch_size(editor->wire_pass, 0, 0, 0);
-        }
+        // Wires update removed (handled by CPU PrimitiveBatcher now)
 
         if (editor->view->node_views_count > 0) {
             // 1. Upload Node Data
@@ -784,8 +773,11 @@ void math_editor_destroy(MathEditor* editor) {
     }
     if (editor->gpu_nodes) stream_destroy(editor->gpu_nodes);
     if (editor->gpu_picking_result) stream_destroy(editor->gpu_picking_result);
-    if (editor->gpu_wires) stream_destroy(editor->gpu_wires);
-    if (editor->gpu_wire_verts) stream_destroy(editor->gpu_wire_verts);
+    // if (editor->gpu_wires) stream_destroy(editor->gpu_wires); // Removed
+    // if (editor->gpu_wire_verts) stream_destroy(editor->gpu_wire_verts); // Removed
+    
+    if (editor->primitive_batcher) primitive_batcher_destroy(editor->primitive_batcher);
+
     // Note: Pipelines are managed by RenderSystem, usually no explicit destroy needed unless dynamic?
     // Actually render_system_destroy_compute_pipeline exists, we should use it.
     if (editor->picking_pipeline_id != 0) {
@@ -807,4 +799,45 @@ void math_editor_destroy(MathEditor* editor) {
     }
 
     free(editor);
+}
+
+// --- Feature System Implementation ---
+
+static void math_feature_init(EngineFeature* f, Engine* e) {
+    if (!f || !e) return;
+    f->user_data = math_editor_create(e);
+    LOG_INFO("MathEngine: Initialized.");
+}
+
+static void math_feature_update(EngineFeature* f, Engine* e) {
+    if (!f || !f->user_data) return;
+    math_editor_update((MathEditor*)f->user_data, e);
+}
+
+static void math_feature_extract(EngineFeature* f, Engine* e) {
+    if (!f || !f->user_data) return;
+    
+    RenderSystem* rs = engine_get_render_system(e);
+    Scene* scene = render_system_get_scene(rs);
+    const Assets* assets = engine_get_assets(e);
+    MemoryArena* arena = engine_get_frame_arena(e);
+    
+    math_editor_render((MathEditor*)f->user_data, scene, assets, arena);
+}
+
+static void math_feature_shutdown(EngineFeature* f) {
+    if (!f || !f->user_data) return;
+    math_editor_destroy((MathEditor*)f->user_data);
+    f->user_data = NULL;
+    LOG_INFO("MathEngine: Shutdown.");
+}
+
+EngineFeature math_engine_feature(void) {
+    EngineFeature f = {0};
+    f.name = "MathEngine";
+    f.on_init = math_feature_init;
+    f.on_update = math_feature_update;
+    f.on_extract = math_feature_extract;
+    f.on_shutdown = math_feature_shutdown;
+    return f;
 }

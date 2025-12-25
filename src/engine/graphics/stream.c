@@ -1,7 +1,7 @@
 #include "engine/graphics/stream.h"
 #include "engine/graphics/render_system.h"
 #include "engine/graphics/internal/backend/renderer_backend.h"
-#include "engine/graphics/internal/resources/stream_internal.h"
+#include "engine/graphics/internal/stream_internal.h"
 #include "foundation/logger/logger.h"
 #include <stdlib.h>
 

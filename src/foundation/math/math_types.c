@@ -166,10 +166,10 @@ Mat4 mat4_orthographic(float left, float right, float bottom, float top, float n
     Mat4 m = mat4_identity();
     m.m[0] = 2.0f / (right - left);
     m.m[5] = 2.0f / (top - bottom);
-    m.m[10] = -2.0f / (far_z - near_z);
+    m.m[10] = 1.0f / (far_z - near_z);
     m.m[12] = -(right + left) / (right - left);
     m.m[13] = -(top + bottom) / (top - bottom);
-    m.m[14] = -(far_z + near_z) / (far_z - near_z);
+    m.m[14] = -near_z / (far_z - near_z);
     return m;
 }
 

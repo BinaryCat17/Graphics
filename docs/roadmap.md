@@ -24,9 +24,12 @@
 *Цель: Рендер не должен знать про UI, а Ядро про Математику.*
 
 - [ ] **Render Agnosticism (Независимость рендера)**
+    - [ ] **Unified Geometry Stream:** Создать механизм `PrimitiveBatcher` для унифицированной отрисовки примитивов (линии, квады) из любой подсистемы (UI, Wires, Gizmos).
+    - [ ] **Fix UI & Wire Rendering:**
+        - [ ] Исправить `ui_renderer.c`: динамическое получение `pipeline_id` вместо хардкода.
+        - [ ] Восстановить отрисовку связей (Wires) через новый `PrimitiveBatcher`.
     - [ ] Удалить зависимость `render_system` от `ui_node.h`.
-    - [ ] Реализовать промежуточный слой `RenderBatchList` / `DrawCommandList`.
-    - [ ] **Задача:** Модуль UI должен сам генерировать список команд. Рендер становится "тупым" исполнителем.
+    - [ ] **Задача:** Модуль UI должен сам генерировать список команд (`RenderBatch`). Рендер становится "тупым" исполнителем.
 - [ ] **Feature System (Plugin Architecture)**
     - [ ] Ввести интерфейс `EngineFeature` (методы `on_init`, `on_update`, `on_extract`).
     - [ ] Удалить прямой инклюд `math_editor.h` из `engine.c`.

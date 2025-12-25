@@ -50,6 +50,8 @@ typedef struct Mesh Mesh;
 typedef enum RenderCommandType {
     RENDER_CMD_BIND_PIPELINE,
     RENDER_CMD_BIND_BUFFER,       // Bind SSBO/UBO to a specific slot
+    RENDER_CMD_BIND_VERTEX_BUFFER,// Bind Vertex Buffer
+    RENDER_CMD_BIND_INDEX_BUFFER, // Bind Index Buffer
     RENDER_CMD_UPDATE_BUFFER,     // Update buffer data (inline)
     RENDER_CMD_DRAW,              // Draw non-indexed
     RENDER_CMD_DRAW_INDEXED,      // Draw indexed
@@ -136,6 +138,18 @@ typedef struct RenderCommandList {
 } RenderCommandList;
 
 
+// GPU Instance Data Layout (std140/std430 compatible)
+// Used for UI and Sprite rendering
+typedef struct GpuInstanceData {
+    Mat4 model;
+    Vec4 color;
+    Vec4 uv_rect;
+    Vec4 params_1;
+    Vec4 params_2;
+    Vec4 clip_rect;
+} GpuInstanceData;
+
+
 // =================================================================================================
 // [RENDER BATCH]
 // =================================================================================================
@@ -152,6 +166,10 @@ typedef struct RenderBatch {
     Stream* bind_buffers[4];   // Streams
     uint32_t bind_slots[4];
     uint32_t bind_count;
+
+    // Geometry Streams (Optional, overrides Mesh)
+    Stream* vertex_stream;
+    Stream* index_stream;
 
     void* material_buffer;     // Legacy/Specific material data
     uint32_t material_size;

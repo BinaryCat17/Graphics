@@ -15,90 +15,14 @@
 // --- Application Logic ---
 
 static void app_on_init(Engine* engine) {
-    // Allocate MathEditor
-    MathEditor* editor = math_editor_create(engine);
-    if (!editor) {
-        LOG_FATAL("Failed to create MathEditor");
-        exit(1);
-    }
-    engine_set_user_data(engine, editor);
-
-    /*
-    // --- INTEGRATION TEST: COMPUTE STREAM ---
-    LOG_INFO("Running Compute Stream Integration Test...");
-    
-    RenderSystem* rs = engine_get_render_system(engine);
-    Stream* stream = stream_create(rs, STREAM_FLOAT, 16);
-    if (stream) {
-        float input[16];
-        for(int i=0; i<16; ++i) input[i] = (float)i;
-        
-        if (!stream_set_data(stream, input, 16)) {
-            LOG_ERROR("Failed to upload stream data.");
-        }
-        
-        const char* compute_src = 
-            "#version 450\n"
-            "layout(local_size_x = 16) in;\n"
-            "layout(std430, set = 1, binding = 0) buffer Data { float values[]; };\n" // set 1 is buffers
-            "void main() {\n"
-            "    uint id = gl_GlobalInvocationID.x;\n"
-            "    if (id < 16) values[id] = values[id] * 2.0;\n"
-            "}\n";
-            
-        uint32_t pipeline = render_system_create_compute_pipeline_from_source(rs, compute_src);
-        if (pipeline > 0) {
-            stream_bind_compute(stream, 0); // Binding 0
-            
-            // Manual Dispatch for Test
-            RendererBackend* backend = render_system_get_backend(rs);
-            if (backend && backend->compute_dispatch) {
-                backend->compute_dispatch(backend, pipeline, 1, 1, 1, NULL, 0);
-                backend->compute_wait(backend);
-                
-                float output[16];
-                if (stream_read_back(stream, output, 16)) {
-                     LOG_INFO("Stream Readback: [0]=%.1f, [1]=%.1f ... [15]=%.1f", output[0], output[1], output[15]);
-                     if (output[1] == 2.0f && output[15] == 30.0f) {
-                         LOG_INFO("SUCCESS: Compute Stream Test Passed!");
-                     } else {
-                         LOG_ERROR("FAILURE: Compute Stream Test Values Incorrect.");
-                     }
-                } else {
-                     LOG_ERROR("FAILURE: Stream Readback failed.");
-                }
-            }
-            
-            // Clean up test pipeline (optional, or reuse)
-            render_system_destroy_compute_pipeline(rs, pipeline);
-        } else {
-            LOG_ERROR("Failed to compile test compute shader.");
-        }
-        
-        stream_destroy(stream);
-    }
-    */
+    // Register Features
+    engine_register_feature(engine, math_engine_feature());
 }
 
 static void app_on_update(Engine* engine) {
-    MathEditor* editor = (MathEditor*)engine_get_user_data(engine);
-    if (!editor) return;
-
-    // Update the Editor Feature
-    math_editor_update(editor, engine);
-
-    // Render the Editor Feature
-    Scene* scene = render_system_get_scene(engine_get_render_system(engine));
-    if (scene) {
-        math_editor_render(editor, scene, engine_get_assets(engine), engine_get_frame_arena(engine));
-    }
-}
-
-static void app_on_shutdown(Engine* engine) {
-    MathEditor* editor = (MathEditor*)engine_get_user_data(engine);
-    if (editor) {
-         math_editor_destroy(editor);
-    }
+    (void)engine;
+    // Global app logic if any (e.g. global hotkeys)
+    // Features are updated automatically by the engine.
 }
 
 int main(int argc, char** argv) {
@@ -121,7 +45,8 @@ int main(int argc, char** argv) {
         .assets_path = config_get_string("assets", "assets"), 
         .ui_path = config_get_string("ui", "assets/ui/editor.yaml"),
         .log_level = log_level,
-        .on_init = app_on_init, .on_update = app_on_update
+        .on_init = app_on_init, 
+        .on_update = app_on_update
     };
     
     // Log Interval / Screenshot
@@ -136,7 +61,7 @@ int main(int argc, char** argv) {
     Engine* engine = engine_create(&config);
     if (engine) {
         engine_run(engine);
-        app_on_shutdown(engine); // Clean up user data
+        // Features are shut down automatically by engine_destroy
         engine_destroy(engine);
     }
     

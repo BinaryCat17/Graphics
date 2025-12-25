@@ -22,15 +22,4 @@ static const unsigned int PRIM_QUAD_INDICES[] = {
     0, 2, 3
 };
 
-// GPU Instance Data Layout (std140/std430 compatible)
-// Used for UI and Sprite rendering
-typedef struct GpuInstanceData {
-    Mat4 model;
-    Vec4 color;
-    Vec4 uv_rect;
-    Vec4 params_1;
-    Vec4 params_2;
-    Vec4 clip_rect;
-} GpuInstanceData;
-
 #endif // PRIMITIVES_H

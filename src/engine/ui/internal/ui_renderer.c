@@ -9,7 +9,11 @@
 #include "engine/assets/assets.h"
 #include "foundation/memory/arena.h"
 #include "foundation/meta/reflection.h"
+#include "engine/graphics/render_system.h"
+#include "engine/graphics/stream.h"
+#include "engine/graphics/graphics_types.h"
 #include <string.h> 
+#include <stdlib.h> 
 
 // --- Provider Registry ---
 #define MAX_UI_PROVIDERS 32
@@ -21,6 +25,113 @@ typedef struct {
 
 static SceneProviderEntry s_providers[MAX_UI_PROVIDERS];
 static int s_provider_count = 0;
+static Stream* s_ui_instance_stream = NULL;
+static size_t s_ui_instance_capacity = 0;
+
+void ui_renderer_extract(Scene* scene, RenderSystem* rs) {
+    if (!scene || !rs) return;
+
+    size_t count = 0;
+    const UiNode* nodes = scene_get_ui_nodes(scene, &count);
+    if (count == 0) return;
+
+    if (count > 0) {
+        LOG_TRACE("UI Extract: Processing %zu nodes. First: [%.1f, %.1f] %gx%g", count, nodes[0].rect.x, nodes[0].rect.y, nodes[0].rect.w, nodes[0].rect.h);
+    }
+    
+    // Resize Stream if needed
+    if (count > s_ui_instance_capacity) {
+        size_t new_cap = count + 1024;
+        if (s_ui_instance_stream) {
+            stream_destroy(s_ui_instance_stream);
+        }
+        s_ui_instance_stream = stream_create(rs, STREAM_CUSTOM, new_cap, sizeof(GpuInstanceData));
+        s_ui_instance_capacity = new_cap;
+        LOG_INFO("UI Renderer: Resized Instance Stream to %zu. Stream Ptr: %p", new_cap, (void*)s_ui_instance_stream);
+    }
+
+    if (!s_ui_instance_stream) return;
+
+    // Map Buffer
+    // Note: Stream assumes we use stream_set_data which copies from CPU pointer.
+    // We need a temporary CPU buffer. We can use the Scene arena or a static scratch.
+    // Given the extraction phase is single-threaded usually, malloc/free or arena is fine.
+    // Using malloc for simplicity to match previous logic, or use a scratch arena if available.
+    // Scene has an arena!
+    
+    // GpuInstanceData* instances = arena_alloc(&scene->arena, sizeof(GpuInstanceData) * count);
+    // WARNING: scene->arena is reset at start of frame. If we alloc here, it persists until next frame start.
+    // This is safe.
+    
+    // BUT ui_renderer.c doesn't have access to scene->arena directly (struct Scene is opaque in header).
+    // scene.h implies it's opaque. scene.c shows it.
+    // ui_renderer.c includes scene.h.
+    // I need to use malloc or modify scene.h to expose arena or add scene_alloc helper.
+    // Let's use malloc for now to minimize changes to Scene API, or simple stack array for small counts?
+    // No, UI can be large.
+    
+    GpuInstanceData* instances = malloc(sizeof(GpuInstanceData) * count);
+    if (!instances) return;
+
+    for (size_t i = 0; i < count; ++i) {
+        const UiNode* node = &nodes[i];
+        GpuInstanceData* inst = &instances[i];
+        
+        // --- Transform ---
+        // Rect (x,y,w,h) -> Mat4 (Translation * Scale)
+        Mat4 s = mat4_scale((Vec3){node->rect.w, node->rect.h, 1.0f});
+        Mat4 t = mat4_translation((Vec3){node->rect.x, node->rect.y, node->z_index});
+        inst->model = mat4_multiply(&t, &s);
+        
+        inst->color = node->color;
+        inst->uv_rect = node->uv_rect;
+        
+        // --- Packing Params ---
+        inst->params_1.x = (float)node->primitive_type;
+        inst->params_1.y = node->corner_radius;
+        
+        if (node->primitive_type == SCENE_MODE_9_SLICE) {
+            inst->params_1.z = node->texture_size.x;
+            inst->params_1.w = node->texture_size.y;
+            inst->params_2 = node->slice_borders;
+        } else if (node->primitive_type == SCENE_PRIM_CURVE) {
+            inst->params_1.y = 1.0f; 
+            inst->params_2 = node->params; // (u1, v1, u2, v2)
+            inst->params_1.z = node->border_width; 
+            if (node->rect.h > 0) inst->params_1.w = node->rect.w / node->rect.h;
+        } else {
+             inst->params_1.z = node->border_width;
+             inst->params_1.w = 0.0f;
+             inst->params_2 = (Vec4){0};
+        }
+        
+        inst->clip_rect = (Vec4){node->clip_rect.x, node->clip_rect.y, node->clip_rect.w, node->clip_rect.h};
+    }
+
+    stream_set_data(s_ui_instance_stream, instances, count);
+    free(instances);
+
+    // Create RenderBatch
+    RenderBatch batch = {0};
+    batch.pipeline_id = 0; // Default UI Pipeline
+    batch.vertex_count = 6; // Quad (Indexed)
+    batch.index_count = 6;
+    batch.instance_count = (uint32_t)count;
+    batch.first_instance = 0;
+    
+    batch.bind_buffers[0] = s_ui_instance_stream;
+    batch.bind_slots[0] = 0; // Instance Buffer Slot
+    batch.bind_count = 1;
+
+    // Push Batch
+    scene_push_render_batch(scene, batch);
+
+    // Clear UiNodes from Scene to prevent double processing if RenderSystem was not updated
+    // But since we are modifying RenderSystem next, this is just for correctness of the 'Extraction' logic.
+    // 'scene_clear_ui_nodes' doesn't exist.
+    // We can assume RenderSystem will ignore ui_nodes or we add a helper.
+    // For now, I will leave them, but RenderSystem will be updated to ignore them.
+}
 
 void scene_register_provider(const char* name, SceneObjectProvider callback) {
     if (s_provider_count >= MAX_UI_PROVIDERS) {

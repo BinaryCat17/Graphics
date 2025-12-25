@@ -170,6 +170,7 @@ set(ENGINE_GRAPHICS_SOURCES
     "src/engine/graphics/internal/backend/vulkan/vk_buffer.c"
     "src/engine/graphics/internal/backend/vulkan/vk_context.c"
     "src/engine/graphics/stream.c"
+    "src/engine/graphics/primitive_batcher.c"
     "src/engine/graphics/gpu_input.c"
     "src/engine/graphics/compute_graph.c"
     "src/engine/graphics/internal/backend/vulkan/vk_swapchain.c"

@@ -2,8 +2,7 @@
 #define RENDER_SYSTEM_INTERNAL_H
 
 #include "engine/graphics/render_system.h"
-#include "engine/graphics/internal/render_frame_packet.h"
-#include "engine/graphics/internal/resources/primitives.h"
+#include "engine/graphics/internal/primitives.h"
 #include "engine/graphics/graphics_types.h"
 #include "foundation/thread/thread.h"
 
@@ -13,6 +12,11 @@ typedef struct PlatformWindow PlatformWindow;
 typedef struct RendererBackend RendererBackend;
 typedef struct Stream Stream;
 typedef struct ComputeGraph ComputeGraph;
+typedef struct Scene Scene;
+
+typedef struct RenderFramePacket {
+    Scene* scene;
+} RenderFramePacket;
 
 struct RenderSystem {
     // Dependencies
@@ -22,9 +26,6 @@ struct RenderSystem {
     PlatformWindow* window;
     RendererBackend* backend;
     Stream* gpu_input_stream; 
-    Stream* ui_instance_stream; 
-    GpuInstanceData* ui_cpu_buffer;
-    size_t ui_cpu_capacity;
     
     RenderCommandList cmd_list; 
     

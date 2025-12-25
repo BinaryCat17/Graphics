@@ -10,6 +10,7 @@ typedef struct SceneTree SceneTree;
 typedef struct Scene Scene;
 typedef struct Assets Assets;
 typedef struct MemoryArena MemoryArena;
+typedef struct RenderSystem RenderSystem;
 
 // --- High-Level Pipeline API ---
 
@@ -17,6 +18,10 @@ typedef struct MemoryArena MemoryArena;
 
 // Generates render commands into the Scene.
 void scene_tree_render(SceneTree* instance, Scene* scene, const Assets* assets, MemoryArena* arena);
+
+// Extract UI Nodes from Scene, convert to GPU buffers, and push RenderBatch.
+// Should be called before render_system_update/draw.
+void ui_renderer_extract(Scene* scene, struct RenderSystem* rs);
 
 // --- Viewport Provider ---
 // Callback for Viewport Rendering (dynamic 3D/custom content inside UI)

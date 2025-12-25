@@ -687,6 +687,22 @@ static void vulkan_renderer_submit_commands(RendererBackend* backend, const Rend
                 vkCmdPushConstants(cmd, current_layout, rc->push_constants.stage_flags, 0, rc->push_constants.size, rc->push_constants.data);
                 break;
             }
+            case RENDER_CMD_BIND_VERTEX_BUFFER: {
+                if (rc->bind_buffer.stream && rc->bind_buffer.stream->buffer_handle) {
+                    VkBufferWrapper* buf = (VkBufferWrapper*)rc->bind_buffer.stream->buffer_handle;
+                    VkBuffer vbuf = buf->buffer;
+                    VkDeviceSize off = 0;
+                    vkCmdBindVertexBuffers(cmd, 0, 1, &vbuf, &off);
+                }
+                break;
+            }
+            case RENDER_CMD_BIND_INDEX_BUFFER: {
+                if (rc->bind_buffer.stream && rc->bind_buffer.stream->buffer_handle) {
+                    VkBufferWrapper* buf = (VkBufferWrapper*)rc->bind_buffer.stream->buffer_handle;
+                    vkCmdBindIndexBuffer(cmd, buf->buffer, 0, VK_INDEX_TYPE_UINT32);
+                }
+                break;
+            }
             case RENDER_CMD_SET_VIEWPORT: {
                 VkViewport vp = {rc->viewport.x, rc->viewport.y, rc->viewport.w, rc->viewport.h, rc->viewport.min_depth, rc->viewport.max_depth};
                 vkCmdSetViewport(cmd, 0, 1, &vp);

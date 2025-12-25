@@ -164,7 +164,10 @@ void render_system_begin_frame(RenderSystem* sys, double time) {
 
     SceneCamera camera = {0};
     camera.view_matrix = mat4_identity();
-    Mat4 proj = mat4_orthographic(0.0f, w, 0.0f, h, -100.0f, 100.0f);
+    // Swap near/far to ensure Z-layering works correctly (Higher Z = Closer/Lower Depth value)
+    // Old: -100, 100. New: 100, -100. 
+    // Z=-10 (Base) -> Farther. Z=-9 (Child) -> Closer.
+    Mat4 proj = mat4_orthographic(0.0f, w, 0.0f, h, 100.0f, -100.0f);
     camera.proj_matrix = proj; 
     
     scene_set_camera(dest->scene, camera);
@@ -266,11 +269,30 @@ void render_system_draw(RenderSystem* sys) {
         }
         
         // 3. Draw
-        if (batch->mesh) {
+        if (batch->vertex_stream) {
+             RenderCommand cmd = {0};
+             cmd.type = RENDER_CMD_BIND_VERTEX_BUFFER;
+             cmd.bind_buffer.stream = batch->vertex_stream;
+             cmd_list_add(&sys->cmd_list, cmd);
+        }
+
+        if (batch->index_stream) {
+             RenderCommand cmd = {0};
+             cmd.type = RENDER_CMD_BIND_INDEX_BUFFER;
+             cmd.bind_buffer.stream = batch->index_stream;
+             cmd_list_add(&sys->cmd_list, cmd);
+             
+             RenderCommand draw_cmd = {0};
+             draw_cmd.type = RENDER_CMD_DRAW_INDEXED;
+             draw_cmd.draw_indexed.index_count = batch->index_count;
+             draw_cmd.draw_indexed.instance_count = batch->instance_count > 0 ? batch->instance_count : 1;
+             draw_cmd.draw_indexed.first_instance = batch->first_instance;
+             cmd_list_add(&sys->cmd_list, draw_cmd);
+        } else if (batch->mesh) {
             // TODO: Implement Mesh Binding (Vertex Buffers) in Backend or via Commands
         } else {
-            // Draw Arrays/Custom/Indexed
-            if (batch->index_count > 0) {
+            // Draw Arrays/Custom/Indexed (without explicit stream binding, e.g. Instancing of Quad)
+            if (batch->index_count > 0 && !batch->index_stream) {
                  RenderCommand cmd = {0};
                  cmd.type = RENDER_CMD_DRAW_INDEXED;
                  cmd.draw_indexed.index_count = batch->index_count;

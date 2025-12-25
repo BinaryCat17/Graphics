@@ -3,6 +3,9 @@
 
 #include "engine/graphics/stream.h"
 
+typedef struct RenderSystem RenderSystem;
+typedef struct RendererBackend RendererBackend;
+
 struct Stream {
     RenderSystem* sys;
     RendererBackend* backend;

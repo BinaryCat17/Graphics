@@ -26,10 +26,32 @@ typedef struct EngineConfig {
     void (*on_update)(Engine* engine);
 } EngineConfig;
 
+// --- Feature System (Plugin Architecture) ---
+
+typedef struct EngineFeature {
+    const char* name;
+    void* user_data;
+    
+    // Called when the feature is registered
+    void (*on_init)(struct EngineFeature* self, Engine* engine);
+    
+    // Called every frame (Simulation Phase)
+    void (*on_update)(struct EngineFeature* self, Engine* engine);
+    
+    // Called before rendering to generate draw commands (Extraction Phase)
+    void (*on_extract)(struct EngineFeature* self, Engine* engine);
+    
+    // Called when the engine shuts down
+    void (*on_shutdown)(struct EngineFeature* self);
+} EngineFeature;
+
 // Lifecycle
 Engine* engine_create(const EngineConfig* config);
 void engine_run(Engine* engine);
 void engine_destroy(Engine* engine);
+
+// Features
+void engine_register_feature(Engine* engine, EngineFeature feature);
 
 // Accessors
 RenderSystem* engine_get_render_system(Engine* engine);

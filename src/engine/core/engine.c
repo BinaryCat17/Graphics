@@ -11,6 +11,7 @@
 #include "engine/graphics/graphics_types.h"
 #include "engine/graphics/gpu_input.h"
 #include "engine/ui/ui_core.h"
+#include "engine/ui/ui_renderer.h"
 
 #include <stdio.h>
 #include <string.h>
@@ -28,6 +29,10 @@ typedef struct Engine {
     // Application Data
     void* user_data;
     MemoryArena frame_arena;
+    
+    // Features
+    EngineFeature features[32];
+    int feature_count;
     
     // State
     bool running;
@@ -51,6 +56,20 @@ static void on_framebuffer_size(PlatformWindow* window, int width, int height, v
     
     if (engine->render_system) {
         render_system_resize(engine->render_system, width, height);
+    }
+}
+
+void engine_register_feature(Engine* engine, EngineFeature feature) {
+    if (!engine || engine->feature_count >= 32) return;
+    
+    engine->features[engine->feature_count] = feature;
+    EngineFeature* f = &engine->features[engine->feature_count];
+    engine->feature_count++;
+    
+    LOG_INFO("Engine: Registered feature '%s'", f->name ? f->name : "Unknown");
+    
+    if (f->on_init) {
+        f->on_init(f, engine);
     }
 }
 
@@ -217,6 +236,21 @@ void engine_run(Engine* engine) {
             engine->on_update(engine);
         }
 
+        // Features Update
+        for (int i = 0; i < engine->feature_count; ++i) {
+            EngineFeature* f = &engine->features[i];
+            if (f->on_update) f->on_update(f, engine);
+        }
+
+        // Features Extract
+        for (int i = 0; i < engine->feature_count; ++i) {
+            EngineFeature* f = &engine->features[i];
+            if (f->on_extract) f->on_extract(f, engine);
+        }
+
+        // Extract UI to Render Batches
+        ui_renderer_extract(render_system_get_scene(rs), rs);
+
         // Render Update
         render_system_update(rs);
 
@@ -227,6 +261,12 @@ void engine_run(Engine* engine) {
 
 void engine_destroy(Engine* engine) {
     if (!engine) return;
+    
+    // Shutdown features in reverse order
+    for (int i = engine->feature_count - 1; i >= 0; --i) {
+        EngineFeature* f = &engine->features[i];
+        if (f->on_shutdown) f->on_shutdown(f);
+    }
     
     ui_system_shutdown();
     render_system_destroy(engine->render_system);

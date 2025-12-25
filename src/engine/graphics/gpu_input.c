@@ -1,4 +1,4 @@
-#include "engine/graphics/graphics_types.h"
+#include "engine/graphics/gpu_input.h"
 #include "engine/input/input.h"
 #include <string.h>
 

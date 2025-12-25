@@ -146,6 +146,8 @@ typedef struct MathEditor {
     struct ComputePass* wire_pass;
     uint32_t wire_compute_pipeline_id;
     uint32_t wire_render_pipeline_id;
+
+    struct PrimitiveBatcher* primitive_batcher;
 } MathEditor;
 
 #endif // MATH_EDITOR_INTERNAL_H
