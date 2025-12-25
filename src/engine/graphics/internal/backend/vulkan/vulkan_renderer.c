@@ -7,8 +7,8 @@
 #include "engine/graphics/internal/backend/vulkan/vk_resources.h"
 #include "engine/graphics/internal/backend/vulkan/vk_utils.h"
 #include "engine/graphics/internal/backend/vulkan/vk_buffer.h"
-#include "engine/graphics/internal/resources/primitives.h"
-#include "engine/graphics/internal/resources/stream_internal.h"
+#include "engine/graphics/internal/primitives.h"
+#include "engine/graphics/internal/stream_internal.h"
 #include "engine/text/font.h"
 
 #include "foundation/logger/logger.h"
@@ -631,12 +631,19 @@ static void vulkan_renderer_submit_commands(RendererBackend* backend, const Rend
     
     // Bind Default Pipeline
     vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, state->pipeline);
+    
+    // Track current layout to ensure Descriptor Sets are bound correctly
+    VkPipelineLayout current_layout = state->pipeline_layout;
 
     // Pending Bindings State for Set 1
     VkBufferWrapper* pending_buffers[4] = {0};
     bool bindings_dirty = false;
     
     // --- Process Commands ---
+    if (list->count > 0) {
+        LOG_DEBUG("Vulkan: Executing %d commands", list->count);
+    }
+
     for (uint32_t i = 0; i < list->count; ++i) {
         RenderCommand* rc = &list->commands[i];
         switch (rc->type) {
@@ -644,10 +651,16 @@ static void vulkan_renderer_submit_commands(RendererBackend* backend, const Rend
                 uint32_t pid = rc->bind_pipeline.pipeline_id;
                 if (pid == 0) {
                      vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, state->pipeline);
+                     current_layout = state->pipeline_layout;
+                     
+                     // Rebind global sets as they might have been disturbed by other pipelines
+                     vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, current_layout, 0, 1, &state->descriptor_set, 0, NULL);
+                     vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, current_layout, 2, 1, &state->compute_target_descriptor, 0, NULL);
                 } else if (pid <= MAX_GRAPHICS_PIPELINES) {
                      int idx = (int)pid - 1;
                      if (state->graphics_pipelines[idx].active) {
                          vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, state->graphics_pipelines[idx].pipeline);
+                         current_layout = state->graphics_pipelines[idx].layout;
                      }
                 }
                 break;
@@ -656,6 +669,7 @@ static void vulkan_renderer_submit_commands(RendererBackend* backend, const Rend
                 if (rc->bind_buffer.slot < 4) {
                     if (rc->bind_buffer.stream) {
                         pending_buffers[rc->bind_buffer.slot] = (VkBufferWrapper*)rc->bind_buffer.stream->buffer_handle;
+                        // LOG_TRACE("Bind Buffer Slot %d: %p", rc->bind_buffer.slot, pending_buffers[rc->bind_buffer.slot]);
                     } else {
                         pending_buffers[rc->bind_buffer.slot] = NULL;
                     }
@@ -664,7 +678,8 @@ static void vulkan_renderer_submit_commands(RendererBackend* backend, const Rend
                 break;
             }
             case RENDER_CMD_PUSH_CONSTANTS: {
-                vkCmdPushConstants(cmd, state->pipeline_layout, rc->push_constants.stage_flags, 0, rc->push_constants.size, rc->push_constants.data);
+                // Use current_layout!
+                vkCmdPushConstants(cmd, current_layout, rc->push_constants.stage_flags, 0, rc->push_constants.size, rc->push_constants.data);
                 break;
             }
             case RENDER_CMD_SET_VIEWPORT: {
@@ -686,38 +701,48 @@ static void vulkan_renderer_submit_commands(RendererBackend* backend, const Rend
                         .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO,
                         .descriptorPool = frame->frame_descriptor_pool,
                         .descriptorSetCount = 1,
-                        .pSetLayouts = &state->compute_ssbo_layout // Reusing layout: 4 SSBOs
+                        .pSetLayouts = &state->compute_ssbo_layout
                     };
                     if (vkAllocateDescriptorSets(state->device, &alloc_info, &set) == VK_SUCCESS) {
                         VkWriteDescriptorSet writes[4];
                         VkDescriptorBufferInfo dbis[4];
-                        uint32_t w_count = 0;
+                        
+                        // Fallback: If slot 0 is valid, use it for others to prevent invalid descriptors.
+                        VkBufferWrapper* fallback = pending_buffers[0]; 
+
                         for(int b=0; b<4; ++b) {
-                            if (pending_buffers[b]) {
-                                dbis[w_count].buffer = pending_buffers[b]->buffer;
-                                dbis[w_count].offset = 0;
-                                dbis[w_count].range = VK_WHOLE_SIZE;
+                            VkBufferWrapper* target = pending_buffers[b] ? pending_buffers[b] : fallback;
+                            if (target) {
+                                dbis[b].buffer = target->buffer;
+                                dbis[b].offset = 0;
+                                dbis[b].range = VK_WHOLE_SIZE;
                                 
-                                writes[w_count].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-                                writes[w_count].pNext = NULL;
-                                writes[w_count].dstSet = set;
-                                writes[w_count].dstBinding = b;
-                                writes[w_count].dstArrayElement = 0;
-                                writes[w_count].descriptorCount = 1;
-                                writes[w_count].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
-                                writes[w_count].pImageInfo = NULL;
-                                writes[w_count].pBufferInfo = &dbis[w_count];
-                                writes[w_count].pTexelBufferView = NULL;
-                                w_count++;
+                                writes[b].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+                                writes[b].pNext = NULL;
+                                writes[b].dstSet = set;
+                                writes[b].dstBinding = b;
+                                writes[b].dstArrayElement = 0;
+                                writes[b].descriptorCount = 1;
+                                writes[b].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+                                writes[b].pImageInfo = NULL;
+                                writes[b].pBufferInfo = &dbis[b];
+                                writes[b].pTexelBufferView = NULL;
                             }
                         }
-                        if (w_count > 0) vkUpdateDescriptorSets(state->device, w_count, writes, 0, NULL);
-                        vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, state->pipeline_layout, 1, 1, &set, 0, NULL);
+                        // Always update 4 bindings because the layout requires it
+                        vkUpdateDescriptorSets(state->device, 4, writes, 0, NULL);
+                        
+                        // Use current_layout!
+                        vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, current_layout, 1, 1, &set, 0, NULL);
+                    } else {
+                        LOG_ERROR("Vulkan: Failed to allocate frame descriptor set!");
                     }
                     bindings_dirty = false;
                 }
                 
+                LOG_DEBUG("Vulkan: DrawIndexed IndexCount=%d InstanceCount=%d", rc->draw_indexed.index_count, rc->draw_indexed.instance_count);
                 if (rc->type == RENDER_CMD_DRAW) {
+                    // LOG_TRACE("Draw: %d verts, %d insts", rc->draw.vertex_count, rc->draw.instance_count);
                     vkCmdDraw(cmd, rc->draw.vertex_count, rc->draw.instance_count, rc->draw.first_vertex, rc->draw.first_instance);
                 } else {
                     vkCmdDrawIndexed(cmd, rc->draw_indexed.index_count, rc->draw_indexed.instance_count, rc->draw_indexed.first_index, rc->draw_indexed.vertex_offset, rc->draw_indexed.first_instance);

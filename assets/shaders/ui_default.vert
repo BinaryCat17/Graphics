@@ -7,9 +7,9 @@ struct GpuInstanceData {
     mat4 model;
     vec4 color;
     vec4 uv_rect;
-    vec4 params;
-    vec4 extra; // Used for Curve Data (P0, P3)
-    vec4 clip_rect; // x,y,w,h (World/Screen Space)
+    vec4 params_1;
+    vec4 params_2;
+    vec4 clip_rect;
 };
 
 layout(std140, set = 1, binding = 0) readonly buffer InstanceBuffer {
@@ -24,32 +24,32 @@ layout(location = 0) out vec4 fragColor;
 layout(location = 1) out vec2 fragUV;
 layout(location = 2) out vec4 fragParams;
 layout(location = 3) out vec4 fragExtra;
-layout(location = 4) out flat vec4 fragClipRect; // Must be flat
+layout(location = 4) out flat vec4 fragClipRect;
 layout(location = 5) out vec3 fragWorldPos;
 layout(location = 6) out vec2 fragOrigUV;
 layout(location = 7) out vec4 fragUVRect;
 layout(location = 8) out vec2 fragTargetSize;
 
 void main() {
-    GpuInstanceData obj = instances.objects[gl_InstanceIndex];
+    GpuInstanceData inst = instances.objects[gl_InstanceIndex];
     
-    vec4 worldPos = obj.model * vec4(inPosition, 1.0);
-    gl_Position = pc.view_proj * worldPos;
+    // Transform Position
+    vec4 world_pos = inst.model * vec4(inPosition, 1.0);
+    gl_Position = pc.view_proj * world_pos;
     
-    fragColor = obj.color;
-    fragParams = obj.params;
-    fragExtra = obj.extra;
-    fragClipRect = obj.clip_rect;
-    fragWorldPos = worldPos.xyz;
-    fragOrigUV = inUV;
-    fragUVRect = obj.uv_rect;
+    // Pass Data to Fragment
+    fragColor = inst.color;
     
-    // Extract scale from model matrix for 9-slice target size
-    fragTargetSize = vec2(
-        length(vec3(obj.model[0][0], obj.model[0][1], obj.model[0][2])),
-        length(vec3(obj.model[1][0], obj.model[1][1], obj.model[1][2]))
-    );
+    // UV Calculation
+    // inUV is 0..1. Map to uv_rect.
+    // uv_rect = (u, v, w, h)
+    fragUV = inst.uv_rect.xy + inUV * inst.uv_rect.zw;
+    fragOrigUV = inUV; // 0..1 for SDF
+    fragUVRect = inst.uv_rect;
     
-    // Transform UV
-    fragUV = inUV * obj.uv_rect.zw + obj.uv_rect.xy;
+    fragParams = inst.params_1;
+    fragExtra = inst.params_2;
+    fragClipRect = inst.clip_rect;
+    fragWorldPos = world_pos.xyz;
+    fragTargetSize = vec2(inst.model[0][0], inst.model[1][1]); // Extract scale X/Y
 }
