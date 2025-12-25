@@ -153,7 +153,11 @@ target_include_directories(engine_text PUBLIC "src/" ${Stb_INCLUDE_DIR})
 target_link_libraries(engine_text PUBLIC foundation_platform foundation_logger engine_scene)
 
 # Assets
-set(ENGINE_ASSETS_SOURCES "src/engine/assets/assets.c")
+set(ENGINE_ASSETS_SOURCES
+    "src/engine/assets/assets.c"
+    "src/engine/assets/internal/asset_storage.c"
+    "src/engine/assets/internal/asset_loader.c"
+)
 add_library(engine_assets STATIC ${ENGINE_ASSETS_SOURCES})
 target_include_directories(engine_assets PUBLIC "src/")
 target_link_libraries(engine_assets PUBLIC foundation_platform foundation_config engine_scene)
@@ -165,9 +169,9 @@ set(ENGINE_GRAPHICS_SOURCES
     "src/engine/graphics/internal/backend/vulkan/vk_utils.c"
     "src/engine/graphics/internal/backend/vulkan/vk_buffer.c"
     "src/engine/graphics/internal/backend/vulkan/vk_context.c"
-    "src/engine/graphics/internal/resources/stream.c"
-    "src/engine/graphics/internal/resources/gpu_input.c"
-    "src/engine/graphics/internal/compute/compute_graph.c"
+    "src/engine/graphics/stream.c"
+    "src/engine/graphics/gpu_input.c"
+    "src/engine/graphics/compute_graph.c"
     "src/engine/graphics/internal/backend/vulkan/vk_swapchain.c"
     "src/engine/graphics/internal/backend/vulkan/vk_pipeline.c"
     "src/engine/graphics/internal/backend/vulkan/vk_resources.c"

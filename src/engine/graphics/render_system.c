@@ -1,7 +1,7 @@
 #include "engine/graphics/render_system.h"
+#include "engine/scene/render_packet.h"
 #include "engine/assets/assets.h"
-#include "engine/graphics/internal/render_frame_packet.h"
-#include "engine/graphics/internal/resources/primitives.h"
+#include "engine/graphics/internal/primitives.h"
 #include "engine/graphics/graphics_types.h"
 #include "foundation/logger/logger.h"
 
