@@ -38,7 +38,7 @@ static void end_single_time_commands(VulkanRendererState* state, VkCommandBuffer
     vkFreeCommandBuffers(state->device, state->cmdpool, 1, &cb);
 }
 
-static void transition_image_layout(VulkanRendererState* state, VkImage image, VkImageLayout oldLayout, VkImageLayout newLayout) {
+void vk_transition_image_layout(VulkanRendererState* state, VkImage image, VkImageLayout oldLayout, VkImageLayout newLayout) {
     VkCommandBuffer cb = begin_single_time_commands(state);
     VkImageMemoryBarrier barrier = { .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER, .oldLayout = oldLayout, .newLayout = newLayout, .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED, .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED, .image = image, .subresourceRange = { .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT, .baseMipLevel = 0, .levelCount = 1, .baseArrayLayer = 0, .layerCount = 1 } };
     VkPipelineStageFlags src_stage = VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
@@ -130,9 +130,9 @@ void vk_create_font_texture(VulkanRendererState* state) {
     vk_create_buffer(state, width * height, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, &staging, &staging_mem);
     void* mapped = NULL; vkMapMemory(state->device, staging_mem, 0, VK_WHOLE_SIZE, 0, &mapped); memcpy(mapped, pixels, width * height); vkUnmapMemory(state->device, staging_mem);
 
-    transition_image_layout(state, state->font_image, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
+    vk_transition_image_layout(state, state->font_image, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
     copy_buffer_to_image(state, staging, state->font_image, (uint32_t)width, (uint32_t)height);
-    transition_image_layout(state, state->font_image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+    vk_transition_image_layout(state, state->font_image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
 
     vkDestroyBuffer(state->device, staging, NULL);
     vkFreeMemory(state->device, staging_mem, NULL);
@@ -239,7 +239,7 @@ void vk_ensure_compute_target(VulkanRendererState* state, int width, int height)
     if (state->res != VK_SUCCESS) fatal_vk("vkCreateImageView (compute)", state->res);
 
     // Transition to General (ready for compute write)
-    transition_image_layout(state, state->compute_target_image, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_GENERAL);
+    vk_transition_image_layout(state, state->compute_target_image, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_GENERAL);
     
     // Update Descriptor Set 2 to point to this new view
     if (state->compute_target_descriptor) {

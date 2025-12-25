@@ -149,6 +149,22 @@ typedef struct VulkanRendererState {
         struct VkBufferWrapper* buffer;
     } graphics_bindings[MAX_COMPUTE_BINDINGS];
 
+    // --- Dynamic Textures ---
+#define MAX_DYNAMIC_TEXTURES 64
+    struct {
+        bool active;
+        uint32_t width;
+        uint32_t height;
+        uint32_t format; // 0=RGBA8, 1=RGBA16F, 2=D32
+        
+        VkImage image;
+        VkDeviceMemory memory;
+        VkImageView view;
+        VkSampler sampler;
+        
+        VkDescriptorSet descriptor; // (Optional) Cached descriptor for sampling
+    } textures[MAX_DYNAMIC_TEXTURES];
+
 } VulkanRendererState;
 
 #endif // VK_TYPES_H

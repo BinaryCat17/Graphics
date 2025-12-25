@@ -40,13 +40,81 @@ void scene_renderer_init(RenderSystem* rs) {
     render_system_register_pass(rs, "RenderScene", scene_render_pass);
 }
 
+// Helper to clear existing resources
+static void free_pipeline_resources(RenderSystem* sys) {
+    for (int i = 0; i < PIPELINE_MAX_RESOURCES; ++i) {
+        if (sys->pipeline_resources[i].handle > 0) {
+            // Check type from def
+            if (sys->pipeline_def.resources[i].type == PIPELINE_RESOURCE_IMAGE_2D) {
+                if (sys->backend && sys->backend->texture_destroy) {
+                    sys->backend->texture_destroy(sys->backend, sys->pipeline_resources[i].handle);
+                }
+            } else if (sys->pipeline_def.resources[i].type == PIPELINE_RESOURCE_BUFFER) {
+                if (sys->pipeline_resources[i].stream_ptr) {
+                    stream_destroy((Stream*)sys->pipeline_resources[i].stream_ptr);
+                }
+            }
+        }
+        sys->pipeline_resources[i].handle = 0;
+        sys->pipeline_resources[i].stream_ptr = NULL;
+    }
+}
+
+// Helper to create resources
+static void create_pipeline_resources(RenderSystem* sys) {
+    PlatformWindowSize size = platform_get_framebuffer_size(sys->window);
+    
+    for (uint32_t i = 0; i < sys->pipeline_def.resource_count; ++i) {
+        PipelineResourceDef* res = &sys->pipeline_def.resources[i];
+        
+        if (res->type == PIPELINE_RESOURCE_IMAGE_2D) {
+            uint32_t w = res->fixed_width > 0 ? res->fixed_width : (uint32_t)((float)size.width * res->scale_x);
+            uint32_t h = res->fixed_height > 0 ? res->fixed_height : (uint32_t)((float)size.height * res->scale_y);
+            if (w == 0) w = 1;
+            if (h == 0) h = 1;
+            
+            // Map format to backend int (0=RGBA8, 1=RGBA16F, 2=D32)
+            // Just assume RGBA8 for now unless specifically extended
+            uint32_t fmt = 0; 
+            if (res->format == PIXEL_FORMAT_RGBA16_FLOAT) fmt = 1;
+            else if (res->format == PIXEL_FORMAT_D32_SFLOAT) fmt = 2;
+
+            if (sys->backend && sys->backend->texture_create) {
+                sys->pipeline_resources[i].handle = sys->backend->texture_create(sys->backend, w, h, fmt);
+                LOG_INFO("RenderSystem: Created Texture '%s' (%dx%d) -> ID %u", res->name, w, h, sys->pipeline_resources[i].handle);
+            }
+        } 
+        else if (res->type == PIPELINE_RESOURCE_BUFFER) {
+            // Buffer creation logic (Size is tricky, might need scale)
+             uint32_t sz = res->fixed_width; // HACK: reusing width field for size bytes if needed
+             if (sz == 0) sz = 1024 * 1024; // Default 1MB
+             
+             Stream* s = stream_create(sys, STREAM_CUSTOM, 1, sz);
+             if (s) {
+                 sys->pipeline_resources[i].stream_ptr = s;
+                 sys->pipeline_resources[i].handle = 1; // Mark as exists
+                 LOG_INFO("RenderSystem: Created Buffer '%s' (%u bytes)", res->name, sz);
+             }
+        }
+    }
+}
+
 void render_system_set_pipeline(RenderSystem* sys, const char* path) {
     if (!sys || !path || !sys->assets) return;
     
     PipelineDefinition def;
     if (pipeline_loader_load(sys->assets, path, &def)) {
+        // Free old
+        free_pipeline_resources(sys);
+        
         sys->pipeline_def = def;
         sys->pipeline_dirty = true;
+        
+        // Create new
+        if (sys->renderer_ready) {
+            create_pipeline_resources(sys);
+        }
+        
         LOG_INFO("RenderSystem: Pipeline updated from '%s'", path);
     }
 }
@@ -425,17 +493,26 @@ void render_system_execute_batches_with_tag(RenderSystem* sys, const RenderBatch
 }
 
 static uint32_t render_system_resolve_resource(RenderSystem* sys, const char* name) {
-    (void)sys;
-    if (!name || name[0] == '\0') return (uint32_t)-1;
+    if (!sys || !name || name[0] == '\0') return (uint32_t)-1;
     if (strcmp(name, "swapchain") == 0) return 0;
     
-    // For now, we only support swapchain. 
-    // Real resource management (Step 5) will be added next.
+    // Look up in pipeline resources
+    for (uint32_t i = 0; i < sys->pipeline_def.resource_count; ++i) {
+        if (strcmp(sys->pipeline_def.resources[i].name, name) == 0) {
+            return sys->pipeline_resources[i].handle;
+        }
+    }
+    
     return (uint32_t)-1;
 }
 
 void render_system_draw(RenderSystem* sys) {
     if (!sys || !sys->renderer_ready || !sys->backend) return;
+    
+    // Lazy Init Resources if not done (e.g. if renderer wasn't ready during set_pipeline)
+    if (sys->pipeline_def.resource_count > 0 && sys->pipeline_resources[0].handle == 0 && sys->pipeline_def.resources[0].type == PIPELINE_RESOURCE_IMAGE_2D) {
+         create_pipeline_resources(sys);
+    }
     
     const RenderFramePacket* packet = render_system_acquire_packet(sys);
     if (!packet) return;
@@ -468,6 +545,9 @@ void render_system_draw(RenderSystem* sys) {
         // Execute via Pipeline Definition
         for (uint32_t i = 0; i < sys->pipeline_def.pass_count; ++i) {
             PipelinePassDef* pass = &sys->pipeline_def.passes[i];
+            
+            // Resolve Inputs (Bind them)
+            // TODO: Bind inputs to descriptor slots if needed (e.g. for Compute)
             
             // Resolve Output (assume first output for now)
             uint32_t target_id = 0;
@@ -511,8 +591,29 @@ void render_system_draw(RenderSystem* sys) {
 
 
 void render_system_resize(RenderSystem* sys, int width, int height) {
-    if (sys && sys->backend && sys->backend->update_viewport) {
+    if (!sys) return;
+    
+    // Resize backend (swapchain)
+    if (sys->backend && sys->backend->update_viewport) {
         sys->backend->update_viewport(sys->backend, width, height);
+    }
+    
+    // Resize Pipeline Resources
+    for (uint32_t i = 0; i < sys->pipeline_def.resource_count; ++i) {
+        PipelineResourceDef* res = &sys->pipeline_def.resources[i];
+        if (res->type == PIPELINE_RESOURCE_IMAGE_2D) {
+            // Only resize if it's window-relative
+            if (res->scale_x > 0.0f || res->scale_y > 0.0f) {
+                uint32_t w = res->fixed_width > 0 ? res->fixed_width : (uint32_t)((float)width * res->scale_x);
+                uint32_t h = res->fixed_height > 0 ? res->fixed_height : (uint32_t)((float)height * res->scale_y);
+                if (w == 0) w = 1;
+                if (h == 0) h = 1;
+                
+                if (sys->pipeline_resources[i].handle > 0 && sys->backend && sys->backend->texture_resize) {
+                    sys->backend->texture_resize(sys->backend, sys->pipeline_resources[i].handle, w, h);
+                }
+            }
+        }
     }
 }
 

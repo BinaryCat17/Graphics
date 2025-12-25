@@ -598,6 +598,223 @@ static void vulkan_graphics_draw(RendererBackend* backend, uint32_t pipeline_id,
     (void)backend; (void)pipeline_id; (void)vertex_count; (void)instance_count;
 }
 
+// --- Dynamic Texture Management ---
+
+static void vk_create_texture_internal(VulkanRendererState* state, int slot, uint32_t w, uint32_t h, uint32_t fmt) {
+    // 1. Format Mapping
+    VkFormat vk_fmt = VK_FORMAT_R8G8B8A8_UNORM;
+    VkImageUsageFlags usage = VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
+    VkImageAspectFlags aspect = VK_IMAGE_ASPECT_COLOR_BIT;
+    
+    if (fmt == 1) { // RGBA16F
+        vk_fmt = VK_FORMAT_R16G16B16A16_SFLOAT;
+        usage |= VK_IMAGE_USAGE_STORAGE_BIT; // Compute Write capable
+    } else if (fmt == 2) { // D32
+        vk_fmt = VK_FORMAT_D32_SFLOAT;
+        usage = VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT; // Depth Attachment
+        aspect = VK_IMAGE_ASPECT_DEPTH_BIT;
+    } else {
+        // RGBA8 (Default)
+        usage |= VK_IMAGE_USAGE_STORAGE_BIT; // Also allow Compute Write
+    }
+
+    // 2. Image
+    VkImageCreateInfo ici = { 
+        .sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO, 
+        .imageType = VK_IMAGE_TYPE_2D, 
+        .format = vk_fmt, 
+        .extent = { w, h, 1 }, 
+        .mipLevels = 1, 
+        .arrayLayers = 1, 
+        .samples = VK_SAMPLE_COUNT_1_BIT, 
+        .tiling = VK_IMAGE_TILING_OPTIMAL, 
+        .usage = usage, 
+        .sharingMode = VK_SHARING_MODE_EXCLUSIVE, 
+        .initialLayout = VK_IMAGE_LAYOUT_UNDEFINED 
+    };
+    
+    if (vkCreateImage(state->device, &ici, NULL, &state->textures[slot].image) != VK_SUCCESS) {
+        LOG_ERROR("Failed to create texture image");
+        return;
+    }
+    
+    // 3. Memory
+    VkMemoryRequirements mr; 
+    vkGetImageMemoryRequirements(state->device, state->textures[slot].image, &mr);
+    VkMemoryAllocateInfo mai = { 
+        .sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO, 
+        .allocationSize = mr.size, 
+        .memoryTypeIndex = find_mem_type(state->physical_device, mr.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT) 
+    };
+    
+    if (vkAllocateMemory(state->device, &mai, NULL, &state->textures[slot].memory) != VK_SUCCESS) {
+        LOG_ERROR("Failed to allocate texture memory");
+        return;
+    }
+    vkBindImageMemory(state->device, state->textures[slot].image, state->textures[slot].memory, 0);
+
+    // 4. View
+    VkImageViewCreateInfo ivci = { 
+        .sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO, 
+        .image = state->textures[slot].image, 
+        .viewType = VK_IMAGE_VIEW_TYPE_2D, 
+        .format = vk_fmt, 
+        .subresourceRange = { .aspectMask = aspect, .baseMipLevel = 0, .levelCount = 1, .baseArrayLayer = 0, .layerCount = 1 } 
+    };
+    if (vkCreateImageView(state->device, &ivci, NULL, &state->textures[slot].view) != VK_SUCCESS) {
+         LOG_ERROR("Failed to create texture view");
+         return;
+    }
+
+    // 5. Sampler (Default Linear)
+    // Only create sampler if not Depth (Depth usually sampled with specific samplers or point)
+    // For now, use linear everywhere.
+    VkSamplerCreateInfo sci = { 
+        .sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO, 
+        .magFilter = VK_FILTER_LINEAR, .minFilter = VK_FILTER_LINEAR, 
+        .addressModeU = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE, 
+        .addressModeV = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE, 
+        .addressModeW = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE, 
+        .borderColor = VK_BORDER_COLOR_INT_OPAQUE_BLACK, 
+        .unnormalizedCoordinates = VK_FALSE, 
+        .mipmapMode = VK_SAMPLER_MIPMAP_MODE_NEAREST 
+    };
+    vkCreateSampler(state->device, &sci, NULL, &state->textures[slot].sampler);
+
+    // 6. Initial Transition
+    if (aspect == VK_IMAGE_ASPECT_COLOR_BIT) {
+        // Transition to General for flexible usage (Compute Write or Read)
+        vk_transition_image_layout(state, state->textures[slot].image, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_GENERAL);
+    } else {
+        // Depth
+         // Usually undefined -> DepthAttachmentOptimal
+         // But here we transition to ShaderReadOnly if we want to sample it? 
+         // Let's leave it undefined, the RenderPass will handle Layout transitions via Attachments.
+    }
+    
+    state->textures[slot].active = true;
+    state->textures[slot].width = w;
+    state->textures[slot].height = h;
+    state->textures[slot].format = fmt;
+}
+
+static uint32_t vulkan_texture_create(RendererBackend* backend, uint32_t width, uint32_t height, uint32_t format) {
+    VulkanRendererState* state = (VulkanRendererState*)backend->state;
+    
+    int slot = -1;
+    for(int i=0; i<MAX_DYNAMIC_TEXTURES; ++i) {
+        if (!state->textures[i].active) {
+            slot = i;
+            break;
+        }
+    }
+    
+    if (slot == -1) {
+        LOG_ERROR("Max dynamic textures reached (%d)", MAX_DYNAMIC_TEXTURES);
+        return 0;
+    }
+    
+    vk_create_texture_internal(state, slot, width, height, format);
+    return (uint32_t)(slot + 1);
+}
+
+static void vulkan_texture_destroy(RendererBackend* backend, uint32_t handle) {
+    VulkanRendererState* state = (VulkanRendererState*)backend->state;
+    if (handle == 0 || handle > MAX_DYNAMIC_TEXTURES) return;
+    
+    int idx = (int)handle - 1;
+    if (state->textures[idx].active) {
+        vkDeviceWaitIdle(state->device); // Safety wait
+        
+        if (state->textures[idx].view) vkDestroyImageView(state->device, state->textures[idx].view, NULL);
+        if (state->textures[idx].image) vkDestroyImage(state->device, state->textures[idx].image, NULL);
+        if (state->textures[idx].memory) vkFreeMemory(state->device, state->textures[idx].memory, NULL);
+        if (state->textures[idx].sampler) vkDestroySampler(state->device, state->textures[idx].sampler, NULL);
+        
+        // Note: We don't free the cached descriptor set because it's allocated from a pool 
+        // that we might reset or it's just one set. 
+        // A proper implementation would free the descriptor set or use a dynamic pool.
+        // For MVP, we leak the descriptor handle (not memory, pool recycles it eventually if we reset pool).
+        // Actually we don't reset the global pool. So this is a minor leak of slots in the pool.
+        
+        memset(&state->textures[idx], 0, sizeof(state->textures[idx]));
+    }
+}
+
+static void vulkan_texture_resize(RendererBackend* backend, uint32_t handle, uint32_t width, uint32_t height) {
+    VulkanRendererState* state = (VulkanRendererState*)backend->state;
+    if (handle == 0 || handle > MAX_DYNAMIC_TEXTURES) return;
+    
+    int idx = (int)handle - 1;
+    if (state->textures[idx].active) {
+        if (state->textures[idx].width == width && state->textures[idx].height == height) return;
+        
+        // Recreate
+        uint32_t fmt = state->textures[idx].format;
+        vulkan_texture_destroy(backend, handle);
+        vk_create_texture_internal(state, idx, width, height, fmt);
+        
+        // Update Descriptor if it exists
+        if (state->textures[idx].descriptor) {
+             VkDescriptorImageInfo dii = { 
+                .sampler = state->textures[idx].sampler, 
+                .imageView = state->textures[idx].view, 
+                .imageLayout = VK_IMAGE_LAYOUT_GENERAL // Assuming General for now
+            };
+            VkWriteDescriptorSet w = { 
+                .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET, 
+                .dstSet = state->textures[idx].descriptor, 
+                .dstBinding = 0, 
+                .descriptorCount = 1, 
+                .descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 
+                .pImageInfo = &dii 
+            };
+            vkUpdateDescriptorSets(state->device, 1, &w, 0, NULL);
+        }
+    }
+}
+
+static void* vulkan_texture_get_descriptor(RendererBackend* backend, uint32_t handle) {
+    VulkanRendererState* state = (VulkanRendererState*)backend->state;
+    if (handle == 0 || handle > MAX_DYNAMIC_TEXTURES) return NULL;
+    
+    int idx = (int)handle - 1;
+    if (!state->textures[idx].active) return NULL;
+    
+    if (state->textures[idx].descriptor) return (void*)state->textures[idx].descriptor;
+    
+    // Allocate new descriptor (Set 2 compatible layout)
+    VkDescriptorSetAllocateInfo dsai = { 
+        .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO, 
+        .descriptorPool = state->descriptor_pool, 
+        .descriptorSetCount = 1, 
+        .pSetLayouts = &state->descriptor_layout // Default Layout (1 Sampler)
+    };
+    
+    if (vkAllocateDescriptorSets(state->device, &dsai, &state->textures[idx].descriptor) != VK_SUCCESS) {
+        LOG_ERROR("Failed to allocate texture descriptor");
+        return NULL;
+    }
+    
+    // Update
+    VkDescriptorImageInfo dii = { 
+        .sampler = state->textures[idx].sampler, 
+        .imageView = state->textures[idx].view, 
+        .imageLayout = VK_IMAGE_LAYOUT_GENERAL 
+    };
+    VkWriteDescriptorSet w = { 
+        .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET, 
+        .dstSet = state->textures[idx].descriptor, 
+        .dstBinding = 0, 
+        .descriptorCount = 1, 
+        .descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 
+        .pImageInfo = &dii 
+    };
+    vkUpdateDescriptorSets(state->device, 1, &w, 0, NULL);
+    
+    return (void*)state->textures[idx].descriptor;
+}
+
 static void vulkan_renderer_submit_commands(RendererBackend* backend, const RenderCommandList* list) {
     VulkanRendererState* state = (VulkanRendererState*)backend->state;
     if (!state || !list) return;
@@ -973,6 +1190,11 @@ RendererBackend* vulkan_renderer_backend(void) {
     backend->graphics_pipeline_destroy = vulkan_graphics_pipeline_destroy;
     backend->graphics_bind_buffer = vulkan_graphics_bind_buffer;
     backend->graphics_draw = vulkan_graphics_draw;
+
+    backend->texture_create = vulkan_texture_create;
+    backend->texture_destroy = vulkan_texture_destroy;
+    backend->texture_resize = vulkan_texture_resize;
+    backend->texture_get_descriptor = vulkan_texture_get_descriptor;
 
     return backend;
 }

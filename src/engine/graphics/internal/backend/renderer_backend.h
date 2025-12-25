@@ -102,6 +102,18 @@ typedef struct RendererBackend {
     // Uses the bound pipeline and buffers.
     void (*graphics_draw)(struct RendererBackend* backend, uint32_t pipeline_id, uint32_t vertex_count, uint32_t instance_count);
 
+    // --- Texture Management ---
+    // Create a texture/image resource. 
+    // format: 0=RGBA8 (Default), 1=RGBA16F, 2=D32
+    // Returns a handle > 0.
+    uint32_t (*texture_create)(struct RendererBackend* backend, uint32_t width, uint32_t height, uint32_t format);
+    void (*texture_destroy)(struct RendererBackend* backend, uint32_t handle);
+    void (*texture_resize)(struct RendererBackend* backend, uint32_t handle, uint32_t width, uint32_t height);
+    
+    // Get the descriptor set for this texture (to bind it as a sampler)
+    // Returns a pointer to the internal descriptor set (VkDescriptorSet* cast to void*)
+    void* (*texture_get_descriptor)(struct RendererBackend* backend, uint32_t handle);
+
 } RendererBackend;
 
 // Registry / Factory

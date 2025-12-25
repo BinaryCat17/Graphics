@@ -50,6 +50,12 @@ struct RenderSystem {
     PipelineDefinition pipeline_def;
     bool pipeline_dirty;
     
+    // Runtime Resources (Map 1:1 with pipeline_def.resources)
+    struct {
+        uint32_t handle; // Backend handle (Texture ID or Buffer ID)
+        void* stream_ptr; // For Buffers (Stream*)
+    } pipeline_resources[PIPELINE_MAX_RESOURCES];
+    
     bool running;
     bool renderer_ready;
     double current_time;
