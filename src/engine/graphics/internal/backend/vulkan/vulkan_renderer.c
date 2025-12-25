@@ -22,6 +22,33 @@
 #include <string.h>
 #include <math.h>
 
+// --- Async Screenshot Worker ---
+
+typedef struct ScreenshotTask {
+    char path[256];
+    int width;
+    int height;
+    void* data;
+} ScreenshotTask;
+
+static int screenshot_thread_func(void* arg) {
+    ScreenshotTask* task = (ScreenshotTask*)arg;
+    if (!task) return 1;
+
+    // Swizzle BGRA -> RGBA (assuming standard swapchain format)
+    image_swizzle_bgra_to_rgba((uint8_t*)task->data, task->width * task->height);
+    
+    if (image_write_png(task->path, task->width, task->height, 4, task->data, 0)) {
+        LOG_INFO("Screenshot saved: %s", task->path);
+    } else {
+        LOG_ERROR("Failed to save screenshot: %s", task->path);
+    }
+    
+    free(task->data);
+    free(task);
+    return 0;
+}
+
 static void vulkan_renderer_request_screenshot(RendererBackend* backend, const char* filepath) {
     VulkanRendererState* state = (VulkanRendererState*)backend->state;
     if (!state || !filepath) return;
@@ -853,22 +880,38 @@ static void vulkan_renderer_submit_commands(RendererBackend* backend, const Rend
     
     vkQueueSubmit(state->queue, 1, &submit_info, state->fences[state->current_frame_cursor]);
     
-    // Save Screenshot (Stall CPU)
+    // Save Screenshot (Async)
     if (capturing_screenshot) {
         vkWaitForFences(state->device, 1, &state->fences[state->current_frame_cursor], VK_TRUE, UINT64_MAX);
         
-        void* data;
-        vkMapMemory(state->device, screenshot_memory, 0, VK_WHOLE_SIZE, 0, &data);
+        void* mapped_data;
+        vkMapMemory(state->device, screenshot_memory, 0, VK_WHOLE_SIZE, 0, &mapped_data);
         
-        VkFormat fmt = state->swapchain_format;
-        if (fmt == VK_FORMAT_B8G8R8A8_SRGB || fmt == VK_FORMAT_B8G8R8A8_UNORM || fmt == VK_FORMAT_B8G8R8A8_SNORM) {
-            image_swizzle_bgra_to_rgba((uint8_t*)data, state->swapchain_extent.width * state->swapchain_extent.height);
-        }
-        
-        if (image_write_png(state->screenshot_path, state->swapchain_extent.width, state->swapchain_extent.height, 4, data, 0)) {
-            LOG_INFO("Screenshot saved: %s", state->screenshot_path);
-        } else {
-            LOG_ERROR("Failed to save screenshot: %s", state->screenshot_path);
+        // Copy to CPU buffer
+        VkDeviceSize data_size = state->swapchain_extent.width * state->swapchain_extent.height * 4;
+        void* cpu_data = malloc(data_size);
+        if (cpu_data) {
+            memcpy(cpu_data, mapped_data, data_size);
+            
+            // Spawn Thread
+            ScreenshotTask* task = malloc(sizeof(ScreenshotTask));
+            if (task) {
+                platform_strncpy(task->path, state->screenshot_path, sizeof(task->path) - 1);
+                task->width = state->swapchain_extent.width;
+                task->height = state->swapchain_extent.height;
+                task->data = cpu_data;
+                
+                Thread* t = thread_create(screenshot_thread_func, task);
+                if (t) {
+                    thread_detach(t);
+                } else {
+                    LOG_ERROR("Failed to create screenshot thread");
+                    free(task);
+                    free(cpu_data);
+                }
+            } else {
+                free(cpu_data);
+            }
         }
         
         vkUnmapMemory(state->device, screenshot_memory);
