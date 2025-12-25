@@ -778,11 +778,65 @@ static void vulkan_renderer_submit_commands(RendererBackend* backend, const Rend
     
     vkCmdEndRenderPass(cmd);
 
-    // Handle Screenshot Logic (Partial Duplicate of render_scene)
-    if (state->screenshot_pending) {
-         // Minimal screenshot support for now: just clear flag to avoid hanging
-         state->screenshot_pending = false; 
-         // TODO: Port full screenshot logic
+    // Handle Screenshot Logic
+    VkBuffer screenshot_buffer = VK_NULL_HANDLE;
+    VkDeviceMemory screenshot_memory = VK_NULL_HANDLE;
+    bool capturing_screenshot = state->screenshot_pending;
+
+    if (capturing_screenshot) {
+        state->screenshot_pending = false; // Clear flag
+        
+        VkDeviceSize size = state->swapchain_extent.width * state->swapchain_extent.height * 4;
+        
+        // 1. Create Buffer
+        VkBufferCreateInfo bci = {
+            .sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO,
+            .size = size,
+            .usage = VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+            .sharingMode = VK_SHARING_MODE_EXCLUSIVE
+        };
+        vkCreateBuffer(state->device, &bci, NULL, &screenshot_buffer);
+        
+        VkMemoryRequirements mem_reqs;
+        vkGetBufferMemoryRequirements(state->device, screenshot_buffer, &mem_reqs);
+        
+        VkMemoryAllocateInfo alloc_info = {
+            .sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO,
+            .allocationSize = mem_reqs.size,
+            .memoryTypeIndex = find_mem_type(state->physical_device, mem_reqs.memoryTypeBits, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT)
+        };
+        vkAllocateMemory(state->device, &alloc_info, NULL, &screenshot_memory);
+        vkBindBufferMemory(state->device, screenshot_buffer, screenshot_memory, 0);
+        
+        // 2. Transition Swapchain to TRANSFER_SRC
+        VkImageMemoryBarrier barrier = {
+            .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
+            .oldLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR,
+            .newLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+            .srcAccessMask = VK_ACCESS_MEMORY_READ_BIT,
+            .dstAccessMask = VK_ACCESS_TRANSFER_READ_BIT,
+            .image = state->swapchain_imgs[image_index],
+            .subresourceRange = { VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1 }
+        };
+        vkCmdPipelineBarrier(cmd, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, 0, 0, NULL, 0, NULL, 1, &barrier);
+        
+        // 3. Copy
+        VkBufferImageCopy region = {
+            .bufferOffset = 0,
+            .bufferRowLength = 0,
+            .bufferImageHeight = 0,
+            .imageSubresource = { VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1 },
+            .imageOffset = {0, 0, 0},
+            .imageExtent = {state->swapchain_extent.width, state->swapchain_extent.height, 1}
+        };
+        vkCmdCopyImageToBuffer(cmd, state->swapchain_imgs[image_index], VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, screenshot_buffer, 1, &region);
+        
+        // 4. Transition back to PRESENT_SRC
+        barrier.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
+        barrier.newLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
+        barrier.srcAccessMask = VK_ACCESS_TRANSFER_READ_BIT;
+        barrier.dstAccessMask = VK_ACCESS_MEMORY_READ_BIT;
+        vkCmdPipelineBarrier(cmd, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, 0, 0, NULL, 0, NULL, 1, &barrier);
     }
 
     vkEndCommandBuffer(cmd);
@@ -799,6 +853,29 @@ static void vulkan_renderer_submit_commands(RendererBackend* backend, const Rend
     
     vkQueueSubmit(state->queue, 1, &submit_info, state->fences[state->current_frame_cursor]);
     
+    // Save Screenshot (Stall CPU)
+    if (capturing_screenshot) {
+        vkWaitForFences(state->device, 1, &state->fences[state->current_frame_cursor], VK_TRUE, UINT64_MAX);
+        
+        void* data;
+        vkMapMemory(state->device, screenshot_memory, 0, VK_WHOLE_SIZE, 0, &data);
+        
+        VkFormat fmt = state->swapchain_format;
+        if (fmt == VK_FORMAT_B8G8R8A8_SRGB || fmt == VK_FORMAT_B8G8R8A8_UNORM || fmt == VK_FORMAT_B8G8R8A8_SNORM) {
+            image_swizzle_bgra_to_rgba((uint8_t*)data, state->swapchain_extent.width * state->swapchain_extent.height);
+        }
+        
+        if (image_write_png(state->screenshot_path, state->swapchain_extent.width, state->swapchain_extent.height, 4, data, 0)) {
+            LOG_INFO("Screenshot saved: %s", state->screenshot_path);
+        } else {
+            LOG_ERROR("Failed to save screenshot: %s", state->screenshot_path);
+        }
+        
+        vkUnmapMemory(state->device, screenshot_memory);
+        vkDestroyBuffer(state->device, screenshot_buffer, NULL);
+        vkFreeMemory(state->device, screenshot_memory, NULL);
+    }
+
     VkPresentInfoKHR present_info = {.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR};
     present_info.waitSemaphoreCount = 1;
     present_info.pWaitSemaphores = &state->sem_render_done;
