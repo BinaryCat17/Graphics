@@ -640,8 +640,13 @@ static void vulkan_renderer_submit_commands(RendererBackend* backend, const Rend
     bool bindings_dirty = false;
     
     // --- Process Commands ---
-    if (list->count > 0) {
+    static double last_log_time = 0.0;
+    double current_time = platform_get_time_ms() / 1000.0;
+    bool should_log = (current_time - last_log_time >= logger_get_trace_interval());
+
+    if (should_log && list->count > 0) {
         LOG_DEBUG("Vulkan: Executing %d commands", list->count);
+        last_log_time = current_time;
     }
 
     for (uint32_t i = 0; i < list->count; ++i) {
@@ -740,7 +745,9 @@ static void vulkan_renderer_submit_commands(RendererBackend* backend, const Rend
                     bindings_dirty = false;
                 }
                 
-                LOG_DEBUG("Vulkan: DrawIndexed IndexCount=%d InstanceCount=%d", rc->draw_indexed.index_count, rc->draw_indexed.instance_count);
+                if (should_log) {
+                    LOG_DEBUG("Vulkan: DrawIndexed IndexCount=%d InstanceCount=%d", rc->draw_indexed.index_count, rc->draw_indexed.instance_count);
+                }
                 if (rc->type == RENDER_CMD_DRAW) {
                     // LOG_TRACE("Draw: %d verts, %d insts", rc->draw.vertex_count, rc->draw.instance_count);
                     vkCmdDraw(cmd, rc->draw.vertex_count, rc->draw.instance_count, rc->draw.first_vertex, rc->draw.first_instance);

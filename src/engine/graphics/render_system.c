@@ -14,7 +14,6 @@
 #include "engine/graphics/internal/backend/renderer_backend.h"
 #include "engine/graphics/internal/backend/vulkan/vulkan_renderer.h"
 #include "engine/graphics/stream.h"
-#include "engine/ui/ui_node.h" // NEW
 #include "engine/graphics/compute_graph.h"
 #include "engine/graphics/internal/render_system_internal.h"
 
@@ -82,10 +81,6 @@ static void try_bootstrap_renderer(RenderSystem* sys) {
             sys->gpu_input_stream = stream_create(sys, STREAM_CUSTOM, 1, sizeof(GpuInputState));
             if (sys->gpu_input_stream) stream_bind_compute(sys->gpu_input_stream, 1);
         }
-        
-        if (!sys->ui_instance_stream) {
-            sys->ui_instance_stream = stream_create(sys, STREAM_CUSTOM, sys->ui_cpu_capacity, sizeof(GpuInstanceData));
-        }
     }
     
     assets_free_file(&vert_shader);
@@ -102,9 +97,6 @@ RenderSystem* render_system_create(const RenderSystemConfig* config) {
     sys->packet_mutex = mutex_create();
     sys->back_packet_index = 1;
     sys->frame_count = 0;
-
-    sys->ui_cpu_capacity = 1024;
-    sys->ui_cpu_buffer = malloc(sizeof(GpuInstanceData) * sys->ui_cpu_capacity);
     
     sys->cmd_list.capacity = 2048;
     sys->cmd_list.commands = malloc(sizeof(RenderCommand) * sys->cmd_list.capacity);
@@ -136,8 +128,6 @@ void render_system_destroy(RenderSystem* sys) {
     }
     
     stream_destroy(sys->gpu_input_stream);
-    stream_destroy(sys->ui_instance_stream);
-    if (sys->ui_cpu_buffer) free(sys->ui_cpu_buffer);
     
     if (sys->cmd_list.commands) free(sys->cmd_list.commands);
 
@@ -221,74 +211,20 @@ void render_system_draw(RenderSystem* sys) {
     if (!packet) return;
     
     Scene* scene = packet->scene;
-    size_t ui_count = 0;
-    const UiNode* ui_nodes = scene_get_ui_nodes(scene, &ui_count);
     
     size_t batch_count = 0;
     const RenderBatch* batches = scene_get_render_batches(scene, &batch_count);
     
+    if (batch_count > 0) {
+        static double last_log_time = 0.0;
+        if (sys->current_time - last_log_time >= logger_get_trace_interval()) {
+            LOG_DEBUG("RenderSystem: Processing %zu batches", batch_count);
+            last_log_time = sys->current_time;
+        }
+    }
+    
     // Reset Command List
     sys->cmd_list.count = 0;
-    
-    // 1. Process UI Nodes -> CPU Instance Buffer
-    if (ui_count > sys->ui_cpu_capacity) {
-        size_t new_cap = ui_count + 1024;
-        GpuInstanceData* new_buf = realloc(sys->ui_cpu_buffer, sizeof(GpuInstanceData) * new_cap);
-        
-        if (new_buf) {
-            sys->ui_cpu_capacity = new_cap;
-            sys->ui_cpu_buffer = new_buf;
-            
-            if (sys->ui_instance_stream) stream_destroy(sys->ui_instance_stream);
-            sys->ui_instance_stream = stream_create(sys, STREAM_CUSTOM, sys->ui_cpu_capacity, sizeof(GpuInstanceData));
-        }
-    }
-    
-    for (size_t i = 0; i < ui_count; ++i) {
-        const UiNode* node = &ui_nodes[i];
-        
-        Mat4 m;
-        // Rect to Transform (Scale + Translate)
-        // Rect is (x, y, w, h). Origin is bottom-left (OpenGL style usually, but check orthographic)
-        // Matrix: Translate(x, y, z) * Scale(w, h, 1)
-        Mat4 s = mat4_scale((Vec3){node->rect.w, node->rect.h, 1.0f});
-        Mat4 t = mat4_translation((Vec3){node->rect.x, node->rect.y, node->z_index});
-        m = mat4_multiply(&t, &s);
-        
-        GpuInstanceData* inst = &sys->ui_cpu_buffer[i];
-        inst->model = m;
-        inst->color = node->color;
-        inst->uv_rect = node->uv_rect;
-        
-        // Packing Params
-        // params_1.x = type
-        inst->params_1.x = (float)node->primitive_type;
-        // params_1.y = corner_radius
-        inst->params_1.y = node->corner_radius;
-        // params_1.z = border_width (or texture_size.x for 9slice)
-        if (node->primitive_type == SCENE_MODE_9_SLICE) {
-            inst->params_1.z = node->texture_size.x;
-            inst->params_1.w = node->texture_size.y;
-            inst->params_2 = node->slice_borders;
-        } else if (node->primitive_type == SCENE_PRIM_CURVE) {
-            // Curves use custom params
-            inst->params_1.y = 1.0f; // Something from old code?
-            inst->params_2 = node->params; // (u1, v1, u2, v2)
-            inst->params_1.z = node->border_width; // Thickness
-            // params_1.w = width/height? Old code had it.
-            // Let's assume the shader uses params_2 mainly.
-            // Recalculating aspect ratio param if needed:
-            if (node->rect.h > 0) inst->params_1.w = node->rect.w / node->rect.h;
-        } else {
-             inst->params_1.z = node->border_width;
-             inst->params_1.w = 0.0f;
-             inst->params_2 = (Vec4){0};
-        }
-        
-        inst->clip_rect = (Vec4){node->clip_rect.x, node->clip_rect.y, node->clip_rect.w, node->clip_rect.h};
-    }
-    
-    // Submit
     
     // Calculate ViewProj
     SceneCamera cam = scene_get_camera(scene);
@@ -303,40 +239,19 @@ void render_system_draw(RenderSystem* sys) {
     
     cmd_list_add(&sys->cmd_list, pc_cmd);
 
-    // 2. Flush UI Batch
-    if (ui_count > 0) {
-         RenderCommand cmd = {0};
-         cmd.type = RENDER_CMD_BIND_PIPELINE;
-         cmd.bind_pipeline.pipeline_id = 0; // Default UI Pipeline
-         cmd_list_add(&sys->cmd_list, cmd);
-         
-         cmd.type = RENDER_CMD_BIND_BUFFER;
-         cmd.bind_buffer.slot = 0;
-         cmd.bind_buffer.stream = sys->ui_instance_stream;
-         cmd_list_add(&sys->cmd_list, cmd);
-         
-         // Upload Data
-         stream_set_data(sys->ui_instance_stream, sys->ui_cpu_buffer, ui_count);
-         
-         cmd.type = RENDER_CMD_DRAW_INDEXED;
-         cmd.draw_indexed.index_count = 6;
-         cmd.draw_indexed.instance_count = (uint32_t)ui_count;
-         cmd.draw_indexed.first_index = 0;
-         cmd.draw_indexed.vertex_offset = 0;
-         cmd.draw_indexed.first_instance = 0;
-         cmd_list_add(&sys->cmd_list, cmd);
-    }
-    
-    // 3. Process Render Batches (3D/Custom)
+    // Process Render Batches
+    uint32_t current_pipeline = (uint32_t)-1;
+
     for (size_t i = 0; i < batch_count; ++i) {
         const RenderBatch* batch = &batches[i];
         
         // 1. Pipeline
-        if (batch->pipeline_id != 0) {
+        if (batch->pipeline_id != current_pipeline) {
              RenderCommand cmd = {0};
              cmd.type = RENDER_CMD_BIND_PIPELINE;
              cmd.bind_pipeline.pipeline_id = batch->pipeline_id;
              cmd_list_add(&sys->cmd_list, cmd);
+             current_pipeline = batch->pipeline_id;
         }
         
         // 2. Custom Bindings
@@ -353,16 +268,26 @@ void render_system_draw(RenderSystem* sys) {
         // 3. Draw
         if (batch->mesh) {
             // TODO: Implement Mesh Binding (Vertex Buffers) in Backend or via Commands
-            // For now assuming Custom Shaders or immediate mode for logic consistency
         } else {
-            // Draw Arrays/Custom
-            RenderCommand cmd = {0};
-            cmd.type = RENDER_CMD_DRAW;
-            cmd.draw.vertex_count = batch->vertex_count;
-            cmd.draw.instance_count = batch->instance_count;
-            cmd.draw.first_vertex = 0;
-            cmd.draw.first_instance = batch->first_instance;
-            cmd_list_add(&sys->cmd_list, cmd);
+            // Draw Arrays/Custom/Indexed
+            if (batch->index_count > 0) {
+                 RenderCommand cmd = {0};
+                 cmd.type = RENDER_CMD_DRAW_INDEXED;
+                 cmd.draw_indexed.index_count = batch->index_count;
+                 cmd.draw_indexed.instance_count = batch->instance_count > 0 ? batch->instance_count : 1;
+                 cmd.draw_indexed.first_index = 0;
+                 cmd.draw_indexed.vertex_offset = 0;
+                 cmd.draw_indexed.first_instance = batch->first_instance;
+                 cmd_list_add(&sys->cmd_list, cmd);
+            } else {
+                 RenderCommand cmd = {0};
+                 cmd.type = RENDER_CMD_DRAW;
+                 cmd.draw.vertex_count = batch->vertex_count;
+                 cmd.draw.instance_count = batch->instance_count > 0 ? batch->instance_count : 1;
+                 cmd.draw.first_vertex = 0;
+                 cmd.draw.first_instance = batch->first_instance;
+                 cmd_list_add(&sys->cmd_list, cmd);
+            }
         }
     }
     
