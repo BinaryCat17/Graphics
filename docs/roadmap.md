@@ -12,10 +12,10 @@
         - [x] `internal/render_system_internal.h` — скрытая реализация RenderSystem.
         - [x] `internal/stream_internal.h` — приватный контракт между Stream и Backend.
     - [x] **Cleanup:** Созданы `graphics_types.h` и выделен `gpu_input.h`. Удалены устаревшие хедеры (`layer_constants.h`, `render_batch.h`).
-- [ ] **Рефакторинг `engine/assets`**
-    - [ ] Разбить `assets.c` на фасад (в корне) и реализацию:
-        - [ ] Загрузка: `internal/asset_loader.c`
-        - [ ] Хранение: `internal/asset_storage.c`
+- [x] **Рефакторинг `engine/assets`**
+    - [x] Разбить `assets.c` на фасад (в корне) и реализацию:
+        - [x] Загрузка: `internal/asset_loader.c`
+        - [x] Хранение: `internal/asset_storage.c`
 - [x] **Внедрение Opaque Pointers (PIMPL)**
     - [x] В публичных хедерах (`render_system.h`) остались только typedefs.
     - [x] Полное определение структуры перенесено в `internal/render_system_internal.h`.
