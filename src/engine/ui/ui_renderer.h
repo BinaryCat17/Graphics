@@ -16,6 +16,8 @@ typedef struct RenderSystem RenderSystem;
 
 // Layout & Render Pipeline
 
+void ui_renderer_init(RenderSystem* rs);
+
 // Generates render commands into the Scene.
 void scene_tree_render(SceneTree* instance, Scene* scene, const Assets* assets, MemoryArena* arena);
 

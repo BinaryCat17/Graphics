@@ -15,9 +15,41 @@
 #include "engine/graphics/internal/backend/vulkan/vulkan_renderer.h"
 #include "engine/graphics/stream.h"
 #include "engine/graphics/compute_graph.h"
+#include "engine/graphics/pipeline_loader.h"
+#include "engine/scene/render_packet.h"
 #include "engine/graphics/internal/render_system_internal.h"
 
-// ... Helper: Packet Management ...
+// ... (rest of includes)
+
+static void scene_render_pass(RenderSystem* sys, const PipelinePassDef* pass_def) {
+    if (!sys || !pass_def) return;
+    
+    Scene* scene = render_system_get_drawing_scene(sys); 
+    if (!scene) return;
+    
+    size_t batch_count = 0;
+    const RenderBatch* batches = scene_get_render_batches(scene, &batch_count);
+    
+    for (uint32_t i = 0; i < pass_def->draw_list_count; ++i) {
+        render_system_execute_batches_with_tag(sys, batches, batch_count, pass_def->draw_lists[i]);
+    }
+}
+
+void scene_renderer_init(RenderSystem* rs) {
+    if (!rs) return;
+    render_system_register_pass(rs, "RenderScene", scene_render_pass);
+}
+
+void render_system_set_pipeline(RenderSystem* sys, const char* path) {
+    if (!sys || !path || !sys->assets) return;
+    
+    PipelineDefinition def;
+    if (pipeline_loader_load(sys->assets, path, &def)) {
+        sys->pipeline_def = def;
+        sys->pipeline_dirty = true;
+        LOG_INFO("RenderSystem: Pipeline updated from '%s'", path);
+    }
+}
 
 static void render_packet_free_resources(RenderFramePacket* packet) {
     if (!packet) return;
@@ -42,6 +74,13 @@ const RenderFramePacket* render_system_acquire_packet(RenderSystem* sys) {
 Scene* render_system_get_scene(RenderSystem* sys) {
     if (!sys) return NULL;
     return sys->packets[sys->back_packet_index].scene;
+}
+
+Scene* render_system_get_drawing_scene(RenderSystem* sys) {
+    if (!sys) return NULL;
+    // Note: This does NOT acquire (swap) packets, just looks at the front one.
+    // It assumes acquire was already called by render_system_draw.
+    return sys->packets[sys->front_packet_index].scene;
 }
 
 // ... Init & Bootstrap ...
@@ -207,42 +246,35 @@ static void cmd_list_add(RenderCommandList* list, RenderCommand cmd) {
     list->commands[list->count++] = cmd;
 }
 
-void render_system_draw(RenderSystem* sys) {
-    if (!sys || !sys->renderer_ready || !sys->backend) return;
-    
-    const RenderFramePacket* packet = render_system_acquire_packet(sys);
-    if (!packet) return;
-    
-    Scene* scene = packet->scene;
-    
-    size_t batch_count = 0;
-    const RenderBatch* batches = scene_get_render_batches(scene, &batch_count);
-    
-    if (batch_count > 0) {
-        static double last_log_time = 0.0;
-        if (sys->current_time - last_log_time >= logger_get_trace_interval()) {
-            LOG_DEBUG("RenderSystem: Processing %zu batches", batch_count);
-            last_log_time = sys->current_time;
+void render_system_register_pass(RenderSystem* sys, const char* name, PipelinePassCallback callback) {
+    if (!sys || !name || !callback) return;
+
+    // Check for existing
+    for (size_t i = 0; i < sys->pass_registry_count; ++i) {
+        if (strcmp(sys->pass_registry[i].name, name) == 0) {
+            sys->pass_registry[i].callback = callback;
+            return;
         }
     }
-    
-    // Reset Command List
-    sys->cmd_list.count = 0;
-    
-    // Calculate ViewProj
-    SceneCamera cam = scene_get_camera(scene);
-    Mat4 view_proj = mat4_multiply(&cam.view_matrix, &cam.proj_matrix);
 
-    // Push Constants Command
-    RenderCommand pc_cmd = {0};
-    pc_cmd.type = RENDER_CMD_PUSH_CONSTANTS;
-    pc_cmd.push_constants.data = &view_proj;
-    pc_cmd.push_constants.size = sizeof(Mat4);
-    pc_cmd.push_constants.stage_flags = 3; // VERTEX | FRAGMENT
-    
-    cmd_list_add(&sys->cmd_list, pc_cmd);
+    if (sys->pass_registry_count >= sys->pass_registry_capacity) {
+        size_t new_cap = sys->pass_registry_capacity > 0 ? sys->pass_registry_capacity * 2 : 8;
+        PassRegistryEntry* new_arr = realloc(sys->pass_registry, new_cap * sizeof(PassRegistryEntry));
+        if (!new_arr) return;
+        sys->pass_registry = new_arr;
+        sys->pass_registry_capacity = new_cap;
+    }
 
-    // Process Render Batches
+    PassRegistryEntry* entry = &sys->pass_registry[sys->pass_registry_count++];
+    strncpy(entry->name, name, PIPELINE_MAX_NAME_LENGTH - 1);
+    entry->callback = callback;
+    
+    LOG_INFO("RenderSystem: Registered pipeline pass '%s'", name);
+}
+
+void render_system_execute_batches(RenderSystem* sys, const RenderBatch* batches, size_t batch_count) {
+    if (!sys || !batches || batch_count == 0) return;
+
     uint32_t current_pipeline = (uint32_t)-1;
 
     for (size_t i = 0; i < batch_count; ++i) {
@@ -291,7 +323,6 @@ void render_system_draw(RenderSystem* sys) {
         } else if (batch->mesh) {
             // TODO: Implement Mesh Binding (Vertex Buffers) in Backend or via Commands
         } else {
-            // Draw Arrays/Custom/Indexed (without explicit stream binding, e.g. Instancing of Quad)
             if (batch->index_count > 0 && !batch->index_stream) {
                  RenderCommand cmd = {0};
                  cmd.type = RENDER_CMD_DRAW_INDEXED;
@@ -312,10 +343,172 @@ void render_system_draw(RenderSystem* sys) {
             }
         }
     }
+}
+
+void render_system_execute_batches_with_tag(RenderSystem* sys, const RenderBatch* batches, size_t batch_count, const char* tag) {
+    if (!sys || !batches || batch_count == 0 || !tag) return;
+
+    uint32_t current_pipeline = (uint32_t)-1;
+
+    for (size_t i = 0; i < batch_count; ++i) {
+        const RenderBatch* batch = &batches[i];
+        
+        // Tag filter
+        if (tag[0] != '\0' && strcmp(batch->draw_list, tag) != 0) {
+            continue;
+        }
+
+        // 1. Pipeline
+        if (batch->pipeline_id != current_pipeline) {
+             RenderCommand cmd = {0};
+             cmd.type = RENDER_CMD_BIND_PIPELINE;
+             cmd.bind_pipeline.pipeline_id = batch->pipeline_id;
+             cmd_list_add(&sys->cmd_list, cmd);
+             current_pipeline = batch->pipeline_id;
+        }
+        
+        // 2. Custom Bindings
+        for (uint32_t b = 0; b < batch->bind_count && b < 4; ++b) {
+            if (batch->bind_buffers[b]) {
+                RenderCommand cmd = {0};
+                cmd.type = RENDER_CMD_BIND_BUFFER;
+                cmd.bind_buffer.slot = batch->bind_slots[b];
+                cmd.bind_buffer.stream = batch->bind_buffers[b];
+                cmd_list_add(&sys->cmd_list, cmd);
+            }
+        }
+        
+        // 3. Draw
+        if (batch->vertex_stream) {
+             RenderCommand cmd = {0};
+             cmd.type = RENDER_CMD_BIND_VERTEX_BUFFER;
+             cmd.bind_buffer.stream = batch->vertex_stream;
+             cmd_list_add(&sys->cmd_list, cmd);
+        }
+
+        if (batch->index_stream) {
+             RenderCommand cmd = {0};
+             cmd.type = RENDER_CMD_BIND_INDEX_BUFFER;
+             cmd.bind_buffer.stream = batch->index_stream;
+             cmd_list_add(&sys->cmd_list, cmd);
+             
+             RenderCommand draw_cmd = {0};
+             draw_cmd.type = RENDER_CMD_DRAW_INDEXED;
+             draw_cmd.draw_indexed.index_count = batch->index_count;
+             draw_cmd.draw_indexed.instance_count = batch->instance_count > 0 ? batch->instance_count : 1;
+             draw_cmd.draw_indexed.first_instance = batch->first_instance;
+             cmd_list_add(&sys->cmd_list, draw_cmd);
+        } else if (batch->mesh) {
+            // TODO: Implement Mesh Binding (Vertex Buffers) in Backend or via Commands
+        } else {
+            if (batch->index_count > 0 && !batch->index_stream) {
+                 RenderCommand cmd = {0};
+                 cmd.type = RENDER_CMD_DRAW_INDEXED;
+                 cmd.draw_indexed.index_count = batch->index_count;
+                 cmd.draw_indexed.instance_count = batch->instance_count > 0 ? batch->instance_count : 1;
+                 cmd.draw_indexed.first_index = 0;
+                 cmd.draw_indexed.vertex_offset = 0;
+                                  cmd.draw_indexed.first_instance = batch->first_instance;
+                                  cmd_list_add(&sys->cmd_list, cmd);
+                             }
+                  else {
+                 RenderCommand cmd = {0};
+                 cmd.type = RENDER_CMD_DRAW;
+                 cmd.draw.vertex_count = batch->vertex_count;
+                 cmd.draw.instance_count = batch->instance_count > 0 ? batch->instance_count : 1;
+                 cmd.draw.first_vertex = 0;
+                 cmd.draw.first_instance = batch->first_instance;
+                 cmd_list_add(&sys->cmd_list, cmd);
+            }
+        }
+    }
+}
+
+static uint32_t render_system_resolve_resource(RenderSystem* sys, const char* name) {
+    (void)sys;
+    if (!name || name[0] == '\0') return (uint32_t)-1;
+    if (strcmp(name, "swapchain") == 0) return 0;
+    
+    // For now, we only support swapchain. 
+    // Real resource management (Step 5) will be added next.
+    return (uint32_t)-1;
+}
+
+void render_system_draw(RenderSystem* sys) {
+    if (!sys || !sys->renderer_ready || !sys->backend) return;
+    
+    const RenderFramePacket* packet = render_system_acquire_packet(sys);
+    if (!packet) return;
+    
+    Scene* scene = packet->scene;
+    
+    // Reset Command List
+    sys->cmd_list.count = 0;
+    
+    // Calculate ViewProj
+    SceneCamera cam = scene_get_camera(scene);
+    Mat4 view_proj = mat4_multiply(&cam.view_matrix, &cam.proj_matrix);
+
+    // Push Constants Command
+    RenderCommand pc_cmd = {0};
+    pc_cmd.type = RENDER_CMD_PUSH_CONSTANTS;
+    pc_cmd.push_constants.data = &view_proj;
+    pc_cmd.push_constants.size = sizeof(Mat4);
+    pc_cmd.push_constants.stage_flags = 3; // VERTEX | FRAGMENT
+    
+    cmd_list_add(&sys->cmd_list, pc_cmd);
+
+    // If we have no pipeline defined yet, fall back to old monolithic behavior
+    if (sys->pipeline_def.pass_count == 0) {
+        // Monolithic: Assume swapchain and no clearing (handled by backend usually)
+        size_t batch_count = 0;
+        const RenderBatch* batches = scene_get_render_batches(scene, &batch_count);
+        render_system_execute_batches(sys, batches, batch_count);
+    } else {
+        // Execute via Pipeline Definition
+        for (uint32_t i = 0; i < sys->pipeline_def.pass_count; ++i) {
+            PipelinePassDef* pass = &sys->pipeline_def.passes[i];
+            
+            // Resolve Output (assume first output for now)
+            uint32_t target_id = 0;
+            if (pass->output_count > 0) {
+                target_id = render_system_resolve_resource(sys, pass->outputs[0]);
+            }
+
+            // Begin Pass
+            RenderCommand begin_cmd = {0};
+            begin_cmd.type = RENDER_CMD_BEGIN_PASS;
+            begin_cmd.begin_pass.target_image_id = target_id;
+            begin_cmd.begin_pass.should_clear = pass->should_clear;
+            memcpy(begin_cmd.begin_pass.clear_color, pass->clear_color, sizeof(float)*4);
+            cmd_list_add(&sys->cmd_list, begin_cmd);
+
+            // Find registered callback
+            PipelinePassCallback callback = NULL;
+            for (size_t j = 0; j < sys->pass_registry_count; ++j) {
+                if (strcmp(sys->pass_registry[j].name, pass->name) == 0) {
+                    callback = sys->pass_registry[j].callback;
+                    break;
+                }
+            }
+
+            if (callback) {
+                callback(sys, pass);
+            } else {
+                LOG_WARN("RenderSystem: No callback registered for pass '%s'", pass->name);
+            }
+
+            // End Pass
+            RenderCommand end_cmd = {0};
+            end_cmd.type = RENDER_CMD_END_PASS;
+            cmd_list_add(&sys->cmd_list, end_cmd);
+        }
+    }
     
     // Submit
     sys->backend->submit_commands(sys->backend, &sys->cmd_list);
 }
+
 
 void render_system_resize(RenderSystem* sys, int width, int height) {
     if (sys && sys->backend && sys->backend->update_viewport) {

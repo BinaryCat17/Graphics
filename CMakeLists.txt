@@ -177,6 +177,7 @@ set(ENGINE_GRAPHICS_SOURCES
     "src/engine/graphics/internal/backend/vulkan/vk_pipeline.c"
     "src/engine/graphics/internal/backend/vulkan/vk_resources.c"
     "src/engine/graphics/render_system.c"
+    "src/engine/graphics/pipeline_loader.c"
 )
 add_library(engine_graphics STATIC ${ENGINE_GRAPHICS_SOURCES})
 target_include_directories(engine_graphics PUBLIC "src/" ${Stb_INCLUDE_DIR})

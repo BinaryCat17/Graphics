@@ -4,15 +4,16 @@
 #include "engine/graphics/render_system.h"
 #include "engine/graphics/internal/primitives.h"
 #include "engine/graphics/graphics_types.h"
+#include "engine/graphics/pipeline.h"
 #include "foundation/thread/thread.h"
 
 // Forward declarations
-typedef struct Assets Assets;
-typedef struct PlatformWindow PlatformWindow;
-typedef struct RendererBackend RendererBackend;
-typedef struct Stream Stream;
-typedef struct ComputeGraph ComputeGraph;
-typedef struct Scene Scene;
+// ... (existing)
+
+typedef struct PassRegistryEntry {
+    char name[PIPELINE_MAX_NAME_LENGTH];
+    PipelinePassCallback callback;
+} PassRegistryEntry;
 
 typedef struct RenderFramePacket {
     Scene* scene;
@@ -39,6 +40,15 @@ struct RenderSystem {
     ComputeGraph** compute_graphs;
     size_t compute_graph_count;
     size_t compute_graph_capacity;
+
+    // Pipeline Pass Registry
+    PassRegistryEntry* pass_registry;
+    size_t pass_registry_count;
+    size_t pass_registry_capacity;
+
+    // Active Pipeline Definition
+    PipelineDefinition pipeline_def;
+    bool pipeline_dirty;
     
     bool running;
     bool renderer_ready;

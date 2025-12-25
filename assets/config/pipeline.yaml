@@ -1,0 +1,23 @@
+pipeline:
+  resources:
+    - name: "SceneColor"
+      type: IMAGE_2D
+      format: RGBA8
+      size:
+        - "window_width"
+        - "window_height"
+
+  passes:
+    - name: "RenderScene"
+      type: GRAPHICS
+      outputs: 
+        - "SceneColor"
+      draw_list: 
+        - "SceneBatches"
+
+    - name: "RenderUI"
+      type: GRAPHICS
+      outputs: 
+        - "swapchain"
+      draw_list: 
+        - "UIBatches"

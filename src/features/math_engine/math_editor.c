@@ -527,6 +527,7 @@ void math_editor_render(MathEditor* editor, Scene* scene, const struct Assets* a
     if (editor->nodes_pipeline_id > 0 && editor->view->node_views_count > 0) {
         RenderBatch batch = {0};
         batch.pipeline_id = editor->nodes_pipeline_id;
+        strncpy(batch.draw_list, "SceneBatches", sizeof(batch.draw_list) - 1);
         batch.vertex_count = 6; 
         batch.instance_count = editor->view->node_views_count;
         
@@ -541,6 +542,7 @@ void math_editor_render(MathEditor* editor, Scene* scene, const struct Assets* a
 
     // 1.5 Render Wires (Unified Geometry Stream)
     if (editor->primitive_batcher && editor->view->wires_count > 0) {
+        primitive_batcher_set_tag(editor->primitive_batcher, "SceneBatches");
         primitive_batcher_begin(editor->primitive_batcher);
         
                 for (uint32_t i = 0; i < editor->view->wires_count; ++i) {

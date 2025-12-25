@@ -33,6 +33,7 @@ struct PrimitiveBatcher {
     uint32_t index_capacity;
 
     uint32_t pipeline_id; 
+    char tag[32];
     
     bool is_drawing;
 };
@@ -53,6 +54,7 @@ PrimitiveBatcher* primitive_batcher_create(RenderSystem* rs) {
     batcher->index_stream = stream_create(rs, STREAM_UINT, batcher->index_capacity, sizeof(uint32_t));
     
     batcher->pipeline_id = 0; 
+    memset(batcher->tag, 0, sizeof(batcher->tag));
 
     return batcher;
 }
@@ -71,6 +73,12 @@ void primitive_batcher_destroy(PrimitiveBatcher* batcher) {
 
 void primitive_batcher_set_pipeline(PrimitiveBatcher* batcher, uint32_t pipeline_id) {
     if (batcher) batcher->pipeline_id = pipeline_id;
+}
+
+void primitive_batcher_set_tag(PrimitiveBatcher* batcher, const char* tag) {
+    if (batcher && tag) {
+        strncpy(batcher->tag, tag, sizeof(batcher->tag) - 1);
+    }
 }
 
 void primitive_batcher_begin(PrimitiveBatcher* batcher) {
@@ -93,6 +101,7 @@ void primitive_batcher_end(PrimitiveBatcher* batcher, Scene* scene) {
     // 2. Create RenderBatch
     RenderBatch batch = {0};
     batch.pipeline_id = batcher->pipeline_id; 
+    strncpy(batch.draw_list, batcher->tag, sizeof(batch.draw_list) - 1);
     
     // Use Vertex Pulling: Bind Vertex Buffer as SSBO (Slot 0)
     batch.bind_buffers[0] = batcher->vertex_stream;

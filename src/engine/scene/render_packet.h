@@ -56,6 +56,7 @@ typedef struct SceneCamera {
 // --- The Scene Container ---
 
 typedef struct Scene Scene;
+typedef struct RenderSystem RenderSystem;
 
 // --- API ---
 
@@ -64,6 +65,8 @@ Scene* scene_create(void);
 void scene_destroy(Scene* scene);
 
 void scene_clear(Scene* scene);
+
+void scene_renderer_init(RenderSystem* rs);
 
 // Push commands
 void scene_push_ui_node(Scene* scene, UiNode node);

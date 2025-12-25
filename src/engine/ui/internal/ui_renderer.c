@@ -12,6 +12,7 @@
 #include "engine/graphics/render_system.h"
 #include "engine/graphics/stream.h"
 #include "engine/graphics/graphics_types.h"
+#include "engine/graphics/pipeline.h"
 #include <string.h> 
 #include <stdlib.h> 
 
@@ -28,7 +29,15 @@ static int s_provider_count = 0;
 static Stream* s_ui_instance_stream = NULL;
 static size_t s_ui_instance_capacity = 0;
 
+void ui_render_pass(RenderSystem* sys, const PipelinePassDef* pass_def);
+
+void ui_renderer_init(RenderSystem* rs) {
+    if (!rs) return;
+    render_system_register_pass(rs, "RenderUI", ui_render_pass);
+}
+
 void ui_renderer_extract(Scene* scene, RenderSystem* rs) {
+
     if (!scene || !rs) return;
 
     size_t count = 0;
@@ -123,14 +132,25 @@ void ui_renderer_extract(Scene* scene, RenderSystem* rs) {
     batch.bind_slots[0] = 0; // Instance Buffer Slot
     batch.bind_count = 1;
 
+    strncpy(batch.draw_list, "UIBatches", sizeof(batch.draw_list) - 1);
+
     // Push Batch
     scene_push_render_batch(scene, batch);
+}
 
-    // Clear UiNodes from Scene to prevent double processing if RenderSystem was not updated
-    // But since we are modifying RenderSystem next, this is just for correctness of the 'Extraction' logic.
-    // 'scene_clear_ui_nodes' doesn't exist.
-    // We can assume RenderSystem will ignore ui_nodes or we add a helper.
-    // For now, I will leave them, but RenderSystem will be updated to ignore them.
+void ui_render_pass(RenderSystem* sys, const PipelinePassDef* pass_def) {
+    if (!sys || !pass_def) return;
+    
+    Scene* scene = render_system_get_drawing_scene(sys);
+    if (!scene) return;
+    
+    size_t batch_count = 0;
+    const RenderBatch* batches = scene_get_render_batches(scene, &batch_count);
+    
+    // For each draw_list tag in the pass definition, execute batches
+    for (uint32_t i = 0; i < pass_def->draw_list_count; ++i) {
+        render_system_execute_batches_with_tag(sys, batches, batch_count, pass_def->draw_lists[i]);
+    }
 }
 
 void scene_register_provider(const char* name, SceneObjectProvider callback) {

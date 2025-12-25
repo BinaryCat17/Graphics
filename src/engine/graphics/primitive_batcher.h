@@ -11,9 +11,10 @@ typedef struct Scene Scene;
 // Lifecycle
 PrimitiveBatcher* primitive_batcher_create(RenderSystem* rs);
 void primitive_batcher_destroy(PrimitiveBatcher* batcher);
-void primitive_batcher_set_pipeline(PrimitiveBatcher* batcher, uint32_t pipeline_id);
 
-// Frame
+void primitive_batcher_set_pipeline(PrimitiveBatcher* batcher, uint32_t pipeline_id);
+void primitive_batcher_set_tag(PrimitiveBatcher* batcher, const char* tag);
+
 void primitive_batcher_begin(PrimitiveBatcher* batcher);
 void primitive_batcher_end(PrimitiveBatcher* batcher, Scene* scene);
 

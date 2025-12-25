@@ -6,6 +6,23 @@
 #include <stddef.h>
 #include "foundation/math/math_types.h"
 
+// =================================================================================================
+// [ENUMS]
+// =================================================================================================
+
+typedef enum PixelFormat {
+    PIXEL_FORMAT_UNKNOWN = 0,
+    PIXEL_FORMAT_R8_UNORM,
+    PIXEL_FORMAT_RG8_UNORM,
+    PIXEL_FORMAT_RGB8_UNORM,
+    PIXEL_FORMAT_RGBA8_UNORM,
+    PIXEL_FORMAT_R16_FLOAT,
+    PIXEL_FORMAT_RG16_FLOAT,
+    PIXEL_FORMAT_RGBA16_FLOAT,
+    PIXEL_FORMAT_D32_SFLOAT,
+    PIXEL_FORMAT_D24_UNORM_S8_UINT
+} PixelFormat;
+
 // Forward Declarations
 typedef struct Stream Stream;
 typedef struct Mesh Mesh;
@@ -59,8 +76,16 @@ typedef enum RenderCommandType {
     RENDER_CMD_SET_VIEWPORT,
     RENDER_CMD_SET_SCISSOR,
     RENDER_CMD_PUSH_CONSTANTS,
-    RENDER_CMD_BARRIER            // Memory barrier
+    RENDER_CMD_BARRIER,           // Memory barrier
+    RENDER_CMD_BEGIN_PASS,        // Start a render pass
+    RENDER_CMD_END_PASS           // End a render pass
 } RenderCommandType;
+
+typedef struct RenderCmdBeginPass {
+    uint32_t target_image_id; // 0 for swapchain
+    float clear_color[4];
+    bool should_clear;
+} RenderCmdBeginPass;
 
 typedef struct RenderCmdBindPipeline {
     uint32_t pipeline_id;
@@ -119,6 +144,7 @@ typedef struct RenderCmdPushConstants {
 typedef struct RenderCommand {
     RenderCommandType type;
     union {
+        RenderCmdBeginPass begin_pass;
         RenderCmdBindPipeline bind_pipeline;
         RenderCmdBindBuffer bind_buffer;
         RenderCmdUpdateBuffer update_buffer;
@@ -188,6 +214,9 @@ typedef struct RenderBatch {
     // Sorting
     float sort_key; // Distance to camera or layer index
     uint32_t layer_id;
+
+    // Pipeline Tagging
+    char draw_list[32]; 
 } RenderBatch;
 
 #endif // GRAPHICS_TYPES_H

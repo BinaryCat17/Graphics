@@ -5,6 +5,9 @@
 #include "internal/scene_graph.h"
 #include "foundation/memory/arena.h"
 #include "foundation/string/string_id.h"
+#include "foundation/logger/logger.h"
+#include "engine/graphics/render_system.h"
+#include "engine/graphics/pipeline.h"
 #include <stddef.h>
 #include <stdlib.h>
 #include <string.h>
@@ -160,24 +163,13 @@ void scene_push_curve(Scene* scene, Vec3 start, Vec3 end, float thickness, Vec4 
 
     UiNode node = {0};
     node.rect = (Rect){min_x + width * 0.5f - width*0.5f, min_y + height * 0.5f - height*0.5f, width, height}; // Rect is x,y,w,h (bottom-left)
-    // Actually, previous implementation used center pos + scale.
-    // Rect usually implies x,y (bottom-left or top-left). 
-    // Let's assume RenderPacket expects x,y,w,h.
-    // Previous: pos = center. scale = size.
     node.rect = (Rect){min_x, min_y, width, height};
     node.z_index = start.z;
     node.color = color;
     node.primitive_type = SCENE_PRIM_CURVE; // 1
     node.flags = UI_RENDER_FLAG_NONE;
     
-    // Packing params into custom Vec4
-    // params.x = u1, params.y = v1, params.z = u2, params.w = v2
     node.params = (Vec4){u1, v1, u2, v2};
-    // We also need thickness.
-    // In previous code: style_params.z = thickness/height.
-    // We might need another param slot if we want to be clean.
-    // But for now let's squeeze it or assume shader handles it.
-    // Wait, UiNode has uv_rect. We can use that for u1,v1,u2,v2?
     node.uv_rect = (Vec4){u1, v1, u2, v2};
     node.border_width = thickness; // Use border_width for thickness
     
@@ -202,7 +194,7 @@ void scene_push_quad_textured(Scene* scene, Vec3 pos, Vec2 size, Vec4 color, Vec
     node.rect = (Rect){pos.x, pos.y, size.x, size.y};
     node.z_index = pos.z;
     node.color = color;
-    node.clip_rect = (Rect){clip_rect.x, clip_rect.y, clip_rect.z, clip_rect.w};
+    node.clip_rect = (Rect){clip_rect.y, clip_rect.y, clip_rect.z, clip_rect.w};
     node.uv_rect = uv_rect;
     node.primitive_type = SCENE_MODE_TEXTURED;
     node.flags = UI_RENDER_FLAG_HAS_BG | UI_RENDER_FLAG_TEXTURED;

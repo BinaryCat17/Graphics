@@ -16,6 +16,9 @@ typedef struct PlatformWindow PlatformWindow;
 typedef struct Scene Scene;
 typedef struct RendererBackend RendererBackend; // Forward declaration
 typedef struct ComputeGraph ComputeGraph;
+typedef struct PipelinePassDef PipelinePassDef;
+
+typedef void (*PipelinePassCallback)(RenderSystem* sys, const PipelinePassDef* pass_def);
 
 typedef struct RenderSystemConfig {
     PlatformWindow* window;
@@ -37,11 +40,23 @@ void render_system_begin_frame(RenderSystem* sys, double time);
 // Gets the current mutable scene for the frame being prepared
 Scene* render_system_get_scene(RenderSystem* sys);
 
+// Gets the scene currently being drawn
+Scene* render_system_get_drawing_scene(RenderSystem* sys);
+
 // Draws the current packet (Executes backend render)
 void render_system_draw(RenderSystem* sys);
 
 // Notifies system of resize
 void render_system_resize(RenderSystem* sys, int width, int height);
+
+void render_system_set_pipeline(RenderSystem* sys, const char* path);
+
+// --- Pipeline Pass Registry ---
+void render_system_register_pass(RenderSystem* sys, const char* name, PipelinePassCallback callback);
+
+// Helper for pass callbacks to execute a filtered list of batches
+void render_system_execute_batches(RenderSystem* sys, const RenderBatch* batches, size_t batch_count);
+void render_system_execute_batches_with_tag(RenderSystem* sys, const RenderBatch* batches, size_t batch_count, const char* tag);
 
 uint32_t render_system_create_compute_pipeline(RenderSystem* sys, uint32_t* spv_code, size_t spv_size);
 // Compiles GLSL (if supported by backend) and creates pipeline

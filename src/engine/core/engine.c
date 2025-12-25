@@ -12,6 +12,7 @@
 #include "engine/graphics/gpu_input.h"
 #include "engine/ui/ui_core.h"
 #include "engine/ui/ui_renderer.h"
+#include "engine/scene/render_packet.h"
 
 #include <stdio.h>
 #include <string.h>
@@ -138,9 +139,14 @@ Engine* engine_create(const EngineConfig* config) {
 
     // 6. UI System
     ui_system_init();
+    ui_renderer_init(engine->render_system);
+    scene_renderer_init(engine->render_system);
 
     // Bindings
     render_system_bind_assets(engine->render_system, engine->assets);
+
+    // Load Pipeline
+    render_system_set_pipeline(engine->render_system, "config/pipeline.yaml");
     
     // 7. Application Init Hook (App sets up Graph, UI, binds them to Renderer)
     if (config->on_init) {
